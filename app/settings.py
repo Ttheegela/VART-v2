@@ -12,7 +12,7 @@ DEFAULT_MODELS = {
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(extra="ignore")
+    model_config = SettingsConfigDict(extra="ignore", env_ignore_empty=True)
 
     database_url: str = ""
     session_secret: str = ""

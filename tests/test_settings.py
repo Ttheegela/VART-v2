@@ -24,3 +24,11 @@ def test_secrets_have_no_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(name, raising=False)
     s = get_settings()
     assert (s.session_secret, s.cron_secret, s.openrouter_api_key) == ("", "", "")
+
+
+def test_blank_values_fall_back_to_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("STANCE_MODEL", "")
+    monkeypatch.setenv("SESSION_SECRET", "")
+    s = get_settings()
+    assert s.models()["stance"] == DEFAULT_MODELS["stance"]
+    assert s.session_secret == ""
