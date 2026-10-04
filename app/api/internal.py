@@ -1,9 +1,11 @@
 import hmac
 from typing import Annotated
 
+import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException
 
-from app.api.deps import SessionDep
+from app.api.deps import LLMDep, SessionDep
+from app.services.canary import run_canary
 from app.services.workspaces import cleanup_expired
 from app.settings import get_settings
 
@@ -23,3 +25,10 @@ CronDep = Annotated[None, Depends(require_cron)]
 @router.get("/api/internal/cleanup")
 def cleanup(_: CronDep, session: SessionDep) -> dict[str, int]:
     return cleanup_expired(session)
+
+
+@router.get("/api/internal/canary")
+def run_daily_canary(_: CronDep, session: SessionDep, llm: LLMDep) -> dict[str, object]:
+    with httpx.Client() as http:
+        row = run_canary(session, llm, http, get_settings())
+    return {"ok": row.ok, "detail": row.detail}
