@@ -5,6 +5,6 @@ useDefault = true
 [[allowlists]]
 description = "GOLDEN_KEY in tests/test_llm_client.py is the sha256 of a canonical LLM request (the record/replay key), not a credential"
 condition = "AND"
-paths = ['''tests/test_llm_client\.py''']
+paths = ['''^tests/test_llm_client\.py$''']
 regexTarget = "line"
 regexes = ['''^\s*GOLDEN_KEY = "[0-9a-f]{64}"\s*$''']
