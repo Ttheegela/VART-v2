@@ -28,7 +28,7 @@ _Last updated: 2026-10-04 · Branch: `main` (origin: https://github.com/Ttheegel
 | Fluid compute | on (region iad1, next to Neon in us-east-1; default timeout 300 s) |
 | Live canary | ok for all three models within the release script's 180 s limit; no `length` finish |
 | Daily crons (cleanup 05:00 UTC, canary 17:00 UTC) | pending: the canary time in `/api/health` after 17:00 UTC on 2026-10-05 |
-| Vercel builds only `main` | pending: no preview build for this record's PR branch |
+| Vercel builds only `main` | ok: the push of this record's PR branch made no deployment (2026-10-04) |
 
 ## Decisions
 This table is the decisions log kept in the repo. The detailed per-task review rulings are in the lead's local ledgers,
