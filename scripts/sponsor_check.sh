@@ -3,6 +3,8 @@
 # The name comes from $SPONSOR_NAME (a GitHub repository secret in CI), so no file in the repo holds it.
 # Anything copied from the hackathon version of VART carries the name, so this catches copies of its code and data.
 set -euo pipefail
+# Byte-wise matching: the name is ASCII, and in a UTF-8 locale some greps fail on bytes that are not valid text.
+export LC_ALL=C
 name="${SPONSOR_NAME:?SPONSOR_NAME is not set}"
 # Padding would quietly weaken the search ("Name " misses "Name."), so refuse it. The message never shows the value.
 case "$name" in
@@ -28,16 +30,24 @@ case "$grep_status" in
 esac
 # core.quotePath=false: git otherwise prints non-ASCII paths as octal escapes, which hides a non-ASCII name.
 git -c core.quotePath=false ls-files > "$tmp/files"
-if grep -i -F -e "$name" "$tmp/files" ; then
-  echo "sponsor-check: the name appears in the file names above" >&2
-  found=1
-fi
+# grep exits 0 on a match, 1 on none and 2 when it fails; in an `if` a failure would read as "no match", so each
+# grep gets a case of its own, and only 0 and 1 are answers.
+grep_status=0
+grep -i -F -e "$name" "$tmp/files" || grep_status=$?
+case "$grep_status" in
+  0) echo "sponsor-check: the name appears in the file names above" >&2; found=1 ;;
+  1) ;;
+  *) echo "sponsor-check: grep failed on the file names" >&2; exit "$grep_status" ;;
+esac
 git -c core.quotePath=false log --all -p > "$tmp/history"
 # The history is read from a file, so there is no pipe for grep to close early. Its output is still discarded: the
 # matching lines would show the name.
-if grep -i -F -e "$name" "$tmp/history" > /dev/null ; then
-  echo "sponsor-check: the name appears in git history" >&2
-  found=1
-fi
+grep_status=0
+grep -i -F -e "$name" "$tmp/history" > /dev/null || grep_status=$?
+case "$grep_status" in
+  0) echo "sponsor-check: the name appears in git history" >&2; found=1 ;;
+  1) ;;
+  *) echo "sponsor-check: grep failed on the git history" >&2; exit "$grep_status" ;;
+esac
 [ "$found" -eq 0 ] && echo "sponsor-check: clean"
 exit "$found"

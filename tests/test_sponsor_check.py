@@ -66,6 +66,15 @@ def _git_failing_on(directory: Path, subcommand: str) -> str:
     return f"{directory}{os.pathsep}{os.environ['PATH']}"
 
 
+def _grep_shim(directory: Path, before: str) -> str:
+    """A PATH whose `grep` runs the shell code `before`, then the real grep (git grep is not affected)."""
+    directory.mkdir()
+    shim = directory / "grep"
+    shim.write_text(f'#!/bin/sh\n{before}\nexec "{shutil.which("grep")}" "$@"\n')
+    shim.chmod(0o755)
+    return f"{directory}{os.pathsep}{os.environ['PATH']}"
+
+
 def _leak_in_the_working_tree(repo: Path) -> None:
     (repo / "a.md").write_text("built for Acmecorp")  # edited, not committed: only `git grep` sees it
 
@@ -244,6 +253,63 @@ def test_a_git_read_that_fails_is_an_error_not_a_pass(
     assert result.returncode == 128  # git's own status
     assert error in result.stderr
     assert "sponsor-check: clean" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("target", "leak", "found", "error"),
+    [
+        ("files", _leak_in_the_index, "file names above", "grep failed on the file names"),
+        ("history", _leak_in_history, "git history", "grep failed on the git history"),
+    ],
+    ids=["file names", "history"],
+)
+def test_a_grep_that_fails_is_an_error_not_a_pass(
+    tmp_path: Path, target: str, leak: Callable[[Path], None], found: str, error: str
+) -> None:
+    # grep exits 2 when it cannot do its job. Read as "no match" it prints "clean" for a leak only it can see.
+    repo = _repo(tmp_path / "repo", {"a.md": "hello"})
+    leak(repo)
+    assert found in _run(repo).stderr  # with a working grep the leak is found
+    fail_on = f'case " $* " in *"/{target} "*) echo "grep: simulated failure" >&2; exit 2 ;; esac'
+    result = _run(repo, PATH=_grep_shim(tmp_path / "shim", fail_on))
+    assert result.returncode == 2  # grep's own status
+    assert f"sponsor-check: {error}" in result.stderr
+    assert "sponsor-check: clean" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    "caller_locale",
+    [{"LANG": "en_US.UTF-8"}, {"LC_ALL": "en_US.UTF-8"}],
+    ids=["only LANG is set", "LC_ALL is set"],
+)
+def test_grep_runs_byte_wise_whatever_the_callers_locale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caller_locale: dict[str, str]
+) -> None:
+    # A UTF-8 locale makes some greps (BSD grep, for one) fail on bytes that are not valid text. CI runners
+    # and terminals usually set only LANG, where a plain `LC_ALL=C` stays a shell variable grep never sees.
+    monkeypatch.delenv("LC_ALL", raising=False)
+    repo = _repo(tmp_path / "repo", {"a.md": "hello"})
+    log = tmp_path / "locale.log"
+    result = _run(repo, PATH=_grep_shim(tmp_path / "shim", f'echo "$LC_ALL" >> "{log}"'), **caller_locale)
+    assert result.returncode == 0
+    assert log.read_text().split() == ["C", "C"]  # the file-name grep and the history grep
+
+
+def test_a_name_on_a_line_with_a_non_utf8_byte_is_still_found(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # macOS's BSD grep, in a UTF-8 locale, skips a line that holds a byte which is not valid UTF-8 and reports
+    # "no match" (exit 1) for the name on it. GNU grep finds it either way.
+    for var in ("LC_ALL", "LC_CTYPE"):
+        monkeypatch.delenv(var, raising=False)
+    repo = _repo(tmp_path / "repo", {"a.md": "hello"})
+    (repo / "a.md").write_bytes(b"caf\xe9 copied from Acmecorp\n")  # Latin-1
+    _git(repo, "commit", "-qam", "latin-1")
+    (repo / "a.md").write_text("clean now")
+    _git(repo, "commit", "-qam", "scrub")  # the name is now in history only
+    result = _run(repo, LANG="en_US.UTF-8")
+    assert result.returncode == 1
+    assert "git history" in result.stderr
 
 
 def test_it_leaves_no_temporary_files_behind(tmp_path: Path) -> None:
