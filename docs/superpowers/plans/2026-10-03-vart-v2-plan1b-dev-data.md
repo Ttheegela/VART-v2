@@ -1644,7 +1644,7 @@ The lead runs this task. The verifier is a fresh Sonnet 5.5 agent that never see
 - Test: `tests/datakit/test_compare.py`
 
 **Interfaces:**
-- Produces: `compare.compare(key: Key, verification: dict) -> list[str]` (one line per disagreement), CLI `python -m datakit.compare <key.yaml> <verify.yaml>`. Verification file shape: `{"items": [{"code", "label", "value", "evidence": [{"doc": filename, "quote"}], "notes"}]}`.
+- Produces: `compare.compare(key: Key, verification: dict) -> list[str]` (one line per disagreement), `compare.prepare(pack: str, out: Path) -> None` (the verifier's folder), CLI `python -m datakit.compare prepare <pack> <out-dir>` and `python -m datakit.compare diff <key.yaml> <verify.yaml>`. Verification file shape: `{"items": [{"code", "label", "value", "evidence": [{"doc": filename, "quote"}], "notes"}]}`.
 
 - [ ] **Step 1: Write the failing test and the comparer**
 
@@ -1677,15 +1677,43 @@ def test_missing_items_are_reported() -> None:
 
 `datakit/compare.py`:
 ```python
-"""Compare a derived key with an independent verifier's labels.   python -m datakit.compare KEY VERIFY"""
+"""Independent key verification.
 
+  python -m datakit.compare prepare dev OUT_DIR   # the verifier's folder: document text, metadata, questions only
+  python -m datakit.compare diff KEY VERIFY       # disagreements between the derived key and the verifier
+"""
+
+import csv
 import sys
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from datakit.schemas import Key, load_yaml
+from datakit.extract import lines_of
+from datakit.schemas import Facts, Key, Selection, load_yaml
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def prepare(pack: str, out: Path) -> None:
+    facts = load_yaml(ROOT / "data" / pack / "facts.yaml", Facts)
+    (out / "docs").mkdir(parents=True, exist_ok=True)
+    for d in facts.documents:
+        lines = lines_of(ROOT / "data" / pack / "docs" / d.filename)
+        numbered = "\n".join(f"{n}: {line}" for n, line in enumerate(lines, start=1))
+        (out / "docs" / f"{d.filename}.txt").write_text(numbered + "\n", encoding="utf-8")
+    with (out / "documents.csv").open("w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["filename", "kind", "status", "date", "scope", "evidence_allowed"])
+        for d in facts.documents:
+            w.writerow([d.filename, d.kind, d.status, d.dated or "", d.scope or "", "yes" if d.evidence_allowed else "no"])
+    for name in ("vsq-a", "mvsp-b"):
+        sel = load_yaml(ROOT / "data" / "questionnaires" / f"{name}.selection.yaml", Selection)
+        with (out / f"questions-{name}.csv").open("w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["code", "question"])
+            w.writerows([i.code, i.question] for i in sel.items)
 
 
 def compare(key: Key, verification: dict[str, Any]) -> list[str]:
@@ -1702,18 +1730,22 @@ def compare(key: Key, verification: dict[str, Any]) -> list[str]:
 
 
 if __name__ == "__main__":
-    lines = compare(load_yaml(Path(sys.argv[1]), Key), yaml.safe_load(Path(sys.argv[2]).read_text(encoding="utf-8")))
-    print("\n".join(lines) or "no disagreements")
+    if sys.argv[1] == "prepare":
+        prepare(sys.argv[2], Path(sys.argv[3]))
+    else:
+        found = compare(load_yaml(Path(sys.argv[2]), Key), yaml.safe_load(Path(sys.argv[3]).read_text(encoding="utf-8")))
+        print("\n".join(found) or "no disagreements")
 ```
 
 Run: `pytest tests/datakit/test_compare.py -q` → Expected: PASS after creating the module (FAIL before).
 
 - [ ] **Step 2: Prepare the verifier's folder (lead)**
 
-In the session scratchpad (outside the repo), create `verify-dev/` containing only:
-- `docs/<filename>.txt` for every rendered document: `python -c "from pathlib import Path; from datakit.extract import lines_of; ..."` writing numbered lines (`1: ...`);
-- `documents.csv`: filename, kind, status, effective/period/as-of date, scope, evidence allowed (metadata only, no answers);
-- `questions-vsq-a.csv` and `questions-mvsp-b.csv`: code, question.
+In the session scratchpad (outside the repo):
+```bash
+python -m datakit.compare prepare dev <scratch>/verify-dev
+ls <scratch>/verify-dev    # docs/  documents.csv  questions-vsq-a.csv  questions-mvsp-b.csv — nothing else
+```
 
 - [ ] **Step 3: Run the verifier (lead dispatches a fresh Sonnet 5.5 agent)**
 
@@ -1722,8 +1754,8 @@ Prompt essentials: work only inside `verify-dev/`; for every question, find the 
 - [ ] **Step 4: Compare and resolve**
 
 ```bash
-python -m datakit.compare data/dev/key/vsq-a.yaml <scratch>/verify-dev/verify-vsq-a.yaml
-python -m datakit.compare data/dev/key/mvsp-b.yaml <scratch>/verify-dev/verify-mvsp-b.yaml
+python -m datakit.compare diff data/dev/key/vsq-a.yaml <scratch>/verify-dev/verify-vsq-a.yaml
+python -m datakit.compare diff data/dev/key/mvsp-b.yaml <scratch>/verify-dev/verify-mvsp-b.yaml
 ```
 For each disagreement decide, and log it in `data/dev/key/RESOLUTIONS.md` (code, what each side said, decision, fix):
 - the document is ambiguous or contains an unregistered sentence → fix the source (or register the sentence), re-render, re-derive;
