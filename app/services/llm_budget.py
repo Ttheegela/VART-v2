@@ -3,15 +3,19 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import case, func, select
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.db.models import LlmUsage
+from app.db.models import IpLimit, LlmUsage
+from app.services.ip_limits import bump
 
 # Calls per workspace per hour. A 60-item questionnaire needs about 60 stance + 50 draft calls.
 CAPS: dict[str, int] = {"stance": 150, "draft": 120, "classify": 40, "recheck": 60}
 GLOBAL_PER_HOUR = 1500  # all workspaces, all steps
+# The global count is one row in ip_limits that no workspace owns. Summing llm_usage instead would let a
+# workspace reset (which deletes its usage rows) refund the budget, so a script could reset past the cap.
+GLOBAL_KEY, GLOBAL_KIND = "global-llm", "llm"
 
 
 def _hour(now: datetime | None) -> datetime:
@@ -19,16 +23,12 @@ def _hour(now: datetime | None) -> datetime:
 
 
 def _global_used(session: Session, hour: datetime) -> int:
-    # Count each workspace/step at most up to its own cap, so refused retries from one workspace
-    # can't use up the global budget for everyone else.
-    per_workspace = case(
-        *[(LlmUsage.kind == kind, func.least(LlmUsage.calls, cap)) for kind, cap in CAPS.items()],
-        else_=LlmUsage.calls,
+    used = session.scalar(
+        select(IpLimit.hits).where(
+            IpLimit.ip_hash == GLOBAL_KEY, IpLimit.window_start == hour, IpLimit.kind == GLOBAL_KIND
+        )
     )
-    total = session.scalar(
-        select(func.coalesce(func.sum(per_workspace), 0)).where(LlmUsage.hour_start == hour)
-    )
-    return int(total or 0)
+    return used or 0
 
 
 def remaining(session: Session, workspace_id: uuid.UUID, kind: str, now: datetime | None = None) -> int:
@@ -43,6 +43,11 @@ def remaining(session: Session, workspace_id: uuid.UUID, kind: str, now: datetim
 
 
 def try_consume(session: Session, workspace_id: uuid.UUID, kind: str, now: datetime | None = None) -> bool:
+    """Spend one call of this step; False when the step's hourly cap or the global hourly cap is used up.
+
+    Callers must commit right after: the upserted rows stay locked until then, and the global counter row is
+    shared by every workspace, so never hold this transaction open across a model call.
+    """
     cap = CAPS[kind]  # KeyError for an unknown step: a programming error, not a visitor error
     hour = _hour(now)
     stmt = (
@@ -55,5 +60,5 @@ def try_consume(session: Session, workspace_id: uuid.UUID, kind: str, now: datet
         .returning(LlmUsage.calls)
     )
     if int(session.execute(stmt).scalar_one()) > cap:
-        return False
-    return _global_used(session, hour) <= GLOBAL_PER_HOUR
+        return False  # refused here, so retries never touch the shared counter
+    return bump(session, GLOBAL_KEY, GLOBAL_KIND, hour) <= GLOBAL_PER_HOUR

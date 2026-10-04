@@ -28,6 +28,19 @@ def test_ip_hash_is_keyed_and_short() -> None:
     assert len(ip_hash("1.1.1.1", "a")) == 32
 
 
+def test_ip_hash_refuses_an_empty_secret() -> None:
+    with pytest.raises(RuntimeError, match="SESSION_SECRET is not set"):
+        ip_hash("1.1.1.1", "")
+
+
+def test_retry_after_is_the_time_left_in_the_window(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(ip_limits.LIMITS, "upload", (2, timedelta(hours=1)))
+    start = datetime(2026, 10, 3, 12, 0, tzinfo=UTC)
+    assert ip_limits.retry_after("upload", start) == 3600
+    assert ip_limits.retry_after("upload", start + timedelta(minutes=30)) == 1800
+    assert ip_limits.retry_after("upload", start + timedelta(seconds=3599, milliseconds=500)) == 1
+
+
 def test_hits_over_the_limit_are_refused(db: Engine, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(ip_limits.LIMITS, "upload", (2, timedelta(hours=1)))
     now = datetime(2026, 10, 3, 12, 30, tzinfo=UTC)
@@ -38,9 +51,11 @@ def test_hits_over_the_limit_are_refused(db: Engine, monkeypatch: pytest.MonkeyP
 
 
 def test_concurrent_hits_count_every_event(db: Engine) -> None:
+    now = datetime(2026, 10, 3, 12, 30, tzinfo=UTC)
+
     def one(_: int) -> None:
         with Session(db) as s:
-            hit(s, "ipC", "upload")
+            hit(s, "ipC", "upload", now)
             s.commit()
 
     with ThreadPoolExecutor(max_workers=8) as pool:

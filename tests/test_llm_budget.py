@@ -2,9 +2,12 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import Engine
+from fastapi.testclient import TestClient
+from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
+from app.db.models import Workspace
+from app.main import app
 from app.services import llm_budget
 from app.services.llm_budget import remaining, try_consume
 from tests import factories as f
@@ -39,6 +42,22 @@ def test_refused_retries_do_not_drain_the_global_cap(db: Engine, monkeypatch: py
         for _ in range(5):
             try_consume(s, a.id, "stance", NOW)  # 1 allowed, 4 refused
         assert try_consume(s, b.id, "stance", NOW) is True
+
+
+def test_reset_does_not_refund_the_global_cap(db: Engine, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(llm_budget.CAPS, "stance", 5)
+    monkeypatch.setattr(llm_budget, "GLOBAL_PER_HOUR", 3)
+    visitor_a = TestClient(app)
+    visitor_a.get("/api/workspace")
+    with Session(db) as s:
+        a = s.scalars(select(Workspace.id)).one()
+        assert [try_consume(s, a, "stance", NOW) for _ in range(3)] == [True, True, True]
+        s.commit()
+    assert visitor_a.post("/api/workspace/reset").status_code == 204  # A and its llm_usage rows are gone
+    with Session(db) as s:
+        b = f.workspace(s)
+        assert try_consume(s, b.id, "stance", NOW) is False
+        assert remaining(s, b.id, "stance", NOW) == 0
 
 
 def test_unknown_step_is_a_programming_error(db: Engine) -> None:
