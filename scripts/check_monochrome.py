@@ -1,10 +1,14 @@
-"""Fail on colour in the UI. Allowed: black, white, transparent, current, neutral-* and true greys."""
+"""Fail on colour in the UI: colours, coloured emoji and colour filters.
+
+Allowed: black, white, transparent, current, neutral-* and true greys.
+"""
 
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+SUFFIXES = {".ts", ".tsx", ".css", ".svg", ".js", ".jsx", ".html"}  # what web/src can ship to a browser
 PALETTES = (
     "red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose"
     "|slate|gray|zinc|stone|taupe|mauve|mist|olive"
@@ -42,6 +46,14 @@ HEX = re.compile(
 )
 # CSS function names are case-insensitive: RGB( is rgb(.
 FUNCTION = re.compile(r"(?<![\w-])(?:rgba?|hsla?|hwb|oklch|oklab|lab|lch|color-mix|color)\(", re.IGNORECASE)
+# Emoji draw in colour whatever the CSS says: U+1F000-U+1FAFF, the check mark and cross emoji (U+2705, U+274C,
+# U+274E), the star (U+2B50) and the emoji presentation selector (U+FE0F), which turns a text glyph into an
+# emoji. The plain text glyphs U+2713 (check mark) and U+2717 (ballot x) are not emoji and stay allowed. The
+# class is written as escapes, so this file stays ASCII.
+EMOJI = re.compile(r"[\U0001F000-\U0001FAFF\u2705\u274C\u274E\u2B50\uFE0F]")
+# Filters that tint a grey element: Tailwind sepia, hue-rotate-<n> and saturate-<n> from 100 up, and the CSS
+# functions sepia( and hue-rotate( (function names are case-insensitive; Tailwind classes are not).
+FILTER = re.compile(r"\b(?:sepia|hue-rotate-\d+|saturate-(?:[2-9]\d\d|1\d\d))\b|\b(?i:sepia|hue-rotate)\(")
 
 # A colour name only styles something where it is a value, so prose such as "red-flagged" or "the green light"
 # is left alone. It is matched whole: not inside a longer word, a hyphenated name, a path or a member access.
@@ -90,20 +102,21 @@ def violations(path: Path) -> list[str]:
         ]
         found += [f"{path}:{n}: colour name {name}" for name in _colour_names(line)]
         found += [f"{path}:{n}: colour function {m.group(0)}" for m in FUNCTION.finditer(line)]
+        found += [f"{path}:{n}: coloured emoji U+{ord(m.group(0)):04X}" for m in EMOJI.finditer(line)]
+        found += [f"{path}:{n}: colour filter {m.group(0)}" for m in FILTER.finditer(line)]
     return found
 
 
 def main() -> int:
-    files = [p for p in (ROOT / "web" / "src").rglob("*") if p.suffix in {".ts", ".tsx", ".css"}]
-    files += [ROOT / "web" / "index.html", ROOT / "web" / "public" / "favicon.svg"]
+    files = [p for p in (ROOT / "web" / "src").rglob("*") if p.suffix in SUFFIXES]
+    files += (ROOT / "web" / "public").rglob("*.svg")  # served as they are: every icon and logo
+    files.append(ROOT / "web" / "index.html")
     files = [f for f in files if f.exists() and f.name != "api-types.ts"]  # api-types.ts is generated
     problems = [v for f in files for v in violations(f)]
     for p in problems:
         print(p, file=sys.stderr)
     if not files:  # a wrong ROOT or a moved web/ must not read as a clean UI
-        print(
-            "monochrome: no files to check under web/ (src, index.html, public/favicon.svg)", file=sys.stderr
-        )
+        print("monochrome: no files to check under web/ (src, index.html, public/*.svg)", file=sys.stderr)
         return 1
     print(f"monochrome: {len(files)} files checked, {len(problems)} problems")
     return 1 if problems else 0

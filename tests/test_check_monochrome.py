@@ -14,7 +14,7 @@ TAILWIND_PALETTES = """
 
 def _file(tmp_path: Path, text: str, name: str = "a.tsx") -> Path:
     p = tmp_path / name
-    p.write_text(text)
+    p.write_text(text, encoding="utf-8")
     return p
 
 
@@ -274,14 +274,109 @@ def test_colour_function_names_must_stand_alone(tmp_path: Path) -> None:
     assert violations(_file(tmp_path, code)) == []
 
 
-# main() walks web/src, web/index.html and web/public/favicon.svg under check_monochrome.ROOT.
+# Ruling 31 (M2): coloured emoji. Code points are built with chr(), so this file never holds a glyph.
+
+EMOJI = [0x1F000, 0x1F534, 0x1F7E2, 0x1F9E1, 0x1FAFF, 0x2705, 0x274C, 0x274E, 0x2B50, 0xFE0F]
+
+
+def _hex(code: int) -> str:
+    return f"U+{code:04X}"
+
+
+@pytest.mark.parametrize("code", EMOJI, ids=_hex)
+def test_coloured_emoji_are_flagged(tmp_path: Path, code: int) -> None:
+    path = _file(tmp_path, f"<p>Status {chr(code)} done</p>")
+    assert violations(path) == [f"{path}:1: coloured emoji {_hex(code)}"]
+
+
+def test_a_text_glyph_made_an_emoji_by_the_presentation_selector_is_flagged(tmp_path: Path) -> None:
+    warning_sign = chr(0x26A0) + chr(0xFE0F)  # a text glyph on its own, a yellow emoji with the selector
+    assert violations(_file(tmp_path, f"<p>{warning_sign} careful</p>")) == [
+        f"{tmp_path / 'a.tsx'}:1: coloured emoji U+FE0F"
+    ]
+
+
+def test_every_emoji_is_reported_with_its_line(tmp_path: Path) -> None:
+    red, green = chr(0x1F534), chr(0x1F7E2)
+    found = violations(_file(tmp_path, f"<p>ok</p>\n<p>{red} down {green} up</p>\n"))
+    assert found == [
+        f"{tmp_path / 'a.tsx'}:2: coloured emoji U+1F534",
+        f"{tmp_path / 'a.tsx'}:2: coloured emoji U+1F7E2",
+    ]
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        0x2713,  # check mark: a text glyph, allowed
+        0x2717,  # ballot x: a text glyph, allowed
+        0x2014,  # em dash
+        0x2026,  # ellipsis
+        0x2192,  # right arrow
+        0x1EFFF,  # the code point before the emoji range
+        0x1FB00,  # the code point after it
+    ],
+    ids=_hex,
+)
+def test_text_glyphs_and_the_code_points_around_the_emoji_range_are_allowed(
+    tmp_path: Path, code: int
+) -> None:
+    assert violations(_file(tmp_path, f"<p>Item {chr(code)} done</p>")) == []
+
+
+# Ruling 31 (M2): filters that tint a grey element.
+
+
+@pytest.mark.parametrize(
+    ("text", "count"),
+    [
+        ('<img className="sepia" />', 1),
+        ('<img className="grayscale sepia hue-rotate-90 saturate-200" />', 3),
+        ('<img className="hover:sepia md:hue-rotate-15 backdrop-saturate-150 -hue-rotate-30" />', 4),
+        (".a { filter: sepia(1) }", 1),
+        (".a { filter: hue-rotate(60deg) }", 1),
+        (".a { backdrop-filter: sepia(0.5) hue-rotate(90deg) }", 2),
+        (".a { filter: SEPIA(1) Hue-Rotate(90deg) }", 2),  # CSS function names are case-insensitive
+        ('const s = { filter: "sepia(1) hue-rotate(60deg)" };', 2),
+    ],
+)
+def test_colour_filters_are_flagged(tmp_path: Path, text: str, count: int) -> None:
+    found = violations(_file(tmp_path, text))
+    assert len(found) == count
+    assert all("colour filter" in v for v in found)
+
+
+@pytest.mark.parametrize(
+    ("n", "flagged"),
+    [(0, False), (50, False), (75, False), (99, False), (100, True), (150, True), (200, True), (999, True)],
+)
+def test_saturate_utilities_are_flagged_from_100_up(tmp_path: Path, n: int, flagged: bool) -> None:
+    found = violations(_file(tmp_path, f'<img className="saturate-{n}" />'))
+    assert (len(found) == 1) is flagged
+    assert not found or found[0].endswith(f"colour filter saturate-{n}")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '<img className="grayscale brightness-90 contrast-125 blur-sm invert saturate-0 saturate-50" />',
+        ".a { filter: grayscale(1) blur(2px) brightness(0.9) contrast(1.1) saturate(0) }",
+        "const sepiaIcon = 1; const huerotate = 2; const hue_rotate = 3; const saturated = 4;",
+        "<p>hue-rotated and desaturated</p>",
+    ],
+)
+def test_filters_that_add_no_colour_are_allowed(tmp_path: Path, text: str) -> None:
+    assert violations(_file(tmp_path, text)) == []
+
+
+# main() walks web/src, web/index.html and web/public/**/*.svg under check_monochrome.ROOT.
 
 
 def _tree(root: Path, files: dict[str, str]) -> None:
     for name, text in files.items():
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text)
+        path.write_text(text, encoding="utf-8")
 
 
 def test_main_passes_a_clean_tree_and_counts_only_the_files_it_checked(
@@ -293,19 +388,40 @@ def test_main_passes_a_clean_tree_and_counts_only_the_files_it_checked(
             "web/src/App.tsx": '<p className="text-black">x</p>\n',
             "web/src/index.css": '@import "tailwindcss";\n',
             "web/index.html": "<html></html>\n",
+            "web/src/assets/logo.svg": '<svg><path fill="#000" /></svg>\n',
+            "web/src/legacy.js": "export const a = 1;\n",
+            "web/src/Legacy.jsx": "export const B = () => null;\n",
+            "web/src/page.html": "<p>hi</p>\n",
+            "web/public/logo.svg": '<svg><path fill="black" /></svg>\n',
+            "web/public/img/mark.svg": '<svg><path fill="white" /></svg>\n',
             # generated from the OpenAPI schema: skipped, so not counted either
             "web/src/lib/api-types.ts": 'export const x = "bg-red-500";\n',
+            # not a file type a browser runs or renders as the UI: not scanned
+            "web/src/notes.md": "bg-red-500\n",
+            "web/public/robots.txt": "bg-red-500\n",
         },
     )
     monkeypatch.setattr(check_monochrome, "ROOT", tmp_path)
     assert check_monochrome.main() == 0
     # there is no favicon.svg in this tree, so it is not counted
-    assert capsys.readouterr().out.strip() == "monochrome: 3 files checked, 0 problems"
+    assert capsys.readouterr().out.strip() == "monochrome: 9 files checked, 0 problems"
 
 
 @pytest.mark.parametrize(
     "path",
-    ["web/src/App.tsx", "web/src/util.ts", "web/src/index.css", "web/index.html", "web/public/favicon.svg"],
+    [
+        "web/src/App.tsx",
+        "web/src/util.ts",
+        "web/src/index.css",
+        "web/src/assets/logo.svg",
+        "web/src/legacy.js",
+        "web/src/Legacy.jsx",
+        "web/src/page.html",
+        "web/index.html",
+        "web/public/favicon.svg",
+        "web/public/logo.svg",
+        "web/public/img/mark.svg",
+    ],
 )
 def test_main_fails_on_a_colour_in_any_scanned_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], path: str
@@ -316,6 +432,17 @@ def test_main_fails_on_a_colour_in_any_scanned_file(
     captured = capsys.readouterr()
     assert f"{tmp_path / path}:2: colour utility bg-red-500" in captured.err
     assert "1 problems" in captured.out
+
+
+def test_main_reports_emoji_and_filters(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _tree(tmp_path, {"web/src/App.tsx": f'<p className="sepia">{chr(0x2705)} done</p>\n'})
+    monkeypatch.setattr(check_monochrome, "ROOT", tmp_path)
+    assert check_monochrome.main() == 1
+    err = capsys.readouterr().err
+    assert f"{tmp_path / 'web/src/App.tsx'}:1: colour filter sepia" in err
+    assert f"{tmp_path / 'web/src/App.tsx'}:1: coloured emoji U+2705" in err
 
 
 def test_main_fails_when_there_is_nothing_to_check(
