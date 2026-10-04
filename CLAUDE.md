@@ -30,6 +30,8 @@ Progress and the decisions table: `docs/PROGRESS.md`. The detailed per-task ledg
   routes by query string.
 - `datakit/` dev-data tools (schemas, renderers, key derivation, validators). `data/` questionnaires, company packs, keys.
 - `scripts/` sponsor_check, check_monochrome, export_openapi, smoke. `tests/` pytest (needs Postgres).
+- `ops/` `setup.sh` runs the infrastructure phases (accounts, release, uptime, status). Tarun runs it in his terminal;
+  secrets go only through its hidden prompts.
 
 ## Commands
 - `docker compose up -d db` — Postgres 17 + pgvector on port 5434 (user/password `vart`).
