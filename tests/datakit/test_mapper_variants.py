@@ -28,7 +28,8 @@ def test_ten_variants_with_mappings_that_point_at_real_headers(tmp_path: Path) -
             question_header = ws[f"{m['question_col']}{m['header_row']}"].value
         else:
             delimiter = ";" if name == "v07.csv" else ","
-            rows = list(csv.reader(path.open(newline="", encoding="utf-8"), delimiter=delimiter))
+            with path.open(newline="", encoding="utf-8") as f:
+                rows = list(csv.reader(f, delimiter=delimiter))
             question_header = rows[int(m["header_row"]) - 1][int(m["question_col"]) - 1]
         assert question_header in {"Question", "Questions", "Control Question", "Pregunta"}, name
 
