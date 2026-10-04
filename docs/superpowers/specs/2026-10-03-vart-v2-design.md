@@ -64,7 +64,7 @@ evidence ("pinned evidence") ahead of search results, so its numbers flatter ret
    `verdicts.json`, the answer key, questionnaire text, company or people names) enters this repo, its history, the
    live app, or any model call made by this project, and no agent opens the hackathon folder's `Hackathon/`,
    `*.zip`, `verdicts.json` or `data/` paths. The only structural reference is the trap list in this spec (section
-   7.3), written from v1's code documentation. Enforced mechanically by a CI deny-list check (section 11.3).
+   7.3), written from v1's code documentation. Enforced mechanically by a CI name check (section 11.3).
 2. Public data only where the license allows redistribution; everything else is synthetic (section 7.6).
 3. UI is monochrome (black, white, neutral grays); state is shown in words, not color.
 4. Secrets never appear in chat, files or commits; Tarun enters them in his own terminal (`read -rs`).
@@ -505,7 +505,7 @@ No subagent runs below Sonnet 5.5.
 
   | Rule | Check |
   |---|---|
-  | no sponsor content | CI deny-list scan over the tree and every commit in a PR: word and phrase n-grams and file hashes are compared against a list that stores only salted hashes, so the list itself reveals nothing |
+  | no sponsor content | `scripts/sponsor_check.sh` in CI: the sponsor's company name (a GitHub repository variable, so no file holds it) must not appear in any file, file name or commit; anything copied from the hackathon version carries that name |
   | no verified answer without a citation | database CHECK constraint |
   | frontend matches backend | generated OpenAPI types; CI fails on drift |
   | no secrets committed | gitleaks in CI |

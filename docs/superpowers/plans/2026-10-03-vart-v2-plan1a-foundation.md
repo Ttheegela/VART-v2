@@ -4,7 +4,7 @@
 
 **Goal:** Build VART v2's production base from PriorPath's proven patterns — settings, a Postgres schema whose constraints enforce the honesty rules, cookie workspaces with budgets and per-IP limits, an OpenRouter client with record/replay, Langfuse tracing, a health check and daily model canary that keep the demo "alive, not awake", a monochrome React shell with generated API types, CI with checks that fail on broken rules — and ship a hello-world deploy.
 
-**Architecture:** One FastAPI app (`app/`) serves the API and the built React UI (`web/` → `public/`) from one Vercel project, backed by a Neon Postgres project of its own. All model calls go through one `LLMClient` protocol with three interchangeable implementations: OpenRouter (live), a recorder (live + write JSONL), and a replayer (JSONL only, never the network). Rules that must never break are written in `CLAUDE.md` *and* enforced by a check that fails: database CHECK constraints, a sponsor deny-list scan, a colour scan, OpenAPI type drift, gitleaks.
+**Architecture:** One FastAPI app (`app/`) serves the API and the built React UI (`web/` → `public/`) from one Vercel project, backed by a Neon Postgres project of its own. All model calls go through one `LLMClient` protocol with three interchangeable implementations: OpenRouter (live), a recorder (live + write JSONL), and a replayer (JSONL only, never the network). Rules that must never break are written in `CLAUDE.md` *and* enforced by a check that fails: database CHECK constraints, a sponsor-name scan, a colour scan, OpenAPI type drift, gitleaks.
 
 **Tech Stack:** Python 3.12, FastAPI 0.142+, Pydantic 2 + pydantic-settings, SQLAlchemy 2 + Alembic, psycopg 3, Postgres 17 (pgvector image), openai SDK → OpenRouter, Langfuse SDK, itsdangerous, httpx; React 19 + Vite 8 + TypeScript 6 + Tailwind v4, oxlint, Vitest, Playwright, openapi-typescript; GitHub Actions; Vercel Hobby; Neon free; UptimeRobot.
 
@@ -66,7 +66,7 @@ vercel.json, .vercelignore NEW
 web/                       NEW  React shell, api client, generated api-types.ts, Playwright smoke
 openapi.json               NEW  generated, committed
 scripts/export_openapi.py  NEW
-scripts/deny_check.py, scripts/deny_hashes.txt   NEW
+scripts/sponsor_check.sh   NEW
 scripts/check_monochrome.py NEW
 scripts/smoke.py           NEW
 .github/workflows/ci.yml   NEW
@@ -183,7 +183,7 @@ Progress and decisions: `docs/PROGRESS.md`.
 
 ## Hard rules (each one has a check that fails)
 1. Never open, copy or quote anything under `~/Desktop/portfolio/projects/ai-money-hackathon/` (sponsor-confidential).
-   Check: `scripts/deny_check.py` in CI.
+   Check: `scripts/sponsor_check.sh` in CI.
 2. No verified or partial answer without a citation. Check: database constraint `ck_answers_cited`.
 3. Tests never touch the network or real keys. Check: CI has no keys; use `tests/fakes.py` and `httpx.MockTransport`.
 4. Monochrome UI: black, white, `neutral-*` only. Check: `scripts/check_monochrome.py`.
@@ -197,7 +197,7 @@ Progress and decisions: `docs/PROGRESS.md`.
 - `migrations/` Alembic. Production migrations run from Tarun's terminal, never in the build.
 - `web/` React + Vite + TypeScript + Tailwind v4; builds into `../public`, which FastAPI serves.
 - `datakit/` dev-data tools (schemas, renderers, key derivation, validators). `data/` questionnaires, company packs, keys.
-- `scripts/` deny_check, check_monochrome, export_openapi, smoke. `tests/` pytest (needs Postgres).
+- `scripts/` sponsor_check, check_monochrome, export_openapi, smoke. `tests/` pytest (needs Postgres).
 
 ## Commands
 - `docker compose up -d db` — Postgres 17 + pgvector on port 5434 (user/password `vart`).
@@ -3412,78 +3412,69 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 7: Mechanical gates — sponsor deny-list, colour scan
+### Task 7: Mechanical gates — sponsor-name check, colour scan
 
 **Files:**
-- Create: `scripts/deny_check.py`, `scripts/deny_hashes.txt`, `scripts/check_monochrome.py`
-- Test: `tests/test_deny_check.py`, `tests/test_check_monochrome.py`
+- Create: `scripts/sponsor_check.sh`, `scripts/check_monochrome.py`
+- Test: `tests/test_sponsor_check.py`, `tests/test_check_monochrome.py`
 
 **Interfaces:**
-- Produces: `deny_check.tokens(text) -> list[str]`, `phrase_hash(words) -> str`, `file_hash(data) -> str`, `load_hashes(path) -> tuple[dict[int, set[str]], set[str]]`, `text_of(name, data) -> str`, `hits(name, data, phrases, files) -> list[str]`, CLI `python scripts/deny_check.py [--history] [--require-entries]`, plus `--add` (phrases on stdin) and `--add-files DIR`; `check_monochrome.violations(path) -> list[str]`, CLI `python scripts/check_monochrome.py`.
+- Produces: `bash scripts/sponsor_check.sh` (reads `SPONSOR_NAME` from the environment; exit 0 clean, 1 found, non-zero when unset); `check_monochrome.violations(path) -> list[str]`, CLI `python scripts/check_monochrome.py`.
+- The sponsor's name is never written into any file. In CI it comes from the GitHub repository variable `SPONSOR_NAME` (set in Task 9); locally the lead passes it on the command line.
 
 - [ ] **Step 1: Write the failing tests**
 
-`tests/test_deny_check.py`:
+`tests/test_sponsor_check.py`:
 ```python
-import io
-import zipfile
+import os
+import subprocess
 from pathlib import Path
 
-from scripts.deny_check import file_hash, hits, load_hashes, phrase_hash, text_of, tokens
+SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "sponsor_check.sh"
 
 
-def _lists(tmp_path: Path, lines: list[str]) -> tuple[dict[int, set[str]], set[str]]:
-    p = tmp_path / "deny.txt"
-    p.write_text("# comment\n" + "\n".join(lines) + "\n")
-    return load_hashes(p)
+def _git(repo: Path, *args: str) -> None:
+    subprocess.run(["git", "-C", str(repo), "-c", "user.email=t@example.com", "-c", "user.name=t", *args],
+                   check=True, capture_output=True)
 
 
-def test_tokens_ignore_case_and_punctuation() -> None:
-    assert tokens("Northwind-Labs, Inc. (j.doe@northwind.example)") == [
-        "northwind", "labs", "inc", "j", "doe", "northwind", "example"
-    ]
+def _repo(tmp_path: Path, files: dict[str, str]) -> Path:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    for name, text in files.items():
+        (tmp_path / name).write_text(text)
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "init")
+    return tmp_path
 
 
-def test_a_denied_phrase_is_found_in_any_spelling(tmp_path: Path) -> None:
-    phrases, files = _lists(tmp_path, [f"phrase2 {phrase_hash(['acme', 'widgets'])}"])
-    assert hits("README.md", b"We copied ACME   widgets text.", phrases, files)
-    assert hits("a.py", b"acme-widgets", phrases, files)
-    assert not hits("b.py", b"acme sells widgets", phrases, files)
+def _run(repo: Path, name: str | None = "Acmecorp") -> subprocess.CompletedProcess[str]:
+    env = {k: v for k, v in os.environ.items() if k != "SPONSOR_NAME"}
+    if name:
+        env["SPONSOR_NAME"] = name
+    return subprocess.run(["bash", str(SCRIPT)], cwd=repo, env=env, capture_output=True, text=True)
 
 
-def test_a_denied_file_is_found_by_its_bytes(tmp_path: Path) -> None:
-    data = b"%PDF-1.7 secret report bytes"
-    phrases, files = _lists(tmp_path, [f"file {file_hash(data)}"])
-    assert hits("renamed.pdf", data, phrases, files) == ["renamed.pdf: matches a denied file"]
+def test_a_clean_repo_passes(tmp_path: Path) -> None:
+    assert _run(_repo(tmp_path, {"a.md": "hello"})).returncode == 0
 
 
-def test_office_files_are_searched_inside(tmp_path: Path) -> None:
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as z:
-        z.writestr("word/document.xml", "<w:t>Acme</w:t><w:t>Widgets</w:t>")
-    assert "Acme" in text_of("x.docx", buf.getvalue())
-    phrases, files = _lists(tmp_path, [f"phrase2 {phrase_hash(['acme', 'widgets'])}"])
-    assert hits("x.docx", buf.getvalue(), phrases, files)
+def test_the_name_in_a_file_fails_in_any_case(tmp_path: Path) -> None:
+    assert _run(_repo(tmp_path, {"a.md": "built for ACMECORP"})).returncode == 1
 
 
-def test_the_hash_list_reveals_no_plain_text(tmp_path: Path) -> None:
-    line = f"phrase1 {phrase_hash(['acme'])}"
-    assert "acme" not in line
+def test_the_name_in_a_file_name_fails(tmp_path: Path) -> None:
+    assert _run(_repo(tmp_path, {"acmecorp_policy.txt": "x"})).returncode == 1
 
 
-def test_add_entries_hashes_phrases_and_files(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    import scripts.deny_check as dc
+def test_the_name_only_in_history_fails(tmp_path: Path) -> None:
+    repo = _repo(tmp_path, {"a.md": "copied from Acmecorp"})
+    (repo / "a.md").write_text("clean now")
+    _git(repo, "commit", "-qam", "scrub")
+    assert _run(repo).returncode == 1
 
-    hashes = tmp_path / "deny.txt"
-    hashes.write_text("# list\n")
-    monkeypatch.setattr(dc, "HASHES", hashes)
-    (tmp_path / "docs").mkdir()
-    (tmp_path / "docs" / "a.pdf").write_bytes(b"secret bytes")
-    assert dc.add_entries(["Acme Widgets", "one two three four five six seven"], tmp_path / "docs") == 2
-    assert dc.add_entries(["acme   widgets"], None) == 0  # already present, normalized
-    phrases, files = dc.load_hashes(hashes)
-    assert phrase_hash(["acme", "widgets"]) in phrases[2] and file_hash(b"secret bytes") in files
-    assert "acme" not in hashes.read_text().lower()
+
+def test_an_unset_name_is_an_error_not_a_pass(tmp_path: Path) -> None:
+    assert _run(_repo(tmp_path, {"a.md": "hello"}), name=None).returncode != 0
 ```
 
 `tests/test_check_monochrome.py`:
@@ -3521,172 +3512,36 @@ def test_colour_functions_are_flagged(tmp_path: Path) -> None:
     assert violations(_file(tmp_path, ".a { color: rgb(10 20 30) }", "a.css"))
 ```
 
-Run: `pytest tests/test_deny_check.py tests/test_check_monochrome.py -q` → Expected: FAIL (`ModuleNotFoundError: scripts.deny_check`).
+Run: `pytest tests/test_sponsor_check.py tests/test_check_monochrome.py -q` → Expected: FAIL (script missing; `ModuleNotFoundError: scripts.check_monochrome`).
 
-- [ ] **Step 2: Implement the deny-list scanner**
+- [ ] **Step 2: Implement the sponsor-name check**
 
-`scripts/deny_check.py`:
-```python
-"""Fail when the repo contains sponsor-confidential material from the hackathon version of VART.
-
-The deny list (scripts/deny_hashes.txt) stores only salted SHA-256 hashes: of normalized phrases (1 to 6 words)
-and of whole files, so the list itself reveals nothing. Tarun adds entries in his own terminal with --add or
---add-files.
-
-  python scripts/deny_check.py                    # scan tracked files in the working tree
-  python scripts/deny_check.py --history          # scan every file version in git history
-  python scripts/deny_check.py --require-entries  # also fail when the list is empty (CI)
-  python scripts/deny_check.py --add              # add phrases typed on stdin (1-6 words each), then Ctrl-D
-  python scripts/deny_check.py --add-files DIR    # add the hash of every file under DIR (contents never printed)
-"""
-
-import argparse
-import hashlib
-import io
-import re
-import subprocess
-import sys
-import unicodedata
-import zipfile
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parent.parent
-HASHES = ROOT / "scripts" / "deny_hashes.txt"
-SALT = "vart-deny-v1"
-MAX_WORDS = 6
-_NON_WORD = re.compile(r"[^0-9a-z]+")
-_TAG = re.compile(r"<[^>]+>")
-
-
-def tokens(text: str) -> list[str]:
-    return _NON_WORD.sub(" ", unicodedata.normalize("NFKC", text).lower()).split()
-
-
-def phrase_hash(words: list[str]) -> str:
-    return hashlib.sha256(f"{SALT}:{' '.join(words)}".encode()).hexdigest()
-
-
-def file_hash(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
-
-
-def load_hashes(path: Path = HASHES) -> tuple[dict[int, set[str]], set[str]]:
-    phrases: dict[int, set[str]] = {}
-    files: set[str] = set()
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        kind, digest = line.split()
-        if kind == "file":
-            files.add(digest)
-        elif kind.startswith("phrase"):
-            phrases.setdefault(int(kind.removeprefix("phrase")), set()).add(digest)
-    return phrases, files
-
-
-def text_of(name: str, data: bytes) -> str:
-    """Searchable text: Office files by their XML parts, everything else as UTF-8 (binary noise is harmless)."""
-    if name.lower().endswith((".docx", ".xlsx", ".pptx")):
-        try:
-            with zipfile.ZipFile(io.BytesIO(data)) as z:
-                xml = " ".join(z.read(n).decode("utf-8", "ignore") for n in z.namelist() if n.endswith(".xml"))
-        except zipfile.BadZipFile:
-            return ""
-        return _TAG.sub(" ", xml)
-    return data.decode("utf-8", "ignore")
-
-
-def hits(name: str, data: bytes, phrases: dict[int, set[str]], files: set[str]) -> list[str]:
-    found = []
-    if file_hash(data) in files:
-        found.append(f"{name}: matches a denied file")
-    words = tokens(text_of(name, data))
-    for n, digests in sorted(phrases.items()):
-        for i in range(len(words) - n + 1):
-            if phrase_hash(words[i : i + n]) in digests:
-                found.append(f"{name}: contains a denied {n}-word phrase (word {i + 1})")
-                break
-    return found
-
-
-def _git(*args: str) -> bytes:
-    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, check=True).stdout
-
-
-def tracked_files() -> list[tuple[str, bytes]]:
-    names = [n.decode() for n in _git("ls-files", "-z").split(b"\0") if n]
-    return [(n, (ROOT / n).read_bytes()) for n in names if (ROOT / n).is_file()]
-
-
-def history_blobs() -> list[tuple[str, bytes]]:
-    paths: dict[str, str] = {}
-    for line in _git("rev-list", "--all", "--objects").decode().splitlines():
-        sha, _, path = line.partition(" ")
-        if path:
-            paths.setdefault(sha, path)
-    blobs = []
-    for sha, path in paths.items():
-        if _git("cat-file", "-t", sha).strip() == b"blob":
-            blobs.append((f"{path}@{sha[:8]}", _git("cat-file", "blob", sha)))
-    return blobs
-
-
-def add_entries(lines: list[str], directory: Path | None) -> int:
-    entries: set[str] = set()
-    if directory is not None:
-        entries = {f"file {file_hash(p.read_bytes())}" for p in sorted(directory.rglob("*")) if p.is_file()}
-    skipped = 0
-    for line in lines:
-        words = tokens(line)
-        if 1 <= len(words) <= MAX_WORDS:
-            entries.add(f"phrase{len(words)} {phrase_hash(words)}")
-        elif words:
-            skipped += 1
-    if skipped:
-        print(f"skipped {skipped} phrase(s) longer than {MAX_WORDS} words; add their first words", file=sys.stderr)
-    existing = set(HASHES.read_text(encoding="utf-8").splitlines())
-    new = sorted(entries - existing)
-    with HASHES.open("a", encoding="utf-8") as f:
-        f.writelines(line + "\n" for line in new)
-    return len(new)
-
-
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--history", action="store_true")
-    ap.add_argument("--require-entries", action="store_true")
-    ap.add_argument("--add", action="store_true")
-    ap.add_argument("--add-files", type=Path)
-    args = ap.parse_args()
-    if args.add or args.add_files:
-        lines = sys.stdin.read().splitlines() if args.add else []
-        print(f"added {add_entries(lines, args.add_files)} entries")
-        return 0
-    phrases, files = load_hashes()
-    if args.require_entries and not (phrases or files):
-        print("deny-check: the deny list is empty; seed it with --add / --add-files", file=sys.stderr)
-        return 1
-    targets = history_blobs() if args.history else tracked_files()
-    problems = [p for name, data in targets if not name.startswith("scripts/deny_hashes.txt")
-                for p in hits(name, data, phrases, files)]
-    for p in problems:
-        print(f"deny-check: {p}", file=sys.stderr)
-    if problems:
-        return 1
-    print(f"deny-check: {len(targets)} files clean")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+`scripts/sponsor_check.sh`:
+```bash
+#!/usr/bin/env bash
+# Fail when the hackathon sponsor's name appears in any tracked file, file name or commit (spec section 3, rule 1).
+# The name comes from $SPONSOR_NAME (a GitHub repository variable in CI), so no file in the repo holds it.
+# Anything copied from the hackathon version of VART carries the name, so this catches copies of its code and data.
+set -euo pipefail
+name="${SPONSOR_NAME:?SPONSOR_NAME is not set}"
+found=0
+if git grep -l -I -i -F -e "$name" -- . ; then
+  echo "sponsor-check: the name appears in the files above" >&2
+  found=1
+fi
+if git ls-files | grep -i -F -e "$name" ; then
+  echo "sponsor-check: the name appears in the file names above" >&2
+  found=1
+fi
+# No grep -q: an early exit would SIGPIPE git log, and pipefail would turn a match into a miss.
+if git log --all -p | grep -i -F -e "$name" > /dev/null ; then
+  echo "sponsor-check: the name appears in git history" >&2
+  found=1
+fi
+[ "$found" -eq 0 ] && echo "sponsor-check: clean"
+exit "$found"
 ```
-
-`scripts/deny_hashes.txt`:
-```
-# Salted SHA-256 hashes of sponsor-confidential phrases and files (see scripts/deny_check.py).
-# Format: "phraseN <hash>" or "file <hash>". Seeded by Tarun in Plan 1A Task 9 with --add / --add-files.
-```
+`chmod +x scripts/sponsor_check.sh`.
 
 - [ ] **Step 3: Implement the colour scan**
 
@@ -3741,19 +3596,17 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run the tests and the scripts**
 
 ```bash
-pytest tests/test_deny_check.py tests/test_check_monochrome.py -q
-python scripts/deny_check.py
+pytest tests/test_sponsor_check.py tests/test_check_monochrome.py -q
 python scripts/check_monochrome.py
 ```
-Expected: tests PASS; `deny-check: N files clean`; `monochrome: … 0 problems`.
+Expected: tests PASS; `monochrome: … 0 problems`. (The lead runs the sponsor check on this repo with the real name in Task 9.)
 
 - [ ] **Step 5: Backend chain and commit**
 
 ```bash
 ruff check . && ruff format --check . && mypy app scripts && pytest -q && alembic check
-git add scripts/deny_check.py scripts/deny_hashes.txt scripts/check_monochrome.py \
-  tests/test_deny_check.py tests/test_check_monochrome.py
-git commit -m "feat: sponsor deny-list and monochrome checks that fail the build
+git add scripts/sponsor_check.sh scripts/check_monochrome.py tests/test_sponsor_check.py tests/test_check_monochrome.py
+git commit -m "feat: sponsor-name and monochrome checks that fail the build
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
@@ -3930,7 +3783,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version-file: .python-version
-      - run: python scripts/deny_check.py --history --require-entries
+      - run: bash scripts/sponsor_check.sh
+        env:
+          SPONSOR_NAME: ${{ vars.SPONSOR_NAME }}
       - run: python scripts/check_monochrome.py
       - uses: gitleaks/gitleaks-action@v2
         env:
@@ -3980,7 +3835,7 @@ jobs:
           name: playwright-report
           path: web/test-results
 ```
-Locally, verify every command in the `backend`, `frontend` and `gates` jobs except `mypy … datakit`, `python -m datakit.validate all` (Plan 1B) and gitleaks (GitHub only); `deny_check.py --require-entries` is expected to fail until Task 9 seeds the list.
+Locally, verify every command in the `backend`, `frontend` and `gates` jobs except `mypy … datakit`, `python -m datakit.validate all` (Plan 1B), gitleaks (GitHub only) and the sponsor check (the lead runs it in Task 9; an unset `SPONSOR_NAME` fails it by design).
 
 - [ ] **Step 4: Write the progress log**
 
@@ -4022,12 +3877,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 9: Release — merge lanes, seed the deny list, publish, hello-world deploy (Tarun approves first)
+### Task 9: Release — merge lanes, publish, hello-world deploy (Tarun approves first)
 
 This task is run by the lead with Tarun. Present the numbered list below as one release plan; start only after Tarun's explicit OK. Steps marked **(Tarun's terminal)** need a secret or his accounts; ping him with the exact command.
 
 **Files:**
-- Modify: `scripts/deny_hashes.txt` (seeded), `docs/PROGRESS.md` (live URL, release notes)
+- Modify: `docs/PROGRESS.md` (live URL, release notes)
 
 - [ ] **Step 1: Merge the lanes and run everything on `main`**
 
@@ -4039,8 +3894,9 @@ ruff check . && ruff format --check . && mypy app scripts datakit && pytest -q &
 python -m datakit.validate all && python scripts/check_monochrome.py
 (cd web && npm ci && npm run lint && npm test && npm run build && npm run e2e)
 python scripts/export_openapi.py && (cd web && npm run gen:api) && git diff --exit-code openapi.json web/src/lib/api-types.ts
+SPONSOR_NAME='<the sponsor company name>' bash scripts/sponsor_check.sh
 ```
-Expected: all green. Then the final Opus review of `main`.
+Expected: all green, including `sponsor-check: clean`. Then the final Opus review of `main`.
 
 - [ ] **Step 2: Point the old hackathon clones at the renamed repo (lead, before any rename)**
 
@@ -4063,29 +3919,20 @@ gh repo view Ttheegela/VART-hackathon --json name,visibility
 ```
 Expected: `{"name":"VART-hackathon","visibility":"PRIVATE"}`.
 
-- [ ] **Step 4: Seed the deny list (Tarun's terminal)**
+- [ ] **Step 4: Create the public repo, set the check's variable, push (outward)**
 
-```bash
-cd ~/Desktop/portfolio/projects/VART && source .venv/bin/activate
-python scripts/deny_check.py --add-files ~/Desktop/portfolio/projects/ai-money-hackathon/Hackathon
-python scripts/deny_check.py --add-files ~/Desktop/portfolio/projects/ai-money-hackathon/VART-merge/data
-python scripts/deny_check.py --add
-# type the sponsor's company name, product names, people's names and email domain, one per line; then Ctrl-D
-python scripts/deny_check.py --history --require-entries
-```
-Expected: `deny-check: N files clean`. Then the lead commits `scripts/deny_hashes.txt` ("chore: seed the sponsor deny list (hashes only)").
-
-- [ ] **Step 5: Create the public repo and push (outward)**
-
+The variable must exist before the first push, because the first push starts CI.
 ```bash
 gh repo create Ttheegela/VART --public \
   --description "Fills vendor security questionnaires from a company's own documents, with cited, code-decided answers" \
-  --source . --remote origin --push
+  --source . --remote origin
+gh variable set SPONSOR_NAME -R Ttheegela/VART --body '<the sponsor company name>'
+git push -u origin main
 gh repo edit Ttheegela/VART --add-topic fastapi --add-topic llm --add-topic rag --add-topic security-questionnaire
 ```
-Then check the first CI run once (`gh run list -R Ttheegela/VART --limit 1`); fix any red job before Step 6.
+Then check the first CI run once (`gh run list -R Ttheegela/VART --limit 1`); fix any red job before Step 5.
 
-- [ ] **Step 6: Neon project and migration (Tarun's console + terminal)**
+- [ ] **Step 5: Neon project and migration (Tarun's console + terminal)**
 
 In the Neon console: create project `vart`, Postgres 17, region AWS us-east-1. Copy the **direct** connection string (for migrations) and the **pooled** one (for Vercel). Then:
 ```bash
@@ -4094,7 +3941,7 @@ alembic upgrade head && alembic current
 unset DATABASE_URL
 ```
 
-- [ ] **Step 7: Vercel project, secrets, Git connection (Tarun's terminal)**
+- [ ] **Step 6: Vercel project, secrets, Git connection (Tarun's terminal)**
 
 ```bash
 cd ~/Desktop/portfolio/projects/VART
@@ -4109,7 +3956,7 @@ npx vercel git connect                      # production branch: main
 ```
 Optional Langfuse (new project "vart"): add `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` the same way.
 
-- [ ] **Step 8: Deploy and verify**
+- [ ] **Step 7: Deploy and verify**
 
 ```bash
 npx vercel deploy --prod                    # or push to main now that Git is connected
@@ -4120,11 +3967,11 @@ curl -s https://<assigned-domain>/api/health
 ```
 Expected: smoke `ok: …`; canary `{"ok":true,…}`; health shows `"status":"ok"` with the canary's credits. Open `/` in a real browser (Tarun uses Comet) and confirm the status panel.
 
-- [ ] **Step 9: Uptime monitors (Tarun, UptimeRobot dashboard)**
+- [ ] **Step 8: Uptime monitors (Tarun, UptimeRobot dashboard)**
 
 1. HTTP(s) monitor `https://<assigned-domain>/`, every 5 minutes.
 2. Keyword monitor `https://<assigned-domain>/api/health`, keyword `"status":"ok"` (alert when **not** present), every 60 minutes.
 
-- [ ] **Step 10: Record the release**
+- [ ] **Step 9: Record the release**
 
 Update `docs/PROGRESS.md` (live URL, Plan 1A/1B done, what each check showed), commit and push. Update `~/Desktop/portfolio/PROJECT_PLAN.md`'s tracker row for VART (E3).
