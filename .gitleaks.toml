@@ -1,10 +1,16 @@
-# Why: the generic-api-key rule matches GOLDEN_KEY by its name; the value is a sha256 record/replay key, not a credential.
 [extend]
 useDefault = true
 
+# Why: the generic-api-key rule matches GOLDEN_KEY and GOLDEN_KEY_NON_ASCII by name; the value is a sha256 record/replay key, not a credential.
 [[allowlists]]
-description = "GOLDEN_KEY in tests/test_llm_client.py is the sha256 of a canonical LLM request (the record/replay key), not a credential"
+description = "GOLDEN_KEY and GOLDEN_KEY_NON_ASCII (tests/test_llm_client.py, and the Plan 2a draft that appends the second) are the sha256 of a canonical LLM request (the record/replay key), not a credential"
 condition = "AND"
-paths = ['''^tests/test_llm_client\.py$''']
+paths = ['''^(?:tests/test_llm_client\.py|docs/superpowers/plans/2026-10-04-vart-v2-plan2a-engine\.md)$''']
 regexTarget = "line"
-regexes = ['''^\s*GOLDEN_KEY = "[0-9a-f]{64}"\s*$''']
+regexes = ['''^\s*GOLDEN_KEY(?:_NON_ASCII)? = "[0-9a-f]{64}"\s*$''']
+
+# Why: the Plan 2b draft's redaction test uses a fake PEM block, and the private-key rule's match runs on to an END marker inside the redaction regex ~90 lines later; not a key.
+[[allowlists]]
+description = "Fake PEM test input in the Plan 2b draft, not a key; scoped to that one file and to the private-key rule only"
+targetRules = ["private-key"]
+paths = ['''^docs/superpowers/plans/2026-10-04-vart-v2-plan2b-ingest\.md$''']
