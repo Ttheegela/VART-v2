@@ -1,6 +1,7 @@
 # Questionnaire B: the source of mvsp-b.csv (python -m datakit.questionnaires).
 # One question per MVSP v3.0 control (`section` is the MVSP control title). `control` is the closest fact-sheet control;
 # where the fact sheet had none, a must-ask control was added to data/dev/facts.yaml.
+# A trailing "# nearest topic only" on `source` marks a question that asks something other than its MVSP control.
 questionnaire: mvsp-b
 title: MVSP Short Form
 buyer: Northbeam Health
@@ -31,9 +32,9 @@ items:
     control: pentest
   - code: MVSP-1.5
     section: Training
-    question: "Do you provide role-specific security training to your personnel, relevant to their business function?"
-    source: "mvsp:1.5"
-    csf_id: PR.AT-02
+    question: "Do all personnel complete security awareness training at least annually?"
+    source: "mvsp:1.5"  # nearest topic only: MVSP 1.5 asks for role-specific training
+    csf_id: PR.AT-01
     control: security-training
   - code: MVSP-1.6
     section: Compliance

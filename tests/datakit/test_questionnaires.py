@@ -199,7 +199,11 @@ def test_documented_controls_have_one_plain_yes_sentence() -> None:
 # MVSP-B questions that must stay faithful to their MVSP control: (control, must keep, must not have).
 MVSP_B = {
     "MVSP-1.4": ("pentest", ["penetration test"], ["comprehensive", "services"]),
-    "MVSP-1.5": ("security-training", ["role-specific"], []),
+    "MVSP-1.5": (
+        "security-training",
+        ["security awareness training", "at least annually"],
+        ["role-specific"],
+    ),
     "MVSP-2.1": ("customer-sso", ["customers"], ["employees", "internal"]),
     "MVSP-2.6": ("patch-sla", ["dependencies", "patch"], ["scan"]),
     "MVSP-3.3": ("developer-training", ["train your developers"], ["static", "SAST"]),
@@ -226,3 +230,19 @@ def test_contact_questions_ask_for_deal_specific_details() -> None:
         (question,) = asked[control]
         assert question.startswith(f"Will you designate {who} for "), control
         assert all(p in question for p in detail), control
+
+
+def test_mvsp_1_5_says_it_asks_less_than_its_control() -> None:
+    # the evidence is generic annual awareness training; MVSP 1.5 asks for role-specific training
+    raw = (Q / "mvsp-b.selection.yaml").read_text(encoding="utf-8")
+    marked = r'code: MVSP-1\.5\n(?:    .*\n)*?    source: "mvsp:1\.5"  # nearest topic only'
+    assert re.search(marked, raw)
+
+
+def test_the_dependency_patching_sentence_is_a_plain_yes_beside_the_patch_sla() -> None:
+    facts = load_yaml(DATA / "dev" / "facts.yaml", Facts)
+    s = facts.statement("vmp-dependency-patching")
+    assert (s.doc, s.control, s.stance, s.flags) == ("vmp", "patch-sla", "yes", ())
+    assert "dependencies" in s.text and s.text.isascii() and s.text.endswith(".") and not CUES.search(s.text)
+    # still one consistent answer for the control: every sentence about it says yes, so no conflict is created
+    assert {x.stance for x in facts.statements_for("patch-sla")} == {"yes"}

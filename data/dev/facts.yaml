@@ -413,6 +413,11 @@ statements:
     control: patch-sla
     stance: yes
     text: "Critical vulnerabilities are patched within 14 days of discovery."
+  - id: vmp-dependency-patching
+    doc: vmp
+    control: patch-sla
+    stance: yes
+    text: "Vulnerabilities in third-party libraries and dependencies are remediated within the same timelines as other findings."
   - id: vmp-pentest
     doc: vmp
     control: pentest
