@@ -64,7 +64,7 @@ Phases (each is safe to re-run):
   uptime    UptimeRobot monitors on the production domain: HTTP on / every ${UI_INTERVAL_S}s, keyword on /api/health
             every ${HEALTH_INTERVAL_S}s that alerts when ${HEALTH_KEYWORD} is absent. Hidden prompt: UptimeRobot
             API key (just press Enter to get the manual steps instead).
-  status    Names-only summary: Neon project, Vercel project, env var names, GitHub variable names, health.
+  status    Names-only summary: Neon project, Vercel project, env var names, GitHub variable and secret names, health.
 
 Options:
   --langfuse        accounts: also store LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY and LANGFUSE_BASE_URL
@@ -838,6 +838,12 @@ if t:
   info "repo $GH_REPO"
   d=$(gh variable list -R "$GH_REPO" --json name --jq '.[].name' 2>/dev/null | tr '\n' ' ') || d=""
   info "variable names: ${d:-(none)}"
+  # Names only (the API never returns a secret's value). CI's sponsor check reads the secret SPONSOR_NAME.
+  if d=$(gh secret list -R "$GH_REPO" --json name --jq '.[].name' 2>/dev/null | tr '\n' ' '); then
+    info "secret names: ${d:-(none)}"
+  else
+    warn "could not read the repository secrets; check: gh secret list -R $GH_REPO"
+  fi
   step "Health"
   domain=${domain:-$DOMAIN}
   if [ -n "$domain" ]; then
