@@ -13,6 +13,9 @@ data
 .pytest_cache
 .hypothesis
 .claude
+# `release` deploys the local checkout, not the Git tree: keep the review ledgers and the infra script out of the upload.
+.superpowers
+ops
 migrations
 alembic.ini
 docker-compose.yml
