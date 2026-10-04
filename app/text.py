@@ -27,10 +27,17 @@ _TRANSLATE = str.maketrans(
     }
 )
 _SPACE = re.compile(r"\s+")
-# Never visible, never part of a quote: C0 controls that are not whitespace, soft hyphen, zero-width
-# space/joiners, bidi marks, word joiner and invisible operators, byte-order mark, Unicode tag characters.
+# Never visible, never part of a quote, so stripped before NFKC: C0 and C1 controls that are not
+# whitespace (the separators U+001C-001F and NEL U+0085 are whitespace and fold to a space instead) and
+# the default-ignorable characters: soft hyphen, combining grapheme joiner, bidi and Arabic letter marks,
+# Hangul fillers, zero-width characters, word joiner and invisible operators, variation selectors,
+# byte-order mark, interlinear annotation marks, noncharacters U+FFFE-FFFF (pdfium writes U+FFFE for a
+# hyphen at a line break), format and tag characters.
 _INVISIBLE = re.compile(
-    r"[\x00-\x08\x0e-\x1f\x7f\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff\U000e0000-\U000e007f]"
+    r"[\x00-\x08\x0e-\x1b\x7f-\x84\x86-\x9f\xad\U0000034f\U0000061c\U0000115f\U00001160\U000017b4\U000017b5"
+    r"\U0000180b-\U0000180f\U0000200b-\U0000200f\U0000202a-\U0000202e\U00002060-\U0000206f\U00003164"
+    r"\U0000fe00-\U0000fe0f\U0000feff\U0000ffa0\U0000fff0-\U0000fffb\U0000fffe\U0000ffff"
+    r"\U0001bca0-\U0001bca3\U0001d173-\U0001d17a\U000e0000-\U000e0fff]"
 )
 _WORD = re.compile(r"\w")
 
@@ -44,12 +51,17 @@ def normalize(text: str) -> str:
 
 def contains(haystack: str, quote: str) -> bool:
     """True when the quote appears in the text after both are normalized and does not start or end inside a
-    word. An empty quote never matches."""
+    word. A quote ending in a letter may end right before a digit (a footnote mark that lost its superscript:
+    "reviewed quarterly" in "reviewed quarterly1"). An empty quote never matches."""
     needle, text = normalize(quote), normalize(haystack)
     if not needle or needle not in text:
         return False
     head = r"(?<!\w)" if _WORD.match(needle[0]) else ""
-    tail = r"(?!\w)" if _WORD.match(needle[-1]) else ""
+    tail = ""
+    if needle[-1].isalpha():
+        tail = r"(?![^\W\d_])"  # no letter may follow; a digit may
+    elif _WORD.match(needle[-1]):
+        tail = r"(?!\w)"
     return re.search(head + re.escape(needle) + tail, text) is not None
 
 
