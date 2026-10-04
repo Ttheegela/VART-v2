@@ -154,8 +154,9 @@ def test_no_unregistered_control_keywords() -> None:
     assert loose == []
 
 
-# Leak sentences that a reviewer used to probe the keyword net; each one must be flagged. The last three
-# are the acronyms that only match as whole words.
+# Leak sentences that a reviewer used to probe the keyword net; each one must be flagged. Three of them use
+# acronyms that only match as whole words; the last three use an un- prefix, a plural acronym and a hyphenated
+# phrase.
 PROBES = (
     "Office key-fob access is logged.",
     "A diagram of how customer data moves is maintained.",
@@ -167,6 +168,9 @@ PROBES = (
     "Employees sign in through SSO.",
     "Reports are shared under an NDA.",
     "The contract includes an SLA.",
+    "Laptop disks are unencrypted.",
+    "Reports are shared under NDAs.",
+    "We run a bug-bounty program.",
 )
 # Words that merely contain an acronym: "sso", "nda" and "sla" are inside them.
 LOOKALIKES = ("lesson", "association", "agenda", "islands")
@@ -175,8 +179,10 @@ LOOKALIKES = ("lesson", "association", "agenda", "islands")
 def test_the_keyword_net_flags_every_probe_sentence() -> None:
     assert [p for p in PROBES if not CONTROL_WORDS.search(p)] == []
     assert CONTROL_WORDS.search("Access is reviewed.")  # a stem matches at a word start, with any ending
-    unmatched = [w for w in (*CONTROL_STEMS, *CONTROL_ACRONYMS) if not CONTROL_WORDS.search(w)]
-    assert unmatched == []  # every stem and acronym finds itself, so the escaping holds
+    words = [*CONTROL_STEMS, *CONTROL_ACRONYMS]
+    variants = [v for w in words for v in (w, w.replace(" ", "-"), w.replace("-", " "))]
+    unmatched = [v for v in variants if not CONTROL_WORDS.search(v)]
+    assert unmatched == []  # every stem and acronym finds itself, with a space or a hyphen between its words
 
 
 def test_the_keyword_net_does_not_match_inside_words() -> None:

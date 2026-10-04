@@ -51,11 +51,12 @@ MIN_TRAPS: dict[TrapKind, int] = {
 # The net for "this line speaks to a control". tests/datakit/test_render.py fails on a rendered line
 # (for a PDF: a sentence) that CONTROL_WORDS finds and that is neither inside a registered statement nor
 # listed in data/dev/src/ALLOWED_LINES.txt. A stem matches at a word start with any ending ("review"
-# finds "reviewed" but not "preview"); an acronym matches only as a whole word ("sla" is not inside
-# "islands", "sso" not inside "association", "nda" not inside "agenda"); "\w@" finds an email address or
-# a mailbox name. The first group of stems is topics with registered statements; the others are topics
-# no document may speak to (the must-ask controls). There is no bare "training" stem: that is the
-# documented awareness training.
+# finds "reviewed" but not "preview"), also after "un" or "non" ("unencrypted"), and its words may be
+# joined by a space or a hyphen ("bug bounty" finds "bug-bounty"). An acronym matches only as a whole
+# word, singular or plural ("NDAs"; "sla" is not inside "islands", "sso" not inside "association", "nda"
+# not inside "agenda"); "\w@" finds an email address or a mailbox name. The first group of stems is topics
+# with registered statements; the others are topics no document may speak to (the must-ask controls).
+# There is no bare "training" stem: that is the documented awareness training.
 CONTROL_STEMS = (
     "review",
     "multi-factor",
@@ -119,11 +120,18 @@ CONTROL_STEMS = (
     "distribute",
 )
 CONTROL_ACRONYMS = ("mfa", "dast", "sso", "nda", "sla", "csp")
+
+
+def _stem_pattern(stem: str) -> str:
+    words = "[ -]".join(re.escape(word) for word in re.split(r"[ -]", stem))
+    return rf"\b(?:un|non)?{words}\w*"
+
+
 CONTROL_WORDS = re.compile(
     "|".join(
         [
-            *(rf"\b{re.escape(stem)}\w*" for stem in CONTROL_STEMS),
-            *(rf"\b{acronym}\b" for acronym in CONTROL_ACRONYMS),
+            *map(_stem_pattern, CONTROL_STEMS),
+            *(rf"\b{acronym}s?\b" for acronym in CONTROL_ACRONYMS),
             r"\w@",
         ]
     ),
