@@ -524,21 +524,17 @@ No subagent runs below Sonnet 5.5.
 
 ### 11.4 Approval gates (Tarun says yes first)
 
-Renaming the old repo and creating the new one; the first push and every push to `main`; creating the Vercel project
+Merging into `main` and deploying; creating the Vercel project
 and Neon database; entering secrets (his terminal, `read -rs`); production deploys; re-recording paid evals (his
 terminal); creating the Google OAuth client (Plan 5). A short numbered release plan is presented for one approval
 at each release point.
 
-### 11.5 Repo name and the old repo
+### 11.5 Repo
 
-Recommended: rename the old private `Ttheegela/VART` to `Ttheegela/VART-hackathon` (still private) and create a new
-public `Ttheegela/VART` with no history from the old one.
-
-**Required safety step before creating the new repo:** the five local hackathon folders (`VART`, `VART-adapter`,
-`VART-merge`, `VART-ui`, `VART-ui-real` under `projects/ai-money-hackathon/`) all have `origin` set to
-`Ttheegela/VART.git`. After the rename, that URL would point at the new public repo, and a push from an old folder
-would publish sponsor files. Their remotes are switched to `VART-hackathon.git` and checked before the new repo is
-created. (Alternative with no such risk: give the new repo a different name.)
+A fresh public repo, `Ttheegela/VART-v2`, with no history from the hackathon repo. The hackathon repo
+(`Ttheegela/VART`, private, built with teammates) is left exactly as it is: no rename, no changes to anyone's clones.
+Lanes push their branches to `VART-v2` as they work; merging into `main` and deploying happen at the release points
+with Tarun's OK.
 
 ## 12. Definition of done
 

@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Repo: `~/Desktop/portfolio/projects/VART`. Task 1 runs on `main`. Tasks 2–8 run on branch `plan1-foundation` in worktree `~/Desktop/portfolio/projects/VART-wt-foundation` (the lead creates it). Plan 1B runs in parallel on `plan1-data`. Task 9 merges both into `main`. Nothing is pushed before Task 9.
+- Repo: `~/Desktop/portfolio/projects/VART`. Task 1 runs on `main`. Tasks 2–8 run on branch `plan1-foundation` in worktree `~/Desktop/portfolio/projects/VART-wt-foundation` (the lead creates it). Plan 1B runs in parallel on `plan1-data`. The repo is `github.com/Ttheegela/VART-v2` (public, created before Task 1); lanes push their branches there as they go. Task 9 merges both into `main` and deploys, with Tarun's OK.
 - Every commit message ends with exactly: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` (even when the worker is a Sonnet model).
 - Never open, list, copy or quote anything under `~/Desktop/portfolio/projects/ai-money-hackathon/` (sponsor-confidential). Never type the sponsor's company or people names into any file.
 - Python `>=3.12,<3.13`. Runtime dependencies are exactly Task 1's list; adding one needs the lead's OK.
@@ -23,7 +23,7 @@
 - Secrets never in files, chat or commits. `.env*` is gitignored (except `.env.example`). Tarun enters secrets in his own terminal (`read -rs`).
 - Each task owns the files it lists. Touching another file needs the lead's OK; the reviewer rejects unowned edits.
 - Two-failure rule: the same failure twice → stop, report, wait for the adversary review. Never weaken, skip or delete a test to get green. Three attempts on a task → hand it back to the lead.
-- Outward actions (repo rename/creation, push, Vercel, Neon, UptimeRobot, secrets) happen only in Task 9, after Tarun approves the numbered release plan.
+- Pushing lane branches to `VART-v2` is approved. Merging into `main`, deploying, and anything touching Vercel, Neon, OpenRouter or UptimeRobot happen only in Task 9, after Tarun approves the release plan. Infrastructure is set up by the infra-setup agent's one-shot script, which Tarun runs in his own terminal.
 
 ## Review Focus
 
@@ -3898,80 +3898,26 @@ SPONSOR_NAME='<the sponsor company name>' bash scripts/sponsor_check.sh
 ```
 Expected: all green, including `sponsor-check: clean`. Then the final Opus review of `main`.
 
-- [ ] **Step 2: Point the old hackathon clones at the renamed repo (lead, before any rename)**
-
-Only the git configuration is touched; no file in those folders is opened.
-```bash
-for d in VART VART-adapter VART-merge VART-ui VART-ui-real; do
-  git -C ~/Desktop/portfolio/projects/ai-money-hackathon/$d remote set-url origin https://github.com/Ttheegela/VART-hackathon.git
-done
-for d in VART VART-adapter VART-merge VART-ui VART-ui-real; do
-  git -C ~/Desktop/portfolio/projects/ai-money-hackathon/$d remote get-url origin
-done
-```
-Expected: five lines ending `VART-hackathon.git`.
-
-- [ ] **Step 3: Rename the old repo (outward)**
+- [ ] **Step 2: Push `main`**
 
 ```bash
-gh repo rename VART-hackathon -R Ttheegela/VART --yes
-gh repo view Ttheegela/VART-hackathon --json name,visibility
+git push origin main
+gh run list -R Ttheegela/VART-v2 --limit 1
 ```
-Expected: `{"name":"VART-hackathon","visibility":"PRIVATE"}`.
+CI must be green (the `SPONSOR_NAME` repository variable was set when the repo was created). Fix any red job first.
 
-- [ ] **Step 4: Create the public repo, set the check's variable, push (outward)**
+- [ ] **Step 3: Infrastructure, migration, deploy (infra-setup script, Tarun's terminal)**
 
-The variable must exist before the first push, because the first push starts CI.
-```bash
-gh repo create Ttheegela/VART --public \
-  --description "Fills vendor security questionnaires from a company's own documents, with cited, code-decided answers" \
-  --source . --remote origin
-gh variable set SPONSOR_NAME -R Ttheegela/VART --body '<the sponsor company name>'
-git push -u origin main
-gh repo edit Ttheegela/VART --add-topic fastapi --add-topic llm --add-topic rag --add-topic security-questionnaire
-```
-Then check the first CI run once (`gh run list -R Ttheegela/VART --limit 1`); fix any red job before Step 5.
+The infra-setup agent keeps `ops/setup.sh` current. Its `release` phase, run once by Tarun (the lead can start it in
+his Terminal panel; he only pastes keys into hidden prompts):
+- finds the Neon project created in the `accounts` phase and runs `alembic upgrade head` against its direct URL;
+- confirms the Vercel environment variables exist (names only) and triggers the production deploy from `main`;
+- runs `python scripts/smoke.py <domain>`, calls `/api/internal/canary` with `CRON_SECRET`, and prints `/api/health`;
+- creates the two UptimeRobot monitors (UI `/` every 5 minutes; keyword `"status":"ok"` on `/api/health` every
+  60 minutes) when given an UptimeRobot API key, otherwise prints the two manual steps.
+Nothing secret is printed. Expected: smoke `ok: …`, canary `{"ok":true,…}`, health `"status":"ok"`. Then open `/` in
+a real browser (Tarun uses Comet) and confirm the status panel.
 
-- [ ] **Step 5: Neon project and migration (Tarun's console + terminal)**
-
-In the Neon console: create project `vart`, Postgres 17, region AWS us-east-1. Copy the **direct** connection string (for migrations) and the **pooled** one (for Vercel). Then:
-```bash
-read -rs DATABASE_URL && export DATABASE_URL   # paste the DIRECT URL
-alembic upgrade head && alembic current
-unset DATABASE_URL
-```
-
-- [ ] **Step 6: Vercel project, secrets, Git connection (Tarun's terminal)**
-
-```bash
-cd ~/Desktop/portfolio/projects/VART
-npx vercel link --yes --project vart        # creates the project if missing; note the assigned *.vercel.app domain
-read -rs DB && printf %s "$DB" | npx vercel env add DATABASE_URL production && unset DB    # paste the POOLED URL
-python -c "import secrets; print(secrets.token_urlsafe(32))" | npx vercel env add SESSION_SECRET production
-CRON_SECRET=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
-printf %s "$CRON_SECRET" | npx vercel env add CRON_SECRET production
-# In OpenRouter: create key "vart-prod" with a credit limit (e.g. $10) so the canary can read limit_remaining.
-read -rs KEY && printf %s "$KEY" | npx vercel env add OPENROUTER_API_KEY production && unset KEY
-npx vercel git connect                      # production branch: main
-```
-Optional Langfuse (new project "vart"): add `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` the same way.
-
-- [ ] **Step 7: Deploy and verify**
-
-```bash
-npx vercel deploy --prod                    # or push to main now that Git is connected
-python scripts/smoke.py https://<assigned-domain>
-curl -s -H "Authorization: Bearer $CRON_SECRET" https://<assigned-domain>/api/internal/canary   # Tarun's terminal
-unset CRON_SECRET
-curl -s https://<assigned-domain>/api/health
-```
-Expected: smoke `ok: …`; canary `{"ok":true,…}`; health shows `"status":"ok"` with the canary's credits. Open `/` in a real browser (Tarun uses Comet) and confirm the status panel.
-
-- [ ] **Step 8: Uptime monitors (Tarun, UptimeRobot dashboard)**
-
-1. HTTP(s) monitor `https://<assigned-domain>/`, every 5 minutes.
-2. Keyword monitor `https://<assigned-domain>/api/health`, keyword `"status":"ok"` (alert when **not** present), every 60 minutes.
-
-- [ ] **Step 9: Record the release**
+- [ ] **Step 4: Record the release**
 
 Update `docs/PROGRESS.md` (live URL, Plan 1A/1B done, what each check showed), commit and push. Update `~/Desktop/portfolio/PROJECT_PLAN.md`'s tracker row for VART (E3).
