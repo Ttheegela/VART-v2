@@ -88,7 +88,8 @@ filled file goes back in the buyer's own format.
 ## 5. What a visitor does
 
 1. **Landing.** "Try with a sample company" (default) or "Use your own files". Either creates a private workspace
-   tied to a signed cookie; workspaces and everything in them are deleted after 24 hours.
+   tied to a signed cookie; a workspace becomes unusable after 24 hours, and it and everything in it are deleted
+   within about 37 hours (two daily cleanup sweeps).
 2. **Questionnaire.** Pick a bundled sample, or upload xlsx/csv. A column mapper detects the sheet, header row,
    question column, answer column and ID column (and a comments column if present), shows a preview, and the visitor
    confirms or corrects it. Handles header offsets, section rows, merged cells and several sheets.
@@ -128,7 +129,7 @@ class (pydantic-settings), record/replay built into the LLM client, per-IP limit
 
 | Unit (`app/…`) | One job | Calls a model? |
 |---|---|---|
-| `workspaces/` | signed cookie workspace, budgets, per-IP limits, audit log, 24 h cleanup | no |
+| `workspaces/` | signed cookie workspace, budgets, per-IP limits, audit log, 24 h expiry and cleanup | no |
 | `ingest/` | parse files into numbered lines; spreadsheet rows become dated records | no |
 | `redact/` | Presidio PII + secret patterns, applied before storage and before any model call | no |
 | `classify/` | document metadata: rules first, model fallback, user override | fallback only |
@@ -167,11 +168,15 @@ worker process is needed. The run records the prompt versions and model IDs it u
   "as of" date sets the record's `as_of`. PDF visual lines are joined, because wrapping is not a paragraph break.
 - **Chunk flags:** `negation` (not, never, no longer, pending, planned, not yet, …), `placeholder`
   (`[Company Name]`, `{{…}}`, `<insert …>`, "Lorem ipsum"), `injection` (instructions aimed at a model). Pattern lists
-  live in one module and are unit-tested.
+  live in one module and are unit-tested. A placeholder (for example a `[bracketed]` one) marks its own chunk only:
+  that chunk is dropped and never cited, and the rest of the document stays usable evidence.
 - **Document metadata** (`classify/`): kind, status (final/draft), effective date or audit period end, scope,
-  `evidence_allowed`. Rules first (title and body cues: "DRAFT", "Template", placeholders, "Master Services
-  Agreement", "Period of review"), a structured model call only when the rules are unsure, and the visitor can
-  override every field. Contracts, templates and questionnaires default to `evidence_allowed = false`.
+  `evidence_allowed`. Rules first (title and body cues: "DRAFT", "Template", "Master Services Agreement", "Period of
+  review"), a structured model call only when the rules are unsure, and the visitor can override every field. A
+  document is a template only when its title or opening lines are placeholders or it calls itself a template; one
+  placeholder inside an otherwise final policy does not make it one. Scope is read only from an explicit "Scope" or
+  "applies to" line, never guessed and never set by the model call. Contracts, templates and questionnaires default
+  to `evidence_allowed = false`.
 
 ### 6.5 Retrieval
 
@@ -200,7 +205,9 @@ Inputs: the item, its stances, the passages with their document metadata. Rules 
 2. **Evidence gate.** Drop passages whose document has `evidence_allowed = false`, or whose chunk is flagged
    `placeholder` or `injection` (`not-evidence`, `placeholder`, `injection`).
 3. **Irrelevant.** Drop `irrelevant` stances.
-4. **Negation.** A `yes` stance on a `negation`-flagged passage becomes `partial` (quote kept).
+4. **Negation.** A `yes` stance whose quote contains a negation cue becomes `partial` (quote kept). The cue test runs
+   on the quoted text, not on the whole passage; the chunk's `negation` flag stays informational (shown in the
+   evidence drawer, usable by retrieval).
 5. **Scope.** If every `yes` document and every `no` document declares a scope and the two sets of scopes do not
    overlap, it is not a conflict: label `partial`, both cited, with a scope note ("the policy covers internal
    systems; the pentest covers the customer product"). A document with no declared scope applies everywhere.
@@ -246,15 +253,18 @@ If the answer column has a Yes/No validation list without "Partial", the value g
 
 ### 6.11 Database
 
-All tables carry `workspace_id` with `ON DELETE CASCADE` (PriorPath pattern); requests for another workspace's ids
-return 404.
+Every table carries `workspace_id` with `ON DELETE CASCADE` (PriorPath pattern), except `workspaces` itself and four
+tables that have none by design: `document_lines` (keyed by its document) and `run_items` (keyed by its run) go with
+their parent by cascade; `ip_limits` (per-network counters, plus the two global model-call counters) and
+`canary_runs` belong to no workspace, and the cleanup sweep purges their old rows. Requests for another workspace's
+ids return 404.
 
 | Table | Key columns |
 |---|---|
 | `workspaces` | id, created_at, ip_hash |
-| `documents` | id, filename, source (sample/upload/drive), sha256, kind, status, effective_date, scope, evidence_allowed, metadata_source (rule/model/user), line_count |
+| `documents` | id, filename, source (sample/upload/drive/statement), sha256, kind, status, effective_date, scope, evidence_allowed, metadata_source (rule/model/user), line_count |
 | `document_lines` | document_id, n, text (redacted) — primary key (document_id, n) |
-| `chunks` | id, document_id, line_start, line_end, text, heading, flags text[], as_of, `tsv` tsvector (generated), `embedding` vector (nullable) |
+| `chunks` | id, document_id, line_start, line_end, text, heading, flags text[], as_of, `tsv` tsvector (generated); an optional `embedding` vector, added only if Plan 2's retrieval eval shows it helps (full-text search is the default) |
 | `questionnaires` | id, filename, source, original_bytes (xlsx only), sheet, mapping jsonb |
 | `items` | id, questionnaire_id, position, row_ref, code, topic, question, csf_id |
 | `runs` | id, questionnaire_id, status, prompt_versions jsonb, models jsonb, cost_usd, started_at, finished_at |
@@ -317,8 +327,11 @@ frozen contracts, then wired to the real one. Keyboard-usable grid and drawer; l
 
 | Sample | Built from | License |
 |---|---|---|
-| A. "Vendor Security Questionnaire", ~60 items, a deliberately messy xlsx (header offset, section rows, merged cells, a Yes/No column with data validation, a comments column) | Google VSAQ question content (2016, wording modernized), MVSP for current topics; every item tagged with a NIST CSF 2.0 subcategory | VSAQ Apache-2.0, MVSP CC0, NIST public domain |
-| B. "MVSP short form", ~25 items, csv | MVSP | CC0 |
+| A. "Vendor Security Questionnaire", ~60 items, a deliberately messy xlsx (header offset, section rows, merged cells, a Yes/No column with data validation, a comments column) | Questions written for this project, informed by Google VSAQ items (2016) and MVSP controls; topic items tagged with a NIST CSF 2.0 subcategory, engagement-specific items (cyber insurance, named contacts, customer-managed keys, SLA, report sharing) carry a null CSF ID | VSAQ Apache-2.0, MVSP CC0, NIST public domain |
+| B. "MVSP short form", ~25 items, csv | One question per MVSP control, written for this project | CC0 |
+
+Each item's `source` names the closest VSAQ item or MVSP control, which for some topics is only adjacent (see
+`data/NOTICE.md`).
 
 CAIQ, HECVAT, SIG and the VSA questionnaire are not redistributable and are never bundled; visitors may upload
 their own copies.
@@ -384,6 +397,7 @@ on accuracy, cost and latency; results go to `evals/results/bench-<step>.md` and
 |---|---|---|
 | Column mapping | correct mapping on the 10 variants | 10/10 |
 | Parsing | lines extracted vs source text | reported |
+| Classification | kind, status, dated, scope, `evidence_allowed` vs the `facts.yaml` documents on the dev pack | 22/22 |
 | Retrieval | recall@8 of key evidence lines (no pinning) | ≥ 0.90 |
 | Stance | accuracy vs key stances | reported |
 | Labels | accuracy vs key before the interview | ≥ 0.80 |
@@ -406,14 +420,18 @@ cell; the interview fills an item), and the live smoke script against production
 
 ## 9. Security, limits, privacy
 
-- **Isolation:** signed HttpOnly cookie (SameSite=Lax, Secure on Vercel); every query scoped by workspace; 24-hour
-  deletion by daily cron; `POST /api/workspace/reset` for an immediate wipe.
-- **Cost guards:** per-workspace hourly model budget and a global daily cap (PriorPath `llm_budget`), OpenRouter
-  credit cap, per-IP limits on workspace creation, uploads and runs (Postgres counters keyed by a salted IP hash),
-  storage breaker (PriorPath `capacity`), and a precomputed sample run so the default path spends nothing.
+- **Isolation:** signed HttpOnly cookie (SameSite=Lax, Secure on Vercel); every query scoped by workspace; a
+  workspace is unusable after 24 hours and deleted within about 37 hours by two daily sweeps (section 10);
+  `POST /api/workspace/reset` for an immediate wipe.
+- **Cost guards:** per-workspace hourly model-call caps for each step (PriorPath `llm_budget` pattern) plus global
+  caps of 1,500 model calls an hour and 4,000 a day, counted in rows no workspace owns so a workspace reset cannot
+  refund them; OpenRouter credit cap, per-IP limits on workspace creation, uploads and runs (Postgres counters keyed
+  by a salted IP hash), storage breaker (PriorPath `capacity`), and a precomputed sample run so the default path
+  spends nothing.
 - **Upload limits:** PDF/DOCX/XLSX/CSV/MD/TXT only, checked by content as well as extension; ≤ 4 MB per file
-  (Vercel's request limit is 4.5 MB); ≤ 20 documents and ≤ 20,000 lines (about 200 pages) per workspace; ≤ 150 questionnaire items;
-  zip-bomb-safe xlsx reading (size and row caps).
+  (Vercel's request limit is 4.5 MB); ≤ 20 uploaded documents and ≤ 20,000 lines (about 200 pages) per workspace (the
+  bundled 22-document sample pack is loaded by the app, not uploaded, so this limit does not apply to it); ≤ 150
+  questionnaire items; zip-bomb-safe xlsx reading (size and row caps).
 - **Data handling:** uploaded document bytes are parsed in memory and never stored; only redacted lines are kept.
   Redaction (Presidio names, emails, phone numbers, addresses; regexes for API keys, private keys, tokens and
   connection strings) runs before storage and before any model call. The questionnaire xlsx is stored (for
@@ -426,12 +444,13 @@ cell; the interview fills an item), and the live smoke script against production
 
 ## 10. Operations and deployment
 
-Vercel Hobby plan (one project, Git-connected, `main` = production, previews per branch), Neon Postgres with pgvector, Vercel
-cron for cleanup, `/api/health` (database check under a 2 s statement timeout, 503 when degraded), UptimeRobot,
-Langfuse. Migrations run from Tarun's terminal against a Neon branch first, additive changes before code that needs
-them, risky ones back to back with the deploy (PriorPath RUNBOOK rules). After any packaging or middleware change,
-check `/` on the preview as well as `/api/health` (the PriorPath `cdn = true` incident). A hello-world deploy happens
-in Plan 1, not at the end.
+Vercel Hobby plan (one project, Git-connected, `main` = production; Git builds only `main` until Plan 4 gives previews
+a database, so a preview is made on demand with `vercel deploy`), Neon Postgres with pgvector, Vercel crons for
+cleanup (05:00 UTC) and the canary (17:00 UTC), `/api/health` (database check under a 2 s statement timeout; 503 only
+when the database is unreachable, see below), UptimeRobot, Langfuse. Migrations run from Tarun's terminal against a
+Neon branch first, additive changes before code that needs them, risky ones back to back with the deploy (PriorPath
+RUNBOOK rules). After any packaging or middleware change, check `/` on the preview as well as `/api/health` (the
+PriorPath `cdn = true` incident). A hello-world deploy happens in Plan 1, not at the end.
 
 **Alive, not awake.** A portfolio demo sits idle for weeks and must still work on the first click (the old Render and
 Railway demos died: Render's free services sleep and its free databases expire; Railway stops when credits run out).
@@ -441,9 +460,10 @@ Everything here scales to zero and wakes on request, and nothing expires on idle
   database) every 5 minutes, and `/api/health` every 60 minutes as a keyword monitor that alerts unless the body says
   `"status":"ok"`. That wakes Neon about 24 times a day, roughly 15 compute-hours a month.
 - A daily Vercel cron canary (`/api/internal/canary`) makes one tiny call per configured model and reads the
-  OpenRouter credit balance. `/api/health` reports `"status":"degraded"` (HTTP 200) when the last canary failed or
-  credits are under $2, and HTTP 503 only when the database is down; the hourly monitor emails Tarun either way.
-  This catches retired model IDs and empty credits before a visitor does.
+  OpenRouter credit balance; the same run also sweeps expired workspaces, twelve hours after the cleanup cron.
+  `/api/health` reports `"status":"degraded"` (HTTP 200) when the last canary failed, credits are under $2, or the
+  last canary is older than 36 hours (the cron stopped), and HTTP 503 only when the database is unreachable; the
+  hourly monitor emails Tarun either way. This catches retired model IDs and empty credits before a visitor does.
 - The sample path is precomputed and works with zero model credits.
 - No GitHub Actions schedules for keep-alive: GitHub disables scheduled workflows after 60 days without repository
   activity.
@@ -505,7 +525,7 @@ No subagent runs below Sonnet 5.5.
 
   | Rule | Check |
   |---|---|
-  | no sponsor content | `scripts/sponsor_check.sh` in CI: the sponsor's company name (a GitHub repository variable, so no file holds it) must not appear in any file, file name or commit; anything copied from the hackathon version carries that name |
+  | no sponsor content | `scripts/sponsor_check.sh` in CI: the sponsor's company name (a GitHub repository secret, masked in logs, so no file holds it) must not appear in any file, file name or commit; anything copied from the hackathon version carries that name |
   | no verified answer without a citation | database CHECK constraint |
   | frontend matches backend | generated OpenAPI types; CI fails on drift |
   | no secrets committed | gitleaks in CI |
@@ -519,8 +539,9 @@ No subagent runs below Sonnet 5.5.
 - **Two-failure rule:** the same failure twice stops the task for an adversary review and root-cause debugging.
   Tests are never weakened or deleted to get green. After three attempts the task returns to the lead, and to
   Tarun if needed.
-- **Shared memory:** `CLAUDE.md` (compact map: where things live, commands, hard rules), `docs/PROGRESS.md` and a
-  decisions log, updated at the end of every task.
+- **Shared memory:** `CLAUDE.md` (compact map: where things live, commands, hard rules) and `docs/PROGRESS.md`
+  (progress and a decisions table), updated at the end of every task. The lead's detailed per-task ledgers are local
+  and not in the repo.
 
 ### 11.4 Approval gates (Tarun says yes first)
 
@@ -556,11 +577,11 @@ with Tarun's OK.
 | OpenRouter may not offer embeddings | verify in Plan 2; full-text search alone is the fallback and the README says which is used |
 | Vercel bundle size (Presidio + spaCy model + pgvector client + openpyxl) | measure on the Plan 1 hello-world deploy; PriorPath already ships Presidio |
 | openpyxl drops images and charts in exported workbooks | stated in the export notice; checked on the 10 variants |
-| VSAQ wording is from 2016 | modernize wording; MVSP covers current topics; CSF IDs keep it grounded |
+| VSAQ wording is from 2016 | questions are written fresh, informed by VSAQ and not copied; MVSP covers current topics; CSF IDs on topic items keep it grounded |
 | Share-alike on adapted policy text | kept in `data/` under CC BY-SA with attribution; code stays MIT |
 | Synthetic packs can be too easy | traps table is a minimum; holdout built after freeze; key verified independently |
 | Swarm merge conflicts | file ownership per task, contracts frozen first, at most 6 parallel agents |
-| Public uploads abused | per-IP limits, budgets, size caps, 24 h deletion, redaction |
+| Public uploads abused | per-IP limits, budgets, size caps, 24 h expiry (deleted within about 37 h), redaction |
 | Neon's free 100 compute-hours a month run out (a 5-minute database health check alone keeps the compute awake 24/7, about 180 compute-hours a month) | monitors as in section 10 (UI every 5 minutes, database hourly); own Neon project; watch Neon usage after launch |
 | Vercel Hobby allotments are shared by every project on the account (4 Active CPU hours, 360 GB-hours of memory, 1,000,000 function invocations, 100 GB data transfer a month; going over pauses the account's usage for up to 30 days) | parse and redact once per upload, lazy-load Presidio, precomputed sample run, size and per-IP caps; watch the usage page after launch; Hobby is for non-commercial use, which a portfolio demo is |
 
