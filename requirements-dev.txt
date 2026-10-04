@@ -8,11 +8,13 @@ alembic>=1.13,<2
 # The renderers and the PDF reader are pinned exactly: data/dev/docs is compared byte for byte
 # (python -m datakit.validate docs) and read back as text, so a new version means re-rendering and checking the
 # pack again. lxml is what python-docx serializes through; et_xmlfile is what openpyxl writes XML with.
+# pyyaml is pinned too: it dumps data/dev/key/*.yaml, and test_main_writes_the_committed_keys compares those
+# bytes, so a new version means re-deriving the keys (python -m datakit.derive_key dev).
 openpyxl==3.1.5
 et_xmlfile==2.0.0
 python-docx==1.2.0
 lxml==6.1.3
 fpdf2==2.8.9
 pypdfium2==5.13.0
-pyyaml>=6,<7
+pyyaml==6.0.3
 types-PyYAML>=6
