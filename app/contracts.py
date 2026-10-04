@@ -106,6 +106,7 @@ class Retrieval:
 
 @dataclass(frozen=True)
 class Stance:
+    # 1-based index into the passages given to stance(); decide ignores 0, duplicates and out-of-range values
     passage: int
     stance: StanceLabel
     quote: str

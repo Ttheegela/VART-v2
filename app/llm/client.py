@@ -198,6 +198,7 @@ class OpenRouterClient:
                 {"ok": finish == "stop", "finish_reason": str(finish)},
                 {"input": tokens_in, "output": tokens_out},
             )
+            # raw compare on purpose: only exactly "stop" passes; _plain shapes the message, the trace is raw
             if finish != "stop":  # truncated or filtered
                 raise LLMError(f"{req.step}: finish_reason={_plain(finish)}")
             return LLMResult(text, tokens_in, tokens_out, cost, int((time.monotonic() - started) * 1000))

@@ -1,7 +1,10 @@
 """Record and replay model outputs so tests, evals and CI run without keys or network.
 
 A recording is JSONL: one line per model call, keyed by LLMRequest.key(). Replay never calls a model; a
-missing key raises ReplayMiss, so a changed prompt fails loudly instead of silently going live."""
+missing key raises ReplayMiss, so a changed prompt fails loudly instead of silently going live.
+
+Rows may hold lone surrogates (written with errors="surrogatepass"), so any reader must open the file with
+errors="surrogatepass"."""
 
 import json
 import threading

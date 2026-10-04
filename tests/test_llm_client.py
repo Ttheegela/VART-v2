@@ -1,11 +1,12 @@
 import json
+from types import SimpleNamespace
 from typing import Annotated, Any, Literal
 
 import httpx
 import pytest
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
-from app.llm.client import LLMError, OpenRouterClient, build_request, complete_model
+from app.llm.client import LLMError, OpenRouterClient, _plain, build_request, complete_model
 from tests.fakes import FakeLLM
 
 
@@ -310,22 +311,40 @@ def test_a_non_ascii_request_key_is_pinned() -> None:
     assert _golden(user).key() == GOLDEN_KEY_NON_ASCII
 
 
-@pytest.mark.parametrize("raw", ["1e999", "-1e999", "NaN", "-0.5"])
-def test_a_cost_that_is_not_a_finite_positive_number_is_none(raw: str) -> None:
+@pytest.mark.parametrize(
+    ("raw", "cost"),
+    [("1e999", None), ("-1e999", None), ("NaN", None), ("-0.5", None), ("0.0", 0.0)],  # free models cost 0
+)
+def test_a_cost_is_kept_only_when_finite_non_negative(raw: str, cost: float | None) -> None:
     body = json.dumps(_reply('{"ok": true, "note": null}', cost=123.0)).replace("123.0", raw).encode()
     result = _client(_bytes(body, "application/json")).complete(_req())
-    assert result.cost_usd is None and result.text == '{"ok": true, "note": null}'
+    assert result.cost_usd == cost and result.text == '{"ok": true, "note": null}'
 
 
-def test_a_call_reports_its_latency() -> None:
+def test_a_call_reports_its_latency(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Only the client's clock: the trace span reads time.monotonic too.
+    monkeypatch.setattr("app.llm.client.time", SimpleNamespace(monotonic=iter([10.0, 10.25]).__next__))
     result = _client(_json(_reply('{"ok": true, "note": null}'))).complete(_req())
-    assert isinstance(result.latency_ms, int) and result.latency_ms >= 0
+    assert result.latency_ms == 250
 
 
 def test_a_strange_finish_reason_is_not_echoed_raw() -> None:
     client = _client(_json(_reply("{}", finish="Content<script>Filter")))
     with pytest.raises(LLMError, match=r"finish_reason=contentscriptfilter$"):
         client.complete(_req())
+
+
+@pytest.mark.parametrize(
+    ("value", "plain"),
+    [
+        ("", "unknown"),
+        ("\N{CJK UNIFIED IDEOGRAPH-505C}\N{CJK UNIFIED IDEOGRAPH-6B62}", "unknown"),
+        ("abcdefghij" * 5, "abcdefghij" * 2),
+        (None, "none"),
+    ],
+)
+def test_plain_keeps_only_a_short_lowercase_word(value: object, plain: str) -> None:
+    assert _plain(value) == plain
 
 
 @pytest.mark.parametrize("handler", UNUSABLE.values(), ids=UNUSABLE.keys())
