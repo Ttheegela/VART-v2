@@ -1,0 +1,57 @@
+import os
+
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL", "postgresql+psycopg://vart:vart@localhost:5434/vart_test"
+)
+
+import pytest  # noqa: E402
+from sqlalchemy.engine import make_url  # noqa: E402
+
+if "test" not in (make_url(TEST_DATABASE_URL).database or ""):
+    pytest.exit("TEST_DATABASE_URL must point at a test database", returncode=2)
+
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+os.environ.setdefault("SESSION_SECRET", "test-session-secret")
+os.environ.setdefault("CRON_SECRET", "test-cron-secret")
+for _name in ("OPENROUTER_API_KEY", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "VERCEL"):
+    os.environ.pop(_name, None)
+
+from collections.abc import Iterator  # noqa: E402
+
+from alembic import command  # noqa: E402
+from alembic.config import Config  # noqa: E402
+from sqlalchemy import Engine, text  # noqa: E402
+from sqlalchemy.exc import OperationalError  # noqa: E402
+
+from app.db.session import get_engine  # noqa: E402
+
+TABLES = (
+    "workspaces, documents, document_lines, chunks, questionnaires, items, runs, run_items, answers, "
+    "audit_events, llm_usage, ip_limits, canary_runs"
+)
+
+
+def _truncate(engine: Engine) -> None:
+    with engine.begin() as conn:
+        conn.execute(text(f"TRUNCATE {TABLES} RESTART IDENTITY CASCADE"))
+
+
+@pytest.fixture(scope="session")
+def migrated_db() -> Iterator[Engine]:
+    engine = get_engine()
+    try:
+        with engine.connect():
+            pass
+    except OperationalError:
+        if os.environ.get("REQUIRE_DB") == "1":
+            pytest.fail("Postgres is required but not reachable at TEST_DATABASE_URL")
+        pytest.skip("Postgres not running: docker compose up -d db")
+    command.upgrade(Config("alembic.ini"), "head")
+    _truncate(engine)  # e2e runs share this database and leave rows behind
+    yield engine
+
+
+@pytest.fixture
+def db(migrated_db: Engine) -> Iterator[Engine]:
+    yield migrated_db
+    _truncate(migrated_db)

@@ -2910,7 +2910,7 @@ mount_frontend(app, Path(__file__).resolve().parent.parent / "public")
   },
   "crons": [
     { "path": "/api/internal/cleanup", "schedule": "0 5 * * *" },
-    { "path": "/api/internal/canary", "schedule": "0 6 * * *" }
+    { "path": "/api/internal/canary", "schedule": "0 17 * * *" }
   ]
 }
 ```

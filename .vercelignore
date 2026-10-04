@@ -1,0 +1,23 @@
+# Keep the deployed function small: the runtime needs only app/. Plan 4 un-ignores data/ for the sample pack.
+.venv
+.env*
+docs
+tests
+evals
+scripts
+datakit
+data
+.github
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.hypothesis
+.claude
+migrations
+alembic.ini
+docker-compose.yml
+openapi.json
+/public
+web/node_modules
+web/test-results
+web/playwright-report

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd web && npm ci && npm run build",
+  "functions": {
+    "app/main.py": { "excludeFiles": "web/**" }
+  },
+  "crons": [
+    { "path": "/api/internal/cleanup", "schedule": "0 5 * * *" },
+    { "path": "/api/internal/canary", "schedule": "0 17 * * *" }
+  ]
+}
