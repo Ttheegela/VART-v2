@@ -5,9 +5,9 @@ The answer keys next to this file (vsq-a.yaml, mvsp-b.yaml) are derived from the
 reader answered all 89 questions (64 in VSQ-A, 25 in MVSP-B) from the documents alone. It never saw the fact
 sheet, the keys or the plans. Its folder (`python -m datakit.compare prepare dev OUT`) held only the numbered
 text of the 22 documents, a metadata table (kind, status, date, scope, evidence allowed) and the two question
-lists, and it applied the decision rules of spec section 6.7 as written. `python -m datakit.compare diff` then
-listed where its label or value differed from the key: 86 of 89 agreed (VSQ-A 62 of 64, MVSP-B 24 of 25). The
-three disagreements are decided below.
+lists, and it applied the decision rules of spec section 6.7 as its first prompt stated them (that prompt had one
+mistake, noted below). `python -m datakit.compare diff` then listed where its label or value differed from the
+key: 86 of 89 agreed (VSQ-A 62 of 64, MVSP-B 24 of 25). The three disagreements are decided below.
 
 Future verifier prompts treat "planned" and "not yet" as no today. The first prompt listed them as partly-yes
 cues, which caused the two VSQ disagreements: a control planned for later does not exist today.
@@ -45,5 +45,8 @@ cues, which caused the two VSQ disagreements: a control planned for later does n
   HTTP requests are redirected to HTTPS." as its own paragraph after the TLS sentence. It is registered in
   facts.yaml as statement crypto-https-only (doc crypto, control encryption-in-transit, stance yes).
   cryptography-policy.docx was re-rendered and both keys re-derived. VSQ-18 and MVSP-2.2 stay verified / Yes and
-  gain the new quote as evidence; the tallies are unchanged (VSQ-A 30/5/9/7/13, MVSP-B 17/1/1/0/6).
-- Re-verified by a fresh blind reader: verified Yes, citing the new sentence (cryptography-policy.docx line 15); the TLS sentence alone was again judged a different topic.
+  gain the new quote as evidence; the tallies (Yes/No/Partial/Conflict/Unknown) are unchanged: VSQ-A 30/5/9/7/13,
+  MVSP-B 17/1/1/0/6.
+- Re-verified by a fresh blind reader: verified Yes, citing the new sentence (cryptography-policy.docx line 15).
+  On the TLS sentence alone its reply was "related but a different topic, so I did not count it", the same
+  judgement as before.
