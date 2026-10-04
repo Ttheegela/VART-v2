@@ -131,6 +131,9 @@ items:
   - doc: crypto
     quote: Data in transit is encrypted using TLS 1.2 or higher.
     stance: 'yes'
+  - doc: crypto
+    quote: The Kestrelyn application is served only over HTTPS, and HTTP requests are redirected to HTTPS.
+    stance: 'yes'
   conflict_trap: null
   scope_note_expected: false
   honest_negative: false

@@ -341,6 +341,11 @@ statements:
     control: encryption-in-transit
     stance: yes
     text: "Data in transit is encrypted using TLS 1.2 or higher."
+  - id: crypto-https-only
+    doc: crypto
+    control: encryption-in-transit
+    stance: yes
+    text: "The Kestrelyn application is served only over HTTPS, and HTTP requests are redirected to HTTPS."
   - id: crypto-key-rotation
     doc: crypto
     control: key-rotation

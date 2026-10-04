@@ -26,4 +26,6 @@ Customer data at rest is encrypted with AES-256 using AWS KMS.
 
 Data in transit is encrypted using TLS 1.2 or higher.
 
+The Kestrelyn application is served only over HTTPS, and HTTP requests are redirected to HTTPS.
+
 AWS KMS encryption keys are rotated annually.
