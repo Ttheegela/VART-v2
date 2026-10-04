@@ -1,6 +1,6 @@
 # VART v2: design spec
 
-_Date: 2026-10-03 · Status: draft for review · Owner: Tarun Theegela (solo rebuild) · Lead agent: Claude Opus 5.5_
+_Date: 2026-10-03 · Status: approved 2026-10-03; synced with Plan 1 as built 2026-10-04 · Owner: Tarun Theegela (solo rebuild) · Lead agent: Claude Opus 5.5_
 
 VART v2 fills in a vendor security questionnaire from a company's own documents. Every answer cites the exact
 passage it came from, contradictions between documents are flagged instead of guessed, and a person is asked only
@@ -30,7 +30,7 @@ evidence ("pinned evidence") ahead of search results, so its numbers flatter ret
 |---|---|---|
 | Data | sponsor's confidential pack (private) | public questionnaires + synthetic company packs (public) |
 | Inputs | one fixed corpus | sample pack, or the visitor's own questionnaire (xlsx/csv) and documents (PDF/DOCX/XLSX/CSV/MD/TXT) |
-| Retrieval | keyword search + key evidence pinned in | Postgres full-text + pgvector hybrid, no pinned evidence |
+| Retrieval | keyword search + key evidence pinned in | Postgres full-text (pgvector only if the eval shows a gain), no pinned evidence |
 | Labels | pure-code rules, hard-coded to one corpus | the same idea, generalized: rules read document metadata, not file names |
 | Interview | chat with a scripted employee | "Questions for you" queue; answers become evidence that can fill other items |
 | Output | JSON + Streamlit table | the visitor's own xlsx written back with formatting kept |
@@ -101,7 +101,7 @@ filled file goes back in the buyer's own format.
    confidence and number of sources. The sample company's run is precomputed, so the default path is instant and
    costs nothing; "Re-run live" spends the workspace budget.
 5. **Evidence drawer.** For any row: the answer, each cited passage highlighted inside its surrounding lines, the
-   evidence that was dropped and why (failed quote check, template, injection, negation), and for conflicts both
+   evidence that was dropped and why (failed quote check, template, injection) or downgraded by a negation cue, and for conflicts both
    sides with their dates: "The access control policy says X; the access review record dated 2026-09-04 says Y.
    Which is current?"
 6. **Questions for you.** A queue of open items: conflicts first, then unknown and partial items in high-weight topics
@@ -206,8 +206,7 @@ Inputs: the item, its stances, the passages with their document metadata. Rules 
    `placeholder` or `injection` (`not-evidence`, `placeholder`, `injection`).
 3. **Irrelevant.** Drop `irrelevant` stances.
 4. **Negation.** A `yes` stance whose quote contains a negation cue becomes `partial` (quote kept). The cue test runs
-   on the quoted text, not on the whole passage; the chunk's `negation` flag stays informational (shown in the
-   evidence drawer, usable by retrieval).
+   on the quoted text, not on the whole passage; the chunk's `negation` flag stays informational.
 5. **Scope.** If every `yes` document and every `no` document declares a scope and the two sets of scopes do not
    overlap, it is not a conflict: label `partial`, both cited, with a scope note ("the policy covers internal
    systems; the pentest covers the customer product"). A document with no declared scope applies everywhere.
@@ -299,7 +298,7 @@ ids return 404.
   fills), `POST /api/questions/{id}/skip`, `POST /api/suggestions/{id}/accept`
 - Export: `GET /api/runs/{id}/export` (xlsx or csv, matching the input)
 - Audit: `GET /api/audit`
-- Internal: `GET /api/internal/cleanup` (Vercel cron, bearer `CRON_SECRET`)
+- Internal: `GET /api/internal/cleanup` and `GET /api/internal/canary` (Vercel crons, bearer `CRON_SECRET`)
 
 The frontend's TypeScript types are generated from this OpenAPI schema; CI fails if the generated file drifts.
 
@@ -327,8 +326,8 @@ frozen contracts, then wired to the real one. Keyboard-usable grid and drawer; l
 
 | Sample | Built from | License |
 |---|---|---|
-| A. "Vendor Security Questionnaire", ~60 items, a deliberately messy xlsx (header offset, section rows, merged cells, a Yes/No column with data validation, a comments column) | Questions written for this project, informed by Google VSAQ items (2016) and MVSP controls; topic items tagged with a NIST CSF 2.0 subcategory, engagement-specific items (cyber insurance, named contacts, customer-managed keys, SLA, report sharing) carry a null CSF ID | VSAQ Apache-2.0, MVSP CC0, NIST public domain |
-| B. "MVSP short form", ~25 items, csv | One question per MVSP control, written for this project | CC0 |
+| A. "Vendor Security Questionnaire", ~60 items, a deliberately messy xlsx (header offset, section rows, merged cells, a Yes/No column with data validation, a comments column) | Questions written for this project, informed by Google VSAQ items (2016) and MVSP controls; topic items tagged with a NIST CSF 2.0 subcategory, engagement-specific items (cyber insurance, named contacts, customer-managed keys, SLA, report sharing) carry a null CSF ID | CC BY 4.0 (written for this project, see `data/LICENSE`); sources: VSAQ Apache-2.0, MVSP CC0, NIST public domain |
+| B. "MVSP short form", ~25 items, csv | One question per MVSP control, written for this project | CC BY 4.0 (`data/LICENSE`); source: MVSP CC0 |
 
 Each item's `source` names the closest VSAQ item or MVSP control, which for some topics is only adjacent (see
 `data/NOTICE.md`).
@@ -503,7 +502,7 @@ Everything here scales to zero and wakes on request, and nothing expires on idle
 | Backend: API | Sonnet 5.5 | endpoints, runs, limits, export |
 | Frontend | Opus 5.5 | React UI, mock API, Vitest |
 | Evals | Sonnet 5.5 | harness, record/replay, metrics, bench |
-| QA | Sonnet 5.5 | Playwright, real-browser checks on every preview |
+| QA | Sonnet 5.5 | Playwright, real-browser checks on every deploy (previews are made on demand) |
 | Security | Sonnet 5.5 | redaction and injection review, limits, `SECURITY.md` |
 | DevOps | Sonnet 5.5 | CI, Vercel, Neon, health, uptime |
 | Docs | Sonnet 5.5 | README, ARCHITECTURE, RUNBOOK, CUSTOMER_BRIEF, LEARNING, EVALS |

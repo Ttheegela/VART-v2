@@ -17,7 +17,7 @@ rewritten; where one differs from the repo, the repo and these notes win. Deviat
 
 - **Release route (Task 9).** The lanes and the infra script are merged on branch `release-plan1`, pushed, opened as a
   pull request and fast-forwarded into `main` only after CI is green on it; nothing is merged into `main` first (final
-  review I1). Every merge message ends with the trailer. Task 9 below says so.
+  review I1). The `release-plan1` merge commits end with the trailer.
 - **Dependencies (Task 1).** `openai>=3,<4` and `langfuse>=4,<5` (text: `>=1.40,<4`, `>=3.10,<5`).
   `requirements-dev.txt` adds `pytest-socket>=0.7` and pins the data lane's renderers and readers exactly, because the
   dev pack is compared byte for byte: `openpyxl==3.1.5`, `et_xmlfile==2.0.0`, `python-docx==1.2.0`, `lxml==6.1.3`,
@@ -3949,7 +3949,8 @@ This task is run by the lead with Tarun. Present the numbered list below as one 
 The lanes and the infra script are already merged on `release-plan1` (see the execution notes), with the spec and plan
 sync on top. No CI job has ever run on GitHub, and CI runs on `pull_request`, so whatever only Linux shows (byte-exact
 re-rendering of the dev pack, gitleaks over the full history, the `SPONSOR_NAME` secret, Playwright on `ubuntu-24.04`)
-must show up here, not on public `main`.
+must show up here, not on public `main`. The repository secret `SPONSOR_NAME` must exist before the push (set
+2026-10-04; `ops/setup.sh status` lists secret names), or the gates job fails closed.
 
 ```bash
 cd ~/Desktop/portfolio/projects/VART-wt-release   # branch release-plan1
@@ -3986,7 +3987,7 @@ his Terminal panel; he only pastes keys into hidden prompts):
 - finds the Neon project created in the `accounts` phase and runs `alembic upgrade head` against its direct URL;
 - confirms the Vercel environment variables exist (names only) and triggers the production deploy from `main`;
 - runs `python scripts/smoke.py <domain>`, calls `/api/internal/canary` with `CRON_SECRET`, and prints `/api/health`;
-- creates the two UptimeRobot monitors (UI `/` every 5 minutes; keyword `"status":"ok"` on `/api/health` every
+- then, as its own phase (`ops/setup.sh uptime`), creates the two UptimeRobot monitors (UI `/` every 5 minutes; keyword `"status":"ok"` on `/api/health` every
   60 minutes) when given an UptimeRobot API key, otherwise prints the two manual steps.
 Nothing secret is printed. Expected: smoke `ok: …`, canary `{"ok":true,…}`, health `"status":"ok"`. Then open `/` in
 a real browser (Tarun uses Comet) and confirm the status panel.
