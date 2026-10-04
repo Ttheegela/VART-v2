@@ -2,7 +2,9 @@
 
 import hashlib
 import json
+import math
 import re
+import time
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
@@ -49,6 +51,7 @@ class LLMResult:
     input_tokens: int = 0
     output_tokens: int = 0
     cost_usd: float | None = None
+    latency_ms: int | None = None  # wall time of the call; recordings keep it so replayed evals report speed
 
 
 class LLMClient(Protocol):
@@ -111,12 +114,26 @@ def complete_model[M: BaseModel](client: LLMClient, req: LLMRequest, out: type[M
         raise LLMError(f"{req.step}: output did not match {req.schema_name}") from exc
 
 
+def _cost(raw: Any) -> float | None:
+    """usage.cost, or None when it is missing, negative or not finite: an infinite cost would poison every sum
+    it joins (runs.cost_usd, the eval's cost per run). A cost that is not a number raises ValueError, which
+    makes the response unusable."""
+    if raw is None:
+        return None
+    cost = float(raw)
+    return cost if math.isfinite(cost) and cost >= 0 else None
+
+
 def _usage(response: Any) -> tuple[int, int, float | None]:
     u = getattr(response, "usage", None)
     if u is None:
         return 0, 0, None
-    cost = getattr(u, "cost", None)
-    return int(u.prompt_tokens or 0), int(u.completion_tokens or 0), float(cost) if cost is not None else None
+    return int(u.prompt_tokens or 0), int(u.completion_tokens or 0), _cost(getattr(u, "cost", None))
+
+
+def _plain(value: object) -> str:
+    """A provider-controlled value made safe for an error message and a log line."""
+    return re.sub(r"[^a-z_]", "", str(value).lower())[:20] or "unknown"
 
 
 class OpenRouterClient:
@@ -139,6 +156,7 @@ class OpenRouterClient:
         if req.item_id is not None:
             meta["item_id"] = req.item_id
         with trace_llm(req.step, model=req.model, kind=req.step, metadata=meta) as span:
+            started = time.monotonic()
             try:
                 response = self._client.chat.completions.create(
                     model=req.model,
@@ -172,7 +190,8 @@ class OpenRouterClient:
             ) as exc:
                 # A 200 whose body is unusable (error object, no choices, HTML, garbled or infinite usage,
                 # absurdly nested JSON) or a prompt the SDK cannot encode. ValueError already covers the JSON
-                # and Unicode errors. Nothing raw may leave this method: callers catch only LLMError.
+                # and Unicode errors. Nothing raw from a response may leave this method: callers catch only
+                # LLMError.
                 span.end({"ok": False, "error_type": type(exc).__name__})
                 raise LLMError(f"{req.step}: unusable response ({type(exc).__name__})") from exc
             span.end(
@@ -180,8 +199,8 @@ class OpenRouterClient:
                 {"input": tokens_in, "output": tokens_out},
             )
             if finish != "stop":  # truncated or filtered
-                raise LLMError(f"{req.step}: finish_reason={finish}")
-            return LLMResult(text, tokens_in, tokens_out, cost)
+                raise LLMError(f"{req.step}: finish_reason={_plain(finish)}")
+            return LLMResult(text, tokens_in, tokens_out, cost, int((time.monotonic() - started) * 1000))
 
 
 def default_client() -> LLMClient | None:

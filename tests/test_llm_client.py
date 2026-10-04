@@ -294,3 +294,42 @@ def test_error_paths_name_the_offending_definition() -> None:
 
     with pytest.raises(ValueError, match=r"\$defs\.Inner"):
         build_request("stance", "m", "p", "s", "u", Outer)
+
+
+GOLDEN_KEY_NON_ASCII = "5e28a9fb84766deb6f91d11458662eac7ccc0e61f2ddfdf79019c68c5ddbdcf1"
+
+
+def test_a_non_ascii_request_key_is_pinned() -> None:
+    # Pins ensure_ascii=False in key(): flipping it re-keys every recording that holds a curly quote or an
+    # accented letter, and the ASCII golden key above would not notice.
+    user = (
+        "Wird der Zugriff viertelj\N{LATIN SMALL LETTER A WITH DIAERESIS}hrlich "
+        "gepr\N{LATIN SMALL LETTER U WITH DIAERESIS}ft? \N{LEFT DOUBLE QUOTATION MARK}Ja"
+        "\N{RIGHT DOUBLE QUOTATION MARK} \N{EM DASH} caf\N{LATIN SMALL LETTER E WITH ACUTE} \N{CHECK MARK}"
+    )
+    assert _golden(user).key() == GOLDEN_KEY_NON_ASCII
+
+
+@pytest.mark.parametrize("raw", ["1e999", "-1e999", "NaN", "-0.5"])
+def test_a_cost_that_is_not_a_finite_positive_number_is_none(raw: str) -> None:
+    body = json.dumps(_reply('{"ok": true, "note": null}', cost=123.0)).replace("123.0", raw).encode()
+    result = _client(_bytes(body, "application/json")).complete(_req())
+    assert result.cost_usd is None and result.text == '{"ok": true, "note": null}'
+
+
+def test_a_call_reports_its_latency() -> None:
+    result = _client(_json(_reply('{"ok": true, "note": null}'))).complete(_req())
+    assert isinstance(result.latency_ms, int) and result.latency_ms >= 0
+
+
+def test_a_strange_finish_reason_is_not_echoed_raw() -> None:
+    client = _client(_json(_reply("{}", finish="Content<script>Filter")))
+    with pytest.raises(LLMError, match=r"finish_reason=contentscriptfilter$"):
+        client.complete(_req())
+
+
+@pytest.mark.parametrize("handler", UNUSABLE.values(), ids=UNUSABLE.keys())
+def test_an_unusable_response_keeps_its_cause(handler: Any) -> None:
+    with pytest.raises(LLMError) as caught:
+        _client(handler).complete(_req())
+    assert isinstance(caught.value.__cause__, Exception) and not isinstance(caught.value.__cause__, LLMError)
