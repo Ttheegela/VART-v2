@@ -760,7 +760,7 @@ Controls (id · topic · truth) and the statements each must have (doc: stance, 
 | key-rotation | Data | KMS keys rotated annually | crypto: yes |
 | data-classification | Data | Four levels | dcp: yes |
 | data-deletion | Data | Deleted within 30 days after contract end | dcp: yes |
-| data-residency | Data | All customer data in AWS us-east-1 | dcp: yes |
+| data-residency | Data | Policy says all customer data in AWS us-east-1; the asset inventory shows customer invoice exports on an on-premises office server | dcp: yes · ainv: no, the same OFFICE-FS01 record line registered a second time as `ainv-office-fs01-residency` [D3] |
 | ml-training | Data | Customer data never used to train models | dcp: no "Kestrelyn does not use customer data to train machine learning models." [H2] |
 | laptop-encryption | Data | Full-disk encryption required (draft handbook only) | hb: yes [R1] |
 | backups | BC/DR | Daily database backups | bcpol: yes |
@@ -787,7 +787,7 @@ Controls (id · topic · truth) and the statements each must have (doc: stance, 
 | central-logging | Logging | Datadog | lmp: yes |
 | alerting | Logging | On-call alerting for security events | lmp: yes |
 | asset-inventory | Assets | Maintained inventory | amp: yes |
-| cloud-only | Assets | SOC 2 says no on-premises infrastructure; an office file server was added in August | soc2: yes "The Company does not operate any on-premises data processing infrastructure; all systems are hosted in AWS." · ainv: no, the record line for asset OFFICE-FS01 (On-premises file server, Austin office, holds customer invoice exports, added 2026-08-12) [D2] |
+| cloud-only | Assets | SOC 2 says no on-premises infrastructure; an office file server was added in August | soc2: yes "All of the Company's data processing infrastructure is hosted in Amazon Web Services." (positive wording: no negation cue in a yes statement) · ainv: no, the record line for asset OFFICE-FS01 (On-premises file server, Austin office, holds customer invoice exports, added 2026-08-12) [D2] |
 | cyber-insurance | Engagement | (not in any document) | — [M1; fills F1 -> cyber-insurance-limit] |
 | cyber-insurance-limit | Engagement | (not in any document) | — [M2] |
 | security-contact | Engagement | (not in any document) | — [M3; fills F2 -> incident-contact] |
@@ -803,7 +803,7 @@ Injection statements (control: null, flags: [injection]):
 Note "One record line": for `arr` and `ainv`, a statement's `text` is the whole row exactly as `app.text.record_line` renders it from the spreadsheet source in Task 4, e.g. `System: AWS; Owner: Marcus Lee; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status: Overdue`.
 
 Traps (id, kind, statements or controls):
-- D1 date: the acp quarterly statement + the arr Overdue rows. D2 date: the soc2 cloud-only statement + the ainv OFFICE-FS01 row.
+- D1 date: the acp quarterly statement + the arr Overdue rows. D2 date: the soc2 cloud-only statement + the ainv OFFICE-FS01 row. D3 date: dcp-residency + ainv-office-fs01-residency.
 - X1 disagree: bcpol quarterly + bcp annually. X2 disagree: lmp one year + soc2 90 days.
 - S1 scope: acp MFA + pentest MFA. S2 scope: hrp background checks + vrm contractors.
 - N1, N2, N3 negation: the three flagged negation statements above (pentest MFA, soc2 bug bounty, sdp DAST).
@@ -1079,7 +1079,7 @@ if __name__ == "__main__":
 - Every control in the fact sheet appears at least once. Ask about `mfa`, `access-review` and `backup-restore-test` twice in different words (e.g. "Is MFA required for all users, including customer administrators?" and "Do employees use MFA for internal systems?").
 - Questions must not leak the answer ("We know you don't have a bug bounty..." is wrong).
 - Engagement items ask about this deal: cyber insurance (yes/no) and its limit, the security contact for Northbeam Health's account (name, email and a 24/7 phone number) and the incident contact, customer-managed encryption keys, the contractual uptime SLA, and sharing the latest pentest report under NDA. Word them so no document can answer them: the documents name a Head of Security, so the contact questions must ask for engagement-specific contact details that no document prints.
-- Questions about controls with a conflict trap must carry the threshold the documents disagree on, in every wording: access reviews "at least quarterly", backup restore tests "at least quarterly", security log retention "at least 12 months"; otherwise a reader can answer Yes from either side.
+- Questions about controls with a conflict trap must carry the threshold the documents disagree on, in every wording: access reviews "at least quarterly", backup restore tests "at least quarterly", security log retention "at least 12 months"; the cloud-only and data-residency questions must ask whether ALL infrastructure / ALL customer data is in AWS with nothing on premises (a "stored in the United States" wording would be answered Yes by both sides, because the office server is in Austin); otherwise a reader can answer Yes from either side.
 
 `data/questionnaires/mvsp-b.selection.yaml` — `questionnaire: mvsp-b`, `title: MVSP Short Form`, `buyer: Northbeam Health`, exactly 25 items, one per MVSP control, `code` `MVSP-<label>`, `source` `mvsp:<label>`, a question that asks whether the vendor meets that control, `csf_id`, and the closest fact-sheet `control`. If an MVSP control has no close control (e.g. physical access, data flow diagrams), add a control to `facts.yaml` with `truth: (not in any document)` and a `must_ask` trap entry for it, then re-run `validate facts`.
 
