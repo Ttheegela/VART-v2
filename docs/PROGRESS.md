@@ -13,6 +13,10 @@ _Last updated: 2026-10-04 · Branch: `main` (origin: https://github.com/Ttheegel
 | 5 Google Drive | not started | |
 
 ## Decisions
+This table is the decisions log kept in the repo. The detailed per-task review rulings are in the lead's local ledgers,
+which are not in the repo; the ones that changed the spec or a plan are written into that document (the spec, and each
+plan's "Execution notes").
+
 | Date | Decision |
 |---|---|
 | 2026-10-03 | Stack copied from PriorPath v2; VART gets its own Vercel project and Neon project |

@@ -2,7 +2,8 @@
 
 Fills vendor security questionnaires from a company's own documents with cited answers whose labels are decided by
 code, not by the model. Spec: `docs/superpowers/specs/2026-10-03-vart-v2-design.md`. Plans: `docs/superpowers/plans/`.
-Progress and decisions: `docs/PROGRESS.md`.
+Progress and the decisions table: `docs/PROGRESS.md`. The detailed per-task ledgers are local (git-ignored
+`.superpowers/`), not in the repo; what they changed is in the spec and each plan's "Execution notes".
 
 ## Hard rules (each gets a check that fails; the checks land with Plan 1A Tasks 2, 6, 7 and 8)
 1. Never open, copy or quote anything under `~/Desktop/portfolio/projects/ai-money-hackathon/` (sponsor-confidential).
