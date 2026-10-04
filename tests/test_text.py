@@ -1,6 +1,7 @@
 from datetime import date, datetime, time
 from pathlib import Path
 
+from app.patterns import NEGATION
 from app.text import cell_text, contains, normalize, record_line
 
 
@@ -9,6 +10,13 @@ def test_normalize_straightens_quotes_dashes_and_spaces() -> None:
         normalize("  \u201cAccess\u201d is\u00a0reviewed \u2014 quarterly\u2019s  ")
         == '"Access" is reviewed - quarterly\'s'
     )
+
+
+def test_normalize_folds_the_modifier_letter_apostrophe() -> None:
+    # Plan 2A Ruling 12. U+0149 folds as well: NFKC turns it into U+02BC + "n", so it becomes "'n".
+    folded = normalize("isn" + chr(0x2BC) + "t")
+    assert folded == "isn't"
+    assert NEGATION.search(folded)
 
 
 def test_normalize_folds_compatibility_characters() -> None:
@@ -69,7 +77,7 @@ def test_normalize_is_pinned() -> None:
 
     out = "\n".join(normalize(chr(c)) for c in range(sys.maxunicode + 1) if not 0xD800 <= c <= 0xDFFF)
     digest = hashlib.sha256(out.encode()).hexdigest()
-    assert digest == "77d4af9b000f4d898832f34f62abad154cfa0f51858f52d1ee941d5a7dff112f"
+    assert digest == "51d166991e8eaf3eec8fb43f514e3c3e644784c7976bc24355cd2b349dccd89a"
 
 
 def test_record_line_accepts_non_text_headers_and_cells() -> None:

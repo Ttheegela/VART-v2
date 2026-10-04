@@ -13,6 +13,7 @@ _TRANSLATE = str.maketrans(
         "\u2019": "'",  # right single quotation mark
         "\u201a": "'",  # single low-9 quotation mark
         "\u201b": "'",  # single high-reversed-9 quotation mark
+        "\U000002bc": "'",  # modifier letter apostrophe
         "\u201c": '"',  # left double quotation mark
         "\u201d": '"',  # right double quotation mark
         "\u201e": '"',  # double low-9 quotation mark

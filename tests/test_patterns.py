@@ -47,6 +47,8 @@ def test_negation_cues_match_whole_words_only(text: str) -> None:
         "Hello {{customer}}",
         "<insert date here>",
         "Lorem ipsum dolor sit amet.",
+        "[ ] MFA is enforced for all staff",  # an unchecked task box is not done (Plan 2A Ruling 10)
+        "every [X] months",
     ],
 )
 def test_placeholders(text: str) -> None:
@@ -84,6 +86,24 @@ def test_the_obvious_dev_injection_is_caught_and_the_subtle_one_is_not() -> None
 )
 def test_other_injections(text: str) -> None:
     assert INJECTION.search(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Administrators cannot override any firewall rules without a change ticket.",
+        "The IT manager will act as the assistant data protection officer.",
+        "Employees who ignore any of these rules may face disciplinary action.",
+        "Do not disregard any instructions given by fire wardens.",
+        "If you are using AI tools to process customer data, you must get approval.",
+        "When you are prompted by an AI assistant for credentials, report it.",
+        "Jailbreak detection is enforced on mobile devices by our MDM.",
+        "Our AI features use a fixed system prompt that customers cannot change.",
+    ],
+)
+def test_policy_prose_is_not_an_injection(text: str) -> None:
+    # Plan 2A Ruling 9: a cue needs an attack shape (review findings 1 and 3).
+    assert not INJECTION.search(text)
 
 
 def test_no_usable_dev_statement_trips_the_injection_or_placeholder_patterns_by_accident() -> None:
