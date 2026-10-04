@@ -4,41 +4,54 @@
 
 **Goal:** Measure the engine honestly and keep it honest: an eval harness that runs the whole pipeline over the dev pack on recorded model outputs, scores it against the keys, writes committed results and fails CI on a missed gate; a model bench that picks the model per step; then, after the lanes merge, the first recordings, the baseline, the chosen defaults and the gates wired into CI.
 
-**Architecture:** `evals/pack.py` reads the fact sheet, the two questionnaires and the keys (datakit's schemas) and loads the pack's documents into a fresh workspace in fact-sheet order. `evals/run.py` answers every item with `app.pipeline.answer_item`, judges each answer with a model from another family (`evals/judge.py`), simulates the interview (queue, never asked twice, scripted answers that should fill other items), runs a redacted-upload stage on MVSP-B (Plan 1A Ruling 10), and hands everything to `evals/score.py`, which computes the spec 8 metrics and the gates. Model calls go through `ReplayClient` (default, no network), `RecordingClient` (Tarun's terminal) or the live client; a missing recording stops the run with exit code 2. `evals/bench.py` compares candidate models per step on accuracy, cost and latency.
+**Architecture:** `evals/pack.py` reads the fact sheet, the two questionnaires and the keys (datakit's schemas) and loads the pack's documents into a fresh workspace in fact-sheet order. `evals/run.py` answers every item with `app.pipeline.answer_item`, judges each answer with a model from another family (`evals/judge.py`), simulates the interview (queue, never asked twice, scripted answers that should fill other items), runs a redacted-upload stage on MVSP-B (Plan 1A Ruling 10), and hands everything to `evals/score.py`, which computes the spec 8 metrics and the gates. Model calls go through `ReplayClient` (default, no network), `RecordingClient` (run by the lead with the eval key) or the live client; a missing recording stops the run with exit code 2. `evals/bench.py` compares candidate models per step on accuracy, cost and latency.
 
 **Tech Stack:** Python 3.12, the existing record/replay LLM client, datakit's pydantic schemas, httpx (the bench's model catalog), GitHub Actions.
 
-**Spec:** `docs/superpowers/specs/2026-10-03-vart-v2-design.md` - section 8 (mechanics, gates, tests), 7.3 (traps and what must happen), 7.4 (key format), 6.14 (record/replay, the judge's family), 11.4 (approval gates: re-recording paid evals happens in Tarun's terminal). Plan order: `docs/superpowers/plans/2026-10-04-vart-v2-plan2a-engine.md` (Part 0 first; lanes 2A and 2B run beside this one).
+**Spec:** `docs/superpowers/specs/2026-10-03-vart-v2-design.md` - section 8 (mechanics, gates, tests), 7.3 (traps and what must happen), 7.4 (key format), 6.14 (record/replay, the judge's family), 11.4 (approval gates: spending past the eval key's $5 cap). Plan order: `docs/superpowers/plans/2026-10-04-vart-v2-plan2a-engine.md` (Part 0 first; lanes 2A and 2B run beside this one).
+
+## Execution notes (decisions 2026-10-04)
+
+Tarun settled Plan 2's open decisions on 2026-10-04 (one row each in `docs/PROGRESS.md`; the spec carries them in sections 3, 6.5, 6.14, 8, 9, 10, 11.3, 11.4 and 11.5). The steps, commands and code below already carry them; where an older sentence differs, these notes win. The ones that touch this file:
+
+- **Model pool.** The bench candidates are `deepseek/deepseek-v4-flash,deepseek/deepseek-v4-pro,qwen/qwen3.5-flash-02-23,qwen/qwen3.7-plus,z-ai/glm-5.3-flash,moonshotai/kimi-k2.5,openai/gpt-oss-120b` plus the reference `anthropic/claude-sonnet-5.5`; every `--models` example and bench command uses that list (Tasks 3 and 5). A pick is the cheapest pool model that passes every gate and scores within 0.02 of Sonnet 5.5 on the step's bench metric (stance: label accuracy; draft: judge faithfulness); if none does, the lead proposes the best gate-passing pool model, reports the gap, and Tarun decides; Tarun approves the picks, shown with cost per 60 items and p50 seconds per item, before they become defaults (Task 5 Steps 2-3). Sonnet 5.5 is never a default. The draft bench judges a Qwen candidate with `moonshotai/kimi-k2.5` (Task 3, `judge_for`), and a Qwen drafter makes Kimi the judge default. Classify is not benched: its default is the cheapest pool model that keeps the classification eval at 22/22 (Task 5 Step 2).
+- **Gates.** After the baseline each gate tightens to max(spec value, baseline - 0.02) (Task 6 Step 1).
+- **Redaction of visitors' answers.** The interview stage stores each scripted answer as a statement, redacted like an upload (names and emails become tokens); the fixture's second answer carries a name, an email and a phone number on purpose (Task 2 Step 4).
+- **Vectors.** Tried only if the real baseline's retrieval recall@8 is below 0.95, and kept only if they raise it by at least 0.05; this is no longer Tarun's call (Task 4 Step 8; Task 6 Steps 3-4).
+- **Eval key.** Recordings (`python -m evals.run --mode record|live`) and the bench use `VART_EVAL_OPENROUTER_API_KEY` from `~/.config/vart/eval.env`; the lead, or an agent it names, runs them without asking Tarun, loading the file inside the command and mapping it to `OPENROUTER_API_KEY` for that command only (Task 4 Step 4, Task 5 Step 1); spending past the key's $5 cap needs him. The recording and bench steps are lead steps; the error messages and tests that used to point at Tarun now say "use the eval key, see CLAUDE.md" or "re-record with --mode record".
+- **Presidio and spaCy.** They ship in the Vercel function bundle; the lead checks the function size on a preview made with `vercel deploy` (Task 6 Step 5).
+- **Lanes.** Three lanes run in parallel, each in its own worktree: engine (Opus 5.5), ingest (Sonnet 5.5), evals (Sonnet 5.5); this file is the evals lane (Tasks 1-3) and the lead's integration (Tasks 4-6).
+- **Branches.** Tasks 4-6 run on branch `plan2` in `~/Desktop/portfolio/projects/VART-wt-plan2`, not on `main` in the main checkout (`main` stays production); the lead merges the lanes into `plan2` locally, with no approval needed (Task 4 Step 1); pushing and the release (a pull request `plan2` -> `main`, merged by fast-forward after green CI, then the deploy) need Tarun's OK (Task 6 Step 5).
 
 ## Global Constraints
 
 The full list is in plan2a; it applies here unchanged. The lines that matter most for this file:
 
-- Lane tasks (1-3): worktree `~/Desktop/portfolio/projects/VART-wt-evals`, branch `plan2-evals`, database `vart_test_evals`. Integration tasks (4-6): the main checkout on `main`, after Tarun approves the merge; database `vart_test_main` for agents and `vart_test_record` for Tarun's recording runs.
+- Lane tasks (1-3): worktree `~/Desktop/portfolio/projects/VART-wt-evals`, branch `plan2-evals` (from `plan2`), database `vart_test_evals`. Integration tasks (4-6): branch `plan2` in the worktree `~/Desktop/portfolio/projects/VART-wt-plan2`; the lead merges the lanes into it locally, with no approval needed; database `vart_test_main` for agents and `vart_test_record` for the lead's recording runs.
 - Every commit message ends with exactly: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Never open, list, copy or quote anything under `~/Desktop/portfolio/projects/ai-money-hackathon/`; never type the sponsor's company or people names.
 - Backend chain: `ruff check . && ruff format --check . && mypy app scripts datakit evals && pytest -q && alembic check`.
-- "`python -m evals.run --pack dev --replay` runs the whole pipeline over each questionnaire on recorded model outputs, scores it against the key, writes `evals/results/latest.{md,json}`, and exits non-zero on a failed gate. CI runs it and then `git diff --exit-code evals/results` (PriorPath pattern). Re-recording (`--record`) needs the OpenRouter key and runs in Tarun's terminal." (spec 8; this plan spells the flags `--mode replay|record|live`, replay being the default.)
+- "`python -m evals.run --pack dev --replay` runs the whole pipeline over each questionnaire on recorded model outputs, scores it against the key, writes `evals/results/latest.{md,json}`, and exits non-zero on a failed gate. CI runs it and then `git diff --exit-code evals/results` (PriorPath pattern)." (spec 8; this plan spells the flags `--mode replay|record|live`, replay being the default.)
 - "A model bench (`evals/bench.py`) compares candidate models per step on accuracy, cost and latency; results go to `evals/results/bench-<step>.md` and set the defaults." (spec 8)
 - "the judge is from a different family than the drafter" (spec 6.14): `evals.run` refuses to start otherwise.
-- Calls with the OpenRouter key run only in Tarun's terminal, never by an agent holding a key; the lead gives Tarun the exact commands. Secrets never in files, chat or commits (`read -rs`).
+- Calls with an OpenRouter key (`evals.run --mode record|live`, `evals.bench`) use the eval key, `VART_EVAL_OPENROUTER_API_KEY` in `~/.config/vart/eval.env` (mode 600, outside every repo; $5 credit limit). The lead, or an agent the lead names, runs them without asking Tarun: the file is loaded inside the command and mapped to `OPENROUTER_API_KEY` for that command only, and never printed (the commands are in Task 4 Step 4 and Task 5 Step 1). Spending past the cap needs Tarun. The production key stays in Vercel only. No other secret goes in a file, in chat or in a commit.
 - The eval writes to the database it is pointed at, so it refuses any database whose name lacks `test`.
 - Lane 2C imports the engine and ingest modules through the contract stubs Part 0 wrote; its tests replace whatever they call with fakes (`monkeypatch`), so they pass before and after the other lanes merge.
 - Each task owns the files it lists. Two-failure rule; never weaken, skip or delete a test.
 
 ## Review Focus
 
-1. **A recording is missing in replay** (a prompt changed, a model id changed). Expect: exit code 2 and a message that says to re-record in Tarun's terminal; never a pass, never a template or rules-only fallback that hides it. Pinned in Task 2 (`test_a_missing_recording_stops_the_run_with_exit_code_2`) and plan2a Tasks 7 and 9, plan2b Task 3.
+1. **A recording is missing in replay** (a prompt changed, a model id changed). Expect: exit code 2 and a message that says to re-record with `--mode record`; never a pass, never a template or rules-only fallback that hides it. Pinned in Task 2 (`test_a_missing_recording_stops_the_run_with_exit_code_2`) and plan2a Tasks 7 and 9, plan2b Task 3.
 2. **A replay on another machine** (Tarun's Mac records, CI's Ubuntu replays). Expect: byte-identical `evals/results/latest.{json,md}`: prompts hold no ids or dates (plan2a Task 6 test), ranks are rounded with file-and-line tie-breaks (plan2a Task 5), statements use a fixed date, results are sorted and rounded. Pinned in Task 4 (Step 6, the replay check) and Task 6 (the CI step).
 3. **Pointing the eval at a real database.** Expect: refused with exit code 2 before anything is written. Pinned in Task 2 (`test_main_refuses_a_database_that_is_not_a_test_database`).
-4. **A judge from the drafter's family** (for example after the bench moves the drafter to Google). Expect: refused with exit code 2. Pinned in Task 2 (`test_main_refuses_a_judge_from_the_drafters_family`).
+4. **A judge from the drafter's family** (for example after the bench picks a Qwen drafter while the judge default is still a Qwen model). Expect: refused with exit code 2. Pinned in Task 2 (`test_main_refuses_a_judge_from_the_drafters_family`).
 5. **Private strings in the redacted-upload stage** (a name in a record row, an email in the FAQ). Expect: none in stored lines or in any model request; the `redaction_private_leaks` gate fails otherwise. Pinned in Task 1 (`test_redaction_stage_numbers_are_scored`) and measured end to end in Task 4.
 
 ## Lane gates (run by the lead)
 
-- Lane tasks start after plan2a Part 0 and adversary checkpoint 1 are on `main`. Reviewer: Sonnet.
-- Adversary checkpoint 3 (Fable 5.1) on `main..plan2-evals` before the merge in Task 4.
-- Tasks 4-6 are the lead's, on `main`, with Tarun for every network step and every merge or push. The final Opus review of `main` runs after Task 6, before `main` is pushed.
+- Lane tasks start after plan2a Part 0 and adversary checkpoint 1 are on `plan2`. Reviewer: Sonnet.
+- Adversary checkpoint 3 (Fable 5.1) on `plan2..plan2-evals` before the merge in Task 4.
+- Tasks 4-6 are the lead's, on `plan2`: the lane merges and the eval-key runs need no approval (spending past the key's $5 cap, pushing and the release need Tarun's OK). The final Opus review of `plan2` runs after Task 6, before `plan2` is pushed.
 
 ## File Structure
 
@@ -359,7 +372,7 @@ def load_documents(
 ```python
 """Scores one eval run against the answer keys (spec 8). Pure functions over what evals/run.py observed. GATES
 are what CI enforces: the spec 8 table, the Plan 2 addendum (classification 22/22, D-trap date rule) and the
-traps table (spec 7.3); 2C Task 7 tightens them after the baseline."""
+traps table (spec 7.3); 2C Task 6 tightens them after the baseline to max(spec value, baseline - 0.02)."""
 
 import statistics
 from collections.abc import Iterator
@@ -696,7 +709,7 @@ def test_replay_needs_no_key_and_record_refuses_to_start_without_one(
 ) -> None:
     assert isinstance(run.client("replay", tmp_path / "x.jsonl"), ReplayClient)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    with pytest.raises(SystemExit, match="Tarun's terminal"):
+    with pytest.raises(SystemExit, match="use the eval key"):
         run.client("record", tmp_path / "x.jsonl")
 
 
@@ -750,15 +763,15 @@ def test_main_refuses_a_database_that_is_not_a_test_database(monkeypatch: pytest
 
 
 def test_main_refuses_a_judge_from_the_drafters_family(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DRAFT_MODEL", "google/a")
-    monkeypatch.setenv("JUDGE_MODEL", "google/b")
+    monkeypatch.setenv("DRAFT_MODEL", "qwen/a")
+    monkeypatch.setenv("JUDGE_MODEL", "qwen/b")
     assert run.main(["--pack", "dev"]) == 2
-    assert family("google/gemini-2.5-flash") == "google"
+    assert family("qwen/qwen3.7-plus") == "qwen"
 
 
 def test_the_judge_reads_the_evidence_and_the_answer() -> None:
     llm = FakeLLM(['{"faithful": false, "unsupported": ["every 30 days"]}'])
-    out = judge(llm, ItemInput("VSQ-01", "Q?", None), UNKNOWN, "Yes, every 30 days.", "google/j")
+    out = judge(llm, ItemInput("VSQ-01", "Q?", None), UNKNOWN, "Yes, every 30 days.", "qwen/j")
     assert out.unsupported == ["every 30 days"] and llm.requests[0].step == "judge"
     assert llm.requests[0].user.endswith("Answer: Yes, every 30 days.\n")
 
@@ -837,7 +850,7 @@ class JudgeOut(BaseModel):
 
 
 def family(model: str) -> str:
-    """'google/gemini-2.5-flash' -> 'google'."""
+    """'qwen/qwen3.7-plus' -> 'qwen'."""
     return model.split("/", 1)[0].lower()
 
 
@@ -885,7 +898,7 @@ Synthetic visitor answers for the interview stage: one per planted fill (spec 7.
 """Run the whole engine over a company pack and score it against the keys (spec 8).
 
     python -m evals.run --pack dev                  # replay recordings: no network, what CI runs
-    python -m evals.run --pack dev --mode record    # Tarun's terminal only: OPENROUTER_API_KEY set
+    python -m evals.run --pack dev --mode record    # needs OPENROUTER_API_KEY: the eval key, see CLAUDE.md
 
 Writes evals/results/latest.{json,md}; exits 0 when every gate passes, 1 when one fails, 2 when a recording
 is missing or the setup is wrong. Replay never calls a model; a missing recording stops the run (Plan 1A
@@ -954,7 +967,7 @@ def client(mode: str, path: Path) -> LLMClient:
         return ReplayClient(path)
     key = get_settings().openrouter_api_key
     if not key:
-        raise SystemExit("OPENROUTER_API_KEY is not set; record and live runs happen in Tarun's terminal")
+        raise SystemExit("OPENROUTER_API_KEY is not set (use the eval key, see CLAUDE.md)")
     live = OpenRouterClient(key)
     return live if mode == "live" else RecordingClient(live, path)
 
@@ -1152,7 +1165,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         report = run(args.pack, log, models)
     except ReplayMiss as exc:
-        print(f"recording missing ({exc}); re-record in Tarun's terminal with --mode record", file=sys.stderr)
+        print(f"recording missing ({exc}); re-record with --mode record", file=sys.stderr)
         return 2
     if args.mode == "record":
         keep_used(path, {r.key() for r in log.requests})
@@ -1195,9 +1208,9 @@ git commit -m "feat(evals): replay-first harness with judge, interview, fills an
 
 **Interfaces:**
 - Consumes: Tasks 1-2 (`evals.pack`, `evals.judge`, `evals.run.RECORDED`, `RESULTS`, `always`); `app.retrieve.retrieve`, `app.stance.stance`, `app.decide.decide`, `app.draft.write_draft` (stubs until the lanes merge); `app.llm.client.OPENROUTER_BASE_URL`, `OpenRouterClient`, `LLMError`; `app.llm.recorder.RecordingClient`, `ReplayClient`, `ReplayMiss`; httpx.
-- Produces: `python -m evals.bench --step stance|draft --models a,b,c [--pack dev] [--workers 6]` writing `evals/results/bench-<step>.md`; `catalog() -> dict[str, list[str]]`, `usable(models, known) -> list[str]`, `Usage` (thread-safe cost and latency meter), `bench_stance(...)`, `bench_draft(...)`, `markdown(step, pack, rows) -> str`.
+- Produces: `python -m evals.bench --step stance|draft --models a,b,c [--pack dev] [--workers 6]` writing `evals/results/bench-<step>.md`; `catalog() -> dict[str, list[str]]`, `usable(models, known) -> list[str]`, `Usage` (thread-safe cost and latency meter), `JUDGE_FALLBACK`, `judge_for(model, default) -> str | None`, `bench_stance(...)`, `bench_draft(...)`, `markdown(step, pack, rows) -> str`.
 
-The stance bench scores each candidate on label accuracy, conflicts caught and honest negatives kept (decide's rules on the candidate's stances); the draft bench takes decisions from the main recording and scores first-try check passes, template fallbacks and judge faithfulness. Both report failures, total cost and p50 latency per call, and skip a model the public catalog does not list or that lacks structured outputs. Calls run in a thread pool and are recorded under `evals/recorded/candidates/` (git-ignored since Plan 1A Task 1), so a rerun pays only for what is missing.
+The stance bench scores each candidate on label accuracy, conflicts caught and honest negatives kept (decide's rules on the candidate's stances); the draft bench takes decisions from the main recording and scores first-try check passes, template fallbacks and judge faithfulness, judging each candidate with the default judge, or with `moonshotai/kimi-k2.5` when the candidate is from the default judge's family (a Qwen drafter is judged by Kimi; the table's `judge` column says which). Both report failures, total cost and p50 latency per call, and skip a model the public catalog does not list or that lacks structured outputs. Calls run in a thread pool and are recorded under `evals/recorded/candidates/` (git-ignored since Plan 1A Task 1), so a rerun pays only for what is missing.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1207,7 +1220,7 @@ The stance bench scores each candidate on label accuracy, conflicts caught and h
 from datetime import date
 
 from app.llm.client import LLMRequest, LLMResult, build_request
-from evals.bench import Usage, markdown, usable
+from evals.bench import Usage, judge_for, markdown, usable
 from evals.judge import JudgeOut
 
 
@@ -1235,6 +1248,12 @@ def test_the_bench_table_has_one_row_per_model() -> None:
     assert f"# Model bench: stance (dev pack, {date.today().isoformat()})" in text
     assert "| model | label_accuracy | cost_usd |" in text and "| a/one | 0.9 | 0.1 |" in text
     assert "No candidate" in markdown("draft", "dev", [])
+
+
+def test_a_drafter_is_judged_by_another_family() -> None:
+    assert judge_for("deepseek/deepseek-v4-flash", "qwen/qwen3.7-plus") == "qwen/qwen3.7-plus"
+    assert judge_for("qwen/qwen3.5-flash-02-23", "qwen/qwen3.7-plus") == "moonshotai/kimi-k2.5"
+    assert judge_for("moonshotai/kimi-k2.5", "moonshotai/kimi-k2.5") is None  # no judge of another family
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -1245,11 +1264,15 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'evals.bench'`.
 - [ ] **Step 3: Create `evals/bench.py`**
 
 ```python
-"""Model bench (spec 8): compares candidate models for one step on accuracy, cost and latency over the dev
-pack and writes evals/results/bench-<step>.md. Live calls: run only in Tarun's terminal.
+r"""Model bench (spec 8): compares candidate models for one step on accuracy, cost and latency over the dev
+pack and writes evals/results/bench-<step>.md. Live calls need OPENROUTER_API_KEY: the eval key (CLAUDE.md).
 
-    python -m evals.bench --step stance --models google/gemini-2.5-flash-lite,openai/gpt-5-mini
-    python -m evals.bench --step draft --models deepseek/deepseek-v4-flash,openai/gpt-5-mini
+    python -m evals.bench --step stance --models \
+        deepseek/deepseek-v4-flash,deepseek/deepseek-v4-pro,qwen/qwen3.5-flash-02-23,qwen/qwen3.7-plus,\
+        z-ai/glm-5.3-flash,moonshotai/kimi-k2.5,openai/gpt-oss-120b,anthropic/claude-sonnet-5.5
+
+The same list serves --step draft; the candidates are the model pool plus the quality reference
+anthropic/claude-sonnet-5.5 (never a default).
 
 Each candidate's calls are recorded under evals/recorded/candidates/ (git-ignored), so a rerun after a
 network failure pays only for what is missing. The draft bench reads the stance decisions from the main
@@ -1283,6 +1306,7 @@ from evals.judge import family, judge
 from evals.run import RECORDED, RESULTS, always
 
 CANDIDATES = RECORDED / "candidates"
+JUDGE_FALLBACK = "moonshotai/kimi-k2.5"  # judges a candidate drafter from the default judge's family
 
 
 class Usage:
@@ -1316,6 +1340,15 @@ def usable(models: Sequence[str], known: dict[str, list[str]]) -> list[str]:
         else:
             out.append(m)
     return out
+
+
+def judge_for(model: str, default: str) -> str | None:
+    """The judge for a candidate drafter, always from another family (spec 6.14): the default judge, or
+    JUDGE_FALLBACK when the candidate shares the default's family (a Qwen drafter is judged by Kimi)."""
+    for judge_model in (default, JUDGE_FALLBACK):
+        if family(model) != family(judge_model):
+            return judge_model
+    return None
 
 
 def _parallel(fn: Callable[[ItemInput], Any], items: Sequence[ItemInput], workers: int) -> dict[str, Any]:
@@ -1399,16 +1432,19 @@ def bench_draft(
     judge_client = RecordingClient(OpenRouterClient(key), CANDIDATES / "judge.jsonl")
     rows = []
     for model in models:
-        if family(model) == family(defaults["judge"]):
-            print(f"skip {model}: same family as the judge {defaults['judge']}")
+        judge_model = judge_for(model, defaults["judge"])
+        if judge_model is None:
+            print(f"skip {model}: no judge from another family")
             continue
         usage = Usage(
             RecordingClient(OpenRouterClient(key), CANDIDATES / f"draft-{model.replace('/', '_')}.jsonl")
         )
 
-        def one(item: ItemInput, model: str = model, usage: Usage = usage) -> tuple[str, bool, bool]:
+        def one(
+            item: ItemInput, model: str = model, usage: Usage = usage, judge_model: str = judge_model
+        ) -> tuple[str, bool, bool]:
             draft = write_draft(usage, item, decisions[item.key], model, always, documents)
-            faithful = judge(judge_client, item, decisions[item.key], draft.text, defaults["judge"]).faithful
+            faithful = judge(judge_client, item, decisions[item.key], draft.text, judge_model).faithful
             return draft.source, not draft.problems and draft.source == "model", faithful
 
         out = _parallel(one, judged_items, workers)
@@ -1418,7 +1454,7 @@ def bench_draft(
             "fallbacks": sum(src == "template" for src, _, _ in out.values()),
             "judge_faithfulness": round(sum(f for _, _, f in out.values()) / n, 4),
         }
-        rows.append(_row(model, scores, usage, 0))
+        rows.append({**_row(model, scores, usage, 0), "judge": judge_model})
     return rows
 
 
@@ -1447,7 +1483,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     key = get_settings().openrouter_api_key
     if not key:
-        print("OPENROUTER_API_KEY is not set; the bench runs in Tarun's terminal", file=sys.stderr)
+        print("OPENROUTER_API_KEY is not set (use the eval key, see CLAUDE.md)", file=sys.stderr)
         return 2
     models = usable([m.strip() for m in args.models.split(",") if m.strip()], catalog())
     pack = packs.load(args.pack)
@@ -1496,7 +1532,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `pytest tests/test_eval_bench.py -q`
-Expected: PASS (3 tests).
+Expected: PASS (4 tests).
 
 - [ ] **Step 5: Run the chain and commit**
 
@@ -1507,18 +1543,18 @@ git add evals/bench.py tests/test_eval_bench.py
 git commit -m "feat(evals): model bench per step with catalog check, cost, latency and resumable recordings" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-**Lane 2C done when:** Tasks 1-3 are committed and reviewed, `pytest -q` is green in the worktree, and adversary checkpoint 3 has run on `main..plan2-evals`.
+**Lane 2C done when:** Tasks 1-3 are committed and reviewed, `pytest -q` is green in the worktree, and adversary checkpoint 3 has run on `plan2..plan2-evals`. The branch merges into `plan2` in Task 4.
 
 ---
 
-## Integration (on `main`, after all three lanes)
+## Integration (on `plan2`, after all three lanes)
 
 ### Task 4: Merge the lanes, record the first model outputs, and run the baseline
 
-Run by the lead. Steps 1 and 4 need Tarun: his OK to merge, and his terminal for the only step that uses the network with a key.
+Run by the lead, on branch `plan2` in `~/Desktop/portfolio/projects/VART-wt-plan2`. No step needs Tarun: the lead merges the lanes into `plan2` and runs the one step that uses the network with a key (Step 4) with the eval key; spending past its $5 cap would need him.
 
 **Files:**
-- Merge: `plan2-engine`, `plan2-ingest`, `plan2-evals` into `main`
+- Merge: `plan2-engine`, `plan2-ingest`, `plan2-evals` into `plan2`
 - Create (by the record run): `evals/recorded/dev.jsonl`, `evals/results/latest.json`, `evals/results/latest.md`
 - Possibly modify (tuning, Step 7 only): `app/retrieve.py`, `app/chunk.py`, `app/stance.py`, `app/draft.py` with their tests
 
@@ -1526,12 +1562,12 @@ Run by the lead. Steps 1 and 4 need Tarun: his OK to merge, and his terminal for
 - Consumes: everything in plan2a, plan2b and Tasks 1-3.
 - Produces: the committed baseline (`evals/results/latest.*`) that replays byte for byte; the recordings CI replays.
 
-- [ ] **Step 1: Present the merge to Tarun and merge on his OK**
+- [ ] **Step 1: Merge the lanes into `plan2`**
 
-A short numbered release plan: (1) merge `plan2-engine`, `plan2-ingest`, `plan2-evals` into local `main`; (2) the full chain on `main`; (3) the first recording in his terminal (about 330 model calls, roughly $0.10-$0.40 at the default models, about 20 minutes); (4) commit recordings and results locally. Nothing is pushed until Task 6. On his OK:
+The lead's order of work, all local and none needing Tarun's OK: (1) merge `plan2-engine`, `plan2-ingest`, `plan2-evals` into `plan2`; (2) the full chain on `plan2`; (3) the first recording with the eval key (about 330 model calls, roughly $0.10-$0.40 at the default models, about 20 minutes); (4) commit recordings and results locally. Nothing is pushed: pushing and the release need Tarun's OK (Task 6 Step 5).
 
 ```bash
-git checkout main
+cd ~/Desktop/portfolio/projects/VART-wt-plan2   # branch plan2
 git merge --no-ff plan2-engine -m "merge: Plan 2A engine" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git merge --no-ff plan2-ingest -m "merge: Plan 2B ingest" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git merge --no-ff plan2-evals -m "merge: Plan 2C evals" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -1539,7 +1575,7 @@ git merge --no-ff plan2-evals -m "merge: Plan 2C evals" -m "Co-Authored-By: Clau
 
 Expected: three merges without conflicts (the lanes own disjoint files; every stub was replaced by exactly one lane). A conflict means a lane edited a file it did not own: stop and resolve with the owning lane's version.
 
-- [ ] **Step 2: Run the full chain on `main`**
+- [ ] **Step 2: Run the full chain on `plan2`**
 
 Run (database `vart_test_main`): `pip install -r requirements-dev.txt && ruff check . && ruff format --check . && mypy app scripts datakit evals && pytest -q && alembic check && pytest -q tests/test_decide.py tests/test_decide_properties.py --cov=app.decide --cov-branch --cov-fail-under=100 && python -m datakit.validate all`
 Expected: all green; `grep -rn "NotImplementedError" app/` prints nothing (every stub replaced).
@@ -1547,20 +1583,18 @@ Expected: all green; `grep -rn "NotImplementedError" app/` prints nothing (every
 - [ ] **Step 3: Check that replay refuses to run without recordings**
 
 Run: `python -m evals.run --pack dev; echo "exit $?"`
-Expected: `recording missing (...); re-record in Tarun's terminal with --mode record` and `exit 2`.
+Expected: `recording missing (...); re-record with --mode record` and `exit 2`.
 
-- [ ] **Step 4: The first recording (Tarun's terminal)**
+- [ ] **Step 4: The first recording (the lead, with the eval key)**
 
-The lead sends Tarun exactly this, to paste into his own terminal (the key never reaches the chat or a file):
+The lead runs this, without asking Tarun. The eval key stays in `~/.config/vart/eval.env` (mode 600, outside every repo): the file is loaded inside the command and mapped to `OPENROUTER_API_KEY` for that command only, and the key is never printed. The `createdb` line runs from the main checkout, because `docker compose` is never run from a worktree:
 
 ```bash
-cd ~/Desktop/portfolio/projects/VART && source .venv/bin/activate
-docker compose exec db createdb -U vart vart_test_record 2>/dev/null; true
+cd ~/Desktop/portfolio/projects/VART-wt-plan2 && source ~/Desktop/portfolio/projects/VART/.venv/bin/activate
+(cd ~/Desktop/portfolio/projects/VART && docker compose exec db createdb -U vart vart_test_record 2>/dev/null; true)
 export DATABASE_URL=postgresql+psycopg://vart:vart@localhost:5434/vart_test_record
 alembic upgrade head
-read -rs OPENROUTER_API_KEY && export OPENROUTER_API_KEY
-python -m evals.run --pack dev --mode record
-unset OPENROUTER_API_KEY
+(set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.run --pack dev --mode record)
 ```
 
 Expected: about 20 minutes; the last line reads `N/15 gates pass` (with the failed gates named, if any); `evals/recorded/dev.jsonl`, `evals/results/latest.json` and `latest.md` are written. A network error stops the run; running the same command again resumes from the recordings already made and pays only for the rest.
@@ -1579,17 +1613,17 @@ Expected: the same gate line as the record run, the same exit code, and no diff:
 
 - [ ] **Step 7: If a gate fails, tune within these rules (at most three rounds)**
 
-Read `evals/results/latest.md` (label misses) and `latest.json` (`items`: label, value, citations, dropped reasons, draft source per item); sort each miss into retrieval (the key quote never reached the eight passages), stance (the model judged it wrongly), decide (a rule did what the spec says, or did not), or draft (check failures, judge). Allowed: chunk size, retrieval caps, the hop, generic security synonyms, the stance and draft prompts (bump `PROMPT_VERSION` to `@p2`), a decide fix where the code deviates from spec 6.7. Not allowed: anything that reads the keys or the fact sheet at runtime, item-specific rules, pinned evidence, a lowered spec gate. Every change carries a test, goes through review, and is followed by a re-record in Tarun's terminal (Step 4) and Steps 5-6. The same gate failing after two rounds triggers adversary checkpoint 2; after three rounds, Tarun decides (accept and report, or a design change).
+Read `evals/results/latest.md` (label misses) and `latest.json` (`items`: label, value, citations, dropped reasons, draft source per item); sort each miss into retrieval (the key quote never reached the eight passages), stance (the model judged it wrongly), decide (a rule did what the spec says, or did not), or draft (check failures, judge). Allowed: chunk size, retrieval caps, the hop, generic security synonyms, the stance and draft prompts (bump `PROMPT_VERSION` to `@p2`), a decide fix where the code deviates from spec 6.7. Not allowed: anything that reads the keys or the fact sheet at runtime, item-specific rules, pinned evidence, a lowered spec gate. Every change carries a test, goes through review, and is followed by a re-record by the lead with the eval key (Step 4) and Steps 5-6. The same gate failing after two rounds triggers adversary checkpoint 2; after three rounds, Tarun decides (accept and report, or a design change).
 
 - [ ] **Step 8: Record the baseline**
 
-Copy the gate table from `evals/results/latest.md` into the ledger and into the report to Tarun, with cost per 60 items and p50 seconds per item. If `retrieval_recall_at_8` is below 0.95, say so explicitly: vector search could then in principle clear spec 6.5's +0.05 bar, and whether to measure it is Tarun's call.
+Copy the gate table from `evals/results/latest.md` into the ledger and into the report to Tarun, with cost per 60 items and p50 seconds per item. If `retrieval_recall_at_8` is below 0.95, vector search could still clear spec 6.5's +0.05 bar, so vectors are tried (decision of 2026-10-04: tried only below 0.95, kept only if they raise recall@8 by at least 0.05; no longer Tarun's call): the lead writes that follow-up (embedding provider per spec 6.5, `chunks.embedding`, migration, retrieval change, re-record), which this plan does not contain. At 0.95 or above vectors are not tried (they could add at most 0.05), and nothing more is done.
 
 ---
 
 ### Task 5: Run the model bench and set the defaults
 
-Run by the lead; the bench runs in Tarun's terminal.
+Run by the lead, on `plan2`; the bench runs with the eval key, without asking Tarun (spending past its $5 cap needs him; the Sonnet 5.5 reference is the bench's largest cost).
 
 **Files:**
 - Create (by the bench): `evals/results/bench-stance.md`, `evals/results/bench-draft.md`
@@ -1600,30 +1634,29 @@ Run by the lead; the bench runs in Tarun's terminal.
 - Consumes: `python -m evals.bench` (Task 3); the main recording (Task 4).
 - Produces: `DEFAULT_MODELS` set from measurements (spec 6.14), the bench tables committed, and a baseline recorded with those defaults.
 
-- [ ] **Step 1: The bench runs (Tarun's terminal)**
+- [ ] **Step 1: The bench runs (the lead, with the eval key)**
 
-Candidate lists (the bench skips any id OpenRouter's catalog no longer lists or that lacks structured outputs, and says so; the lead may swap in newer ids from the catalog before sending this):
+One candidate list serves both steps: the pool models plus the Sonnet 5.5 reference (the bench skips any id OpenRouter's catalog no longer lists or that lacks structured outputs, and says so; the lead may swap in newer pool ids from the catalog). Prices for the record (OpenRouter, checked 2026-10-04, $ per million tokens in/out): Sonnet 5.5 2.00/10.00; deepseek-v4-flash 0.022/1.28; deepseek-v4-pro 0.209/0.418; qwen3.5-flash-02-23 0.065/0.26; qwen3.7-plus 0.32/1.28; glm-5.3-flash 0.15/0.50; kimi-k2.5 0.45/2.25; gpt-oss-120b 0.037/0.17.
 
 ```bash
-cd ~/Desktop/portfolio/projects/VART && source .venv/bin/activate
+cd ~/Desktop/portfolio/projects/VART-wt-plan2 && source ~/Desktop/portfolio/projects/VART/.venv/bin/activate
 export DATABASE_URL=postgresql+psycopg://vart:vart@localhost:5434/vart_test_record
-read -rs OPENROUTER_API_KEY && export OPENROUTER_API_KEY
-python -m evals.bench --step stance --models google/gemini-2.5-flash-lite,google/gemini-2.5-flash,openai/gpt-5-mini,deepseek/deepseek-v4-flash,qwen/qwen3-235b-a22b-2507
-python -m evals.bench --step draft --models deepseek/deepseek-v4-flash,openai/gpt-5-mini,mistralai/mistral-small-3.2-24b-instruct,qwen/qwen3-235b-a22b-2507
-unset OPENROUTER_API_KEY
+MODELS=deepseek/deepseek-v4-flash,deepseek/deepseek-v4-pro,qwen/qwen3.5-flash-02-23,qwen/qwen3.7-plus,z-ai/glm-5.3-flash,moonshotai/kimi-k2.5,openai/gpt-oss-120b,anthropic/claude-sonnet-5.5
+(set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.bench --step stance --models "$MODELS")
+(set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.bench --step draft --models "$MODELS")
 ```
 
-Expected: `wrote evals/results/bench-stance.md` and `wrote evals/results/bench-draft.md`; Google candidates are skipped in the draft bench while the judge is Google (spec 6.14).
+Expected: `wrote evals/results/bench-stance.md` and `wrote evals/results/bench-draft.md`; in the draft bench a Qwen candidate is judged by `moonshotai/kimi-k2.5` and every other candidate by the default judge (the table's `judge` column says which). A network error stops a bench; running it again pays only for the calls still missing. If a run would pass the key's $5 cap, stop and ask Tarun.
 
 - [ ] **Step 2: Propose the picks; Tarun approves**
 
-Rule: per step, the cheapest candidate whose label accuracy (stance) or judge faithfulness (draft) is within 0.02 of the best and that kept every honest negative, caught every conflict and failed no call; ties go to lower p50 latency. Classify and recheck follow the stance pick (classify is a rules fallback the dev pack never needs; recheck is the stance prompt). The judge stays from a different family than the chosen drafter; if the drafter becomes Google, the judge moves to the best non-Google stance candidate. Send Tarun the two tables, the picks and the cost per 60-item run they imply.
+Rule (decision of 2026-10-04): per step, the cheapest pool model that passes every gate (it kept every honest negative, caught every conflict and failed no call, and its label accuracy (stance) or judge faithfulness (draft) is at or above its spec gate, 0.80 or 0.90) and scores within 0.02 of Sonnet 5.5 on the step's bench metric (stance: label accuracy; draft: judge faithfulness); ties go to lower p50 latency. Sonnet 5.5 is the reference and is never picked. If no pool model is within 0.02, the lead proposes the best gate-passing pool model and reports the gap, and Tarun decides. Classify is not benched: its default is the cheapest pool model that keeps the classification eval at 22/22 on the dev pack, which the lead checks once in Step 4 (the dev pack's rules decide all 22 documents, so a classify model is only called on a document no rule knows). Recheck follows the stance pick (it is the stance prompt). The judge stays from a different family than the chosen drafter: when the drafter is a Qwen model, the judge default becomes `moonshotai/kimi-k2.5`. Send Tarun the two tables and the picks, each shown with its cost per 60 items (the table's `cost_usd` divided by the items benched, times 60) and its p50 seconds per item, plus the cost per 60-item run they imply; Tarun approves the picks before they become defaults.
 
 - [ ] **Step 3: Set the defaults**
 
-Edit the values in `DEFAULT_MODELS` in `app/settings.py` and the matching commented lines in `.env.example` to the approved ids (`recheck` equals `stance`). Run: `pytest tests/test_settings.py tests/test_main.py tests/test_canary.py -q` (the canary will check the new ids daily once deployed).
+Edit the values in `DEFAULT_MODELS` in `app/settings.py` and the matching commented lines in `.env.example` to the approved ids (`recheck` equals `stance`; when the approved drafter is a Qwen model, `judge` is `moonshotai/kimi-k2.5`). Run: `pytest tests/test_settings.py tests/test_main.py tests/test_canary.py -q` (the pool test in `test_settings.py` fails on a default outside the pool or a judge from the drafter's family; the canary will check the new ids daily once deployed).
 
-- [ ] **Step 4: Re-record with the new defaults (Tarun's terminal), then replay-check**
+- [ ] **Step 4: Re-record with the new defaults (the lead, with the eval key), then replay-check**
 
 If any default changed, repeat Task 4 Steps 4-6 (recording keys contain the model id, so the old recordings no longer match). Expected: the gate line again, then a byte-identical replay.
 
@@ -1649,7 +1682,7 @@ git commit -m "evals: model bench results, defaults set from them, baseline re-r
 
 - [ ] **Step 1: Tighten the gates from the baseline (spec 8: "tightened after the Plan 2 baseline")**
 
-For every `>=` gate whose baseline beats the spec value: new target = the larger of the spec value and the baseline minus 0.02, rounded down to two decimals; `<=` gates stay at 0; `1.0` gates stay at 1.0. Example: a label accuracy baseline of 0.87 gives `"label_accuracy": (">=", 0.85)`. Edit `GATES` in `evals/score.py`, then:
+Decision of 2026-10-04: each gate tightens to max(spec value, baseline - 0.02). For every `>=` gate: new target = the larger of the spec value and the baseline minus 0.02, rounded down to two decimals (a baseline that beats the spec value by less than 0.02 leaves the gate at the spec value); `<=` gates stay at 0; `1.0` gates stay at 1.0. Example: a label accuracy baseline of 0.87 gives `"label_accuracy": (">=", 0.85)`. Edit `GATES` in `evals/score.py`, then:
 
 Run: `python -m evals.run --pack dev; echo "exit $?"`
 Expected: `15/15 gates pass`, `exit 0`, and only the gate targets changed in `evals/results/` (`git diff evals/results`).
@@ -1668,16 +1701,16 @@ In `.github/workflows/ci.yml`, backend job: change `mypy app scripts datakit` to
 
 - [ ] **Step 3: Update `docs/PROGRESS.md`**
 
-In "At a glance", Plan 2 becomes `done` with the note "engine, ingest, evals; baseline <label accuracy>, recall@8 <value>, cost <value> per 60 items". Add decision rows dated the day of the merge: "Sample packs are not redacted; uploads and visitor answers are; citations quote the stored line (Plan 1A Ruling 10) - SECURITY.md (Plan 4) must say so"; "Retrieval is full-text only: recall@8 <value>, vectors cannot clear spec 6.5's +0.05 bar"; "Models per step from the bench: stance <id>, draft <id>, judge <id>"; "Gates set from the baseline (evals/score.py)".
+In "At a glance", Plan 2 becomes `done` with the note "engine, ingest, evals; baseline <label accuracy>, recall@8 <value>, cost <value> per 60 items". Add decision rows dated the day of the merge: "Sample packs are not redacted; uploads and visitor answers are; citations quote the stored line (Plan 1A Ruling 10) - SECURITY.md (Plan 4) must say so"; "Retrieval is full-text only: recall@8 <value>; vectors are tried only below 0.95 and kept only if they add 0.05 (<not tried, or the measured result>)"; "Models per step from the bench: stance <id>, draft <id>, judge <id>"; "Gates set from the baseline (evals/score.py)".
 
 - [ ] **Step 4: Spec sync (lead)**
 
 Edit the spec so it matches what was built and measured, one sentence each:
-- 6.5: candidates ranked by `ts_rank_cd` and an IDF-weighted term overlap, merged by reciprocal rank fusion; at most two text passages and three record rows per document; vectors not added (recall@8 <value>).
+- 6.5: candidates ranked by `ts_rank_cd` and an IDF-weighted term overlap, merged by reciprocal rank fusion; at most two text passages and three record rows per document; vectors not added (recall@8 <value>; tried only below 0.95, kept only if they add 0.05).
 - 6.7 rule 1: containment per line of the passage; 3 to 30 words, record rows as whole `Header: value` fields; reasons `quote-length` and `record-field`; any quote failure costs 0.2 in rule 9.
 - 6.8: an unknown item gets no draft call; its question goes to the interview queue as it is.
 - 6.11: `chunks.record`; `chunks.embedding` not added.
-- 6.14: the recheck model defaults to the stance model.
+- 6.14: the starting defaults are replaced by the bench's picks (stance <id>, draft <id>, classify <id>, judge <id>); the recheck model defaults to the stance model.
 - 8: the column-mapping gate moves to Plan 3 with the mapper; Plan 2 adds gates for classification (22/22), the D-trap date rule, fills, and the redacted-upload stage (citations 1.00, leaks 0).
 - 9: redaction finds personal names (two or more capitalised words, not organisation or product names), emails, phones, street addresses and secrets; place names are kept.
 
@@ -1688,7 +1721,7 @@ git add evals/score.py tests/test_eval_score.py .github/workflows/ci.yml docs/PR
 git commit -m "evals: gates set from the baseline and enforced in CI; progress and spec synced" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-Then the final Opus review of `main` (the whole Plan 2 diff). On a clean review, the lead sends Tarun a numbered release plan: push `main` to `VART-v2`; watch CI (backend job now runs the eval); the Vercel build picks up the new runtime dependencies (Presidio, spaCy and its model): check the function size on the preview before production, and `/` and `/api/health` after deploy (spec 10). Push and deploy only on his OK.
+Then the final Opus review of `plan2` (the whole Plan 2 diff). On a clean review, the lead sends Tarun one numbered release plan: (1) the Vercel build picks up the new runtime dependencies (Presidio, spaCy and its model), so check the function size on a preview made from the Vercel CLI (`vercel deploy` without `--prod`; Git previews are off for every branch except `main`, `vercel.json` `git.deploymentEnabled`; the preview sits behind Vercel Authentication, which does not matter because the size check reads the build output); (2) push `plan2` to `VART-v2` and open a pull request `plan2` -> `main`; (3) watch CI (the backend job now runs the eval); (4) fast-forward `main` to `plan2` after green CI, then deploy; (5) check `/` and `/api/health` after the deploy (spec 10). Push and release only on his OK.
 
 ## Self-review notes (for the lead)
 

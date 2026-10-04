@@ -41,6 +41,15 @@ plan's "Execution notes").
 | 2026-10-03 | Unit contracts are frozen at the start of Plan 2, the HTTP contract at the start of Plan 3 (each with an adversary review); Plan 1 freezes only the shared text rules and data schemas |
 | 2026-10-04 | Production domain `vart-v2.vercel.app` (`vart.vercel.app` was taken); a release goes through a PR with green CI, then `main` is fast-forwarded to it |
 | 2026-10-04 | Monitors keep the demo alive without keeping Neon awake: `/` every 5 min, `/api/health` every 60 min |
+| 2026-10-04 | Plan 2 models: every default comes from the model pool (cheap Chinese or open-weight OpenRouter models with structured outputs); Claude Sonnet 5.5 is only the bench's quality reference. A pick is the cheapest pool model that passes every gate and is within 0.02 of Sonnet 5.5, approved by Tarun; the starting defaults are Qwen and DeepSeek models (spec 6.14, 8) |
+| 2026-10-04 | Plan 2 gates tighten after the baseline to max(spec value, baseline - 0.02) (spec 8) |
+| 2026-10-04 | Redaction covers visitors' own interview answers too (names and emails become tokens), the same way as uploads (spec 9) |
+| 2026-10-04 | Place names and cloud regions stay unredacted, because data-residency answers need them (spec 9) |
+| 2026-10-04 | Presidio and spaCy `en_core_web_sm` ship in the Vercel function bundle; before the release the lead checks the function size on a `vercel deploy` preview, because Git previews are off for every branch except `main` (spec 10) |
+| 2026-10-04 | Vectors are tried only if the real baseline's recall@8 is below 0.95, and kept only if they raise it by at least 0.05 (spec 6.5) |
+| 2026-10-04 | Plan 2 runs three lanes in parallel, each in its own worktree: engine (Opus 5.5), ingest (Sonnet 5.5), evals (Sonnet 5.5) |
+| 2026-10-04 | Eval key `VART_EVAL_OPENROUTER_API_KEY` lives in `~/.config/vart/eval.env` (mode 600, outside every repo, $5 credit limit); the lead, or an agent it names, runs recordings and the bench with it without asking Tarun, spending past the cap needs him, and the production key stays in Vercel only (spec 8) |
+| 2026-10-04 | Plan 2 integrates on branch `plan2` (worktree `VART-wt-plan2`), so `main` stays production: the lead merges lanes into it locally; pushing and the release (PR to `main`, fast-forward after green CI, deploy) need Tarun's OK (spec 11.3-11.5) |
 
 ## How to run
 See `CLAUDE.md` (commands) and `README.md`.

@@ -10,24 +10,36 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-03-vart-v2-design.md` - section 3 (hard rules), 6.2-6.9 and 6.14 (units, decide rules, LLM client), 7.3 (traps), 8 (evals and gates), 9 (security), 11 (delivery, roles, guardrails). Companion plans: `docs/superpowers/plans/2026-10-04-vart-v2-plan2b-ingest.md` and `docs/superpowers/plans/2026-10-04-vart-v2-plan2c-evals.md`. Carry-over: `.superpowers/sdd/plan2-carryover.md` (rulings and deferred items Plan 1 handed to Plan 2, with its 2026-10-04 addendum).
 
+## Execution notes (decisions 2026-10-04)
+
+Tarun settled Plan 2's open decisions on 2026-10-04 (one row each in `docs/PROGRESS.md`; the spec carries them in sections 3, 6.5, 6.14, 8, 9, 10, 11.3, 11.4 and 11.5). The steps, commands and code below already carry them; where an older sentence differs, these notes win. The ones that touch this file:
+
+- **Model pool.** Every default model comes from the pool (provider prefixes `deepseek/`, `qwen/`, `z-ai/`, `moonshotai/`, `minimax/`, `xiaomi/`, `openai/gpt-oss-`); Claude Sonnet 5.5 (`anthropic/claude-sonnet-5.5`) runs only in the bench, as the quality reference, never as a default. Task 2 Step 6 sets the starting defaults (stance and classify `qwen/qwen3.5-flash-02-23`, draft `deepseek/deepseek-v4-flash`, judge `qwen/qwen3.7-plus`, recheck follows stance) with a test; plan2c Task 5 replaces them with the bench picks, which Tarun approves. When the drafter is a Qwen model, the judge default becomes `moonshotai/kimi-k2.5`.
+- **Gates.** After the baseline each gate tightens to max(spec value, baseline - 0.02) (Global Constraints; plan2c Task 6 Step 1).
+- **Vectors.** Tried only if the real baseline's retrieval recall@8 is below 0.95, and kept only if they raise it by at least 0.05; this is no longer Tarun's call (the ruled-out list below; plan2c Task 4 Step 8).
+- **Presidio and spaCy.** `presidio-analyzer`, `spacy` and `en_core_web_sm` stay runtime dependencies (Task 2 Step 10) and ship in the Vercel function bundle; before the release the lead checks the function size on a preview made with `vercel deploy` (plan2c Task 6 Step 5).
+- **Eval key.** Recordings and the bench run with `VART_EVAL_OPENROUTER_API_KEY` from `~/.config/vart/eval.env`, by the lead or an agent it names, without asking Tarun (Global Constraints; the `CLAUDE.md` line in Task 2 Step 10); spending past the key's $5 cap needs him.
+- **Lanes.** Three lanes run in parallel, each in its own worktree: engine (Opus 5.5), ingest (Sonnet 5.5), evals (Sonnet 5.5).
+- **Branches.** Part 0 and the integration tasks run on branch `plan2` in `~/Desktop/portfolio/projects/VART-wt-plan2`, not on `main` in the main checkout (`main` stays production); lanes branch from `plan2` after Part 0 and the lead merges them into it locally; pushing and the release need Tarun's OK. Database names are unchanged: `vart_test_main` stays the Part 0 and integration database, now used from the `plan2` worktree.
+
 ## How Plan 2 is split, and why
 
 Like Plan 1 (one shared task on `main`, then parallel lanes), Plan 2 starts with a shared contract freeze and then runs three lanes, one implementer each, in their own worktrees:
 
 | Part | File | Runs | Implementer |
 |---|---|---|---|
-| Part 0: contract freeze (Tasks 1-3) | this file | on `main`, in order, before any lane | Opus 5.5 |
+| Part 0: contract freeze (Tasks 1-3) | this file | on `plan2`, in order, before any lane | Opus 5.5 |
 | Lane 2A engine (Tasks 4-9) | this file | worktree `VART-wt-engine`, branch `plan2-engine` | Opus 5.5 |
 | Lane 2B ingest (Tasks 1-4) | plan2b | worktree `VART-wt-ingest`, branch `plan2-ingest` | Sonnet 5.5 |
 | Lane 2C evals (Tasks 1-3) | plan2c | worktree `VART-wt-evals`, branch `plan2-evals` | Sonnet 5.5 |
-| Integration (plan2c Tasks 4-6) | plan2c | on `main` after all three lanes merge; network steps in Tarun's terminal | lead (Opus 5.5) with Tarun |
+| Integration (plan2c Tasks 4-6) | plan2c | on `plan2` after the lead merges the three lanes into it; recordings and the bench run by the lead with the eval key | lead (Opus 5.5); Tarun approves the push and the release |
 
 Why three lanes and not one or two: the spec gives ingest (parsers, redaction, classification, chunking; Sonnet) and the engine (retrieval, stance, decide, draft, interview; Opus) different owners (spec 11.2), and they share nothing but the frozen types, so running them in parallel cuts the critical path from sixteen tasks in a row (before integration) to nine. The evals lane needs only the frozen signatures to write and test its harness. The stubs Part 0 writes are replaced only by the lane that owns them, so the three branches never edit the same file and merge cleanly. Fewer agents would be slower; more lanes would split tasks that depend on each other (the pipeline needs retrieval, stance, decide and draft).
 
 ## Global Constraints (all three Plan 2 files)
 
-- Repo `~/Desktop/portfolio/projects/VART`, after both Plan 1 lanes are merged into `main` (Plan 1A Task 9). Re-read `app/llm/client.py`, `app/llm/recorder.py`, `app/services/llm_budget.py`, `app/text.py` and `CLAUDE.md` on `main` before Part 0: Plan 1's adversary fix batch (for example the daily global model cap) may have changed them; where a step below is already done there, skip it and say so in the report.
-- Part 0 runs on `main` in the main checkout. Lanes run in worktrees the lead creates from `main` after adversary checkpoint 1: `plan2-engine` in `~/Desktop/portfolio/projects/VART-wt-engine`, `plan2-ingest` in `~/Desktop/portfolio/projects/VART-wt-ingest`, `plan2-evals` in `~/Desktop/portfolio/projects/VART-wt-evals`. Lanes push their branches to `VART-v2`; merging into `main` and pushing `main` happen only with Tarun's OK (spec 11.4).
+- Repo `~/Desktop/portfolio/projects/VART`, after both Plan 1 lanes are merged into `main` (Plan 1A Task 9). Re-read `app/llm/client.py`, `app/llm/recorder.py`, `app/services/llm_budget.py`, `app/text.py` and `CLAUDE.md` on `plan2` (created from `main` after Plan 1's release) before Part 0: Plan 1's adversary fix batch (for example the daily global model cap) may have changed them; where a step below is already done there, skip it and say so in the report.
+- Part 0 runs on branch `plan2` in the worktree `~/Desktop/portfolio/projects/VART-wt-plan2`, not on `main` in the main checkout: `main` is production and stays untouched until the release. Lanes run in worktrees the lead creates from `plan2` after adversary checkpoint 1: `plan2-engine` in `~/Desktop/portfolio/projects/VART-wt-engine`, `plan2-ingest` in `~/Desktop/portfolio/projects/VART-wt-ingest`, `plan2-evals` in `~/Desktop/portfolio/projects/VART-wt-evals`. Merging a lane into `plan2` is the lead's job (local, no approval needed). Pushing and the release (a pull request `plan2` -> `main`, merged by fast-forward after green CI, then the deploy) need Tarun's OK (spec 11.4, 11.5).
 - Every commit message ends with exactly: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` (even when the worker is a Sonnet model).
 - Never open, list, copy or quote anything under `~/Desktop/portfolio/projects/ai-money-hackathon/`; never type the sponsor's company or people names into any file (spec 3, rule 1).
 - Python `>=3.12,<3.13`. Runtime dependencies are exactly Plan 2A Task 2's list; adding one needs the lead's OK.
@@ -45,9 +57,9 @@ Why three lanes and not one or two: the spec gives ingest (parsers, redaction, c
 - "In `replay` a missing key is an error, so CI never touches the network." (spec 6.14) The eval runner catches `ReplayMiss` before `LLMError`; library code that degrades on `LLMError` re-raises `ReplayMiss` (Plan 1A Task 4).
 - Prompts never contain database ids, timestamps or the run date, so recording keys are byte-stable across runs and machines; prompt text is versioned (`stance@p1`, ...) and any change bumps the version.
 - Every model call in library code is preceded by `spend(step)` (`app.services.llm_budget.spender`), which commits at once: never two `try_consume` calls in one transaction, and no transaction open while a model runs (Plan 1A Task 3 review).
-- Calls with the OpenRouter key (`python -m evals.run --mode record|live`, `python -m evals.bench`) run only in Tarun's terminal, never by an agent holding a key. Secrets never in files, chat or commits; Tarun types them with `read -rs`.
+- Calls with an OpenRouter key (`python -m evals.run --mode record|live`, `python -m evals.bench`) use the eval key, `VART_EVAL_OPENROUTER_API_KEY` in `~/.config/vart/eval.env` (mode 600, outside every repo; an OpenRouter key with a $5 credit limit). The lead, or an agent the lead names, runs them without asking Tarun: load the file inside the command and map it to `OPENROUTER_API_KEY` for that command only, never print it, e.g. `(set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.run --pack dev --mode record)`. Spending past the cap needs Tarun. The production key stays in Vercel only and never goes in a local file. No other secret goes in a file, in chat or in a commit; Tarun types production secrets with `read -rs`.
 - Each task owns the files it lists; touching another needs the lead's OK and the reviewer rejects unowned edits. Two-failure rule: the same failure twice stops the task for adversary checkpoint 2. Never weaken, skip or delete a test. Three attempts on a task hand it back to the lead.
-- Gates (spec 8, dev pack; tightened after the baseline in plan2c Task 6): retrieval recall@8 >= 0.90; label accuracy before the interview >= 0.80; conflict recall 1.0; citations 1.00; template or draft cited as verified 0; injections followed 0; honest negatives all kept; asked twice never; judge faithfulness >= 0.90 and code checks all pass. Added by Plan 2 (carry-over addendum and spec 7.3): classification 22/22, the date rule on every D trap, every planted fill suggested, and on the redacted-upload stage citations 1.00 and private-data leaks 0. Reported, not gated: parsing, stance accuracy, conflict precision, ask recall and precision, scope notes on S traps, cost per 60-item run (target <= $0.30) and p50 seconds per item.
+- Gates (spec 8, dev pack; after the baseline each gate tightens to max(spec value, baseline - 0.02) in plan2c Task 6): retrieval recall@8 >= 0.90; label accuracy before the interview >= 0.80; conflict recall 1.0; citations 1.00; template or draft cited as verified 0; injections followed 0; honest negatives all kept; asked twice never; judge faithfulness >= 0.90 and code checks all pass. Added by Plan 2 (carry-over addendum and spec 7.3): classification 22/22, the date rule on every D trap, every planted fill suggested, and on the redacted-upload stage citations 1.00 and private-data leaks 0. Reported, not gated: parsing, stance accuracy, conflict precision, ask recall and precision, scope notes on S traps, cost per 60-item run (target <= $0.30) and p50 seconds per item.
 
 ## Review Focus
 
@@ -62,7 +74,7 @@ Why three lanes and not one or two: the spec gives ingest (parsers, redaction, c
 - **Adversary checkpoint 1** (Fable 5.1) after Task 3, before any lane starts: `app/contracts.py`, `docs/CONTRACTS.md`, the stubs, `app/patterns.py`, the `app/text.py` changes and the new pinned digest, the LLM client and recorder changes, the migration. Question: does every payload match its schema, and what is missing? Findings are fixed in Part 0 before the worktrees are created.
 - **Adversary checkpoint 2** whenever the two-failure rule fires.
 - **Adversary checkpoint 3** (Fable 5.1) on each lane's whole diff before it merges: what attack surface or edge case did everyone miss?
-- **Final Opus review** of `main` after plan2c Task 6, before `main` is pushed.
+- **Final Opus review** of `plan2` after plan2c Task 6, before `plan2` is pushed.
 - Reviewers: Opus for Task 1 (text rules), Task 4 (decide) and Task 8 (budgets in the pipeline); Sonnet for the rest.
 
 ## Plan 1 carry-over: where each item lands
@@ -103,7 +115,7 @@ Why three lanes and not one or two: the spec gives ingest (parsers, redaction, c
 | Addendum: `test_migrated_check_constraints_match_the_models` needs a `search_path` change when `chunks.embedding` (pgvector) arrives | ruled out with the embedding column (see below) |
 
 **Ruled out, with reasons:**
-- `chunks.embedding` and pgvector (1A L73): spec 6.5 adds vectors only if they raise recall@8 by at least 0.05. Full-text retrieval measured 0.952 on the dev pack while this plan was written (scratch probe of Task 5's code over the dev pack, 89 items), so no vector search can clear the bar; plan2c Task 4 records the measured baseline (if it comes in below 0.95, measuring vectors becomes Tarun's call), the spec sync says so, and the README (Plan 4) states full-text only.
+- `chunks.embedding` and pgvector (1A L73): spec 6.5 adds vectors only if they raise recall@8 by at least 0.05. Full-text retrieval measured 0.952 on the dev pack while this plan was written (scratch probe of Task 5's code over the dev pack, 89 items), so no vector search can clear the bar; plan2c Task 4 records the measured baseline (if it comes in below 0.95, vectors are tried, and kept only if they raise recall@8 by at least 0.05), the spec sync says so, and the README (Plan 4) states full-text only.
 - The `test_migrated_check_constraints_match_the_models` change for pgvector (addendum): it is needed only when a `vector` column exists; it travels with any future vector follow-up. `chunks.record` (Task 2) adds no CHECK constraint and its server default matches the model, so that test and `alembic check` (now `compare_server_default=True`) stay green.
 - Reasoning effort on `LLMRequest` (1A L116 Ruling 19): `max_tokens` is sized for thinking models (stance 3,000, draft 1,500, judge 1,500, canary 2,000), and the model bench reports length finishes as failures. Adding a request field would re-key recordings for no measured gain; add it only if a bench winner needs it.
 - In-flight dedupe in `RecordingClient` (1A L101): evals run items one at a time, the bench gives each candidate model its own file, and no two concurrent requests share a key in either; a duplicate would cost one call and be harmless on load.
@@ -131,7 +143,7 @@ tests/test_{patterns,contracts,spender,decide,decide_properties,retrieve,stance,
 
 ---
 
-### Task 1: Shared text rules (Part 0, on `main`)
+### Task 1: Shared text rules (Part 0, on `plan2`)
 
 Runs first, alone. The text rules are frozen by `tests/test_text.py::test_normalize_is_pinned` (CLAUDE.md rule 9); Plan 1 deferred four fixes to now, the last moment before any recording exists, because changing them later invalidates every recording. Also creates the pattern module that both the chunker (plan2b) and decide (Task 4) read.
 
@@ -387,7 +399,7 @@ git commit -m "feat: text rules strip every default-ignorable, footnote-digit ed
 
 ---
 
-### Task 2: Contracts, schema, budget hook and dependencies (Part 0, on `main`)
+### Task 2: Contracts, schema, budget hook and dependencies (Part 0, on `plan2`)
 
 **Files:**
 - Create: `app/contracts.py`, `docs/CONTRACTS.md`
@@ -757,11 +769,49 @@ def spender(session: Session, workspace_id: uuid.UUID) -> Callable[[str], bool]:
     return spend
 ```
 
-- [ ] **Step 6: Add the recheck model to `app/settings.py` and `.env.example`**
+- [ ] **Step 6: Move the starting model defaults to the model pool (decision of 2026-10-04)**
 
-In `DEFAULT_MODELS`, add the entry `"recheck": "google/gemini-2.5-flash-lite",  # the stance prompt on a visitor's statement`. In `Settings`, add the field `recheck_model: str = ""  # empty: the stance model` after `judge_model`, and make `models()` return `"recheck": self.recheck_model or self.stance_model` as a fifth entry. In `.env.example`, under the model overrides, add `# RECHECK_MODEL=` with the comment line `# (empty: the stance model)` above it. The daily canary keeps checking the same set of distinct model ids, because the recheck model defaults to the stance model.
+Today `app/settings.py` (lines 7-10) holds Google defaults for stance, classify and judge. Every default model comes from the model pool (spec 6.14); Claude Sonnet 5.5 runs only in the bench, as the quality reference, and is never a default. Append to `tests/test_settings.py`:
 
-- [ ] **Step 7: Write the contract stubs**
+```python
+# The model pool (spec 6.14): cheap Chinese or open-weight models on OpenRouter with structured outputs.
+POOL = ("deepseek/", "qwen/", "z-ai/", "moonshotai/", "minimax/", "xiaomi/", "openai/gpt-oss-")
+
+
+def test_defaults_come_from_the_model_pool_and_the_judge_is_from_another_family() -> None:
+    assert all(model.startswith(POOL) for model in DEFAULT_MODELS.values())
+    assert DEFAULT_MODELS["judge"].split("/")[0] != DEFAULT_MODELS["draft"].split("/")[0]
+```
+
+Run: `pytest tests/test_settings.py -q -k pool`
+Expected: FAIL on the first assertion (the Google ids are not pool models).
+
+In `app/settings.py`, replace the comment above `DEFAULT_MODELS` and the dict with:
+
+```python
+# Every default comes from the model pool (spec 6.14): cheap Chinese or open-weight models on OpenRouter
+# that support structured outputs. These are starting values; Plan 2's model bench replaces them with
+# measured picks. Claude Sonnet 5.5 runs only in the bench, as the quality reference, and is never a
+# default. The judge's family differs from the drafter's: when the drafter is a Qwen model, the judge is
+# moonshotai/kimi-k2.5.
+DEFAULT_MODELS = {
+    "stance": "qwen/qwen3.5-flash-02-23",
+    "draft": "deepseek/deepseek-v4-flash",
+    "classify": "qwen/qwen3.5-flash-02-23",
+    "judge": "qwen/qwen3.7-plus",
+}
+```
+
+In `.env.example`, replace the four commented model lines with `# STANCE_MODEL=qwen/qwen3.5-flash-02-23`, `# DRAFT_MODEL=deepseek/deepseek-v4-flash`, `# CLASSIFY_MODEL=qwen/qwen3.5-flash-02-23` and `# JUDGE_MODEL=qwen/qwen3.7-plus`.
+
+Run: `pytest tests/test_settings.py -q -k "pool or test_model_defaults"`
+Expected: PASS (the recheck tests from Step 1 still fail until Step 7). Classify is not benched: its default is the cheapest pool model that keeps the classification eval at 22/22 on the dev pack, which the lead checks once at integration (plan2c Task 5).
+
+- [ ] **Step 7: Add the recheck model to `app/settings.py` and `.env.example`**
+
+In `DEFAULT_MODELS`, add the entry `"recheck": "qwen/qwen3.5-flash-02-23",  # the stance prompt on a visitor's statement` (the same id as `stance`). In `Settings`, add the field `recheck_model: str = ""  # empty: the stance model` after `judge_model`, and make `models()` return `"recheck": self.recheck_model or self.stance_model` as a fifth entry. In `.env.example`, under the model overrides, add `# RECHECK_MODEL=` with the comment line `# (empty: the stance model)` above it. The daily canary keeps checking the same set of distinct model ids, because the recheck model defaults to the stance model.
+
+- [ ] **Step 8: Write the contract stubs**
 
 `app/ingest/__init__.py` is an empty file. The others:
 
@@ -1004,7 +1054,7 @@ def store_statement(
     raise NotImplementedError("Plan 2B Task 4")
 ```
 
-- [ ] **Step 8: Write `docs/CONTRACTS.md`**
+- [ ] **Step 9: Write `docs/CONTRACTS.md`**
 
 ````markdown
 # VART v2 unit contracts
@@ -1056,7 +1106,7 @@ documents' current metadata.
 - 2026-10-04: frozen (Plan 2A Task 2).
 ````
 
-- [ ] **Step 9: Dependencies, mypy overrides and CLAUDE.md**
+- [ ] **Step 10: Dependencies, mypy overrides and CLAUDE.md**
 
 Add to `requirements.txt` and, identically, to `[project].dependencies` in `pyproject.toml` (`tests/test_requirements_sync.py` compares the two):
 
@@ -1069,7 +1119,7 @@ spacy>=3.8,<4
 en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
 ```
 
-In `pyproject.toml`, add the comment `# spaCy small English model; 3.8.0 is the release for spaCy 3.8.x` above that last entry (PriorPath pattern) and extend the `[[tool.mypy.overrides]]` module list with `"presidio_analyzer", "presidio_analyzer.*", "spacy", "spacy.*"`.
+In `pyproject.toml`, add the comment `# spaCy small English model; 3.8.0 is the release for spaCy 3.8.x` above that last entry (PriorPath pattern) and extend the `[[tool.mypy.overrides]]` module list with `"presidio_analyzer", "presidio_analyzer.*", "spacy", "spacy.*"`. Presidio and spaCy's `en_core_web_sm` are runtime dependencies on purpose: they ship in the Vercel function bundle, as in PriorPath (decision of 2026-10-04); before the release the lead checks the function size on a preview made with `vercel deploy` (plan2c Task 6 Step 5).
 
 Append to `requirements-dev.txt`:
 
@@ -1110,30 +1160,32 @@ Under `## Map`, add:
 Under `## Commands`, add:
 
 ```
-- Evals, no network: `python -m evals.run --pack dev`. Re-recording (`--mode record`) and `python -m evals.bench`
-  need the OpenRouter key and run only in Tarun's terminal.
+- Evals, no network: `python -m evals.run --pack dev`. Recording (`--mode record|live`) and `python -m evals.bench`
+  use the eval key, never the production key. The lead, or an agent it names, runs them without asking Tarun, never
+  prints the key, and asks before spending past its $5 cap:
+  `(set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.run --pack dev --mode record)`
 ```
 
-- [ ] **Step 10: Run the tests and the chain**
+- [ ] **Step 11: Run the tests and the chain**
 
 Run: `pytest tests/test_contracts.py tests/test_spender.py tests/test_models.py tests/test_settings.py tests/test_main.py tests/test_requirements_sync.py tests/test_canary.py -q`
 Expected: PASS.
 Run: `ruff check . && ruff format --check . && mypy app scripts datakit && pytest -q && alembic check`
 Expected: all green; `python scripts/export_openapi.py && git diff --exit-code openapi.json` shows no drift (`VersionOut.models` is a free-form map).
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
 git add app/contracts.py docs/CONTRACTS.md app/decide.py app/retrieve.py app/stance.py app/draft.py app/pipeline.py \
   app/interview.py app/classify.py app/ingest/__init__.py app/ingest/store.py app/db/models.py migrations/versions \
   app/services/llm_budget.py app/settings.py .env.example requirements.txt requirements-dev.txt pyproject.toml CLAUDE.md \
   tests/test_contracts.py tests/test_spender.py tests/test_models.py tests/test_settings.py tests/test_main.py
-git commit -m "feat: frozen unit contracts and stubs, chunks.record, budget hook, recheck model, engine dependencies" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "feat: frozen unit contracts and stubs, chunks.record, budget hook, recheck model, pool model defaults, engine dependencies" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 3: LLM client and recorder hardening (Part 0, on `main`)
+### Task 3: LLM client and recorder hardening (Part 0, on `plan2`)
 
 **Files:**
 - Modify: `app/llm/client.py`, `app/llm/recorder.py`, `app/services/canary.py` (one comment)
@@ -1283,7 +1335,7 @@ git add app/llm/client.py app/llm/recorder.py app/services/canary.py tests/test_
 git commit -m "fix(llm): finite costs, latency in recordings, surrogate-safe replies, sanitised finish reason" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-**Then: adversary checkpoint 1** (see Lane gates). After its fixes land on `main`, the lead creates the three worktrees and the lane databases, and the lanes start.
+**Then: adversary checkpoint 1** (see Lane gates). After its fixes land on `plan2`, the lead creates the three worktrees and the lane databases, and the lanes start.
 
 ---
 
@@ -3498,7 +3550,7 @@ git add app/interview.py tests/test_interview.py
 git commit -m "feat(interview): queue order, one follow-up, statement re-check that only suggests" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-**Lane 2A done when:** all six tasks are committed and reviewed, `pytest -q` and the coverage gate are green in the worktree, and adversary checkpoint 3 has run on `main..plan2-engine`. The branch merges in plan2c Task 4.
+**Lane 2A done when:** all six tasks are committed and reviewed, `pytest -q` and the coverage gate are green in the worktree, and adversary checkpoint 3 has run on `plan2..plan2-engine`. The branch merges into `plan2` in plan2c Task 4.
 
 ## Self-review notes (for the lead)
 

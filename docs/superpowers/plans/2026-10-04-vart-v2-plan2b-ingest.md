@@ -8,7 +8,17 @@
 
 **Tech Stack:** Python 3.12, openpyxl (read-only mode), python-docx, pypdfium2 (text page, font size, loose char boxes), Presidio + spaCy `en_core_web_sm`, SQLAlchemy 2 bulk inserts.
 
-**Spec:** `docs/superpowers/specs/2026-10-03-vart-v2-design.md` - sections 6.4 (ingest, chunk flags, document metadata), 6.11 (tables), 9 (upload limits, data handling). Plan order and the shared contract freeze: `docs/superpowers/plans/2026-10-04-vart-v2-plan2a-engine.md` (Part 0, Tasks 1-3, must be on `main` before this lane starts).
+**Spec:** `docs/superpowers/specs/2026-10-03-vart-v2-design.md` - sections 6.4 (ingest, chunk flags, document metadata), 6.11 (tables), 9 (upload limits, data handling). Plan order and the shared contract freeze: `docs/superpowers/plans/2026-10-04-vart-v2-plan2a-engine.md` (Part 0, Tasks 1-3, must be on `plan2` before this lane starts).
+
+## Execution notes (decisions 2026-10-04)
+
+Tarun settled Plan 2's open decisions on 2026-10-04 (one row each in `docs/PROGRESS.md`). The steps and code below already carry them; where an older sentence differs, these notes win. The ones that touch this file:
+
+- **Visitors' answers are redacted too.** `store_statement` redacts an interview answer like an upload: names and emails become tokens (Task 4, `test_a_statement_is_a_dated_redacted_evidence_document`; emails go through the same `redact_lines` as uploads, pinned in `test_an_upload_is_redacted_before_it_is_stored`). Spec 9 says so.
+- **Place names and cloud regions stay unredacted**, because data-residency answers need them (Task 2, `test_business_text_is_left_alone` keeps `Ireland` and `AWS us-east-1`; the `app/redact.py` docstring says so).
+- **Presidio and spaCy.** `presidio-analyzer`, `spacy` and `en_core_web_sm` ship in the Vercel function bundle as runtime dependencies (plan2a Task 2 Step 10); before the release the lead checks the function size on a preview made with `vercel deploy` (plan2c Task 6 Step 5).
+- **Classify is not benched.** Its default (`Settings.classify_model`; the starting value is set in plan2a Task 2 Step 6) is the cheapest pool model that keeps the classification eval at 22/22 on the dev pack; the lead checks it once at integration (plan2c Task 5).
+- **Lane and branches.** This lane runs in parallel with 2A and 2C, in its own worktree (Sonnet 5.5), branches from `plan2` after Part 0, and is merged into `plan2` by the lead (plan2c Task 4); pushing and the release need Tarun's OK.
 
 ## Global Constraints
 
@@ -31,14 +41,14 @@ The full list is in plan2a; it applies here unchanged. The lines that matter mos
 1. **Real-world PDFs:** a word hyphenated across a line break, a paragraph that runs over a page break, a scan with no text layer, a password-protected file. Expect: the hyphen kept as a plain `-` (`multi-factor` survives), the paragraph joined into one line, a readable refusal for the last two. Pinned in Task 1 (`test_a_word_hyphenated_across_lines_keeps_a_plain_hyphen`, `test_paragraph_rules`, `test_a_scan_or_an_empty_pdf_is_refused`, `test_a_password_protected_pdf_is_refused`).
 2. **Spreadsheets as visitors make them:** a title and an "As of" line above the header, formulas saved without a cached value, a CSV saved as Windows-1252 or with a byte-order mark. Expect: the header found by the reference rule, every record dated by the stated date, formula cells shown as `(formula without a saved value)` and noted, text decoded correctly. Pinned in Task 1.
 3. **Upload abuse:** a zip bomb named `.xlsx`, a `.docx` renamed `.xlsx`, NUL bytes in a `.csv`, a 4 MB + 1 byte file, a 21st document, a workspace over 20,000 lines. Expect: `IngestError` with a sentence a visitor can read, and nothing stored. Pinned in Tasks 1 and 4.
-4. **Personal data in uploads:** names in record rows, emails, phone numbers, street addresses, keys and connection strings. Expect: tokens (`<PERSON>`, `<EMAIL>`, `<PHONE>`, `<ADDRESS>`, `<SECRET>`) in stored lines and in the file name; company, product and place names kept. Pinned in Tasks 2 and 4.
+4. **Personal data in uploads:** names in record rows, emails, phone numbers, street addresses, keys and connection strings. Expect: tokens (`<PERSON>`, `<EMAIL>`, `<PHONE>`, `<ADDRESS>`, `<SECRET>`) in stored lines and in the file name; company, product and place names and cloud regions kept. Pinned in Tasks 2 and 4.
 5. **Templates and placeholders:** a real policy with one `[bracketed]` line near its end (the dev pack's vulnerability policy) stays evidence; a document whose opening lines are placeholders or call it a template is not; scope only from an explicit scope line. Pinned in Task 3.
 
 ## Lane gates (run by the lead)
 
-- Starts after plan2a Part 0 and adversary checkpoint 1 are on `main`.
+- Starts after plan2a Part 0 and adversary checkpoint 1 are on `plan2`.
 - Reviewers: Opus for Task 1 (upload limits), Task 2 (redaction) and Task 4 (workspace limits); Sonnet for Task 3 (spec 11.2: Opus reviews decide, redaction and limits).
-- Adversary checkpoint 3 (Fable 5.1) on `main..plan2-ingest` before the merge in plan2c Task 4.
+- Adversary checkpoint 3 (Fable 5.1) on `plan2..plan2-ingest` before the merge in plan2c Task 4.
 
 ## File Structure
 
@@ -716,8 +726,8 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'app.redact'`.
 Regexes find secrets, emails, phone numbers and street addresses. Presidio (spaCy's small English model) finds
 personal names, kept only when they look like one: two or more capitalised words and no organisation or
 product word (the small model also tags company and product names as people; Plan 2 planning measured it on
-the dev pack). Place names are kept on purpose: data-residency answers depend on them. Sample packs are not
-redacted (Plan 1A Ruling 10); uploads and the visitor's own answers are."""
+the dev pack). Place names and cloud regions are kept on purpose: data-residency answers depend on them.
+Sample packs are not redacted (Plan 1A Ruling 10); uploads and the visitor's own answers are."""
 
 import re
 import threading
@@ -1555,7 +1565,7 @@ git add app/chunk.py app/ingest/store.py tests/test_chunk.py tests/test_ingest_s
 git commit -m "feat(ingest): heading-aware chunks with flags, one-transaction storage, upload limits, statements" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-**Lane 2B done when:** all four tasks are committed and reviewed, `pytest -q` is green in the worktree, and adversary checkpoint 3 has run on `main..plan2-ingest`. The branch merges in plan2c Task 4.
+**Lane 2B done when:** all four tasks are committed and reviewed, `pytest -q` is green in the worktree, and adversary checkpoint 3 has run on `plan2..plan2-ingest`. The branch merges into `plan2` in plan2c Task 4.
 
 ## Self-review notes (for the lead)
 
