@@ -1,10 +1,17 @@
 name: ci
 on:
   push:
+    branches: [main]
   pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   backend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     services:
       postgres:
         image: pgvector/pgvector:pg17
@@ -27,7 +34,9 @@ jobs:
         with:
           python-version-file: .python-version
           cache: pip
-          cache-dependency-path: requirements-dev.txt
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
       - run: ruff format --check .
@@ -37,7 +46,8 @@ jobs:
       - run: python scripts/export_openapi.py && git diff --exit-code openapi.json
       - run: python -m datakit.validate all
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: web
@@ -54,11 +64,12 @@ jobs:
       - run: npm run build
       - run: npm run gen:api && git diff --exit-code src/lib/api-types.ts
   gates:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # sponsor_check.sh scans the whole history (git log --all -p)
+          fetch-depth: 0 # the sponsor check and gitleaks both scan the whole history
       - uses: actions/setup-python@v5
         with:
           python-version-file: .python-version
@@ -67,11 +78,31 @@ jobs:
           # A repository secret, not a variable: a variable prints unmasked in public run logs.
           SPONSOR_NAME: ${{ secrets.SPONSOR_NAME }}
       - run: python scripts/check_monochrome.py
-      - uses: gitleaks/gitleaks-action@v3 # v2 runs on Node 20, which GitHub is removing from hosted runners
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # The gitleaks CLI, not gitleaks-action: the action scans only the `--no-merges --first-parent` range of a push
+      # (upstream issues #236, #163, #199), which skips what a merge brings in or fails on some merge pushes.
+      # The CLI scans every commit on every ref, on every run. No token and no network use beyond the download.
+      - name: gitleaks over the whole history
+        run: |
+          set -euo pipefail
+          # Pinned release. The sha256 is the linux_x64 line of the release's gitleaks_8.30.1_checksums.txt (GitHub's
+          # digest for the asset is the same). Bump both together.
+          version=8.30.1
+          sha256=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+          if [ "$(git rev-parse --is-shallow-repository)" != false ]; then
+            echo "shallow clone: the checkout needs fetch-depth: 0" >&2
+            exit 1
+          fi
+          archive="$RUNNER_TEMP/gitleaks.tar.gz"
+          curl --fail --silent --show-error --location --retry 5 --retry-delay 3 --retry-all-errors \
+            --output "$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz"
+          echo "${sha256}  ${archive}" | sha256sum --check --strict -
+          tar -xzf "$archive" -C "$RUNNER_TEMP" gitleaks
+          # Exit 1 on any finding; --redact keeps secret values out of this public log.
+          "$RUNNER_TEMP/gitleaks" git --redact --verbose --no-banner .
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     needs: [backend, frontend]
     services:
       postgres:
@@ -95,7 +126,9 @@ jobs:
         with:
           python-version-file: .python-version
           cache: pip
-          cache-dependency-path: requirements-dev.txt
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       - run: alembic upgrade head
       - uses: actions/setup-node@v4
@@ -112,5 +145,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: test-results
           path: web/test-results

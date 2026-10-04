@@ -1,6 +1,6 @@
 # VART v2 — Progress Log
 
-_Last updated: 2026-10-03 · Branch: `main` (local; no remote yet) · Live: not yet deployed_
+_Last updated: 2026-10-04 · Branch: `main` (origin: https://github.com/Ttheegela/VART-v2, public) · Live: not yet deployed_
 
 ## At a glance
 | Plan | Status | Notes |
