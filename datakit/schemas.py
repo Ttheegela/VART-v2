@@ -1,5 +1,6 @@
 """Shapes of the dev-data files. Everything under data/ is validated against these before evals trust it."""
 
+import re
 from datetime import date
 from pathlib import Path
 from typing import Any, Literal
@@ -156,8 +157,23 @@ class Key(_Strict):
     items: tuple[KeyItem, ...]
 
 
+_BOOL = "tag:yaml.org,2002:bool"
+
+
+class _Loader(yaml.SafeLoader):
+    """SafeLoader with only true/false as booleans; YAML 1.1 would turn a bare yes/no stance into a bool."""
+
+    yaml_implicit_resolvers = {
+        first: [(tag, rx) for tag, rx in rules if tag != _BOOL]
+        for first, rules in yaml.SafeLoader.yaml_implicit_resolvers.items()
+    }
+
+
+_Loader.add_implicit_resolver(_BOOL, re.compile(r"^(?:true|True|TRUE|false|False|FALSE)$"), list("tTfF"))
+
+
 def load_yaml[M: BaseModel](path: Path, model: type[M]) -> M:
-    return model.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+    return model.model_validate(yaml.load(path.read_text(encoding="utf-8"), Loader=_Loader))
 
 
 def dump_yaml(obj: BaseModel | dict[str, Any], path: Path) -> None:
