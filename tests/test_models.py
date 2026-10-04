@@ -6,7 +6,17 @@ from sqlalchemy import Engine, delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.db.models import Answer, AuditEvent, Chunk, Document, DocumentLine, LlmUsage, RunItem, Workspace
+from app.db.models import (
+    Answer,
+    AuditEvent,
+    Base,
+    Chunk,
+    Document,
+    DocumentLine,
+    LlmUsage,
+    RunItem,
+    Workspace,
+)
 from tests import factories as f
 
 
@@ -188,3 +198,27 @@ def test_deleting_a_workspace_deletes_everything_in_it(s: Session) -> None:
     ):
         assert s.scalar(text(f"select count(*) from {table}")) == 0, table
     assert s.scalar(select(func.count()).select_from(Document)) == 0
+
+
+_CHECKS = text("""
+    select c.relname, k.conname, pg_get_constraintdef(k.oid)
+    from pg_constraint k join pg_class c on c.oid = k.conrelid join pg_namespace n on n.oid = c.relnamespace
+    where k.contype = 'c' and n.nspname = :schema
+""")
+
+
+def test_migrated_check_constraints_match_the_models(migrated_db: Engine) -> None:
+    """`alembic check` never compares CHECK constraints, and the tests above run against the migrated tables,
+    so a rule edited only in models.py would pass CI and never reach production (nor the reverse). Postgres
+    normalizes the definition on both sides. pg_attrdef is left out on purpose: sequence defaults print as
+    nextval('public.x_id_seq') in one schema and nextval('x_id_seq') in the other; `alembic check` compares
+    the other server defaults (compare_server_default in migrations/env.py)."""
+    with migrated_db.begin() as conn:
+        conn.execute(text("drop schema if exists model_probe cascade; create schema model_probe"))
+        conn.execute(text("set local search_path to model_probe"))
+        Base.metadata.create_all(conn)
+        from_models = set(conn.execute(_CHECKS, {"schema": "model_probe"}).all())
+        conn.execute(text("drop schema model_probe cascade"))
+        migrated = set(conn.execute(_CHECKS, {"schema": "public"}).all())
+    assert migrated, "no CHECK constraints found in the migrated schema"
+    assert migrated == from_models, sorted(migrated ^ from_models)
