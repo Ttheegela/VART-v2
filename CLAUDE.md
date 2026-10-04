@@ -24,7 +24,9 @@ Progress and decisions: `docs/PROGRESS.md`.
 ## Map
 - `app/` FastAPI: `settings.py`, `text.py` (quote + record-line rules), `db/`, `api/`, `services/`, `llm/`, `observability.py`, `main.py`
 - `migrations/` Alembic. Production migrations run from Tarun's terminal, never in the build.
-- `web/` React + Vite + TypeScript + Tailwind v4; builds into `../public`, which FastAPI serves.
+- `web/` React + Vite + TypeScript + Tailwind v4; builds into `../public`, which FastAPI serves. Only `/` and
+  `/api/*` exist in production (Vercel serves `public/` from the CDN; other paths are FastAPI's JSON 404), so the UI
+  routes by query string.
 - `datakit/` dev-data tools (schemas, renderers, key derivation, validators). `data/` questionnaires, company packs, keys.
 - `scripts/` sponsor_check, check_monochrome, export_openapi, smoke. `tests/` pytest (needs Postgres).
 
@@ -34,3 +36,4 @@ Progress and decisions: `docs/PROGRESS.md`.
   (lanes use `vart_test_<lane>`). pytest reads `TEST_DATABASE_URL`; `alembic check` and the app read `DATABASE_URL`.
 - Backend: `ruff check . && ruff format --check . && mypy app scripts && pytest -q && alembic check`
 - Frontend: `cd web && npm run lint && npm test && npm run build`
+- Gates: `python scripts/check_monochrome.py` (the sponsor check is CI-only: it needs the secret)

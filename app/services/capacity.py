@@ -2,7 +2,9 @@ from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-MAX_DB_BYTES = 400 * 1024 * 1024  # Neon free gives 1 GB per project; stay well under it
+# Neon Free gives 1 GB of Postgres storage per project (20 GB per account); stay well under it.
+# Source: https://neon.com/docs/introduction/plans (checked 2026-10-04)
+MAX_DB_BYTES = 400 * 1024 * 1024
 
 
 def demo_is_full(session: Session) -> bool:
