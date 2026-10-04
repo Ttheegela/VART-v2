@@ -430,6 +430,21 @@ them, risky ones back to back with the deploy (PriorPath RUNBOOK rules). After a
 check `/` on the preview as well as `/api/health` (the PriorPath `cdn = true` incident). A hello-world deploy happens
 in Plan 1, not at the end.
 
+**Alive, not awake.** A portfolio demo sits idle for weeks and must still work on the first click (the old Render and
+Railway demos died: Render's free services sleep and its free databases expire; Railway stops when credits run out).
+Everything here scales to zero and wakes on request, and nothing expires on idle:
+- VART gets its own Neon project, so its 100 free compute-hours a month are separate from PriorPath's.
+- Monitoring must not keep the database awake: UptimeRobot checks `/` (served from the CDN, no function, no
+  database) every 5 minutes, and `/api/health` every 60 minutes as a keyword monitor that alerts unless the body says
+  `"status":"ok"`. That wakes Neon about 24 times a day, roughly 15 compute-hours a month.
+- A daily Vercel cron canary (`/api/internal/canary`) makes one tiny call per configured model and reads the
+  OpenRouter credit balance. `/api/health` reports `"status":"degraded"` (HTTP 200) when the last canary failed or
+  credits are under $2, and HTTP 503 only when the database is down; the hourly monitor emails Tarun either way.
+  This catches retired model IDs and empty credits before a visitor does.
+- The sample path is precomputed and works with zero model credits.
+- No GitHub Actions schedules for keep-alive: GitHub disables scheduled workflows after 60 days without repository
+  activity.
+
 ## 11. Delivery
 
 ### 11.1 Plans
@@ -528,6 +543,7 @@ created. (Alternative with no such risk: give the new repo a different name.)
 - [ ] Tests and evals run in GitHub Actions on every push; gates green
 - [ ] Langfuse traces on every model call; `/api/health` with UptimeRobot
 - [ ] Rate limits, budgets and a precomputed sample run
+- [ ] Stays alive: UptimeRobot on `/` (5 min) and `/api/health` (60 min, keyword), daily canary green, sample path works with no model credits
 - [ ] README written problem first: demo GIF, architecture, eval results (dev and holdout), v1 vs v2
 - [ ] `ARCHITECTURE.md`, `RUNBOOK.md`, `SECURITY.md`, `EVALS.md`, `LEARNING.md`, `PROGRESS.md`
 - [ ] Portfolio entry text: solo rebuild, accurate stack, demo link (site updated in the final refresh)
@@ -544,6 +560,7 @@ created. (Alternative with no such risk: give the new repo a different name.)
 | Synthetic packs can be too easy | traps table is a minimum; holdout built after freeze; key verified independently |
 | Swarm merge conflicts | file ownership per task, contracts frozen first, at most 6 parallel agents |
 | Public uploads abused | per-IP limits, budgets, size caps, 24 h deletion, redaction |
+| Neon's free 100 compute-hours a month run out (a 5-minute database health check alone keeps the compute awake 24/7, about 180 compute-hours a month) | monitors as in section 10 (UI every 5 minutes, database hourly); own Neon project; watch Neon usage after launch |
 | Vercel Hobby allotments are shared by every project on the account (4 Active CPU hours, 360 GB-hours of memory, 1,000,000 function invocations, 100 GB data transfer a month; going over pauses the account's usage for up to 30 days) | parse and redact once per upload, lazy-load Presidio, precomputed sample run, size and per-IP caps; watch the usage page after launch; Hobby is for non-commercial use, which a portfolio demo is |
 
 ## 14. Out of scope (re-stated)
