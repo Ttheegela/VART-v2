@@ -10,6 +10,66 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-03-vart-v2-design.md` — §3 hard rules, §6.1–6.2, §6.11 (schema), §6.14 (LLM client), §9 (security, limits), §10 (operations, *alive not awake*), §11 (delivery, guardrails). Companion plan: `docs/superpowers/plans/2026-10-03-vart-v2-plan1b-dev-data.md`.
 
+## Execution notes (2026-10-04)
+
+Plan 1A was built task by task, each task reviewed. The code blocks below are the plan as written and are not
+rewritten; where one differs from the repo, the repo and these notes win. Deviations, as built:
+
+- **Release route (Task 9).** The lanes and the infra script are merged on branch `release-plan1`, pushed, opened as a
+  pull request and fast-forwarded into `main` only after CI is green on it; nothing is merged into `main` first (final
+  review I1). Every merge message ends with the trailer. Task 9 below says so.
+- **Dependencies (Task 1).** `openai>=3,<4` and `langfuse>=4,<5` (text: `>=1.40,<4`, `>=3.10,<5`).
+  `requirements-dev.txt` adds `pytest-socket>=0.7` and pins the data lane's renderers and readers exactly, because the
+  dev pack is compared byte for byte: `openpyxl==3.1.5`, `et_xmlfile==2.0.0`, `python-docx==1.2.0`, `lxml==6.1.3`,
+  `fpdf2==2.8.9`, `pypdfium2==5.13.0`, `pyyaml==6.0.3` (text: ranges). Runtime dependencies stay ranges; pins or a
+  lock file are a Plan 4 item.
+- **Task 1.** `app/text.py` is the version hardened at adversary checkpoint 1 (word-edge `contains`, more hyphen folds,
+  invisible characters stripped before NFKC, ASCII-only source, a pinned digest), not the code below, and is frozen
+  (`CLAUDE.md` rule 9). `Settings` ignores empty environment values; `docker-compose.yml` publishes Postgres on
+  `127.0.0.1:5434`; `pyproject.toml` runs pytest with `--disable-socket --allow-hosts=127.0.0.1,localhost,::1` (it
+  guards Python socket connects, not DNS or libpq); `tests/test_requirements_sync.py` keeps `pyproject.toml` and
+  `requirements.txt` equal.
+- **Schema (Task 2).** The initial migration is `186f3400ded0`. Beyond the DDL below: `answers.conflict` is
+  `JSONB(none_as_null=True)`; indexes on `answers.statement_id` and `run_items.item_id`, and no separate ones on
+  `answers.run_id` or `items.questionnaire_id` (their unique constraints already lead with them);
+  `documents.source` allows `statement`. `compare_server_default=True` in
+  `migrations/env.py` and `test_migrated_check_constraints_match_the_models` stop CHECK constraints and server defaults
+  drifting between `models.py` and the migration.
+- **Budgets (Task 3).** The global model budget is counted in `ip_limits` rows no workspace owns (`global-llm`, kinds
+  `llm` and `llm-day`), so a workspace reset cannot refund it: 1,500 calls an hour **and 4,000 a day**
+  (`GLOBAL_PER_DAY`; the text has no daily cap), besides the per-workspace hourly caps per step. `ip_hash` raises on an
+  empty `SESSION_SECRET`; a cookie older than 24 hours starts a fresh workspace; `POST /api/workspace/reset` reads the
+  cookie itself and never creates a workspace or counts against the network's limit.
+- **LLM client (Task 4).** Every unusable HTTP 200 reply becomes `LLMError` (never a raw SDK exception), and schemas
+  with `oneOf` or `prefixItems` are rejected.
+- **Canary and health (Task 5).** The canary's `max_tokens` is 2000 (text: 200, which a reasoning model can use up and
+  end in `finish_reason=length`). `/api/health` answers 503 only when the database is unreachable; a failed canary,
+  credits under $2 or a canary older than 36 hours give 200 with `"status":"degraded"`.
+- **Crons and retention.** `vercel.json` has two crons: cleanup at `0 5 * * *` and the canary at `0 17 * * *` (UTC). The
+  canary endpoint also sweeps expired workspaces, so a workspace is unusable after 24 hours and deleted within about
+  37 hours.
+- **Frontend (Task 6).** `openapi-typescript` stays at 6.7.6: 7.x declares a TypeScript 5 peer and the project uses
+  TypeScript 6 (re-check in Plan 4). `scripts/export_openapi.py` puts the repo root on `sys.path`. The status panel
+  renders outside the workspace gate, so a database outage still shows "Unavailable".
+- **Gates (Task 7).** `check_monochrome.py` also scans `.svg`, `.js`, `.jsx` and `.html` under `web/src`,
+  `web/public/*.svg` and `web/index.html`, and flags 4- and 8-digit hex, named colours, colour functions, coloured
+  emoji and colour filters. `sponsor_check.sh` fails closed on any git or grep error, rejects a padded name, runs
+  under `LC_ALL=C` and never prints the name. **The sponsor name is a repository secret, not a variable** (text:
+  `vars.SPONSOR_NAME`; a variable prints unmasked in public run logs).
+- **CI (Task 8).** `ci.yml` runs on `push` to `main` and on `pull_request` (text: every push), with
+  `permissions: contents: read`, `runs-on: ubuntu-24.04` on every job (text: `ubuntu-latest`),
+  `persist-credentials: false`, job timeouts and per-ref concurrency. The gates job reads `secrets.SPONSOR_NAME` and
+  scans the whole history with the gitleaks CLI 8.30.1 (pinned download, sha256-checked, `--redact`, shallow clones
+  refused) instead of `gitleaks/gitleaks-action@v2`, which scans only the `--no-merges --first-parent` range of a push
+  and would skip or fail on the lane merges. `.gitleaks.toml` allowlists one line, `GOLDEN_KEY` in
+  `tests/test_llm_client.py` (a sha256 replay key). The backend job runs `mypy app scripts datakit` and exports
+  `DATABASE_URL` for `alembic check`.
+- **Infra and deploy.** `ops/setup.sh` (phases `accounts`, `release`, `uptime`, `status`) pins Vercel CLI 62.2.0 and
+  neonctl 8.0.5; the UptimeRobot monitors come from the separate `uptime` phase, after `release` (text: part of
+  `release`). Preview deployments get no production secrets until Plan 4 adds a Neon branch for them, so `vercel.json`
+  makes Git build only `main` (`git.deploymentEnabled`). `release` deploys the local checkout, so `.vercelignore` also
+  excludes `.superpowers` and `ops`.
+
 ## Global Constraints
 
 - Repo: `~/Desktop/portfolio/projects/VART`. Task 1 runs on `main`. Tasks 2–8 run on branch `plan1-foundation` in worktree `~/Desktop/portfolio/projects/VART-wt-foundation` (the lead creates it). Plan 1B runs in parallel on `plan1-data`. The repo is `github.com/Ttheegela/VART-v2` (public, created before Task 1); lanes push their branches there as they go. Task 9 merges both into `main` and deploys, with Tarun's OK.
@@ -3884,27 +3944,40 @@ This task is run by the lead with Tarun. Present the numbered list below as one 
 **Files:**
 - Modify: `docs/PROGRESS.md` (live URL, release notes)
 
-- [ ] **Step 1: Merge the lanes and run everything on `main`**
+- [ ] **Step 1: Push `release-plan1`, open a pull request, wait for green CI**
+
+The lanes and the infra script are already merged on `release-plan1` (see the execution notes), with the spec and plan
+sync on top. No CI job has ever run on GitHub, and CI runs on `pull_request`, so whatever only Linux shows (byte-exact
+re-rendering of the dev pack, gitleaks over the full history, the `SPONSOR_NAME` secret, Playwright on `ubuntu-24.04`)
+must show up here, not on public `main`.
 
 ```bash
-cd ~/Desktop/portfolio/projects/VART
-git merge --no-ff plan1-foundation -m "merge: Plan 1A foundation"
-git merge --no-ff plan1-data -m "merge: Plan 1B dev data"
+cd ~/Desktop/portfolio/projects/VART-wt-release   # branch release-plan1
 ruff check . && ruff format --check . && mypy app scripts datakit && pytest -q && alembic check
 python -m datakit.validate all && python scripts/check_monochrome.py
 (cd web && npm ci && npm run lint && npm test && npm run build && npm run e2e)
 python scripts/export_openapi.py && (cd web && npm run gen:api) && git diff --exit-code openapi.json web/src/lib/api-types.ts
 SPONSOR_NAME='<the sponsor company name>' bash scripts/sponsor_check.sh
+git push -u origin release-plan1
+gh pr create -R Ttheegela/VART-v2 --base main --head release-plan1 --title "Plan 1: foundation, dev data, infra script" --body "Plan 1A and 1B lanes plus the infra script, reviewed."
+gh pr checks -R Ttheegela/VART-v2 --watch
 ```
-Expected: all green, including `sponsor-check: clean`. Then the final Opus review of `main`.
+Expected: the local chain is green, including `sponsor-check: clean`, and all four jobs (backend, frontend, gates, e2e)
+are green on the pull request. Fix any red job on the branch, not on `main`. (The final Opus review of the merged
+branch is done; the docs and chore commits on top of it are its fixes.)
 
-- [ ] **Step 2: Push `main`**
+- [ ] **Step 2: Fast-forward `main` and push (Tarun's OK first)**
 
 ```bash
+cd ~/Desktop/portfolio/projects/VART
+git switch main && git pull --ff-only origin main && git merge --ff-only release-plan1
 git push origin main
-gh run list -R Ttheegela/VART-v2 --limit 1
+gh run list -R Ttheegela/VART-v2 --branch main --limit 1
 ```
-CI must be green (the `SPONSOR_NAME` repository variable was set when the repo was created). Fix any red job first.
+Do not use GitHub's merge button: it makes a new commit that CI has not tested. `main` must be the exact commit the pull
+request tested, and the `push` run on it must be green too, because `ops/setup.sh release` reads that run's result for
+`HEAD`. That checkout must have no uncommitted or untracked files (`release` stops on them); commit or move stray
+drafts first.
 
 - [ ] **Step 3: Infrastructure, migration, deploy (infra-setup script, Tarun's terminal)**
 
@@ -3918,6 +3991,19 @@ his Terminal panel; he only pastes keys into hidden prompts):
 Nothing secret is printed. Expected: smoke `ok: …`, canary `{"ok":true,…}`, health `"status":"ok"`. Then open `/` in
 a real browser (Tarun uses Comet) and confirm the status panel.
 
+Checklist the reviews deferred to this step (record each result in `docs/PROGRESS.md`):
+- **Fluid compute is on** for the project (Project Settings, Functions; Vercel turns it on by default for new
+  projects, so this is a confirmation). The canary makes three sequential model calls with 60 s timeouts each; if
+  Fluid compute is off, add `maxDuration` for `app/main.py` to `vercel.json` first.
+- **Time the first live canary call** (the one the script makes) and note the seconds. A `finish_reason=length`
+  failure at 2000 tokens becomes a Plan 2 item (reasoning effort).
+- **The next day, confirm the Vercel cron wrote a canary row**: `/api/health` shows a canary newer than 17:00 UTC, and
+  the 05:00 UTC cleanup shows in Project Settings, Cron Jobs, or the logs. Until a first row exists, `/api/health`
+  cannot show a cron that never registered.
+- **Git builds only `main`.** The Step 4 push to `main` should create a production deployment, and a pushed lane
+  branch should create none (`git.deploymentEnabled` in `vercel.json`).
+
 - [ ] **Step 4: Record the release**
 
-Update `docs/PROGRESS.md` (live URL, Plan 1A/1B done, what each check showed), commit and push. Update `~/Desktop/portfolio/PROJECT_PLAN.md`'s tracker row for VART (E3).
+Update `docs/PROGRESS.md` (live URL, Plan 1A/1B done, what each check showed, the canary call's duration and the
+checklist results), commit and push. Update `~/Desktop/portfolio/PROJECT_PLAN.md`'s tracker row for VART (E3).

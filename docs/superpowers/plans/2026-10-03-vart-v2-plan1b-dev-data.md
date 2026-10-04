@@ -10,6 +10,42 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-03-vart-v2-design.md` — §6.4 (lines, records), §6.7 (decide rules), §7 (data), §8 (evals). Companion plan: `docs/superpowers/plans/2026-10-03-vart-v2-plan1a-foundation.md` (its Task 1 must be merged first: it provides `app/text.py`, `pyproject.toml`, `requirements-dev.txt` and `CLAUDE.md`).
 
+## Execution notes (2026-10-04)
+
+Plan 1B was built task by task, each task reviewed. The code blocks below are the plan as written and are not
+rewritten; where one differs from the repo, the repo and these notes win. Deviations, as built:
+
+- **Pins.** The renderers and readers are pinned exactly in `requirements-dev.txt` (text: ranges): `openpyxl==3.1.5`,
+  `et_xmlfile==2.0.0`, `python-docx==1.2.0`, `lxml==6.1.3`, `fpdf2==2.8.9`, `pypdfium2==5.13.0`, `pyyaml==6.0.3`. The
+  rendered pack is compared byte for byte (`validate docs`) and a test compares the dumped keys as bytes, so a new
+  version means re-rendering and re-checking the pack on purpose.
+- **Determinism.** `normalize_zip` writes stored (uncompressed) zips, sets the creating OS to Unix and strips
+  `Application` and `AppVersion` from `docProps/app.xml`; PDFs are written uncompressed (`set_compression(False)`).
+  By design no rendered byte depends on the zlib build, the OS, the clock or the locale; this was checked on macOS
+  only, so the pull request's CI is the first Linux run. `.gitattributes` marks `data/**` as `-text`.
+- **YAML.** `datakit.schemas.load_yaml` reads only `true` and `false` as booleans (YAML 1.1 turns unquoted
+  `yes`/`no`/`on`/`off` into booleans), and `load_yaml_raw`, which loads the spreadsheet sources, does the same, so a
+  `Yes` cell stays text. Other YAML 1.1 coercions (`10:30`, `0777`, `~`) still hit bare spreadsheet cells: quote them
+  in the Plan 4 holdout sources.
+- **Questionnaires.** VSQ-A has 64 items and MVSP-B 25. The questions are written for this project, informed by VSAQ
+  and MVSP (text, here and in the `data/NOTICE.md` block below: "reworded from VSAQ items; `source` names the original
+  item"): `source` names the closest item, and a `# nearest topic only` comment marks the ones where it is only
+  adjacent. The seven engagement-specific VSQ-A items (VSQ-58 to VSQ-64) have a null `csf_id`. Expected outcomes
+  (Yes/No/Partial/Conflict/Unknown): VSQ-A 30/5/9/7/13, MVSP-B 17/1/1/0/6.
+- **Negation.** The keys follow spec section 6.7 rule 4 as synced: negation is judged on the quoted text, and
+  `check_facts` rejects a `yes` statement flagged `negation`.
+- **Unregistered-sentence net (Task 4).** `CONTROL_WORDS` matches word starts, with an optional `un`/`non` prefix and
+  whole-word acronyms, not bare substrings, so "lesson" and "agenda" stay quiet and "unencrypted" is caught.
+- **Key verification (Task 6).** A blind reader re-derived the keys from the documents alone and agreed on 86 of 89
+  entries. The three differences are resolved in `data/dev/key/RESOLUTIONS.md`: VSQ-36 and VSQ-38 keep their key (a
+  control that is only planned is a No today), and MVSP-2.2 got a document fix (the registered statement
+  `crypto-https-only`).
+- **Licensing.** `data/sources/vsaq/LICENSE` holds the Apache-2.0 text next to the vendored VSAQ files, and
+  `data/LICENSE` states the terms of each part of `data/`; attribution stays in `data/NOTICE.md`.
+- **Size.** The dev pack has 22 documents (61 controls, 71 statements, 36 traps), more than the 20-document visitor
+  upload limit. The sample-pack path (Plan 2 and 3) is not subject to that limit and should load the pack by
+  `facts.documents`, not by globbing the folder.
+
 ## Global Constraints
 
 - Branch `plan1-data` in worktree `~/Desktop/portfolio/projects/VART-wt-data` (the lead creates it from `main` after Plan 1A Task 1). Merged by Plan 1A Task 9.
