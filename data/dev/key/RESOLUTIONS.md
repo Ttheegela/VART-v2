@@ -46,4 +46,4 @@ cues, which caused the two VSQ disagreements: a control planned for later does n
   facts.yaml as statement crypto-https-only (doc crypto, control encryption-in-transit, stance yes).
   cryptography-policy.docx was re-rendered and both keys re-derived. VSQ-18 and MVSP-2.2 stay verified / Yes and
   gain the new quote as evidence; the tallies are unchanged (VSQ-A 30/5/9/7/13, MVSP-B 17/1/1/0/6).
-- Re-verified by a fresh blind reader: pending
+- Re-verified by a fresh blind reader: verified Yes, citing the new sentence (cryptography-policy.docx line 15); the TLS sentence alone was again judged a different topic.
