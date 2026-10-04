@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 
 from datakit.questionnaires import OUT as QDIR
-from datakit.questionnaires import build_csv, build_xlsx, mvsp_items, vsaq_items
+from datakit.questionnaires import build_csv, build_xlsx, mapping_json, mvsp_items, vsaq_items
 from datakit.schemas import Facts, Selection, TrapKind, load_yaml
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -152,6 +152,8 @@ def _questionnaires_stage(pack: str) -> list[str]:
             builder(sel, fresh)
             if fresh.read_bytes() != (QDIR / f"{name}.{suffix}").read_bytes():
                 p.append(f"{name}.{suffix} is stale: run python -m datakit.questionnaires")
+    if (QDIR / "vsq-a.mapping.json").read_bytes() != mapping_json().encode("utf-8"):
+        p.append("vsq-a.mapping.json is stale: run python -m datakit.questionnaires")
     covered = {i.control for i in load_yaml(QDIR / "vsq-a.selection.yaml", Selection).items}
     p += [f"vsq-a never asks about control {c}" for c in sorted(controls - covered)]
     return p

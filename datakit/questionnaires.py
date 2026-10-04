@@ -23,6 +23,15 @@ QUESTION_TYPES = {"yesno", "radiogroup", "checkgroup", "line", "box"}
 _TAG = re.compile(r"<[^>]+>")
 _CONCAT = re.compile(r'"\s*\+\s*\n\s*"')  # VSAQ files join long strings JavaScript-style: "..." +\n "..."
 _STAMP = re.compile(rb"(<dcterms:(?:created|modified)[^>]*>)[^<]*(</dcterms:(?:created|modified)>)")
+_GENERATOR = re.compile(rb"<(Application|AppVersion)>[^<]*</\1>")  # app.xml names the tool and its version
+MAPPING: dict[str, str | int] = {
+    "sheet": "Questionnaire",
+    "header_row": 5,
+    "id_col": "A",
+    "question_col": "C",
+    "answer_col": "D",
+    "comments_col": "E",
+}
 
 
 def _plain(text: str) -> str:
@@ -63,15 +72,18 @@ def mvsp_items() -> dict[str, str]:
 
 
 def normalize_zip(path: Path) -> None:
-    """Fixed timestamps inside an Office zip so a rebuild is byte-identical."""
+    """Make an Office zip byte-identical on every rebuild, on any machine: fixed timestamps, stored (not
+    deflated) members so no zlib build can differ, and no tool name or version in docProps/app.xml."""
     with zipfile.ZipFile(path) as zin:
         parts = [(i.filename, zin.read(i.filename)) for i in zin.infolist()]
-    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zout:
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_STORED) as zout:
         for name, data in parts:
             if name == "docProps/core.xml":
                 data = _STAMP.sub(rb"\g<1>2026-01-01T00:00:00Z\g<2>", data)
+            elif name == "docProps/app.xml":
+                data = _GENERATOR.sub(b"", data)
             info = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
-            info.compress_type = zipfile.ZIP_DEFLATED
+            info.compress_type = zipfile.ZIP_STORED
             info.external_attr = 0o644 << 16
             zout.writestr(info, data)
 
@@ -131,24 +143,14 @@ def build_csv(sel: Selection, path: Path) -> None:
             w.writerow([item.code, item.section, item.question, "", ""])
 
 
+def mapping_json() -> str:
+    return json.dumps(MAPPING, indent=2) + "\n"
+
+
 def main() -> None:
     build_xlsx(load_yaml(OUT / "vsq-a.selection.yaml", Selection), OUT / "vsq-a.xlsx")
     build_csv(load_yaml(OUT / "mvsp-b.selection.yaml", Selection), OUT / "mvsp-b.csv")
-    (OUT / "vsq-a.mapping.json").write_text(
-        json.dumps(
-            {
-                "sheet": "Questionnaire",
-                "header_row": 5,
-                "id_col": "A",
-                "question_col": "C",
-                "answer_col": "D",
-                "comments_col": "E",
-            },
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
+    (OUT / "vsq-a.mapping.json").write_text(mapping_json(), encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

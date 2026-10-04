@@ -177,6 +177,7 @@ controls:
   - {id: data-residency, topic: Data, truth: "All customer data in AWS us-east-1"}
   - {id: ml-training, topic: Data, truth: "Customer data never used to train models"}
   - {id: laptop-encryption, topic: Data, truth: "Full-disk encryption required (draft handbook only)"}
+  - {id: media-sanitization, topic: Data, truth: "Media from retired assets is wiped (NIST SP 800-88) or destroyed before reuse or disposal"}
   # BC/DR
   - {id: backups, topic: BC/DR, truth: "Daily database backups"}
   - {id: backup-restore-test, topic: BC/DR, truth: "Policy says quarterly; plan says annually"}
@@ -190,9 +191,12 @@ controls:
   - {id: bug-bounty, topic: Vulnerability, truth: "No bug bounty; planned for 2027"}
   - {id: dast, topic: Vulnerability, truth: "No DAST yet; planned"}
   - {id: customer-pentest, topic: Vulnerability, truth: "Customers may not run their own tests"}
+  - {id: vuln-disclosure, topic: Vulnerability, truth: "Reports go to vulnerability-reports@kestrelyn.example and are acknowledged within two business days"}
   # SDLC
   - {id: sast, topic: SDLC, truth: "SAST in CI on every pull request"}
   - {id: code-review, topic: SDLC, truth: "Second-engineer review before merge"}
+  - {id: secure-frameworks, topic: SDLC, truth: "Developers rely on the framework's built-in input validation and output encoding (OWASP ASVS)"}
+  - {id: build-release, topic: SDLC, truth: "Production builds and deployments run only through the CI/CD pipeline from the main branch"}
   # Incident response
   - {id: ir-plan, topic: Incident response, truth: "A plan exists only as a draft"}
   - {id: ir-tabletop, topic: Incident response, truth: "Annual tabletop (draft only)"}
@@ -219,14 +223,12 @@ controls:
   - {id: uptime-sla, topic: Engagement, truth: "Only the contract template mentions 99.9%"}
   - {id: report-sharing, topic: Engagement, truth: "(not in any document)"}
   # MVSP topics no document speaks to (added with the MVSP short form): each is a must_ask trap below
-  - {id: vuln-disclosure, topic: Vulnerability, truth: "(not in any document)"}
   - {id: self-assessment, topic: Governance, truth: "(not in any document)"}
-  - {id: media-sanitization, topic: Data, truth: "(not in any document)"}
+  - {id: customer-sso, topic: Access, truth: "(not in any document)"}
+  - {id: physical-access, topic: Access, truth: "(not in any document)"}
   - {id: data-flow-diagram, topic: Data, truth: "(not in any document)"}
   - {id: security-headers, topic: SDLC, truth: "(not in any document)"}
-  - {id: secure-frameworks, topic: SDLC, truth: "(not in any document)"}
-  - {id: build-release, topic: SDLC, truth: "(not in any document)"}
-  - {id: physical-access, topic: Access, truth: "(not in any document)"}
+  - {id: developer-training, topic: SDLC, truth: "(not in any document)"}
 
 statements:
   # Governance
@@ -369,6 +371,11 @@ statements:
     control: laptop-encryption
     stance: yes
     text: "All company laptops must use full-disk encryption."
+  - id: amp-media-sanitization
+    doc: amp
+    control: media-sanitization
+    stance: yes
+    text: "Storage media from retired assets, including media that held production data, is wiped following NIST SP 800-88 guidelines or physically destroyed before reuse or disposal."
   # BC/DR
   - id: bcpol-backups
     doc: bcpol
@@ -456,6 +463,11 @@ statements:
     control: customer-pentest
     stance: no
     text: "Customer-initiated penetration testing is not permitted."
+  - id: faq-vuln-disclosure
+    doc: faq
+    control: vuln-disclosure
+    stance: yes
+    text: "Security researchers can report vulnerabilities to vulnerability-reports@kestrelyn.example, and Kestrelyn acknowledges each report within two business days."
   # SDLC
   - id: sdp-sast
     doc: sdp
@@ -467,6 +479,16 @@ statements:
     control: code-review
     stance: yes
     text: "Every pull request must be reviewed by a second engineer before it is merged."
+  - id: sdp-secure-frameworks
+    doc: sdp
+    control: secure-frameworks
+    stance: yes
+    text: "Developers rely on the built-in protections of the actively maintained application framework for input validation and output encoding, following the OWASP ASVS checklist."
+  - id: sdp-build-release
+    doc: sdp
+    control: build-release
+    stance: yes
+    text: "Production builds and deployments run exclusively through the CI/CD pipeline from the main branch."
   # Incident response
   - id: irp-plan
     doc: irp
@@ -705,16 +727,16 @@ traps:
     note: "No document says whether the pentest report can be shared."
   - id: M8
     kind: must_ask
-    controls: [vuln-disclosure]
-    note: "No document says whether Kestrelyn publishes a vulnerability disclosure policy for outside researchers."
-  - id: M9
-    kind: must_ask
     controls: [self-assessment]
     note: "No document mentions a security self-assessment, whether against MVSP or anything else."
+  - id: M9
+    kind: must_ask
+    controls: [customer-sso]
+    note: "No document says whether customers can sign in to Kestrelyn Ledger with single sign-on from their own identity provider."
   - id: M10
     kind: must_ask
-    controls: [media-sanitization]
-    note: "No document describes how storage media that held production data is sanitized or destroyed."
+    controls: [physical-access]
+    note: "No document describes physical access controls for offices or other facilities."
   - id: M11
     kind: must_ask
     controls: [data-flow-diagram]
@@ -725,16 +747,8 @@ traps:
     note: "No document mentions HTTP security headers such as a Content Security Policy."
   - id: M13
     kind: must_ask
-    controls: [secure-frameworks]
-    note: "No document says which frameworks or libraries the application is built on or how they handle escaping."
-  - id: M14
-    kind: must_ask
-    controls: [build-release]
-    note: "No document describes the build and release process or build provenance."
-  - id: M15
-    kind: must_ask
-    controls: [physical-access]
-    note: "No document describes physical access controls for offices or other facilities."
+    controls: [developer-training]
+    note: "No document says developers receive security training on preventing vulnerabilities such as injection or cross-site scripting."
   # fills: one answer from the visitor should fill more than one question
   - id: F1
     kind: fills

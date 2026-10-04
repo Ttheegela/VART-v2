@@ -7,7 +7,7 @@ buyer: Northbeam Health
 items:
   - code: MVSP-1.1
     section: External vulnerability reports
-    question: "Do you publish a vulnerability disclosure policy that tells outside researchers how to report security issues to you?"
+    question: "Do you publish contact details for reporting security vulnerabilities and commit to acknowledging reports within a set time?"
     source: "mvsp:1.1"
     csf_id: ID.RA-08
     control: vuln-disclosure
@@ -25,15 +25,15 @@ items:
     control: self-assessment
   - code: MVSP-1.4
     section: External testing
-    question: "Do you contract a security vendor to run comprehensive penetration tests of your products and systems at least annually?"
+    question: "Does an independent security vendor penetration test your product at least annually?"
     source: "mvsp:1.4"
     csf_id: ID.RA-01
     control: pentest
   - code: MVSP-1.5
     section: Training
-    question: "Do you provide security training to your personnel?"
+    question: "Do you provide role-specific security training to your personnel, relevant to their business function?"
     source: "mvsp:1.5"
-    csf_id: PR.AT-01
+    csf_id: PR.AT-02
     control: security-training
   - code: MVSP-1.6
     section: Compliance
@@ -49,16 +49,16 @@ items:
     control: breach-notification
   - code: MVSP-1.8
     section: Data handling
-    question: "Do you sanitize storage media that held unencrypted production data, following NIST SP 800-88 or an equivalent, before reuse or disposal?"
+    question: "Do you sanitize storage media that held production data, following NIST SP 800-88 or an equivalent, before reuse or disposal?"
     source: "mvsp:1.8"
     csf_id: ID.AM-08
     control: media-sanitization
   - code: MVSP-2.1
     section: Single sign-on
-    question: "Do you use single sign-on through a central identity provider to control access to your systems?"
+    question: "Can your customers sign in to your product through single sign-on with their own identity provider, at no additional cost?"
     source: "mvsp:2.1"
     csf_id: PR.AA-04
-    control: sso
+    control: customer-sso
   - code: MVSP-2.2
     section: HTTPS-only
     question: "Is your application served only over HTTPS?"
@@ -79,16 +79,16 @@ items:
     control: password-standard
   - code: MVSP-2.5
     section: Security libraries
-    question: "Do you build on modern, maintained frameworks or libraries that escape output and sanitize input to prevent injection and cross-site scripting?"
+    question: "Do you build on maintained frameworks or libraries whose built-in protections handle input validation and output encoding?"
     source: "mvsp:2.5"
     csf_id: PR.PS-06
     control: secure-frameworks
   - code: MVSP-2.6
     section: Dependency patching
-    question: "Do you regularly scan your application, including its third-party components, for known vulnerabilities?"
+    question: "Do you patch critical vulnerabilities in your application's third-party dependencies within a defined time frame?"
     source: "mvsp:2.6"
-    csf_id: ID.RA-01
-    control: vuln-scanning
+    csf_id: PR.PS-02
+    control: patch-sla
   - code: MVSP-2.7
     section: Logging
     question: "Do you keep logs of security-relevant events, such as authentication, and collect them in a central logging system?"
@@ -115,10 +115,10 @@ items:
     control: data-flow-diagram
   - code: MVSP-3.3
     section: Vulnerability prevention
-    question: "Do you automatically test your source code for security flaws, such as injection and cross-site scripting, before release?"
+    question: "Do you train your developers to prevent authorization bypass, insecure session management, injection, cross-site scripting and cross-site request forgery?"
     source: "mvsp:3.3"
-    csf_id: PR.PS-06
-    control: sast
+    csf_id: PR.AT-02
+    control: developer-training
   - code: MVSP-3.4
     section: Time to fix vulnerabilities
     question: "Do you deploy fixes for critical vulnerabilities within 90 days of discovery?"
@@ -127,7 +127,7 @@ items:
     control: patch-sla
   - code: MVSP-3.5
     section: Build and release process
-    question: "Do you build releases from version control with a consistent build process that records how each artifact was built?"
+    question: "Do production builds and deployments run only through an automated CI/CD pipeline?"
     source: "mvsp:3.5"
     csf_id: PR.PS-06
     control: build-release

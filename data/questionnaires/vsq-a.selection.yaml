@@ -1,6 +1,7 @@
 # Questionnaire A: the source of vsq-a.xlsx (python -m datakit.questionnaires).
-# Each question is reworded from `source` (a VSAQ item, or an MVSP control where VSAQ has nothing close; for topics
-# neither covers, the nearest item). `control` is the fact-sheet control the question is answered from.
+# Questions are written for this project, informed by VSAQ items and MVSP controls. `source` names the closest VSAQ
+# item or MVSP control; a trailing "# nearest topic only" marks items where that is only an adjacent topic.
+# `control` is the fact-sheet control the question is answered from.
 # Every control appears at least once; mfa, access-review and backup-restore-test are asked twice in different words.
 # Questions about the conflict-trap controls carry the threshold the documents disagree on.
 questionnaire: vsq-a
@@ -17,7 +18,7 @@ items:
   - code: VSQ-02
     section: Governance
     question: "Are your security policies reviewed at least annually?"
-    source: "vsaq:security_privacy_programs#secprog"
+    source: "vsaq:security_privacy_programs#secprog"  # nearest topic only
     csf_id: GV.PO-02
     control: policy-review
   - code: VSQ-03
@@ -48,13 +49,13 @@ items:
   - code: VSQ-07
     section: Access Control
     question: "Do employees reach your internal systems through a single sign-on service?"
-    source: "mvsp:2.1"
+    source: "mvsp:2.1"  # nearest topic only
     csf_id: PR.AA-04
     control: sso
   - code: VSQ-08
     section: Access Control
     question: "Is multi-factor authentication required for all users, including customer administrators of your product?"
-    source: "mvsp:4.2"
+    source: "mvsp:4.2"  # nearest topic only
     csf_id: PR.AA-03
     control: mfa
   - code: VSQ-09
@@ -78,7 +79,7 @@ items:
   - code: VSQ-12
     section: Access Control
     question: "Do you enforce a minimum password length for employee accounts?"
-    source: "vsaq:webapp#application_custom_auth_pwdreq"
+    source: "vsaq:webapp#application_custom_auth_pwdreq"  # nearest topic only
     csf_id: PR.AA-01
     control: password-standard
   - code: VSQ-13
@@ -90,7 +91,7 @@ items:
   - code: VSQ-14
     section: Access Control
     question: "Do both your own staff and your customers' administrators have to use multi-factor authentication to sign in?"
-    source: "vsaq:infrastructure#network_vpn"
+    source: "vsaq:infrastructure#network_vpn"  # nearest topic only
     csf_id: PR.AA-03
     control: mfa
   - code: VSQ-15
@@ -99,293 +100,305 @@ items:
     source: "vsaq:physical_and_datacenter#office_access"
     csf_id: PR.AA-06
     control: physical-access
-  # Data Security
   - code: VSQ-16
+    section: Access Control
+    question: "Can your customers sign in to your product through single sign-on with their own identity provider?"
+    source: "mvsp:2.1"
+    csf_id: PR.AA-04
+    control: customer-sso
+  # Data Security
+  - code: VSQ-17
     section: Data Security
     question: "Is customer data encrypted at rest in your production environment?"
     source: "mvsp:2.8"
     csf_id: PR.DS-01
     control: encryption-at-rest
-  - code: VSQ-17
+  - code: VSQ-18
     section: Data Security
     question: "Do you encrypt customer data in transit using TLS 1.2 or higher?"
     source: "vsaq:webapp#application_ssl_configuration_ciphers"
     csf_id: PR.DS-02
     control: encryption-in-transit
-  - code: VSQ-18
-    section: Data Security
-    question: "Are your encryption keys rotated at least annually?"
-    source: "vsaq:webapp#application_ssl_configuration_keys"
-    csf_id: PR.DS-01
-    control: key-rotation
   - code: VSQ-19
     section: Data Security
-    question: "Do you have a data classification scheme that assigns each type of data you handle a sensitivity level?"
-    source: "mvsp:3.1"
-    csf_id: ID.AM-05
-    control: data-classification
+    question: "Are your encryption keys rotated at least annually?"
+    source: "vsaq:webapp#application_ssl_configuration_keys"  # nearest topic only
+    csf_id: PR.DS-01
+    control: key-rotation
   - code: VSQ-20
     section: Data Security
-    question: "Do you delete customer data within 30 days after a contract ends?"
-    source: "mvsp:1.8"
-    csf_id: ID.AM-08
-    control: data-deletion
+    question: "Do you have a data classification scheme that assigns each type of data you handle a sensitivity level?"
+    source: "mvsp:3.1"  # nearest topic only
+    csf_id: ID.AM-05
+    control: data-classification
   - code: VSQ-21
     section: Data Security
-    question: "Is ALL customer data stored in AWS, with nothing held on premises?"
-    source: "vsaq:physical_and_datacenter#dc_countries"
-    csf_id: GV.OC-03
-    control: data-residency
+    question: "Do you delete customer data within 30 days after a contract ends?"
+    source: "mvsp:1.8"  # nearest topic only
+    csf_id: ID.AM-08
+    control: data-deletion
   - code: VSQ-22
     section: Data Security
+    question: "Is ALL customer data stored in AWS, with nothing held on premises?"
+    source: "vsaq:physical_and_datacenter#dc_countries"  # nearest topic only
+    csf_id: GV.OC-03
+    control: data-residency
+  - code: VSQ-23
+    section: Data Security
     question: "Do you use customer data to train machine learning models?"
-    source: "mvsp:1.8"
+    source: "mvsp:1.8"  # nearest topic only
     csf_id: PR.DS-10
     control: ml-training
-  - code: VSQ-23
+  - code: VSQ-24
     section: Data Security
     question: "Do you require full-disk encryption on all company laptops?"
     source: "vsaq:infrastructure#clients_laptops_hd_encrypted"
     csf_id: PR.DS-01
     control: laptop-encryption
-  - code: VSQ-24
+  - code: VSQ-25
     section: Data Security
-    question: "Do you wipe or destroy storage media that held unencrypted production data before it is reused or disposed of?"
+    question: "Do you wipe or physically destroy the storage media of retired assets before they are reused or disposed of?"
     source: "mvsp:1.8"
     csf_id: ID.AM-08
     control: media-sanitization
-  - code: VSQ-25
+  - code: VSQ-26
     section: Data Security
     question: "Do you keep a current diagram of how sensitive data enters your systems and where it is stored?"
     source: "mvsp:3.2"
     csf_id: ID.AM-03
     control: data-flow-diagram
   # Business Continuity
-  - code: VSQ-26
+  - code: VSQ-27
     section: Business Continuity
     question: "Are your production databases backed up at least daily?"
-    source: "vsaq:infrastructure#servers_backup_frequency"
+    source: "vsaq:infrastructure#servers_backup_frequency"  # nearest topic only
     csf_id: PR.DS-11
     control: backups
-  - code: VSQ-27
+  - code: VSQ-28
     section: Business Continuity
     question: "Do you test restoring from your backups at least quarterly?"
     source: "vsaq:infrastructure#servers_backup_test"
     csf_id: PR.DS-11
     control: backup-restore-test
-  - code: VSQ-28
+  - code: VSQ-29
     section: Business Continuity
     question: "Have you defined recovery time and recovery point objectives for your production service?"
-    source: "mvsp:4.4"
+    source: "mvsp:4.4"  # nearest topic only
     csf_id: PR.IR-03
     control: rto-rpo
-  - code: VSQ-29
+  - code: VSQ-30
     section: Business Continuity
     question: "Do you test failover to your disaster recovery setup at least annually?"
     source: "mvsp:4.4"
     csf_id: ID.IM-02
     control: dr-test
-  - code: VSQ-30
+  - code: VSQ-31
     section: Business Continuity
     question: "Do you run a trial restore from backup at least quarterly to prove that the backups work?"
     source: "vsaq:infrastructure#servers_backup_test"
     csf_id: RC.RP-03
     control: backup-restore-test
   # Vulnerability Management
-  - code: VSQ-31
+  - code: VSQ-32
     section: Vulnerability Management
     question: "Do you regularly scan your production systems for known vulnerabilities?"
     source: "vsaq:infrastructure#testing_scans"
     csf_id: ID.RA-01
     control: vuln-scanning
-  - code: VSQ-32
+  - code: VSQ-33
     section: Vulnerability Management
     question: "Do you patch critical vulnerabilities within 30 days of discovery?"
     source: "vsaq:infrastructure#servers_patching"
     csf_id: PR.PS-02
     control: patch-sla
-  - code: VSQ-33
+  - code: VSQ-34
     section: Vulnerability Management
     question: "Does an independent third party penetration test your product at least annually?"
     source: "vsaq:infrastructure#testing_pentests"
     csf_id: ID.RA-01
     control: pentest
-  - code: VSQ-34
-    section: Vulnerability Management
-    question: "Have the findings from your most recent penetration test been remediated?"
-    source: "mvsp:3.4"
-    csf_id: ID.RA-06
-    control: pentest-remediation
   - code: VSQ-35
     section: Vulnerability Management
-    question: "Do you run a public bug bounty program that rewards outside researchers for reporting vulnerabilities?"
-    source: "mvsp:1.1"
-    csf_id: ID.RA-08
-    control: bug-bounty
+    question: "Have the findings from your most recent penetration test been remediated?"
+    source: "mvsp:3.4"  # nearest topic only
+    csf_id: ID.RA-06
+    control: pentest-remediation
   - code: VSQ-36
     section: Vulnerability Management
-    question: "Do you give outside researchers an easy-to-find way to report security vulnerabilities, such as a published disclosure policy?"
+    question: "Do you run a public bug bounty program that rewards outside researchers for reporting vulnerabilities?"
+    source: "mvsp:1.1"  # nearest topic only
+    csf_id: ID.RA-08
+    control: bug-bounty
+  - code: VSQ-37
+    section: Vulnerability Management
+    question: "Do you give outside researchers a published way to report security vulnerabilities and acknowledge their reports within a set time?"
     source: "vsaq:webapp#application_vm_securitycontact"
     csf_id: ID.RA-08
     control: vuln-disclosure
-  - code: VSQ-37
+  - code: VSQ-38
     section: Vulnerability Management
     question: "Do you run dynamic application security testing (DAST) against your running application?"
-    source: "vsaq:webapp#application_testing_qa_security"
+    source: "vsaq:webapp#application_testing_qa_security"  # nearest topic only
     csf_id: PR.PS-06
     control: dast
-  - code: VSQ-38
+  - code: VSQ-39
     section: Vulnerability Management
     question: "Are customers allowed to run their own penetration tests against your product?"
     source: "mvsp:1.2"
     csf_id: ID.IM-02
     control: customer-pentest
   # Secure Development
-  - code: VSQ-39
-    section: Secure Development
-    question: "Do you run static application security testing (SAST) on your source code?"
-    source: "vsaq:webapp#application_testing_unit_security"
-    csf_id: PR.PS-06
-    control: sast
   - code: VSQ-40
     section: Secure Development
+    question: "Do you run static application security testing (SAST) on your source code?"
+    source: "vsaq:webapp#application_testing_unit_security"  # nearest topic only
+    csf_id: PR.PS-06
+    control: sast
+  - code: VSQ-41
+    section: Secure Development
     question: "Does a second engineer review every code change before it is merged?"
-    source: "vsaq:webapp#application_sqli_prepared_consistent"
+    source: "vsaq:webapp#application_sqli_prepared_consistent"  # nearest topic only
     csf_id: PR.PS-06
     control: code-review
-  - code: VSQ-41
+  - code: VSQ-42
     section: Secure Development
     question: "Does your web application set security headers, such as a Content Security Policy and framing restrictions?"
     source: "mvsp:2.3"
     csf_id: PR.PS-01
     control: security-headers
-  - code: VSQ-42
+  - code: VSQ-43
     section: Secure Development
-    question: "Is your application built on maintained frameworks that escape output and sanitize input automatically?"
+    question: "Do your developers rely on their framework's built-in protections for input validation and output encoding?"
     source: "mvsp:2.5"
     csf_id: PR.PS-06
     control: secure-frameworks
-  - code: VSQ-43
+  - code: VSQ-44
     section: Secure Development
-    question: "Are releases built from version control by a consistent build process that records how each artifact was built?"
+    question: "Do production builds and deployments run only through an automated CI/CD pipeline?"
     source: "mvsp:3.5"
     csf_id: PR.PS-06
     control: build-release
+  - code: VSQ-45
+    section: Secure Development
+    question: "Do you train your developers to prevent common web vulnerabilities, such as authorization bypass, injection and cross-site scripting?"
+    source: "mvsp:3.3"
+    csf_id: PR.AT-02
+    control: developer-training
   # Incident Response
-  - code: VSQ-44
+  - code: VSQ-46
     section: Incident Response
     question: "Do you have a documented incident response plan?"
     source: "vsaq:security_privacy_programs#secprog_incidents_procedures"
     csf_id: ID.IM-04
     control: ir-plan
-  - code: VSQ-45
+  - code: VSQ-47
     section: Incident Response
     question: "Do you hold an incident response tabletop exercise at least annually?"
-    source: "vsaq:security_privacy_programs#secprog_incidents_knowhow"
+    source: "vsaq:security_privacy_programs#secprog_incidents_knowhow"  # nearest topic only
     csf_id: ID.IM-02
     control: ir-tabletop
-  - code: VSQ-46
+  - code: VSQ-48
     section: Incident Response
     question: "Do you notify affected customers within 72 hours of confirming a security breach?"
     source: "vsaq:security_privacy_programs#secprog_incidents_inform"
     csf_id: RS.CO-02
     control: breach-notification
   # Vendor Management
-  - code: VSQ-47
+  - code: VSQ-49
     section: Vendor Management
     question: "Do you assess the security risk of each vendor at least annually?"
     source: "vsaq:security_privacy_programs#secprog_vendorsec_owner"
     csf_id: GV.SC-07
     control: vendor-assessment
-  - code: VSQ-48
+  - code: VSQ-50
     section: Vendor Management
     question: "Do you keep a list of your subprocessors and give customers advance notice before adding a new one?"
     source: "mvsp:4.3"
     csf_id: ID.AM-04
     control: subprocessors
   # Human Resources
-  - code: VSQ-49
+  - code: VSQ-51
     section: Human Resources
     question: "Do you run background checks on all personnel, employees and contractors alike, before they access sensitive systems?"
     source: "vsaq:security_privacy_programs#secprog_background_checks"
     csf_id: GV.RR-04
     control: background-checks
-  - code: VSQ-50
+  - code: VSQ-52
     section: Human Resources
     question: "Do all employees complete security awareness training at least annually?"
-    source: "vsaq:security_privacy_programs#secprog_train_tvc"
+    source: "vsaq:security_privacy_programs#secprog_train_tvc"  # nearest topic only
     csf_id: PR.AT-01
     control: security-training
   # Logging and Monitoring
-  - code: VSQ-51
+  - code: VSQ-53
     section: Logging and Monitoring
     question: "Do you retain security logs for at least 12 months?"
     source: "vsaq:infrastructure#servers_logging_retention"
     csf_id: PR.PS-04
     control: log-retention
-  - code: VSQ-52
+  - code: VSQ-54
     section: Logging and Monitoring
     question: "Are security logs from your systems collected in a central location?"
     source: "vsaq:infrastructure#servers_logging_central"
     csf_id: PR.PS-04
     control: central-logging
-  - code: VSQ-53
+  - code: VSQ-55
     section: Logging and Monitoring
     question: "Do security events generate alerts to your on-call staff?"
     source: "vsaq:infrastructure#network_monitoring_security"
     csf_id: DE.AE-06
     control: alerting
   # Asset Management
-  - code: VSQ-54
+  - code: VSQ-56
     section: Asset Management
     question: "Do you maintain an inventory of your information assets, such as servers, laptops and cloud accounts?"
-    source: "vsaq:infrastructure#servers_configmgmt"
+    source: "vsaq:infrastructure#servers_configmgmt"  # nearest topic only
     csf_id: ID.AM-01
     control: asset-inventory
-  - code: VSQ-55
+  - code: VSQ-57
     section: Asset Management
     question: "Is ALL infrastructure behind your service hosted in AWS, with nothing on premises?"
     source: "vsaq:physical_and_datacenter#dc_outsourced"
     csf_id: ID.AM-02
     control: cloud-only
   # Engagement: details of this deal that no document can answer
-  - code: VSQ-56
-    section: Engagement
-    question: "Does your company carry cyber insurance that would cover a security incident involving Northbeam Health's data?"
-    source: "mvsp:1.7"
-    csf_id: null
-    control: cyber-insurance
-  - code: VSQ-57
-    section: Engagement
-    question: "Is the coverage limit of your cyber insurance at least USD 5,000,000 per claim?"
-    source: "mvsp:1.7"
-    csf_id: null
-    control: cyber-insurance-limit
   - code: VSQ-58
     section: Engagement
-    question: "Will you name a security contact for Northbeam Health's account, with name, email address and a 24/7 phone number?"
+    question: "Does your company carry cyber insurance that would cover a security incident involving Northbeam Health's data?"
+    source: "mvsp:1.7"  # nearest topic only
+    csf_id: null
+    control: cyber-insurance
+  - code: VSQ-59
+    section: Engagement
+    question: "Is the coverage limit of your cyber insurance at least USD 5,000,000 per claim?"
+    source: "mvsp:1.7"  # nearest topic only
+    csf_id: null
+    control: cyber-insurance-limit
+  - code: VSQ-60
+    section: Engagement
+    question: "Will you designate a security contact for Northbeam Health's account and provide that person's name, email address and a 24/7 phone number?"
     source: "vsaq:infrastructure#security_contacts"
     csf_id: null
     control: security-contact
-  - code: VSQ-59
+  - code: VSQ-61
     section: Engagement
-    question: "Will you name the person Northbeam Health should call first if a security incident affects its data, with name, email address and phone number?"
+    question: "Will you designate an incident contact for Northbeam Health's account and provide that person's name, email address and a 24/7 phone number?"
     source: "vsaq:webapp#security_contacts"
     csf_id: null
     control: incident-contact
-  - code: VSQ-60
+  - code: VSQ-62
     section: Engagement
     question: "Does your service let Northbeam Health use customer-managed encryption keys for its data?"
-    source: "mvsp:2.8"
+    source: "mvsp:2.8"  # nearest topic only
     csf_id: null
     control: cmek
-  - code: VSQ-61
+  - code: VSQ-63
     section: Engagement
     question: "Will your contract with Northbeam Health include an uptime SLA of at least 99.9%?"
-    source: "vsaq:physical_and_datacenter#dc_outage"
+    source: "vsaq:physical_and_datacenter#dc_outage"  # nearest topic only
     csf_id: null
     control: uptime-sla
-  - code: VSQ-62
+  - code: VSQ-64
     section: Engagement
     question: "Will you share your latest penetration test report with Northbeam Health under an NDA?"
     source: "vsaq:infrastructure#testing_pentests_sharesummary"
