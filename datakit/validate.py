@@ -5,11 +5,14 @@ python -m datakit.validate facts|docs|questionnaires|keys|mapper|all [--pack dev
 
 import argparse
 import sys
+import tempfile
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 
-from datakit.schemas import Facts, TrapKind, load_yaml
+from datakit.questionnaires import OUT as QDIR
+from datakit.questionnaires import build_csv, build_xlsx, mvsp_items, vsaq_items
+from datakit.schemas import Facts, Selection, TrapKind, load_yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -132,6 +135,26 @@ def check_facts(f: Facts) -> list[str]:
 @stage("facts")
 def _facts_stage(pack: str) -> list[str]:
     return check_facts(load_yaml(DATA / pack / "facts.yaml", Facts))
+
+
+@stage("questionnaires")
+def _questionnaires_stage(pack: str) -> list[str]:
+    p: list[str] = []
+    known = vsaq_items() | mvsp_items()
+    controls = {c.id for c in load_yaml(DATA / pack / "facts.yaml", Facts).controls}
+    for name, builder, suffix in (("vsq-a", build_xlsx, "xlsx"), ("mvsp-b", build_csv, "csv")):
+        sel = load_yaml(QDIR / f"{name}.selection.yaml", Selection)
+        p += [f"{name} {i.code}: unknown source {i.source}" for i in sel.items if i.source not in known]
+        p += [f"{name} {i.code}: unknown control {i.control}" for i in sel.items if i.control not in controls]
+        p += [f"{name} {i.code}: question must be ASCII" for i in sel.items if not i.question.isascii()]
+        with tempfile.TemporaryDirectory() as tmp:
+            fresh = Path(tmp) / f"{name}.{suffix}"
+            builder(sel, fresh)
+            if fresh.read_bytes() != (QDIR / f"{name}.{suffix}").read_bytes():
+                p.append(f"{name}.{suffix} is stale: run python -m datakit.questionnaires")
+    covered = {i.control for i in load_yaml(QDIR / "vsq-a.selection.yaml", Selection).items}
+    p += [f"vsq-a never asks about control {c}" for c in sorted(controls - covered)]
+    return p
 
 
 def main(argv: list[str] | None = None) -> int:

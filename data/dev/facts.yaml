@@ -218,6 +218,15 @@ controls:
   - {id: cmek, topic: Engagement, truth: "(not in any document)"}
   - {id: uptime-sla, topic: Engagement, truth: "Only the contract template mentions 99.9%"}
   - {id: report-sharing, topic: Engagement, truth: "(not in any document)"}
+  # MVSP topics no document speaks to (added with the MVSP short form): each is a must_ask trap below
+  - {id: vuln-disclosure, topic: Vulnerability, truth: "(not in any document)"}
+  - {id: self-assessment, topic: Governance, truth: "(not in any document)"}
+  - {id: media-sanitization, topic: Data, truth: "(not in any document)"}
+  - {id: data-flow-diagram, topic: Data, truth: "(not in any document)"}
+  - {id: security-headers, topic: SDLC, truth: "(not in any document)"}
+  - {id: secure-frameworks, topic: SDLC, truth: "(not in any document)"}
+  - {id: build-release, topic: SDLC, truth: "(not in any document)"}
+  - {id: physical-access, topic: Access, truth: "(not in any document)"}
 
 statements:
   # Governance
@@ -694,6 +703,38 @@ traps:
     kind: must_ask
     controls: [report-sharing]
     note: "No document says whether the pentest report can be shared."
+  - id: M8
+    kind: must_ask
+    controls: [vuln-disclosure]
+    note: "No document says whether Kestrelyn publishes a vulnerability disclosure policy for outside researchers."
+  - id: M9
+    kind: must_ask
+    controls: [self-assessment]
+    note: "No document mentions a security self-assessment, whether against MVSP or anything else."
+  - id: M10
+    kind: must_ask
+    controls: [media-sanitization]
+    note: "No document describes how storage media that held production data is sanitized or destroyed."
+  - id: M11
+    kind: must_ask
+    controls: [data-flow-diagram]
+    note: "No document mentions a data flow diagram."
+  - id: M12
+    kind: must_ask
+    controls: [security-headers]
+    note: "No document mentions HTTP security headers such as a Content Security Policy."
+  - id: M13
+    kind: must_ask
+    controls: [secure-frameworks]
+    note: "No document says which frameworks or libraries the application is built on or how they handle escaping."
+  - id: M14
+    kind: must_ask
+    controls: [build-release]
+    note: "No document describes the build and release process or build provenance."
+  - id: M15
+    kind: must_ask
+    controls: [physical-access]
+    note: "No document describes physical access controls for offices or other facilities."
   # fills: one answer from the visitor should fill more than one question
   - id: F1
     kind: fills

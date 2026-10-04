@@ -1,0 +1,8 @@
+{
+  "sheet": "Questionnaire",
+  "header_row": 5,
+  "id_col": "A",
+  "question_col": "C",
+  "answer_col": "D",
+  "comments_col": "E"
+}
