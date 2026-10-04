@@ -14,14 +14,14 @@
 
 Tarun settled Plan 2's open decisions on 2026-10-04 (one row each in `docs/PROGRESS.md`; the spec carries them in sections 3, 6.5, 6.14, 8, 9, 10, 11.3, 11.4 and 11.5). The steps, commands and code below already carry them; where an older sentence differs, these notes win. The ones that touch this file:
 
-- **Model pool.** The bench candidates are `deepseek/deepseek-v4-flash,deepseek/deepseek-v4-pro,qwen/qwen3.5-flash-02-23,qwen/qwen3.7-plus,z-ai/glm-5.3-flash,moonshotai/kimi-k2.5,openai/gpt-oss-120b` plus the reference `anthropic/claude-sonnet-5.5`; every `--models` example and bench command uses that list (Tasks 3 and 5). A pick is the cheapest pool model that passes every gate and scores within 0.02 of Sonnet 5.5 on the step's bench metric (stance: label accuracy; draft: judge faithfulness); if none does, the lead proposes the best gate-passing pool model, reports the gap, and Tarun decides; Tarun approves the picks, shown with cost per 60 items and p50 seconds per item, before they become defaults (Task 5 Steps 2-3). Sonnet 5.5 is never a default. The draft bench judges a Qwen candidate with `moonshotai/kimi-k2.5` (Task 3, `judge_for`), and a Qwen drafter makes Kimi the judge default. Classify is not benched: its default is the cheapest pool model that keeps the classification eval at 22/22 (Task 5 Step 2).
+- **Model pool.** The bench candidates are `deepseek/deepseek-v4-flash,deepseek/deepseek-v4-pro,qwen/qwen3.5-flash-02-23,qwen/qwen3.7-plus,z-ai/glm-5.3-flash,moonshotai/kimi-k2.5,openai/gpt-oss-120b` plus the reference `anthropic/claude-sonnet-5.5`; every `--models` example and bench command uses that list (Tasks 3 and 5). A pick is the cheapest pool model that passes every gate and scores within 0.02 of Sonnet 5.5 on the step's bench metric (stance: label accuracy; draft: judge faithfulness); if none does, the lead proposes the best gate-passing pool model, reports the gap, and Tarun decides; Tarun approves the picks, shown with cost per 60 items and p50 seconds per item, before they become defaults (Task 5 Steps 2-3). Sonnet 5.5 is never a default. The draft bench judges a Qwen candidate with `moonshotai/kimi-k2.5` (Task 3, `judge_for`), and judges the Sonnet 5.5 reference with both judges, one row each, so every candidate is compared with a reference row from its own judge (Task 3, `judges_for`); a Qwen drafter makes Kimi the judge default. Classify is not benched: its default is the cheapest pool model that keeps the classification eval at 22/22 (Task 5 Step 2).
 - **Gates.** After the baseline each gate tightens to max(spec value, baseline - 0.02) (Task 6 Step 1).
 - **Redaction of visitors' answers.** The interview stage stores each scripted answer as a statement, redacted like an upload (names and emails become tokens); the fixture's second answer carries a name, an email and a phone number on purpose (Task 2 Step 4).
 - **Vectors.** Tried only if the real baseline's retrieval recall@8 is below 0.95, and kept only if they raise it by at least 0.05; this is no longer Tarun's call (Task 4 Step 8; Task 6 Steps 3-4).
 - **Eval key.** Recordings (`python -m evals.run --mode record|live`) and the bench use `VART_EVAL_OPENROUTER_API_KEY` from `~/.config/vart/eval.env`; the lead, or an agent it names, runs them without asking Tarun, loading the file inside the command and mapping it to `OPENROUTER_API_KEY` for that command only (Task 4 Step 4, Task 5 Step 1); spending past the key's $5 cap needs him. The recording and bench steps are lead steps; the error messages and tests that used to point at Tarun now say "use the eval key, see CLAUDE.md" or "re-record with --mode record".
-- **Presidio and spaCy.** They ship in the Vercel function bundle; the lead checks the function size on a preview made with `vercel deploy` (Task 6 Step 5).
+- **Presidio and spaCy.** They ship in the Vercel function bundle; the lead checks the function size on a preview made with `vercel deploy` (Task 6 Step 6).
 - **Lanes.** Three lanes run in parallel, each in its own worktree: engine (Opus 5.5), ingest (Sonnet 5.5), evals (Sonnet 5.5); this file is the evals lane (Tasks 1-3) and the lead's integration (Tasks 4-6).
-- **Branches.** Tasks 4-6 run on branch `plan2` in `~/Desktop/portfolio/projects/VART-wt-plan2`, not on `main` in the main checkout (`main` stays production); the lead merges the lanes into `plan2` locally, with no approval needed (Task 4 Step 1); pushing and the release (a pull request `plan2` -> `main`, merged by fast-forward after green CI, then the deploy) need Tarun's OK (Task 6 Step 5).
+- **Branches.** Tasks 4-6 run on branch `plan2` in `~/Desktop/portfolio/projects/VART-wt-plan2`, not on `main` in the main checkout (`main` stays production); the lead merges the lanes into `plan2` locally, with no approval needed (Task 4 Step 1); pushing and the release (a pull request `plan2` -> `main`, merged by fast-forward after green CI, then the deploy) need Tarun's OK (Task 6 Step 6).
 
 ## Global Constraints
 
@@ -63,6 +63,7 @@ evals/recorded/dev.jsonl, evals/results/latest.{json,md}       NEW (Task 4, writ
 evals/results/bench-stance.md, evals/results/bench-draft.md    NEW (Task 5, written by the bench)
 app/settings.py, .env.example                                  MODIFY (Task 5, chosen defaults)
 evals/score.py (GATES), .github/workflows/ci.yml, docs/PROGRESS.md, CLAUDE.md, the spec   MODIFY (Task 6)
+evals/results/latest.{json,md} (gate targets), ops/setup.sh (migrate phase)               MODIFY (Task 6)
 tests/test_eval_score.py, tests/test_eval_run.py, tests/test_eval_bench.py                 NEW (Tasks 1-3)
 ```
 
@@ -1207,10 +1208,10 @@ git commit -m "feat(evals): replay-first harness with judge, interview, fills an
 - Test: `tests/test_eval_bench.py`
 
 **Interfaces:**
-- Consumes: Tasks 1-2 (`evals.pack`, `evals.judge`, `evals.run.RECORDED`, `RESULTS`, `always`); `app.retrieve.retrieve`, `app.stance.stance`, `app.decide.decide`, `app.draft.write_draft` (stubs until the lanes merge); `app.llm.client.OPENROUTER_BASE_URL`, `OpenRouterClient`, `LLMError`; `app.llm.recorder.RecordingClient`, `ReplayClient`, `ReplayMiss`; httpx.
-- Produces: `python -m evals.bench --step stance|draft --models a,b,c [--pack dev] [--workers 6]` writing `evals/results/bench-<step>.md`; `catalog() -> dict[str, list[str]]`, `usable(models, known) -> list[str]`, `Usage` (thread-safe cost and latency meter), `JUDGE_FALLBACK`, `judge_for(model, default) -> str | None`, `bench_stance(...)`, `bench_draft(...)`, `markdown(step, pack, rows) -> str`.
+- Consumes: Tasks 1-2 (`evals.pack`, `evals.judge`, `evals.run.RECORDED`, `RESULTS`, `always`); `app.retrieve.retrieve`, `app.stance.stance`, `app.decide.decide`, `app.draft.write_draft` (stubs until the lanes merge); `app.llm.client.OPENROUTER_BASE_URL`, `OpenRouterClient`, `LLMError`; `app.llm.recorder.RecordingClient`, `ReplayClient`, `ReplayMiss`; `app.db.session.database_url`, `get_engine`; httpx.
+- Produces: `python -m evals.bench --step stance|draft --models a,b,c [--pack dev] [--workers 6]` writing `evals/results/bench-<step>.md`; `catalog() -> dict[str, list[str]]`, `usable(models, known) -> list[str]`, `Usage` (thread-safe cost and latency meter), `JUDGE_FALLBACK`, `REFERENCE`, `judge_for(model, default) -> str | None`, `judges_for(model, default) -> list[str]`, `bench_stance(...)`, `bench_draft(...)`, `markdown(step, pack, rows) -> str`.
 
-The stance bench scores each candidate on label accuracy, conflicts caught and honest negatives kept (decide's rules on the candidate's stances); the draft bench takes decisions from the main recording and scores first-try check passes, template fallbacks and judge faithfulness, judging each candidate with the default judge, or with `moonshotai/kimi-k2.5` when the candidate is from the default judge's family (a Qwen drafter is judged by Kimi; the table's `judge` column says which). Both report failures, total cost and p50 latency per call, and skip a model the public catalog does not list or that lacks structured outputs. Calls run in a thread pool and are recorded under `evals/recorded/candidates/` (git-ignored since Plan 1A Task 1), so a rerun pays only for what is missing.
+The stance bench scores each candidate on label accuracy, conflicts caught and honest negatives kept (decide's rules on the candidate's stances); the draft bench takes decisions from the main recording and scores first-try check passes, template fallbacks and judge faithfulness, judging each candidate with the default judge, or with `moonshotai/kimi-k2.5` when the candidate is from the default judge's family (a Qwen drafter is judged by Kimi; the table's `judge` column says which). The Sonnet 5.5 reference (`REFERENCE`) is judged by both, one row each, so every candidate is compared with a reference row from its own judge (`judges_for`). Both report the number of items benched, failures, total cost and p50 latency per call, and skip a model the public catalog does not list or that lacks structured outputs; like `evals.run`, the bench refuses a database whose name lacks `test`. Calls run in a thread pool and are recorded under `evals/recorded/candidates/` (git-ignored since Plan 1A Task 1), so a rerun pays only for what is missing.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1219,8 +1220,10 @@ The stance bench scores each candidate on label accuracy, conflicts caught and h
 ```python
 from datetime import date
 
+import pytest
+
 from app.llm.client import LLMRequest, LLMResult, build_request
-from evals.bench import Usage, judge_for, markdown, usable
+from evals.bench import REFERENCE, Usage, judge_for, judges_for, main, markdown, usable
 from evals.judge import JudgeOut
 
 
@@ -1254,6 +1257,19 @@ def test_a_drafter_is_judged_by_another_family() -> None:
     assert judge_for("deepseek/deepseek-v4-flash", "qwen/qwen3.7-plus") == "qwen/qwen3.7-plus"
     assert judge_for("qwen/qwen3.5-flash-02-23", "qwen/qwen3.7-plus") == "moonshotai/kimi-k2.5"
     assert judge_for("moonshotai/kimi-k2.5", "moonshotai/kimi-k2.5") is None  # no judge of another family
+
+
+def test_the_reference_gets_a_row_from_each_judge() -> None:
+    # A Qwen drafter is judged by Kimi, so the reference needs a Kimi-judged row to be compared with.
+    assert judges_for(REFERENCE, "qwen/qwen3.7-plus") == ["qwen/qwen3.7-plus", "moonshotai/kimi-k2.5"]
+    assert judges_for(REFERENCE, "moonshotai/kimi-k2.5") == ["moonshotai/kimi-k2.5"]
+    assert judges_for("deepseek/deepseek-v4-flash", "qwen/qwen3.7-plus") == ["qwen/qwen3.7-plus"]
+    assert judges_for("moonshotai/kimi-k2.5", "moonshotai/kimi-k2.5") == []
+
+
+def test_the_bench_refuses_a_database_that_is_not_a_test_database(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://vart:vart@localhost:5434/vart")
+    assert main(["--step", "stance", "--models", "a/one"]) == 2
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -1289,11 +1305,12 @@ from typing import Any
 
 import httpx
 from sqlalchemy import delete
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from app.contracts import Decision, ItemInput, Retrieval
 from app.db.models import Workspace
-from app.db.session import get_engine
+from app.db.session import database_url, get_engine
 from app.decide import decide
 from app.draft import write_draft
 from app.llm.client import OPENROUTER_BASE_URL, LLMClient, LLMError, LLMRequest, LLMResult, OpenRouterClient
@@ -1307,6 +1324,7 @@ from evals.run import RECORDED, RESULTS, always
 
 CANDIDATES = RECORDED / "candidates"
 JUDGE_FALLBACK = "moonshotai/kimi-k2.5"  # judges a candidate drafter from the default judge's family
+REFERENCE = "anthropic/claude-sonnet-5.5"  # the quality reference (spec 8), never a default
 
 
 class Usage:
@@ -1351,6 +1369,18 @@ def judge_for(model: str, default: str) -> str | None:
     return None
 
 
+def judges_for(model: str, default: str) -> list[str]:
+    """Every judge a candidate's drafts get: judge_for's pick, plus JUDGE_FALLBACK for the reference, so that
+    a candidate only the fallback can judge (a Qwen drafter) is compared with the reference under its own
+    judge."""
+    first = judge_for(model, default)
+    if first is None:
+        return []
+    if model == REFERENCE and first != JUDGE_FALLBACK and family(JUDGE_FALLBACK) != family(model):
+        return [first, JUDGE_FALLBACK]
+    return [first]
+
+
 def _parallel(fn: Callable[[ItemInput], Any], items: Sequence[ItemInput], workers: int) -> dict[str, Any]:
     with ThreadPoolExecutor(workers) as pool:
         return dict(zip((i.key for i in items), pool.map(fn, items), strict=True))
@@ -1393,6 +1423,7 @@ def bench_stance(
         good = {c: d for c, d in decisions.items() if d is not None}
         keys = pack.keys
         scores = {
+            "items": len(items),
             "label_accuracy": round(
                 sum(
                     (d.label, d.value) == (keys[c].expected_label, keys[c].expected_value)
@@ -1432,8 +1463,8 @@ def bench_draft(
     judge_client = RecordingClient(OpenRouterClient(key), CANDIDATES / "judge.jsonl")
     rows = []
     for model in models:
-        judge_model = judge_for(model, defaults["judge"])
-        if judge_model is None:
+        judges = judges_for(model, defaults["judge"])
+        if not judges:
             print(f"skip {model}: no judge from another family")
             continue
         usage = Usage(
@@ -1441,20 +1472,24 @@ def bench_draft(
         )
 
         def one(
-            item: ItemInput, model: str = model, usage: Usage = usage, judge_model: str = judge_model
-        ) -> tuple[str, bool, bool]:
+            item: ItemInput, model: str = model, usage: Usage = usage, judges: list[str] = judges
+        ) -> tuple[str, bool, list[bool]]:
             draft = write_draft(usage, item, decisions[item.key], model, always, documents)
-            faithful = judge(judge_client, item, decisions[item.key], draft.text, judge_model).faithful
-            return draft.source, not draft.problems and draft.source == "model", faithful
+            verdicts = [
+                judge(judge_client, item, decisions[item.key], draft.text, j).faithful for j in judges
+            ]
+            return draft.source, not draft.problems and draft.source == "model", verdicts
 
         out = _parallel(one, judged_items, workers)
         n = len(judged_items) or 1
-        scores = {
-            "first_drafts_pass": round(sum(first for _, first, _ in out.values()) / n, 4),
-            "fallbacks": sum(src == "template" for src, _, _ in out.values()),
-            "judge_faithfulness": round(sum(f for _, _, f in out.values()) / n, 4),
-        }
-        rows.append({**_row(model, scores, usage, 0), "judge": judge_model})
+        for k, judge_model in enumerate(judges):  # the reference gets one row per judge
+            scores = {
+                "items": len(judged_items),
+                "first_drafts_pass": round(sum(first for _, first, _ in out.values()) / n, 4),
+                "fallbacks": sum(src == "template" for src, _, _ in out.values()),
+                "judge_faithfulness": round(sum(v[k] for _, _, v in out.values()) / n, 4),
+            }
+            rows.append({**_row(model, scores, usage, 0), "judge": judge_model})
     return rows
 
 
@@ -1481,6 +1516,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--pack", default="dev")
     parser.add_argument("--workers", type=int, default=6)
     args = parser.parse_args(argv)
+    if "test" not in (make_url(database_url()).database or ""):  # the bench writes a workspace there
+        print("refusing to run: DATABASE_URL must point at a test database", file=sys.stderr)
+        return 2
     key = get_settings().openrouter_api_key
     if not key:
         print("OPENROUTER_API_KEY is not set (use the eval key, see CLAUDE.md)", file=sys.stderr)
@@ -1532,7 +1570,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `pytest tests/test_eval_bench.py -q`
-Expected: PASS (4 tests).
+Expected: PASS (6 tests).
 
 - [ ] **Step 5: Run the chain and commit**
 
@@ -1556,7 +1594,7 @@ Run by the lead, on branch `plan2` in `~/Desktop/portfolio/projects/VART-wt-plan
 **Files:**
 - Merge: `plan2-engine`, `plan2-ingest`, `plan2-evals` into `plan2`
 - Create (by the record run): `evals/recorded/dev.jsonl`, `evals/results/latest.json`, `evals/results/latest.md`
-- Possibly modify (tuning, Step 7 only): `app/retrieve.py`, `app/chunk.py`, `app/stance.py`, `app/draft.py` with their tests
+- Possibly modify (tuning, Step 7 only): `app/retrieve.py`, `app/chunk.py`, `app/stance.py`, `app/draft.py` with their tests; for a decide fix `app/decide.py`, `tests/test_decide.py` and `tests/test_decide_properties.py` (with the 100% branch coverage gate); for a prompt bump `docs/CONTRACTS.md` (its `PROMPT_VERSION` values are frozen signatures: update the row and add a change-log line)
 
 **Interfaces:**
 - Consumes: everything in plan2a, plan2b and Tasks 1-3.
@@ -1564,7 +1602,7 @@ Run by the lead, on branch `plan2` in `~/Desktop/portfolio/projects/VART-wt-plan
 
 - [ ] **Step 1: Merge the lanes into `plan2`**
 
-The lead's order of work, all local and none needing Tarun's OK: (1) merge `plan2-engine`, `plan2-ingest`, `plan2-evals` into `plan2`; (2) the full chain on `plan2`; (3) the first recording with the eval key (about 330 model calls, roughly $0.10-$0.40 at the default models, about 20 minutes); (4) commit recordings and results locally. Nothing is pushed: pushing and the release need Tarun's OK (Task 6 Step 5).
+The lead's order of work, all local and none needing Tarun's OK: (1) merge `plan2-engine`, `plan2-ingest`, `plan2-evals` into `plan2`; (2) the full chain on `plan2`; (3) the first recording with the eval key (about 330 model calls, roughly $0.10-$0.40 at the default models, about 20 minutes); (4) commit recordings and results locally. Nothing is pushed: pushing and the release need Tarun's OK (Task 6 Step 6).
 
 ```bash
 cd ~/Desktop/portfolio/projects/VART-wt-plan2   # branch plan2
@@ -1577,7 +1615,7 @@ Expected: three merges without conflicts (the lanes own disjoint files; every st
 
 - [ ] **Step 2: Run the full chain on `plan2`**
 
-Run (database `vart_test_main`): `pip install -r requirements-dev.txt && ruff check . && ruff format --check . && mypy app scripts datakit evals && pytest -q && alembic check && pytest -q tests/test_decide.py tests/test_decide_properties.py --cov=app.decide --cov-branch --cov-fail-under=100 && python -m datakit.validate all`
+Run (database `vart_test_main`, in this worktree's venv `~/Desktop/portfolio/projects/VART-wt-plan2/.venv`, never the main checkout's, which lacks Plan 2's packages; Plan 2A Ruling 5): `pip install -r requirements-dev.txt && ruff check . && ruff format --check . && mypy app scripts datakit evals && pytest -q && alembic check && pytest -q tests/test_decide.py tests/test_decide_properties.py --cov=app.decide --cov-branch --cov-fail-under=100 && python -m datakit.validate all`
 Expected: all green; `grep -rn "NotImplementedError" app/` prints nothing (every stub replaced).
 
 - [ ] **Step 3: Check that replay refuses to run without recordings**
@@ -1590,14 +1628,14 @@ Expected: `recording missing (...); re-record with --mode record` and `exit 2`.
 The lead runs this, without asking Tarun. The eval key stays in `~/.config/vart/eval.env` (mode 600, outside every repo): the file is loaded inside the command and mapped to `OPENROUTER_API_KEY` for that command only, and the key is never printed. The `createdb` line runs from the main checkout, because `docker compose` is never run from a worktree:
 
 ```bash
-cd ~/Desktop/portfolio/projects/VART-wt-plan2 && source ~/Desktop/portfolio/projects/VART/.venv/bin/activate
+cd ~/Desktop/portfolio/projects/VART-wt-plan2 && source ~/Desktop/portfolio/projects/VART-wt-plan2/.venv/bin/activate
 (cd ~/Desktop/portfolio/projects/VART && docker compose exec db createdb -U vart vart_test_record 2>/dev/null; true)
 export DATABASE_URL=postgresql+psycopg://vart:vart@localhost:5434/vart_test_record
 alembic upgrade head
 (set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.run --pack dev --mode record)
 ```
 
-Expected: about 20 minutes; the last line reads `N/15 gates pass` (with the failed gates named, if any); `evals/recorded/dev.jsonl`, `evals/results/latest.json` and `latest.md` are written. A network error stops the run; running the same command again resumes from the recordings already made and pays only for the rest.
+Expected: about 20 minutes; the last line reads `N/15 gates pass` (with the failed gates named, if any); `evals/recorded/dev.jsonl`, `evals/results/latest.json` and `latest.md` are written. A failed stance or judge call stops the run; running the same command again resumes from the recordings already made and pays only for the rest. A failed draft, recheck or classify call does not stop it (the library falls back to the template, skips the item or keeps the rules' answer) and leaves a request with no recording, so Step 6's replay exits 2: then run this step again (it retries only the missing calls) and redo Steps 5-6. A stance or judge reply that does not parse is recorded before it is rejected, so a resume replays it and stops again: delete that row from `evals/recorded/dev.jsonl` first.
 
 - [ ] **Step 5: Commit the recordings and the results**
 
@@ -1639,18 +1677,18 @@ Run by the lead, on `plan2`; the bench runs with the eval key, without asking Ta
 One candidate list serves both steps: the pool models plus the Sonnet 5.5 reference (the bench skips any id OpenRouter's catalog no longer lists or that lacks structured outputs, and says so; the lead may swap in newer pool ids from the catalog). Prices for the record (OpenRouter, checked 2026-10-04, $ per million tokens in/out): Sonnet 5.5 2.00/10.00; deepseek-v4-flash 0.022/1.28; deepseek-v4-pro 0.209/0.418; qwen3.5-flash-02-23 0.065/0.26; qwen3.7-plus 0.32/1.28; glm-5.3-flash 0.15/0.50; kimi-k2.5 0.45/2.25; gpt-oss-120b 0.037/0.17.
 
 ```bash
-cd ~/Desktop/portfolio/projects/VART-wt-plan2 && source ~/Desktop/portfolio/projects/VART/.venv/bin/activate
+cd ~/Desktop/portfolio/projects/VART-wt-plan2 && source ~/Desktop/portfolio/projects/VART-wt-plan2/.venv/bin/activate
 export DATABASE_URL=postgresql+psycopg://vart:vart@localhost:5434/vart_test_record
 MODELS=deepseek/deepseek-v4-flash,deepseek/deepseek-v4-pro,qwen/qwen3.5-flash-02-23,qwen/qwen3.7-plus,z-ai/glm-5.3-flash,moonshotai/kimi-k2.5,openai/gpt-oss-120b,anthropic/claude-sonnet-5.5
 (set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.bench --step stance --models "$MODELS")
 (set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.bench --step draft --models "$MODELS")
 ```
 
-Expected: `wrote evals/results/bench-stance.md` and `wrote evals/results/bench-draft.md`; in the draft bench a Qwen candidate is judged by `moonshotai/kimi-k2.5` and every other candidate by the default judge (the table's `judge` column says which). A network error stops a bench; running it again pays only for the calls still missing. If a run would pass the key's $5 cap, stop and ask Tarun.
+Expected: `wrote evals/results/bench-stance.md` and `wrote evals/results/bench-draft.md`; in the draft bench a Qwen candidate is judged by `moonshotai/kimi-k2.5` and every other candidate by the default judge, and the Sonnet 5.5 reference has a row for each of the two judges (the table's `judge` column says which). A network error stops a bench; running it again pays only for the calls still missing. If a run would pass the key's $5 cap, stop and ask Tarun.
 
 - [ ] **Step 2: Propose the picks; Tarun approves**
 
-Rule (decision of 2026-10-04): per step, the cheapest pool model that passes every gate (it kept every honest negative, caught every conflict and failed no call, and its label accuracy (stance) or judge faithfulness (draft) is at or above its spec gate, 0.80 or 0.90) and scores within 0.02 of Sonnet 5.5 on the step's bench metric (stance: label accuracy; draft: judge faithfulness); ties go to lower p50 latency. Sonnet 5.5 is the reference and is never picked. If no pool model is within 0.02, the lead proposes the best gate-passing pool model and reports the gap, and Tarun decides. Classify is not benched: its default is the cheapest pool model that keeps the classification eval at 22/22 on the dev pack, which the lead checks once in Step 4 (the dev pack's rules decide all 22 documents, so a classify model is only called on a document no rule knows). Recheck follows the stance pick (it is the stance prompt). The judge stays from a different family than the chosen drafter: when the drafter is a Qwen model, the judge default becomes `moonshotai/kimi-k2.5`. Send Tarun the two tables and the picks, each shown with its cost per 60 items (the table's `cost_usd` divided by the items benched, times 60) and its p50 seconds per item, plus the cost per 60-item run they imply; Tarun approves the picks before they become defaults.
+Rule (decision of 2026-10-04): per step, the cheapest pool model that passes every gate (it kept every honest negative, caught every conflict and failed no call, and its label accuracy (stance) or judge faithfulness (draft) is at or above its spec gate, 0.80 or 0.90) and scores within 0.02 of Sonnet 5.5 on the step's bench metric (stance: label accuracy; draft: judge faithfulness, against the Sonnet 5.5 row with the same judge); ties go to lower p50 latency. Sonnet 5.5 is the reference and is never picked. If no pool model is within 0.02, the lead proposes the best gate-passing pool model and reports the gap, and Tarun decides. Classify is not benched: its default is the cheapest pool model that keeps the classification eval at 22/22 on the dev pack. The dev pack's rules decide all 22 documents, so that eval never calls a classify model; the lead checks the default instead with one live classify call with the eval key on a document no rule knows, cheapest pool model first (the starting default `qwen/qwen3.5-flash-02-23`), stepping up only if it misclassifies (Plan 2A Ruling 3). Recheck follows the stance pick (it is the stance prompt). The judge stays from a different family than the chosen drafter: when the drafter is a Qwen model, the judge default becomes `moonshotai/kimi-k2.5`. Send Tarun the two tables and the picks, each shown with its cost per 60 items (the table's `cost_usd` divided by its `items`, times 60) and its p50 seconds per item, plus the cost per 60-item run they imply; Tarun approves the picks before they become defaults.
 
 - [ ] **Step 3: Set the defaults**
 
@@ -1672,13 +1710,14 @@ git commit -m "evals: model bench results, defaults set from them, baseline re-r
 ### Task 6: Set the gates, wire CI, update the docs
 
 **Files:**
-- Modify: `evals/score.py` (`GATES`), `tests/test_eval_score.py` (only if a gate's direction or name changes; values change freely)
-- Modify: `.github/workflows/ci.yml` (backend job), `CLAUDE.md` (map line already added in plan2a Task 2; commands checked), `docs/PROGRESS.md`
+- Modify: `evals/score.py` (`GATES`), `tests/test_eval_score.py` (only if a gate's direction or name changes; values change freely), `evals/results/latest.json` and `evals/results/latest.md` (Step 1's run rewrites their gate targets; committed in Step 1)
+- Modify: `.github/workflows/ci.yml` (backend job), `CLAUDE.md` (map line already added in plan2a Task 2; commands checked; the `ops/` line gains the `migrate` phase), `docs/PROGRESS.md`
+- Modify: `ops/setup.sh` (a `migrate` phase, Step 5)
 - Modify (lead, spec sync): `docs/superpowers/specs/2026-10-03-vart-v2-design.md`
 
 **Interfaces:**
 - Consumes: the baseline from Task 5.
-- Produces: CI that fails on a missed gate, on results drift, and on decide below 100% branch coverage.
+- Produces: CI that fails on a missed gate, on results drift, and on decide below 100% branch coverage; `ops/setup.sh migrate`, which brings the production database to alembic head before `main` moves.
 
 - [ ] **Step 1: Tighten the gates from the baseline (spec 8: "tightened after the Plan 2 baseline")**
 
@@ -1686,6 +1725,13 @@ Decision of 2026-10-04: each gate tightens to max(spec value, baseline - 0.02). 
 
 Run: `python -m evals.run --pack dev; echo "exit $?"`
 Expected: `15/15 gates pass`, `exit 0`, and only the gate targets changed in `evals/results/` (`git diff evals/results`).
+
+Commit the gates with the results they produce, before Step 2 runs `git diff --exit-code evals/results` locally:
+
+```bash
+git add evals/score.py tests/test_eval_score.py evals/results/latest.json evals/results/latest.md
+git commit -m "evals: gates tightened from the baseline" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
 
 - [ ] **Step 2: Wire CI**
 
@@ -1712,16 +1758,64 @@ Edit the spec so it matches what was built and measured, one sentence each:
 - 6.11: `chunks.record`; `chunks.embedding` not added.
 - 6.14: the starting defaults are replaced by the bench's picks (stance <id>, draft <id>, classify <id>, judge <id>); the recheck model defaults to the stance model.
 - 8: the column-mapping gate moves to Plan 3 with the mapper; Plan 2 adds gates for classification (22/22), the D-trap date rule, fills, and the redacted-upload stage (citations 1.00, leaks 0).
+- 8 (mechanics): the harness's flags are `--mode replay|record|live`, replay by default (the spec still says `--replay` and `--record`).
 - 9: redaction finds personal names (two or more capitalised words, not organisation or product names), emails, phones, street addresses and secrets; place names are kept.
 
-- [ ] **Step 5: Commit, final review, release plan**
+- [ ] **Step 5: Add a `migrate` phase to `ops/setup.sh` (Plan 2A Ruling 4)**
+
+Plan 2 adds a migration (`chunks.record`, plan2a Task 2), and Vercel's Git integration deploys `main` as soon as it moves, so the production database must reach alembic head first (spec 10: migrations run from Tarun's terminal, additive changes before the code that needs them). Today `migrate()` runs only inside the `release` phase, which also rotates `CRON_SECRET`, connects Git and redeploys; the new phase only migrates, and the `release` phase stays as it is. Add, after `phase_release` and before the `phase: uptime` section:
 
 ```bash
-git add evals/score.py tests/test_eval_score.py .github/workflows/ci.yml docs/PROGRESS.md CLAUDE.md docs/superpowers/specs/2026-10-03-vart-v2-design.md
-git commit -m "evals: gates set from the baseline and enforced in CI; progress and spec synced" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+# ---------------------------------------------------------------- phase: migrate
+phase_migrate() {
+  local head upstream green
+  echo "Migrates Neon to alembic head from a clean, pushed, CI-green HEAD. No CRON_SECRET change, no deploy."
+  check_tools
+  check_vercel
+  check_neon
+  step "Branch"
+  [ -z "$(git status --porcelain)" ] || fail "the working tree is not clean: commit or stash first"
+  upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null) ||
+    fail "HEAD has no upstream branch: push it first"
+  git fetch --quiet "${upstream%%/*}" || fail "git fetch ${upstream%%/*} failed"
+  head=$(git rev-parse HEAD)
+  [ "$head" = "$(git rev-parse '@{u}')" ] || fail "HEAD is not equal to $upstream: push or pull first"
+  green=$(gh run list --commit "$head" --json conclusion --jq '[.[] | select(.conclusion == "success")] | length') ||
+    fail "gh run list failed"
+  [ "${green:-0}" -gt 0 ] || fail "no green CI run for $head yet (gh run list --commit $head)"
+  ok "clean, equal to $upstream, CI green for ${head:0:7}"
+  step "Vercel project"  # what phase_release runs before migrate()
+  vercel_has_project || fail "Vercel project '$VERCEL_PROJECT' not found. Run: ops/setup.sh accounts"
+  load_project
+  ensure_link
+  migrate
+  ok "migrate done: the database is at alembic head. Next: fast-forward main to this HEAD and push"
+}
 ```
 
-Then the final Opus review of `plan2` (the whole Plan 2 diff). On a clean review, the lead sends Tarun one numbered release plan: (1) the Vercel build picks up the new runtime dependencies (Presidio, spaCy and its model), so check the function size on a preview made from the Vercel CLI (`vercel deploy` without `--prod`; Git previews are off for every branch except `main`, `vercel.json` `git.deploymentEnabled`; the preview sits behind Vercel Authentication, which does not matter because the size check reads the build output); (2) push `plan2` to `VART-v2` and open a pull request `plan2` -> `main`; (3) watch CI (the backend job now runs the eval); (4) fast-forward `main` to `plan2` after green CI, then deploy; (5) check `/` and `/api/health` after the deploy (spec 10). Push and release only on his OK.
+The CI check is meant to be the same `gh run list --commit` check `release_checks` makes: if that function's query differs from the two `green` lines above, use its form. In `usage()`, after the `release` entry, add:
+
+```
+  migrate   Run on the branch being released, after its pull request's CI is green and before main moves
+            (Plan 2 onward). Checks the tools and logins, a clean tree, HEAD equal to its upstream and a green
+            CI run for HEAD, then: alembic upgrade head (Neon direct URL). No CRON_SECRET change, no deploy,
+            no prompts.
+```
+
+In the phase dispatch, add `migrate) phase_migrate ;;` after `release) phase_release ;;` and make the last case `*) fail "unknown phase '$phase' (accounts, release, migrate, uptime, status)" ;;`. In `CLAUDE.md`'s map, the `ops/` line lists the phases as `(accounts, release, migrate, uptime, status)`.
+
+Run: `bash -n ops/setup.sh && ops/setup.sh --help | grep -A3 '^  migrate'`
+Expected: no syntax error, then the four usage lines above. The phase itself is not run here: Tarun runs it in step (4) of the release plan below.
+
+- [ ] **Step 6: Commit, final review, release plan**
+
+```bash
+git add evals/score.py tests/test_eval_score.py evals/results/latest.json evals/results/latest.md ops/setup.sh \
+  .github/workflows/ci.yml docs/PROGRESS.md CLAUDE.md docs/superpowers/specs/2026-10-03-vart-v2-design.md
+git commit -m "evals: gates enforced in CI; ops/setup.sh migrate phase; progress and spec synced" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+Then the final Opus review of `plan2` (the whole Plan 2 diff). On a clean review, the lead sends Tarun one numbered release plan: (1) the Vercel build picks up the new runtime dependencies (Presidio, spaCy and its model), so check the function size on a preview made from the Vercel CLI (`vercel deploy` without `--prod`; Git previews are off for every branch except `main`, `vercel.json` `git.deploymentEnabled`; the preview sits behind Vercel Authentication, which does not matter because the size check reads the build output); (2) push `plan2` to `VART-v2` and open a pull request `plan2` -> `main`; (3) wait for green CI on the pull request (the backend job now runs the eval; a ReplayMiss there on a statement or upload prompt points first at a numpy or blis version difference between machines, plan2a Task 2 Step 10); (4) Tarun runs `ops/setup.sh migrate` from the `plan2` head in `~/Desktop/portfolio/projects/VART-wt-plan2` (Step 5), so the production database reaches alembic head before any Plan 2 code is deployed (spec 10); (5) fast-forward `main` to the pull request head and push (Vercel's Git integration deploys production); (6) check production: `python scripts/smoke.py https://vart-v2.vercel.app`, `/` and `/api/health` (`"status":"ok"`, spec 10), and the canary's entry in `/api/health` after its next daily run, which now calls the new default model ids. Push and release only on his OK.
 
 ## Self-review notes (for the lead)
 

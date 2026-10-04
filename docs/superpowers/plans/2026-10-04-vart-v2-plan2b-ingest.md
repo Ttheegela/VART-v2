@@ -16,7 +16,7 @@ Tarun settled Plan 2's open decisions on 2026-10-04 (one row each in `docs/PROGR
 
 - **Visitors' answers are redacted too.** `store_statement` redacts an interview answer like an upload: names and emails become tokens (Task 4, `test_a_statement_is_a_dated_redacted_evidence_document`; emails go through the same `redact_lines` as uploads, pinned in `test_an_upload_is_redacted_before_it_is_stored`). Spec 9 says so.
 - **Place names and cloud regions stay unredacted**, because data-residency answers need them (Task 2, `test_business_text_is_left_alone` keeps `Ireland` and `AWS us-east-1`; the `app/redact.py` docstring says so).
-- **Presidio and spaCy.** `presidio-analyzer`, `spacy` and `en_core_web_sm` ship in the Vercel function bundle as runtime dependencies (plan2a Task 2 Step 10); before the release the lead checks the function size on a preview made with `vercel deploy` (plan2c Task 6 Step 5).
+- **Presidio and spaCy.** `presidio-analyzer`, `spacy` and `en_core_web_sm` ship in the Vercel function bundle as runtime dependencies (plan2a Task 2 Step 10); before the release the lead checks the function size on a preview made with `vercel deploy` (plan2c Task 6 Step 6).
 - **Classify is not benched.** Its default (`Settings.classify_model`; the starting value is set in plan2a Task 2 Step 6) is the cheapest pool model that keeps the classification eval at 22/22 on the dev pack; the lead checks it once at integration (plan2c Task 5).
 - **Lane and branches.** This lane runs in parallel with 2A and 2C, in its own worktree (Sonnet 5.5), branches from `plan2` after Part 0, and is merged into `plan2` by the lead (plan2c Task 4); pushing and the release need Tarun's OK.
 
@@ -75,7 +75,7 @@ tests/test_chunk.py, tests/test_ingest_store.py   NEW
 - Consumes: `app.contracts.Line`, `LineKind`, `ParsedDocument`; `app.text.cell_text`, `normalize`, `record_line`; `datakit.extract.lines_of` (tests only, the reference).
 - Produces: `parse(filename: str, data: bytes) -> ParsedDocument`; `text_lines(text: str) -> list[Line]` (store_statement reads a visitor's answer with it); `sniff(filename, data) -> str`; `decode(data) -> str`; `class IngestError(ValueError)`; constants `MAX_BYTES`, `MAX_LINES`, `MAX_UNZIPPED`, `MAX_MEMBERS`, `FORMULA_NOTE`. `app.ingest.pdf`: `pdf_lines(data) -> list[Line]`, `join_lines(visual: list[Visual]) -> list[tuple[str, float]]`, `Visual(text, size, bottom, page)`.
 
-Line rules mirror `datakit/extract.py` (Plan 1B Ruling 6, including its spreadsheet header rule: the header is the first row with two or more filled cells that are all text; rows above it are plain lines). On every dev document except the two PDFs the lines are identical to the reference; for the PDFs the joined text is identical and the lines are paragraphs. Two additions over the reference: a sheet's stated "As of" date dates every record row (otherwise the row's latest date does; Plan 2 addendum), and a formula cell with no cached value is shown, not dropped (adversary F11). PDF paragraphs (adversary F15 and the addendum's measurements: 5 mm pitch inside a paragraph, 6-7 mm between paragraphs, rows and after headings): a new paragraph starts at a font-size change, a bullet, or a gap wider than 1.6 font sizes after a line that ends a sentence or before one that starts with a capital or a digit; a paragraph may run across a page break; pdfium itself joins a word hyphenated across lines and marks the hyphen U+FFFE, which becomes `-`. Measured while this plan was written: all 98 dev key quotes sit in exactly one parsed line, including the SOC 2 opinion sentence that wraps across two visual lines.
+Line rules mirror `datakit/extract.py` (Plan 1B Ruling 6, including its spreadsheet header rule: the header is the first row with two or more filled cells that are all text; rows above it are plain lines). The copy of its markdown and table rules is deliberate: `app/` must not import `datakit` (`.vercelignore` keeps it out of the function bundle), and `datakit` stays the Plan 1B reference the parity tests compare against. On every dev document except the two PDFs the lines are identical to the reference; for the PDFs the joined text is identical and the lines are paragraphs. Three additions over the reference: a sheet's stated "As of" date dates every record row (otherwise the row's latest date does; Plan 2 addendum); a table row in a docx or md file is a record dated by its latest date too (spec 6.4: "table rows in any document"; the reference returns text only, so the parity tests compare text and are unaffected); and a formula cell with no cached value is shown, not dropped (adversary F11). A cell that looks like an ISO date but is not one (`2026-13-45`) dates nothing instead of raising. PDF paragraphs (adversary F15 and the addendum's measurements: 5 mm pitch inside a paragraph, 6-7 mm between paragraphs, rows and after headings): a new paragraph starts at a font-size change, a bullet, or a gap wider than 1.6 font sizes after a line that ends a sentence or before one that starts with a capital or a digit; a paragraph may run across a page break; pdfium itself joins a word hyphenated across lines and marks the hyphen U+FFFE, which becomes `-`. Measured while this plan was written: all 98 dev key quotes sit in exactly one parsed line, including the SOC 2 opinion sentence that wraps across two visual lines.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -90,7 +90,7 @@ from pathlib import Path
 import openpyxl
 import pytest
 
-from app.ingest.parse import FORMULA_NOTE, MAX_BYTES, IngestError, parse
+from app.ingest.parse import FORMULA_NOTE, MAX_BYTES, MAX_LINES, IngestError, parse
 from datakit.extract import lines_of
 from datakit.schemas import Facts, load_yaml
 
@@ -163,6 +163,19 @@ def test_csv_in_windows_encoding_or_with_a_byte_order_mark() -> None:
     assert parse("b.csv", bom).lines[0].text == "System: Okta; Status: Overdue"
 
 
+def test_a_table_row_in_any_document_is_dated_by_its_latest_date() -> None:
+    # Spec 6.4: a table row is a record, dated by its latest date cell; 2026-13-45 is not a date.
+    md = NL.join(
+        ["| System | Last review | Next |", "|---|---|---|", "| Okta | 2026-01-10 | 2026-13-45 |", ""]
+    )
+    (row,) = parse("t.md", md.encode()).lines
+    assert (row.text, row.kind, row.as_of) == (
+        "System: Okta; Last review: 2026-01-10; Next: 2026-13-45",
+        "record",
+        date(2026, 1, 10),
+    )
+
+
 def _bomb() -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
@@ -179,6 +192,7 @@ def _bomb() -> bytes:
         ("a.exe", b"MZ\x90\x00", "content must match"),
         ("a.docx", b"PK\x03\x04garbage", "damaged"),
         ("a.xlsx", _bomb(), "too large once unpacked"),
+        ("long.txt", b"line.\n\n" * (MAX_LINES + 1), "20,000 lines"),
         ("empty.md", b"\n\n   \n", "No text"),
     ],
 )
@@ -311,6 +325,7 @@ spreadsheet rows become record lines through app.text.record_line. The line rule
 the reference the dev pack was validated with (tests/test_ingest_parse.py compares the two). PDFs live in
 app/ingest/pdf.py. Limits are spec section 9's."""
 
+import contextlib
 import csv
 import io
 import re
@@ -347,7 +362,8 @@ def _cells(line: str) -> list[str]:
 
 def text_lines(text: str) -> list[Line]:
     """Markdown or plain text: '#' headings, '- '/'* ' bullets and pipe tables are their own lines; the other
-    lines of a paragraph are joined (wrapping is not a paragraph break)."""
+    lines of a paragraph are joined (wrapping is not a paragraph break). A table row is dated by its latest
+    date (spec 6.4)."""
     out: list[Line] = []
     para: list[str] = []
     header: list[str] | None = None
@@ -368,7 +384,8 @@ def text_lines(text: str) -> list[Line]:
             if header is None:
                 header = _cells(line)
             elif not _TABLE_RULE.match(line.strip()):
-                out.append(Line(record_line(header, _cells(line)), "record"))
+                cells = _cells(line)
+                out.append(Line(record_line(header, cells), "record", _latest_date(cells)))
             continue
         if line.startswith("#"):
             flush()
@@ -392,15 +409,16 @@ def _docx_lines(data: bytes) -> list[Line]:
                 out.append(Line(normalize(block.text), kind))
         elif isinstance(block, Table):
             rows = [[c.text for c in r.cells] for r in block.rows]
-            out.extend(Line(record_line(rows[0], r), "record") for r in rows[1:])
+            out.extend(Line(record_line(rows[0], r), "record", _latest_date(r)) for r in rows[1:])
     return [x for x in out if x.text]
 
 
 def _latest_date(values: list[Any]) -> date | None:
     found = [v.date() if isinstance(v, datetime) else v for v in values if isinstance(v, date)]
-    found += [
-        date.fromisoformat(v.strip()) for v in values if isinstance(v, str) and _ISO_DATE.match(v.strip())
-    ]
+    for v in values:
+        if isinstance(v, str) and _ISO_DATE.match(v.strip()):
+            with contextlib.suppress(ValueError):  # 2026-13-45 looks like a date and is not one
+                found.append(date.fromisoformat(v.strip()))
     return max(found, default=None)
 
 
@@ -623,7 +641,7 @@ def pdf_lines(data: bytes) -> list[Line]:
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `pytest tests/test_ingest_parse.py tests/test_ingest_pdf.py -q`
-Expected: PASS (33 and 8 tests).
+Expected: PASS (35 and 8 tests).
 
 - [ ] **Step 6: Run the chain and commit**
 
@@ -700,7 +718,8 @@ def test_business_text_is_left_alone(text: str) -> None:
 
 
 def test_a_private_key_block_is_one_secret() -> None:
-    key = "-----BEGIN RSA PRIVATE KEY-----\nMIIEow\nabc\n-----END RSA PRIVATE KEY-----"
+    # Built in pieces so that no file holds a whole fake key block for gitleaks to match (Plan 2 addendum).
+    key = "-----BEGIN RSA " + "PRIVATE KEY-----\nMIIEow\nabc\n-----END RSA " + "PRIVATE KEY-----"
     assert redact_text(f"before {key} after") == "before <SECRET> after"
 
 
@@ -905,10 +924,10 @@ git commit -m "feat(redact): names, emails, phones, addresses and secrets out of
 - Test: `tests/test_classify.py`
 
 **Interfaces:**
-- Consumes: `app.contracts` (`DocKind`, `DocMeta`, `ParsedDocument`, `Spend`, `Line` in tests), `app.patterns.PLACEHOLDER`, `app.llm.client` (`LLMClient`, `LLMError`, `build_request`, `complete_model`), `app.llm.recorder.ReplayMiss`; `parse` (Task 1) in tests.
+- Consumes: `app.contracts` (`SCOPES`, `DocKind`, `DocMeta`, `ParsedDocument`, `Spend`, `Line` in tests), `app.patterns.PLACEHOLDER`, `app.llm.client` (`LLMClient`, `LLMError`, `build_request`, `complete_model`), `app.llm.recorder.ReplayMiss`; `parse` (Task 1) in tests.
 - Produces: `PROMPT_VERSION = "classify@p1"`, `ClassifyOut`, `rules(fmt: str, texts: Sequence[str]) -> tuple[DocMeta, bool]` (`bool` = sure), `classify(filename, parsed, llm, model, spend) -> DocMeta`.
 
-Rules (title = first line, opening = first three lines, head = first six): a contract cue in the opening makes a contract; placeholders or the word "template" in the opening make a template (kind `other`, not evidence); spreadsheets are records; "Examination period", "Period of review", "Audit period" or "Report date" in the head make a report (Plan 1B M6: the SOC 2 summary says "Examination period"); otherwise the title's word (questionnaire, report, plan, policy/standard/procedure/handbook/program, or faq/wiki/notes/readme/guide/glossary/export for `other`), else a "Version ... Effective/DRAFT" line makes a policy. `DRAFT` (capitals) or "draft ... not approved" in the opening makes a draft. Dates: Effective, the end of a stated period, Report date, As of. Scope only from a line that starts "Scope:" or "This policy/report/... applies to/covers", mapped to the five scopes in `app.contracts.SCOPES` (first match wins, so "internal systems ... staff" is internal systems). No rule for the kind: the model fallback (one budgeted call; it never sets scope; `ReplayMiss` propagates; any other `LLMError` keeps the rules' answer). On the dev pack the rules decide all 22 documents exactly like the fact sheet, so the eval needs no classify recording.
+Rules (title = first line, opening = first three lines, head = first six): a contract cue in the opening makes a contract; placeholders or the word "template" in the opening make a template (kind `other`, not evidence); the word "questionnaire" in the title makes a questionnaire (not evidence), checked before the spreadsheet rule so that a questionnaire spreadsheet is never evidence (spec 6.4); spreadsheets are records; "Examination period", "Period of review", "Audit period" or "Report date" in the head make a report (Plan 1B M6: the SOC 2 summary says "Examination period"); otherwise the title's word (report, plan, policy/standard/procedure/handbook/program, or faq/wiki/notes/readme/guide/glossary/export for `other`), else a "Version ... Effective/DRAFT" line makes a policy. `DRAFT` (capitals) or "draft ... not approved" in the opening makes a draft. Dates: Effective, the end of a stated period, Report date, As of. Scope only from a line that starts "Scope:" or "This policy/report/... applies to/covers", mapped to the five scopes in `app.contracts.SCOPES` (first match wins, so "internal systems ... staff" is internal systems). No rule for the kind: the model fallback (one budgeted call; it never sets scope; `ReplayMiss` propagates; any other `LLMError` keeps the rules' answer). On the dev pack the rules decide all 22 documents exactly like the fact sheet, so the eval needs no classify recording.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -987,7 +1006,12 @@ def test_dates_effective_period_end_report_date_and_as_of() -> None:
     assert rules("md", ["FAQ", "Last updated 2026-08-20."])[0].effective_date is None
 
 
-DOC = ParsedDocument("md", (Line("Meeting notes 12"), Line("We met and talked.")))
+def test_a_questionnaire_spreadsheet_is_never_evidence() -> None:
+    # Spec 6.4: questionnaires default to evidence_allowed = false, a spreadsheet one too.
+    path = ROOT / "data" / "questionnaires" / "vsq-a.xlsx"
+    parsed = parse(path.name, path.read_bytes())
+    meta, sure = rules(parsed.format, [x.text for x in parsed.lines])
+    assert (meta.kind, meta.evidence_allowed, sure) == ("questionnaire", False, True)
 
 
 def test_the_model_is_asked_only_when_no_rule_knows_the_kind() -> None:
@@ -1046,7 +1070,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from app.contracts import DocKind, DocMeta, ParsedDocument, Spend
+from app.contracts import SCOPES, DocKind, DocMeta, ParsedDocument, Spend
 from app.llm.client import LLMClient, LLMError, build_request, complete_model
 from app.llm.recorder import ReplayMiss
 from app.patterns import PLACEHOLDER
@@ -1078,8 +1102,8 @@ _CONTRACT = re.compile(
 _TEMPLATE = re.compile(r"\btemplate\b", re.IGNORECASE)
 _DRAFT = re.compile(r"\bDRAFT\b|\bdraft\b[^.]{0,40}\bnot (?:yet )?approved\b")
 _VERSIONED = re.compile(r"\bversion\b.{0,30}?\b(?:effective|draft)\b", re.IGNORECASE)
+_QUESTIONNAIRE = re.compile(r"\bquestionnaire\b", re.IGNORECASE)
 _TITLE_KINDS: tuple[tuple[DocKind, re.Pattern[str]], ...] = (
-    ("questionnaire", re.compile(r"\bquestionnaire\b", re.IGNORECASE)),
     ("report", re.compile(r"\breport\b", re.IGNORECASE)),
     ("plan", re.compile(r"\bplan\b", re.IGNORECASE)),
     ("policy", re.compile(r"\b(?:polic(?:y|ies)|standard|procedures?|handbook|program)\b", re.IGNORECASE)),
@@ -1089,15 +1113,16 @@ _SCOPE_LINE = re.compile(
     r"^(?:scope:|this (?:policy|standard|procedure|report|plan|document) (?:applies to|covers)\b)",
     re.IGNORECASE,
 )
+_INTERNAL, _PRODUCT, _PRODUCTION, _EMPLOYEES, _VENDORS = SCOPES  # the scope names come from app.contracts
 _SCOPES = (  # first match wins: "internal systems ... staff" is internal-systems, not employees
-    ("internal-systems", re.compile(r"\b(?:internal|corporate) systems?\b", re.IGNORECASE)),
-    ("customer-product", re.compile(r"\bcustomer(?:[- ]facing)? product\b", re.IGNORECASE)),
-    ("production", re.compile(r"\bproduction\b", re.IGNORECASE)),
+    (_INTERNAL, re.compile(r"\b(?:internal|corporate) systems?\b", re.IGNORECASE)),
+    (_PRODUCT, re.compile(r"\bcustomer(?:[- ]facing)? product\b", re.IGNORECASE)),
+    (_PRODUCTION, re.compile(r"\bproduction\b", re.IGNORECASE)),
     (
-        "vendors-and-contractors",
+        _VENDORS,
         re.compile(r"\b(?:vendors?|contractors?|suppliers?|third[- ]part(?:y|ies))\b", re.IGNORECASE),
     ),
-    ("employees", re.compile(r"\b(?:employees?|staff|workforce|personnel)\b", re.IGNORECASE)),
+    (_EMPLOYEES, re.compile(r"\b(?:employees?|staff|workforce|personnel)\b", re.IGNORECASE)),
 )
 
 
@@ -1137,6 +1162,8 @@ def rules(fmt: str, texts: Sequence[str]) -> tuple[DocMeta, bool]:
         kind = "contract"
     elif template:
         kind = "other"
+    elif _QUESTIONNAIRE.search(title):  # before the spreadsheet rule: a questionnaire is never evidence
+        kind = "questionnaire"
     elif fmt in ("xlsx", "csv"):
         kind = "record"
     elif any(_PERIOD.search(t) or _REPORT_DATE.search(t) for t in texts[:HEAD]):
@@ -1179,7 +1206,7 @@ def classify(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `pytest tests/test_classify.py -q`
-Expected: PASS (33 tests, 22 of them one per dev document).
+Expected: PASS (34 tests, 22 of them one per dev document).
 
 - [ ] **Step 5: Run the chain and commit**
 
@@ -1200,10 +1227,10 @@ git commit -m "feat(classify): metadata by rules (22 of 22 dev documents), model
 - Test: `tests/test_chunk.py`, `tests/test_ingest_store.py`
 
 **Interfaces:**
-- Consumes: `parse`, `text_lines`, `IngestError` (Task 1); `redact_lines`, `redact_text` (Task 2); `classify` (Task 3); `app.patterns`; `app.db.models.Chunk` (with `record`), `Document`, `DocumentLine`.
+- Consumes: `parse`, `text_lines`, `IngestError` (Task 1); `redact_lines`, `redact_text` (Task 2); `classify` (Task 3); `app.patterns`; `app.db.models.Chunk` (with `record`), `Document`, `DocumentLine`, `Workspace` (the row lock).
 - Produces: `app.chunk.chunk_lines(lines: Sequence[Line]) -> list[ChunkSpec]`, `flags_of(text) -> tuple[Flag, ...]`, `MAX_WORDS = 120`; `app.ingest.store.ingest_document(session, workspace_id, filename, data, *, source, llm, model, spend) -> Document`, `store_statement(session, workspace_id, text, *, filename, today) -> Document`, `MAX_DOCUMENTS = 20`, `MAX_WORKSPACE_LINES = 20_000`.
 
-Chunks: a heading closes the running passage and labels the following ones (it is not itself a line of any passage); lines under one heading join until 120 words (measured: recall@8 0.95 at 120, 0.93 at 60, 0.92 at 40); every record row is its own passage with its `as_of`; flags from `app.patterns`. The service parses, then (uploads only) checks the workspace limits and redacts lines and file name, classifies, and writes the document, its lines and its chunks in one transaction; a failure stores nothing. Statements: the visitor's accepted answer, redacted, kind and source `statement`, evidence, dated `today` (spec 6.9).
+Chunks: a heading closes the running passage and labels the following ones (it is not itself a line of any passage); lines under one heading join until 120 words (measured: recall@8 0.95 at 120, 0.93 at 60, 0.92 at 40); every record row is its own passage with its `as_of`; flags from `app.patterns`. The service parses, then (uploads only) checks the workspace limits and redacts lines and file name, classifies, and writes the document, its lines and its chunks in one transaction; a failure stores nothing. For uploads the write first locks the workspace row and checks the limits again, because classify may have committed (the spender does) since the first check, so two uploads at once cannot both pass it. Statements: the visitor's accepted answer, redacted, kind and source `statement`, evidence, dated `today` (spec 6.9).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1255,14 +1282,16 @@ def test_flags() -> None:
 from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Chunk, Document, DocumentLine
+from app.db.models import Chunk, Document, DocumentLine, Workspace
+from app.ingest import store
 from app.ingest.parse import IngestError
-from app.ingest.store import MAX_DOCUMENTS, ingest_document, store_statement
+from app.ingest.store import MAX_DOCUMENTS, MAX_WORKSPACE_LINES, ingest_document, store_statement
 from tests import factories as f
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -1329,6 +1358,37 @@ def test_uploads_are_limited_per_workspace_and_samples_are_not(s: Session) -> No
     with pytest.raises(IngestError, match="at most 20 documents"):
         _ingest(s, ws.id, "one-more.md", "upload", b"# One more\n\nText.\n")
     assert _ingest(s, ws.id, "security-faq.md").source == "sample"  # the 22-document dev pack loads
+
+
+def test_uploads_are_limited_to_20000_lines_per_workspace(s: Session) -> None:
+    ws = f.workspace(s)
+    f.document(s, ws, filename="big.md", line_count=MAX_WORKSPACE_LINES - 1)
+    s.commit()
+    with pytest.raises(IngestError, match="20,000 lines"):
+        _ingest(s, ws.id, "two.md", "upload", b"# Two\n\nLines.\n")
+    assert len(s.scalars(select(Document).where(Document.workspace_id == ws.id)).all()) == 1  # none stored
+
+
+def test_a_concurrent_upload_cannot_slip_past_the_document_limit(
+    s: Session, db: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = f.workspace(s)
+    for i in range(MAX_DOCUMENTS - 1):
+        f.document(s, ws, filename=f"d{i}.md")
+    s.commit()
+    ws_id, real = ws.id, store.classify
+
+    def classify_while_another_upload_lands(*args: Any, **kwargs: Any) -> Any:
+        with Session(db) as other:  # the 20th document arrives between the two limit checks
+            f.document(other, other.get_one(Workspace, ws_id), filename="other.md")
+            other.commit()
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(store, "classify", classify_while_another_upload_lands)
+    with pytest.raises(IngestError, match="at most 20 documents"):
+        _ingest(s, ws_id, "late.md", "upload", b"# Late\n\nText.\n")
+    s.rollback()
+    assert len(s.scalars(select(Document).where(Document.workspace_id == ws_id)).all()) == MAX_DOCUMENTS
 
 
 def test_a_statement_is_a_dated_redacted_evidence_document(s: Session) -> None:
@@ -1444,7 +1504,7 @@ from sqlalchemy.orm import Session
 from app.chunk import chunk_lines
 from app.classify import classify
 from app.contracts import DocMeta, Line, Spend
-from app.db.models import Chunk, Document, DocumentLine
+from app.db.models import Chunk, Document, DocumentLine, Workspace
 from app.ingest.parse import IngestError, parse, text_lines
 from app.llm.client import LLMClient
 from app.redact import redact_lines, redact_text
@@ -1474,6 +1534,11 @@ def _store(
     meta: DocMeta,
     lines: Sequence[Line],
 ) -> Document:
+    if source in ("upload", "drive"):
+        # Lock the workspace row and count again: classify may have committed (the spender does) since
+        # ingest_document's first check, so two uploads at once could otherwise both pass it.
+        session.execute(select(Workspace.id).where(Workspace.id == workspace_id).with_for_update())
+        _check_limits(session, workspace_id, len(lines))
     doc = Document(
         workspace_id=workspace_id,
         filename=filename[:255],
@@ -1554,7 +1619,7 @@ def store_statement(
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `pytest tests/test_chunk.py tests/test_ingest_store.py -q`
-Expected: PASS (4 and 5 tests).
+Expected: PASS (4 and 7 tests).
 
 - [ ] **Step 6: Run the chain and commit**
 
