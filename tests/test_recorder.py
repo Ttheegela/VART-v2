@@ -53,3 +53,10 @@ def test_recordings_survive_unicode_line_separators(tmp_path: Path) -> None:
     assert all(ch in written for ch in (chr(0x2028), chr(0x2029), chr(0x85)))  # the premise: raw in the file
     assert ReplayClient(path).complete(REQ).text == text
     assert RecordingClient(FakeLLM([]), path).complete(REQ).text == text
+
+
+def test_a_prompt_with_a_lone_surrogate_can_be_recorded_and_replayed(tmp_path: Path) -> None:
+    req = build_request("draft", "acme/fast", "draft@p1", "s", "bad " + chr(0xD800), Out)  # broken PDF text
+    path = tmp_path / "r.jsonl"
+    RecordingClient(FakeLLM(['{"ok": true}']), path).complete(req)
+    assert ReplayClient(path).complete(req).text == '{"ok": true}'

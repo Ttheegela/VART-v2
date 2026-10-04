@@ -38,7 +38,9 @@ class LLMRequest:
             sort_keys=True,
             ensure_ascii=False,
         )
-        return hashlib.sha256(payload.encode()).hexdigest()
+        # surrogatepass: a lone surrogate (broken PDF text) must still get its own key; valid text encodes
+        # exactly as before, so no existing key changes.
+        return hashlib.sha256(payload.encode("utf-8", "surrogatepass")).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -159,9 +161,18 @@ class OpenRouterClient:
                 # End the span here, before LLMError hides the cause, so a trace tells a 402 from a timeout.
                 span.end({"ok": False, "error_type": type(exc).__name__})
                 raise LLMError(f"{req.step}: {type(exc).__name__}") from exc
-            except (ValueError, TypeError, AttributeError, IndexError, KeyError, UnicodeError) as exc:
-                # A 200 whose body is unusable (error object, no choices, HTML, garbled usage) or a prompt the
-                # SDK cannot encode. Nothing raw may leave this method: callers catch only LLMError.
+            except (
+                ValueError,
+                TypeError,
+                AttributeError,
+                IndexError,
+                KeyError,
+                ArithmeticError,
+                RecursionError,
+            ) as exc:
+                # A 200 whose body is unusable (error object, no choices, HTML, garbled or infinite usage,
+                # absurdly nested JSON) or a prompt the SDK cannot encode. ValueError already covers the JSON
+                # and Unicode errors. Nothing raw may leave this method: callers catch only LLMError.
                 span.end({"ok": False, "error_type": type(exc).__name__})
                 raise LLMError(f"{req.step}: unusable response ({type(exc).__name__})") from exc
             span.end(

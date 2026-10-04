@@ -135,6 +135,12 @@ def _with(**changes: Any) -> dict[str, Any]:
     return {**_reply('{"ok": true, "note": null}'), **changes}
 
 
+def _with_raw_tokens(literal: str) -> bytes:
+    # httpx refuses to serialise infinity, so the number goes into the JSON text by hand
+    body = json.dumps(_with(usage={"prompt_tokens": "TOKENS", "completion_tokens": 1}))
+    return body.replace('"TOKENS"', literal).encode()
+
+
 # Every way a 200 can come back unusable. Callers (the canary, the pipeline) catch only LLMError.
 UNUSABLE = {
     "error body and no choices": _json({"error": {"message": "Provider returned error", "code": 502}}),
@@ -153,6 +159,8 @@ UNUSABLE = {
         _with(usage={"prompt_tokens": 1, "completion_tokens": 1, "cost": "abc"})
     ),
     "usage is not an object": _json(_with(usage="n/a")),
+    "usage tokens overflow to infinity": _bytes(_with_raw_tokens("1e999"), "application/json"),
+    "absurdly nested json": _bytes(b"[" * 100_000, "application/json"),
 }
 
 
@@ -191,21 +199,31 @@ class Golden(BaseModel):
     note: str | None
 
 
+GOLDEN_KEY = "f161dab50867e96edd9fb63aeaafba56dba94af3f7be62649f1d67e979bfb103"
+
+
+def _golden(user: str = "Is data encrypted at rest?") -> Any:
+    return build_request(
+        "stance", "acme/fast", "stance@p1", "You answer security questionnaires.", user, Golden
+    )
+
+
 def test_the_request_key_is_pinned() -> None:
     # Every recording is stored under this key. If this fails, the key recipe or the JSON schema that pydantic
     # emits changed (a pydantic upgrade can do that), which silently re-keys every recording. Updating the
     # digest means re-recording evals.
-    req = build_request(
-        "stance",
-        "acme/fast",
-        "stance@p1",
-        "You answer security questionnaires.",
-        "Is data encrypted at rest?",
-        Golden,
-    )
-    assert req.key() == "f161dab50867e96edd9fb63aeaafba56dba94af3f7be62649f1d67e979bfb103", json.dumps(
-        req.schema, sort_keys=True
-    )
+    assert _golden().key() == GOLDEN_KEY, json.dumps(_golden().schema, sort_keys=True)
+
+
+def test_a_lone_surrogate_in_a_prompt_still_gets_its_own_key() -> None:
+    # A broken PDF extraction can leave one behind. key() must not raise, valid text must key exactly as
+    # before, and the encoding must not be lossy (replace or ignore would make prompts share one key).
+    assert _golden().key() == GOLDEN_KEY
+    first = _golden("bad " + chr(0xD800)).key()
+    second = _golden("bad " + chr(0xD801)).key()
+    assert len(first) == 64 and first != second
+    lossy = {_golden(f"bad {tail}").key() for tail in ("", "?", chr(0xFFFD))}
+    assert {first, second}.isdisjoint(lossy)
 
 
 class OptionA(BaseModel):
