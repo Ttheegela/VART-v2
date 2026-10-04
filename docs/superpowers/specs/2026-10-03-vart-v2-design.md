@@ -162,8 +162,9 @@ worker process is needed. The run records the prompt versions and model IDs it u
   XLSX (openpyxl), CSV, MD, TXT. Limits in section 9.
 - **Lines:** every document becomes 1-based numbered lines (a paragraph, heading, list item or table row is one
   line). Citations point to document + line range + exact quote, so they survive re-chunking.
-- **Records:** spreadsheet rows become one line each, keyed by the header; a date column or a stated "as of" date
-  sets the record's `as_of`.
+- **Records:** spreadsheet rows (and table rows in any document) become one line each, rendered by
+  `app.text.record_line` as `Header: value; Header: value` (empty cells skipped); a date column or a stated
+  "as of" date sets the record's `as_of`. PDF visual lines are joined, because wrapping is not a paragraph break.
 - **Chunk flags:** `negation` (not, never, no longer, pending, planned, not yet, …), `placeholder`
   (`[Company Name]`, `{{…}}`, `<insert …>`, "Lorem ipsum"), `injection` (instructions aimed at a model). Pattern lists
   live in one module and are unit-tested.
@@ -200,16 +201,16 @@ Inputs: the item, its stances, the passages with their document metadata. Rules 
    `placeholder` or `injection` (`not-evidence`, `placeholder`, `injection`).
 3. **Irrelevant.** Drop `irrelevant` stances.
 4. **Negation.** A `yes` stance on a `negation`-flagged passage becomes `partial` (quote kept).
-5. **Scope.** If `yes` and `no` evidence come from documents with different declared scopes, it is not a conflict:
-   label `partial`, both cited, with a scope note ("the policy covers internal systems; the pentest covers the
-   customer product").
+5. **Scope.** If every `yes` document and every `no` document declares a scope and the two sets of scopes do not
+   overlap, it is not a conflict: label `partial`, both cited, with a scope note ("the policy covers internal
+   systems; the pentest covers the customer product"). A document with no declared scope applies everywhere.
 6. **Conflict.** Otherwise, `yes` and `no` from two or more documents is a conflict. When one side is a record whose
    `as_of` is later than the other document's effective date or audit period end, the rule is `date` and the newer
    record is listed first; otherwise the rule is `documents-disagree`.
 7. **Label.** No surviving evidence → `unknown`. Conflict → `conflict`. All `yes` → `verified`, value Yes. All `no`
    → `verified`, value No (an honest negative is still verified). Any other mix → `partial`, value Partial.
 8. **Draft ceiling.** If every surviving citation comes from documents with status `draft`, `verified` becomes
-   `partial`.
+   `partial` (value Partial; every partial label carries value Partial).
 9. **Confidence.** verified 0.9, partial 0.6, conflict 0.3, unknown 0.0; minus 0.2 if anything was dropped for
    containment; floor 0.
 
@@ -259,9 +260,11 @@ return 404.
 | `runs` | id, questionnaire_id, status, prompt_versions jsonb, models jsonb, cost_usd, started_at, finished_at |
 | `run_items` | run_id, item_id, state (pending/claimed/done), claimed_at — the step endpoint's work list |
 | `answers` | id, run_id, item_id, label, value, text, citations jsonb, dropped jsonb, conflict jsonb, scope_note, confidence, statement_id, approved_at, edited |
-| `interview_questions` | id, questionnaire_id, item_ids, text, status, asked_count, answer_text |
+| `interview_questions` (Plan 3) | id, run_id, item_ids, text, status, asked_count, answer_text |
+| `suggestions` (Plan 3) | id, run_id, item_id, statement_id, label, value, text, citations, status |
 | `audit_events` | id, at, actor, action, ref, detail jsonb |
 | `llm_usage`, `ip_limits` | hourly and per-IP counters (PriorPath budgets + new IP windows) |
+| `canary_runs` | id, at, ok, detail jsonb (per-model result, remaining credit) |
 
 **Constraints that encode the rules** (the v1 idea Tarun built, kept as database checks):
 - `CHECK (label NOT IN ('verified','partial') OR jsonb_array_length(citations) > 0)` — no verified or partial answer
@@ -351,12 +354,12 @@ documents alone; every disagreement is resolved (and the fact sheet, document or
 | Must-ask items (only the company can answer) | ≥ 5 | unknown → asked |
 | One answer fills several items | ≥ 2 | suggested fills appear |
 
-### 7.4 Answer key format (`data/<pack>/key/<questionnaire>.json`)
+### 7.4 Answer key format (`data/<pack>/key/<questionnaire>.yaml`)
 
-Per item: `id`, `expected_label`, `expected_value`, `must_ask`, `evidence` (`[{doc, line_start, line_end, quote}]`,
-by document and line so it is independent of chunking), `conflict_id`, `scope_note_expected`, `honest_negative`,
-`trap`, `fills` (item ids an answer here should also fill), `notes`. Pack level: `conflicts`, `traps`, and the
-expected interview set.
+Derived by code from the fact sheet (`datakit/derive_key.py`), never hand-written. Per item: `code`,
+`expected_label`, `expected_value`, `must_ask`, `evidence` (`[{doc, quote, stance}]`, anchored by exact quote so it
+is independent of line numbering and chunking), `conflict_trap`, `scope_note_expected`, `honest_negative`, `traps`
+(trap ids the item exercises), `fills` (item codes an answer here should also fill). Traps live in the fact sheet.
 
 ### 7.5 Column-mapper set
 
@@ -449,11 +452,13 @@ Everything here scales to zero and wakes on request, and nothing expires on idle
 
 ### 11.1 Plans
 
-1. **Foundation and dev data.** Repo scaffold from PriorPath patterns, `CLAUDE.md` map and rules, `Settings`,
+1. **Foundation and dev data** (plans 1A and 1B, run in parallel after a shared scaffold task). Repo scaffold from
+   PriorPath patterns, `CLAUDE.md` map and rules, `Settings`, shared text rules (`app/text.py`, adversary-reviewed),
    database schema and first migration, CI with the mechanical gates, LLM client with record/replay, observability,
-   health, frozen `CONTRACTS.md` and OpenAPI types (adversary review before freezing), hello-world deploy. In parallel:
-   dev pack fact sheet, documents, questionnaires A and B, answer keys with independent verification, column-mapper
-   set, licensing files.
+   health and daily canary, the OpenAPI type-generation pipeline, hello-world deploy. In parallel: dev pack fact
+   sheet, documents, questionnaires A and B, answer keys with independent verification, column-mapper set, licensing
+   files. The Python unit contracts are frozen at the start of Plan 2 and the HTTP contract at the start of Plan 3,
+   each with the adversary review, when the lanes that depend on them split.
 2. **Engine and evals.** Ingest, redaction, classification, chunking, retrieval, stance, decide, draft and check,
    interview planner, eval harness, first recordings, baseline, model bench, gates set.
 3. **API and UI.** All endpoints, step runner with concurrency tests, budgets and IP limits, column mapper, export,
