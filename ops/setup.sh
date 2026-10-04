@@ -374,11 +374,14 @@ ensure_link() { # link this directory to the project (idempotent). vercel link a
   guard_gitignore
   if [ -e .env.local ]; then had_env=1; fi
   before=$(git status --porcelain) || fail "git status failed"
+  cp .gitignore "$WORK/gitignore" || fail "could not back up .gitignore"
   vc link --yes --project "$VERCEL_PROJECT" >/dev/null || {
     vc_err
     fail "vercel link failed"
   }
   if [ "$had_env" = 0 ]; then rm -f .env.local; fi
+  # vercel link appends ".env*" unless that exact line exists; after "!.env.example" it would ignore .env.example again.
+  cp "$WORK/gitignore" .gitignore || fail "could not restore .gitignore"
   [ "$(git status --porcelain)" = "$before" ] || fail "vercel link changed files in the repo (see git status); revert them, then re-run"
   linked=$(python3 -c 'import json; print(json.load(open(".vercel/project.json")).get("projectId", ""))' 2>/dev/null || true)
   [ "$linked" = "$pid" ] || fail "vercel link did not create .vercel/project.json for $VERCEL_PROJECT"
@@ -396,6 +399,7 @@ vercel_project() {
       vc_err
       fail "vercel project add failed"
     }
+    for _ in 1 2 3 4 5 6; do vercel_has_project && break; sleep 5; done # the list lags a new project by seconds
     vercel_has_project || fail "the new Vercel project is not visible yet; re-run in a minute"
     ok "project created"
   fi
