@@ -41,7 +41,7 @@ describe("App", () => {
     expect((await screen.findByText("Database")).nextElementSibling).toHaveTextContent(/^Unavailable$/);
   });
 
-  it("asks for the workspace before the health check", async () => {
+  it("requests the workspace and the system health on load", async () => {
     const fetchMock = vi.fn(async (url: string) =>
       new Response(
         JSON.stringify(url.endsWith("/api/workspace") ? { created_at: "2026-10-03T12:00:00Z" } : { status: "ok", db: "ok", canary: null }),
@@ -52,7 +52,7 @@ describe("App", () => {
     render(<App />);
     expect(await screen.findByRole("region", { name: "System status" })).toBeInTheDocument();
     expect(await screen.findByText(/arrives in the next build/)).toBeInTheDocument();
-    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/workspace", "/api/health"]);
+    expect(fetchMock.mock.calls.map(([url]) => url).sort()).toEqual(["/api/health", "/api/workspace"]);
   });
 
   it("announces both loading states", () => {

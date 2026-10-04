@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import StatusPanel from "./components/StatusPanel";
 import { ensureWorkspace, messageOf } from "./lib/api";
@@ -7,8 +7,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // A layout effect runs before StatusPanel's effect, so /api/workspace is requested first (app/api/deps.py).
-  useLayoutEffect(() => {
+  useEffect(() => {
     ensureWorkspace().then(
       () => setReady(true),
       (e) => setError(messageOf(e)),
