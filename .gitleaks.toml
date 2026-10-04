@@ -1,0 +1,10 @@
+# Why: the generic-api-key rule matches GOLDEN_KEY by its name; the value is a sha256 record/replay key, not a credential.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "GOLDEN_KEY in tests/test_llm_client.py is the sha256 of a canonical LLM request (the record/replay key), not a credential"
+condition = "AND"
+paths = ['''tests/test_llm_client\.py''']
+regexTarget = "line"
+regexes = ['''^\s*GOLDEN_KEY = "[0-9a-f]{64}"\s*$''']
