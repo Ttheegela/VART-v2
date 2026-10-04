@@ -9,8 +9,8 @@
 #   ops/setup.sh --help
 #
 # Secrets never reach the screen, a file or a command line: they live in shell variables or pipes, and the EXIT trap
-# unsets them. Flags and API fields were checked against: Vercel CLI 62.2.0 (npx --no-install vercel), neonctl 8.0.5
-# (a shim for the `neon` CLI), UptimeRobot API v3 (https://uptimerobot.com/api/v3/), OpenRouter GET /api/v1/key.
+# unsets them. Flags and API fields were checked against: Vercel CLI 62.2.0 (run as npx --yes vercel@62.2.0), neonctl
+# 8.0.5 (a shim for the `neon` CLI), UptimeRobot API v3 (https://uptimerobot.com/api/v3/), OpenRouter GET /api/v1/key.
 set -euo pipefail
 set +x # never trace: secrets pass through shell variables
 
@@ -20,6 +20,8 @@ PROD_BRANCH=main
 VERCEL_SCOPE=theegelatarun-4606
 VERCEL_PROJECT=vart
 VERCEL_FRAMEWORK=fastapi
+VERCEL_CLI_VERSION=62.2.0
+VERCEL_NPX="npx --yes vercel@$VERCEL_CLI_VERSION" # for the hints printed to Tarun
 NEON_PROJECT=vart
 NEON_REGION=aws-us-east-1
 NEON_PG_VERSION=17
@@ -30,10 +32,11 @@ UPTIMEROBOT_API=https://api.uptimerobot.com/v3
 UI_INTERVAL_S=300
 HEALTH_INTERVAL_S=3600
 HEALTH_KEYWORD='"status":"ok"'
-ENV_TARGETS="production preview"
+ENV_TARGETS="production" # previews get no secrets until Plan 4 adds a Neon branch for them
 CRON_PATHS="/api/internal/cleanup /api/internal/canary"
 
 PHASE=""
+FAILED=0
 LANGFUSE=0
 REPLACE=""
 DOMAIN=""
@@ -48,7 +51,9 @@ usage() {
 Usage: ops/setup.sh <phase> [options]
 
 Phases (each is safe to re-run):
-  accounts  Neon project, Vercel project + local link, Vercel env vars. Git is NOT connected and nothing is deployed.
+  accounts  Neon project, Vercel project + local link, Vercel env vars (production only: preview deploys get no secrets
+            and show the UI but not the database until Plan 4 adds a Neon branch for previews). Git is NOT connected
+            and nothing is deployed.
             Checks: gh, node/npx, python3, Vercel CLI logged in as $VERCEL_SCOPE, Neon login (browser if needed), repo.
             Hidden prompts, in order: OpenRouter API key; with --langfuse also Langfuse public key, Langfuse secret
             key, then a visible optional Langfuse base URL. Create the OpenRouter key first: name $OPENROUTER_KEY_NAME,
@@ -67,8 +72,10 @@ Options:
   --domain HOST     uptime, status: production host to use instead of asking Vercel
   -h, --help        this text
 
-Environment: NEON_API_KEY skips the Neon browser login; NEON_ORG_ID selects an organization when your Neon
-account has several.
+Neon login: the browser login (it opens by itself, nothing to type) is the recommended way. If you must use an API
+key, type it hidden instead of putting it on a command line (shell history keeps those):
+  read -rs NEON_API_KEY && export NEON_API_KEY      # run unset NEON_API_KEY afterwards
+NEON_ORG_ID=<org id> (an id, not a secret) selects an organization when your Neon account has several.
 EOF
 }
 
@@ -77,6 +84,7 @@ ok() { printf 'OK    %s\n' "$*"; }
 info() { printf '      %s\n' "$*"; }
 warn() { printf 'WARN  %s\n' "$*"; }
 fail() {
+  FAILED=1
   printf 'FAIL  %s\n' "$*" >&2
   exit 1
 }
@@ -109,25 +117,31 @@ read_secret() { # PROMPT VARNAME: hidden input into the named variable
 new_secret() { python3 -c 'import secrets; print(secrets.token_urlsafe(32))'; }
 
 init() {
-  ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+  ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd) || fail "cannot find the repo directory"
   cd "$ROOT"
-  WORK=$(mktemp -d "${TMPDIR:-/tmp}/vart-setup.XXXXXX")
+  WORK=$(mktemp -d "${TMPDIR:-/tmp}/vart-setup.XXXXXX") || fail "cannot create a temporary directory"
   trap cleanup EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
 }
 cleanup() {
+  local rc=$?
   if [ -t 0 ]; then stty echo 2>/dev/null || true; fi
   unset db_url direct_url session_secret cron_secret or_key lf_pk lf_sk lf_url ur_key UR_LIST
   if [ -n "$WORK" ]; then rm -rf "$WORK"; fi
+  # a command that failed under set -e without its own message (never printed with a secret in it)
+  if [ "$rc" -ne 0 ] && [ "$rc" -ne 130 ] && [ "$rc" -ne 143 ] && [ "$FAILED" = 0 ]; then
+    printf 'FAIL  %s stopped unexpectedly (exit %s): the step after the last OK line above failed without a message. Re-run; if it repeats, report that step\n' "${PHASE:-setup}" "$rc" >&2
+  fi
 }
 
 # ---------------------------------------------------------------- CLI wrappers
-# Vercel: --scope pins the account; agent-detection variables are dropped so the output is the same everywhere.
+# Vercel: pinned version (npx caches it after the first run, so a new release cannot break a later run); --scope pins
+# the account; agent-detection variables are dropped so the output is the same everywhere.
 # vc = quiet, no stdin (stderr kept for vc_err); vc_in = stdin comes from the caller; vc_live = stderr visible.
-vc() { env -u AI_AGENT -u CLAUDECODE -u CLAUDE_CODE npx --no-install vercel "$@" --scope "$VERCEL_SCOPE" </dev/null 2>"$WORK/vc.err"; }
-vc_in() { env -u AI_AGENT -u CLAUDECODE -u CLAUDE_CODE npx --no-install vercel "$@" --scope "$VERCEL_SCOPE" 2>"$WORK/vc.err"; }
-vc_live() { env -u AI_AGENT -u CLAUDECODE -u CLAUDE_CODE npx --no-install vercel "$@" --scope "$VERCEL_SCOPE" </dev/null; }
+vc() { env -u AI_AGENT -u CLAUDECODE -u CLAUDE_CODE npx --yes "vercel@$VERCEL_CLI_VERSION" "$@" --scope "$VERCEL_SCOPE" </dev/null 2>"$WORK/vc.err"; }
+vc_in() { env -u AI_AGENT -u CLAUDECODE -u CLAUDE_CODE npx --yes "vercel@$VERCEL_CLI_VERSION" "$@" --scope "$VERCEL_SCOPE" 2>"$WORK/vc.err"; }
+vc_live() { env -u AI_AGENT -u CLAUDECODE -u CLAUDE_CODE npx --yes "vercel@$VERCEL_CLI_VERSION" "$@" --scope "$VERCEL_SCOPE" </dev/null; }
 vc_err() { sed -e '/^Vercel CLI [0-9.]*$/d' -e '/^$/d' "$WORK/vc.err" | head -15 | redact "$@" || true; }
 # Neon: run from a scratch directory so the CLI can never drop a .neon file into the repo.
 neonctl() { (cd "$WORK" && npx -y "neonctl@$NEONCTL_VERSION" "$@"); }
@@ -143,7 +157,7 @@ check_tools() {
   need python3 "Install Python 3: brew install python"
   need curl "curl is missing"
   need git "git is missing"
-  ver=$(node -p 'process.versions.node')
+  ver=$(node -p 'process.versions.node') || fail "could not run node"
   IFS=. read -r maj min _ <<EOF2
 $ver
 EOF2
@@ -156,27 +170,39 @@ EOF2
 
 check_vercel() {
   local who
-  vc --version >/dev/null ||
-    fail "the Vercel CLI is not installed. Run once: npx vercel --version (accept the install), then re-run"
+  info "Vercel CLI: vercel@$VERCEL_CLI_VERSION via npx (the first run downloads it)"
+  vc --version >/dev/null || {
+    vc_err
+    fail "could not start the Vercel CLI ($VERCEL_NPX --version failed). Check your network and npm registry access, then re-run"
+  }
   who=$(vc whoami) || {
     vc_err
-    fail "the Vercel CLI is not logged in. Run: npx vercel login"
+    fail "the Vercel CLI is not logged in. Run: $VERCEL_NPX login"
   }
   [ "$who" = "$VERCEL_SCOPE" ] ||
-    fail "Vercel is logged in as '$who' but this project lives in '$VERCEL_SCOPE'. Run: npx vercel logout && npx vercel login"
+    fail "Vercel is logged in as '$who' but this project lives in '$VERCEL_SCOPE'. Run: $VERCEL_NPX logout && $VERCEL_NPX login"
   ok "Vercel CLI logged in as $who"
+}
+
+neon_has_login() { # an API key in the environment, or a saved login in the file the Neon CLI reads (current or legacy dir)
+  local h=${XDG_CONFIG_HOME:-$HOME/.config}
+  if [ -n "${NEON_API_KEY:-}" ]; then return 0; fi
+  if [ -f "${NEON_CONFIG_DIR:-${NEONCTL_CONFIG_DIR:-$h/neon}}/credentials.json" ]; then return 0; fi
+  if [ -f "$h/neonctl/credentials.json" ]; then return 0; fi
+  return 1
 }
 
 check_neon() {
   local login orgs n
   info "Neon CLI: neonctl@$NEONCTL_VERSION via npx (the first run downloads it)"
-  login=$(neonctl me --output json | python3 -c 'import json, sys; print(json.load(sys.stdin).get("login", ""))' 2>/dev/null) || login=""
-  if [ -z "$login" ]; then
-    info "Neon: not signed in. A browser window opens (neonctl auth)."
-    neonctl auth || fail "neonctl auth failed"
-    login=$(neonctl me --output json | python3 -c 'import json, sys; print(json.load(sys.stdin).get("login", ""))' 2>/dev/null) ||
-      fail "neonctl me still fails after signing in"
+  # `neonctl me` starts its own browser login when nobody is signed in, and its output is piped: sign in first, in the open
+  if ! neon_has_login; then
+    info "Neon: no saved login. A browser window opens now (neonctl auth): approve the login there, then come back here."
+    neonctl auth || fail "neonctl auth failed (message above)"
   fi
+  login=$(neonctl me --output json | python3 -c 'import json, sys; print(json.load(sys.stdin).get("login", ""))' 2>/dev/null) ||
+    fail "neonctl me failed (message above). To sign in again run: npx -y neonctl@$NEONCTL_VERSION auth, then re-run"
+  [ -n "$login" ] || fail "neonctl me returned no account name; to sign in again run: npx -y neonctl@$NEONCTL_VERSION auth"
   ok "Neon logged in as $login"
   # Without --org-id the Neon CLI may ask which organization on stdout, which a script cannot show: always pass it.
   if [ -n "${NEON_ORG_ID:-}" ]; then
@@ -189,7 +215,7 @@ import json, sys
 d = json.load(sys.stdin)
 for o in (d if isinstance(d, list) else d.get("organizations", [])):
     print(o.get("id", ""), o.get("name", ""))') || orgs=""
-  n=$(printf '%s\n' "$orgs" | awk 'NF' | wc -l | tr -d ' ')
+  n=$(printf '%s\n' "$orgs" | awk 'NF' | wc -l | tr -d ' ') || fail "could not count the Neon organizations"
   if [ "$n" -gt 1 ]; then
     printf '%s\n' "$orgs" | sed 's/^/      /'
     fail "your Neon account has $n organizations (ids above). Re-run with: NEON_ORG_ID=<id> ops/setup.sh $PHASE"
@@ -339,7 +365,7 @@ guard_gitignore() {
 
 ensure_link() { # link this directory to the project (idempotent). vercel link also drops a short-lived OIDC token
   local pid linked before had_env=0 # into .env.local; remove that file again when this run created it.
-  pid=$(pjget 'd.get("id")')
+  pid=$(pjget 'd.get("id")') || fail "could not read the Vercel project id"
   linked=$(python3 -c 'import json; print(json.load(open(".vercel/project.json")).get("projectId", ""))' 2>/dev/null || true)
   if [ "$linked" = "$pid" ]; then
     ok "directory linked to $VERCEL_PROJECT (.vercel/project.json)"
@@ -347,7 +373,7 @@ ensure_link() { # link this directory to the project (idempotent). vercel link a
   fi
   guard_gitignore
   if [ -e .env.local ]; then had_env=1; fi
-  before=$(git status --porcelain)
+  before=$(git status --porcelain) || fail "git status failed"
   vc link --yes --project "$VERCEL_PROJECT" >/dev/null || {
     vc_err
     fail "vercel link failed"
@@ -374,14 +400,14 @@ vercel_project() {
     ok "project created"
   fi
   load_project
-  fw=$(pjget 'd.get("framework")')
+  fw=$(pjget 'd.get("framework")') || fail "could not read the project's framework"
   if [ -z "$fw" ]; then
     vc project update "$VERCEL_PROJECT" --framework "$VERCEL_FRAMEWORK" --yes >/dev/null || {
       vc_err
       fail "could not set the framework preset to $VERCEL_FRAMEWORK"
     }
     load_project
-    fw=$(pjget 'd.get("framework")')
+    fw=$(pjget 'd.get("framework")') || fail "could not read the project's framework"
   fi
   if [ "$fw" = "$VERCEL_FRAMEWORK" ]; then ok "framework preset: $fw"; else warn "framework preset is '$fw', expected $VERCEL_FRAMEWORK"; fi
   if [ -n "$(git_link)" ]; then info "Git: already connected ($(git_link))"; else info "Git: not connected (the release phase does that)"; fi
@@ -391,7 +417,7 @@ vercel_project() {
 # ---------------------------------------------------------------- secrets: prompts and env vars
 ask_openrouter() {
   local resp code limits
-  printf '\nOpenRouter key (used for production and preview). Create it first:\n'
+  printf '\nOpenRouter key (stored for production). Create it first:\n'
   printf '  1. open https://openrouter.ai/settings/keys\n  2. Create Key: name "%s", credit limit $10\n' "$OPENROUTER_KEY_NAME"
   printf '  3. paste it below (input is hidden)\n'
   read_secret "OpenRouter API key" or_key
@@ -442,7 +468,7 @@ env_vars() {
     case $db_url in postgres://* | postgresql://*) ;; *) fail "unexpected Neon connection string format" ;; esac
     case $db_url in *-pooler.*) ;; *) fail "Neon returned a non-pooled connection string" ;; esac
   fi
-  if [ "$need_sess" = 1 ]; then session_secret=$(new_secret); fi
+  if [ "$need_sess" = 1 ]; then session_secret=$(new_secret) || fail "could not generate SESSION_SECRET (python3 secrets failed)"; fi
   if [ "$need_or" = 1 ]; then ask_openrouter; fi
   if [ "$need_lf" = 1 ]; then ask_langfuse; fi
   for t in $ENV_TARGETS; do
@@ -482,6 +508,7 @@ phase_accounts() {
   info "Vercel environment variables:"
   print_env_names
   echo
+  warn "preview deploys get no secrets: they show the UI but not the database until Plan 4 adds a Neon branch for previews"
   ok "accounts done. Next, once Plan 1A Task 9 has the app on $PROD_BRANCH and pushed: ops/setup.sh release"
 }
 
@@ -500,12 +527,13 @@ release_checks() {
   ok "on $PROD_BRANCH, clean, equal to origin/$PROD_BRANCH ($(git rev-parse --short HEAD))"
   ci=$(gh run list -R "$GH_REPO" --commit "$(git rev-parse HEAD)" --json status,conclusion 2>/dev/null | python3 -c '
 import json, sys
-print(",".join(sorted({r.get("conclusion") or r.get("status") or "?" for r in json.load(sys.stdin)})))' 2>/dev/null) || ci=""
+print(",".join(sorted({r.get("conclusion") or r.get("status") or "?" for r in json.load(sys.stdin)})))' 2>/dev/null) ||
+    fail "could not read the CI status for this commit (gh run list failed). Check: gh run list -R $GH_REPO"
+  # Plan 1A Task 9 needs green CI: only "every run for this commit succeeded" passes; pending, missing or failed all stop here
   case $ci in
     success) ok "CI is green for this commit" ;;
-    "") warn "no CI run found for this commit (Plan 1A Task 9 wants green CI before releasing)" ;;
-    *failure* | *cancelled* | *timed_out*) fail "CI is not green for this commit ($ci). Fix it first (Plan 1A Task 9, step 2)" ;;
-    *) warn "CI status for this commit: $ci. Wait for success before releasing" ;;
+    "") fail "no CI run found for this commit: push $PROD_BRANCH and wait for CI to pass (Plan 1A Task 9, step 2)" ;;
+    *) fail "CI is not green for this commit (runs: $ci; every run must be success). Wait for it or fix it first (Plan 1A Task 9, step 2)" ;;
   esac
 }
 
@@ -519,7 +547,8 @@ migrate() {
   if [ -x .venv/bin/alembic ]; then alembic=.venv/bin/alembic; elif command -v alembic >/dev/null 2>&1; then alembic=alembic; else
     fail "alembic not found. Create the venv: python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt"
   fi
-  pw=$(printf '%s' "$direct_url" | python3 -c 'import sys, urllib.parse as u; print(u.urlsplit(sys.stdin.read().strip()).password or "")')
+  pw=$(printf '%s' "$direct_url" | python3 -c 'import sys, urllib.parse as u; print(u.urlsplit(sys.stdin.read().strip()).password or "")') ||
+    fail "could not read the Neon connection string"
   rc=0
   out=$(DATABASE_URL="$direct_url" "$alembic" upgrade head 2>&1) || rc=$?
   printf '%s\n' "$out" | redact "$direct_url" "$pw" | sed 's/^/      /'
@@ -534,7 +563,7 @@ connect_git() {
   local g gtype grepo gbranch
   step "Git connection"
   load_project
-  g=$(git_link)
+  g=$(git_link) || fail "could not read the project's Git link"
   if [ -z "$g" ]; then
     # `vercel git connect` exits 1 when the repo is already connected, so it only runs when nothing is connected
     vc git connect "https://github.com/$GH_REPO" --yes >/dev/null || {
@@ -542,14 +571,14 @@ connect_git() {
       fail "could not connect $GH_REPO. Make sure the Vercel GitHub app can see it: https://github.com/settings/installations -> Vercel -> Configure -> add $GH_REPO"
     }
     load_project
-    g=$(git_link)
+    g=$(git_link) || fail "could not read the project's Git link"
   fi
   [ -n "$g" ] || fail "Git connection did not stick; check the project's Git settings in Vercel"
   # shellcheck disable=SC2086
   set -- $g
   gtype=$1 grepo=$2 gbranch=${3:-}
   [ "$gtype" = github ] && [ "$grepo" = "$GH_REPO" ] ||
-    fail "the project is connected to $grepo ($gtype), not $GH_REPO: run npx vercel git disconnect, then re-run"
+    fail "the project is connected to $grepo ($gtype), not $GH_REPO: run $VERCEL_NPX git disconnect, then re-run"
   ok "Git connected: $grepo"
   if [ "$gbranch" = "$PROD_BRANCH" ]; then ok "production branch: $gbranch"; else warn "production branch is '$gbranch', expected $PROD_BRANCH (Project Settings -> Environments -> Production)"; fi
 }
@@ -558,13 +587,13 @@ deploy_prod() {
   local dep d p
   step "Production deploy"
   info "building on Vercel (a few minutes)"
-  dep=$(vc_live deploy --prod --yes) || fail "deploy failed (output above). Logs: npx vercel inspect <deployment-url> --logs"
+  dep=$(vc_live deploy --prod --yes) || fail "deploy failed (output above). Logs: $VERCEL_NPX inspect <deployment-url> --logs"
   ok "deployed: $dep"
   load_project
-  domain=$(prod_domain)
+  domain=$(prod_domain) || fail "could not read the production domain"
   [ -n "$domain" ] || fail "no production domain found after the deploy"
   ok "production domain: https://$domain"
-  d=$(cron_list)
+  d=$(cron_list) || fail "could not read the registered crons"
   for p in $CRON_PATHS; do
     if has_line "$(printf '%s\n' "$d" | sed 's/ .*//')" "$p"; then ok "cron registered: $p"; else warn "cron not registered: $p"; fi
   done
@@ -625,7 +654,7 @@ phase_release() {
   ensure_link
   migrate
   step "Cron secret and env check"
-  cron_secret=$(new_secret)
+  cron_secret=$(new_secret) || fail "could not generate CRON_SECRET (python3 secrets failed)"
   set_env CRON_SECRET production "$cron_secret"
   refresh_env_pairs
   for n in DATABASE_URL SESSION_SECRET OPENROUTER_API_KEY CRON_SECRET; do
@@ -702,7 +731,7 @@ print(json.dumps(b))' "$@"
 
 ur_ensure() { # KIND NAME URL INTERVAL CONTACT_IDS [KEYWORD]
   local id kw=${6:-}
-  id=$(ur_find "$3" "$kw")
+  id=$(ur_find "$3" "$kw") || fail "could not read the UptimeRobot monitor list"
   if [ -n "$id" ]; then
     ok "monitor already exists: $2 (id $id)"
     return 0
@@ -733,7 +762,7 @@ phase_uptime() {
     check_vercel
     vercel_has_project || fail "Vercel project '$VERCEL_PROJECT' not found. Run: ops/setup.sh accounts"
     load_project
-    domain=$(prod_domain)
+    domain=$(prod_domain) || fail "could not read the production domain"
   fi
   [ -n "$domain" ] || fail "no production domain yet: run ops/setup.sh release first, or pass --domain HOST"
   ok "production domain: https://$domain"
@@ -755,7 +784,8 @@ phase_uptime() {
   [ "$UR_CODE" = 200 ] || fail "could not read alert contacts (HTTP $UR_CODE: $(ur_error))"
   contacts=$(printf '%s' "$UR_BODY" | python3 -c '
 import json, sys
-print(",".join(str(c["id"]) for c in json.load(sys.stdin) if isinstance(c, dict) and "id" in c))')
+print(",".join(str(c["id"]) for c in json.load(sys.stdin) if isinstance(c, dict) and "id" in c))') ||
+    fail "could not read the alert contacts from UptimeRobot's answer"
   if [ -z "$contacts" ]; then warn "the account has no alert contacts: add your email in the dashboard, or the monitors alert nobody"; fi
   ur GET "/monitors?limit=200"
   [ "$UR_CODE" = 200 ] || fail "could not list monitors (HTTP $UR_CODE: $(ur_error))"
@@ -782,20 +812,20 @@ phase_status() {
   if vercel_has_project; then
     load_project
     info "project $VERCEL_PROJECT, id $(pjget 'd.get("id")'), framework $(pjget 'd.get("framework")')"
-    g=$(git_link)
+    g=$(git_link) || fail "could not read the project's Git link"
     if [ -n "$g" ]; then info "Git: $g"; else info "Git: not connected"; fi
     refresh_env_pairs
     info "environment variables:"
     print_env_names
-    d=$(cron_list)
+    d=$(cron_list) || fail "could not read the registered crons"
     if [ -n "$d" ]; then printf '%s\n' "$d" | sed 's/^/      cron: /'; else info "no crons registered yet"; fi
-    domain=${DOMAIN:-$(prod_domain)}
+    domain=${DOMAIN:-$(prod_domain)} || fail "could not read the production domain"
     if [ -n "$domain" ]; then info "production URL: https://$domain"; fi
     d=$(printf '%s' "$pj" | python3 -c '
 import json, sys
 t = (json.load(sys.stdin).get("targets") or {}).get("production") or {}
 if t:
-    print(t.get("readyState", ""), t.get("url", ""))')
+    print(t.get("readyState", ""), t.get("url", ""))') || fail "could not read the latest production deployment"
     if [ -n "$d" ]; then info "latest production deployment: $d"; else info "no production deployment yet"; fi
   else
     warn "no Vercel project named $VERCEL_PROJECT"
