@@ -136,9 +136,8 @@ class Item(Base):
     __tablename__ = "items"
     id: Mapped[uuid.UUID] = _uuid_pk()
     workspace_id: Mapped[uuid.UUID] = _workspace_fk()
-    questionnaire_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("questionnaires.id", ondelete="CASCADE"), index=True
-    )
+    # No index on questionnaire_id: uq_items_position (questionnaire_id, position) already leads with it.
+    questionnaire_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("questionnaires.id", ondelete="CASCADE"))
     position: Mapped[int] = mapped_column(Integer)
     row_ref: Mapped[str] = mapped_column(String(64))
     code: Mapped[str | None] = mapped_column(String(64), default=None)
@@ -167,7 +166,10 @@ class Run(Base):
 class RunItem(Base):
     __tablename__ = "run_items"
     run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), primary_key=True)
-    item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("items.id", ondelete="CASCADE"), primary_key=True)
+    # Indexed: deleting an item cascades here, and the primary key leads with run_id, not item_id.
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
     state: Mapped[str] = mapped_column(String(8), default="pending", server_default="pending")
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     __table_args__ = (
@@ -180,18 +182,24 @@ class Answer(Base):
     __tablename__ = "answers"
     id: Mapped[uuid.UUID] = _uuid_pk()
     workspace_id: Mapped[uuid.UUID] = _workspace_fk()
-    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), index=True)
+    # No index on run_id: uq_answers_run_item (run_id, item_id) already leads with it.
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"))
     item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("items.id", ondelete="CASCADE"), index=True)
     label: Mapped[str] = mapped_column(String(16))
     value: Mapped[str | None] = mapped_column(String(8), default=None)
     text: Mapped[str] = mapped_column(Text, default="", server_default="")
     citations: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, server_default="[]")
     dropped: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, server_default="[]")
-    conflict: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
+    # none_as_null: an explicit None is SQL NULL, not JSON null, so "conflict IS NULL" finds plain answers.
+    conflict: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True), default=None)
     scope_note: Mapped[str | None] = mapped_column(Text, default=None)
     confidence: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
-    # NO ACTION (not RESTRICT): a workspace delete removes answers and statements in one statement.
-    statement_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id"), default=None)
+    # NO ACTION: a statement that an answer cites cannot be deleted by itself. A workspace delete still works
+    # because answers.workspace_id cascades at the first level, and Postgres checks this key (NO ACTION or
+    # RESTRICT alike) only after the first-level cascades, by which time those answers are gone.
+    statement_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("documents.id"), default=None, index=True
+    )
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     edited: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = _created_at()

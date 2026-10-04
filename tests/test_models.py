@@ -1,11 +1,12 @@
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import Engine, delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.db.models import AuditEvent, Chunk, Document, DocumentLine, Workspace
+from app.db.models import Answer, AuditEvent, Chunk, Document, DocumentLine, LlmUsage, RunItem, Workspace
 from tests import factories as f
 
 
@@ -72,6 +73,13 @@ def test_one_answer_per_item_per_run(s: Session) -> None:
         f.answer(s, r, it)
 
 
+def test_an_answer_without_a_conflict_stores_sql_null(s: Session) -> None:
+    _, _, it, r = _run(s)
+    f.answer(s, r, it, conflict=None)  # explicit None: SQL NULL, not the JSON value null
+    s.commit()
+    assert s.scalar(select(func.count()).select_from(Answer).where(Answer.conflict.is_(None))) == 1
+
+
 @pytest.mark.parametrize(
     ("fields", "constraint"),
     [
@@ -89,6 +97,56 @@ def test_chunk_fields_are_constrained(s: Session, fields: dict[str, object], con
 def test_document_kind_is_constrained(s: Session) -> None:
     with pytest.raises(IntegrityError, match="ck_documents_kind"):
         f.document(s, f.workspace(s), kind="memo")
+
+
+def _add(s: Session, row: object) -> None:
+    s.add(row)
+    s.flush()
+
+
+def _bad_run_item(s: Session) -> None:
+    _, _, it, r = _run(s)
+    _add(s, RunItem(run_id=r.id, item_id=it.id, state="stuck"))
+
+
+def _bad_document_line(s: Session) -> None:
+    _add(
+        s,
+        DocumentLine(document_id=f.document(s, f.workspace(s)).id, n=0, text="Access is reviewed quarterly."),
+    )
+
+
+def _second_item_at_position_1(s: Session) -> None:
+    _, q, _, _ = _run(s)  # _run already put an item at position 1
+    f.item(s, q, row_ref="Questionnaire!C7")
+
+
+def _answer_with_json_object(s: Session, column: str) -> None:
+    # label unknown on purpose: for verified or partial, ck_answers_cited would be evaluated first
+    _, _, it, r = _run(s)
+    f.answer(s, r, it, label="unknown", **{column: {}})
+
+
+@pytest.mark.parametrize(
+    ("constraint", "make"),
+    [
+        ("ck_documents_source", lambda s: f.document(s, f.workspace(s), source="email")),
+        ("ck_documents_status", lambda s: f.document(s, f.workspace(s), status="bogus")),
+        ("ck_documents_metadata_source", lambda s: f.document(s, f.workspace(s), metadata_source="llm")),
+        ("ck_questionnaires_source", lambda s: f.questionnaire(s, f.workspace(s), source="email")),
+        ("ck_runs_status", lambda s: f.run(s, f.questionnaire(s, f.workspace(s)), status="paused")),
+        ("ck_run_items_state", _bad_run_item),
+        ("ck_document_lines_n", _bad_document_line),
+        ("uq_items_position", _second_item_at_position_1),
+        ("ck_answers_json_arrays", lambda s: _answer_with_json_object(s, "citations")),
+        ("ck_answers_json_arrays", lambda s: _answer_with_json_object(s, "dropped")),
+    ],
+)
+def test_other_named_constraints_reject_bad_rows(
+    s: Session, constraint: str, make: Callable[[Session], object]
+) -> None:
+    with pytest.raises(IntegrityError, match=constraint):
+        make(s)
 
 
 def test_chunks_are_full_text_searchable(s: Session) -> None:
@@ -111,6 +169,8 @@ def test_deleting_a_workspace_deletes_everything_in_it(s: Session) -> None:
     stmt = f.document(s, ws, kind="statement", source="statement", filename="answer.txt")
     f.answer(s, r, it, label="user_confirmed", statement_id=stmt.id)
     s.add(AuditEvent(workspace_id=ws.id, actor="visitor", action="upload"))
+    s.add(RunItem(run_id=r.id, item_id=it.id))
+    s.add(LlmUsage(workspace_id=ws.id, hour_start=datetime(2026, 1, 1, tzinfo=UTC), kind="draft", calls=1))
     s.commit()
     s.execute(delete(Workspace).where(Workspace.id == ws.id))
     s.commit()
@@ -121,8 +181,10 @@ def test_deleting_a_workspace_deletes_everything_in_it(s: Session) -> None:
         "questionnaires",
         "items",
         "runs",
+        "run_items",
         "answers",
         "audit_events",
+        "llm_usage",
     ):
         assert s.scalar(text(f"select count(*) from {table}")) == 0, table
     assert s.scalar(select(func.count()).select_from(Document)) == 0
