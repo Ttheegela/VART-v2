@@ -1,0 +1,926 @@
+pack: dev
+questionnaire: vsq-a
+items:
+- code: VSQ-01
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: isp
+    quote: Kestrelyn maintains a documented information security program that is approved by the CEO.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-02
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: isp
+    quote: All Kestrelyn security policies are reviewed at least annually.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - P2
+  fills: []
+- code: VSQ-03
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: isp
+    quote: The information security program is owned by Dana Ortiz, Head of Security.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-04
+  expected_label: verified
+  expected_value: 'No'
+  must_ask: false
+  evidence:
+  - doc: isp
+    quote: Kestrelyn is not ISO/IEC 27001 certified.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: true
+  traps:
+  - H1
+  - I1
+  fills: []
+- code: VSQ-05
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: soc2
+    quote: The service auditor issued an unqualified opinion on the Company's SOC 2 Type II examination for the period 2025-07-01
+      to 2026-06-30.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-06
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M8
+  fills: []
+- code: VSQ-07
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: All internal systems are accessed through Okta single sign-on (SSO).
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-08
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: Multi-factor authentication (MFA) is required for all internal systems.
+    stance: 'yes'
+  - doc: pentest
+    quote: MFA is not yet enforced for customer administrator accounts in Kestrelyn Ledger.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: true
+  honest_negative: false
+  traps:
+  - N1
+  - S1
+  fills: []
+- code: VSQ-09
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: User access to internal systems is reviewed quarterly.
+    stance: 'yes'
+  - doc: arr
+    quote: 'System: Okta; Owner: Marcus Lee; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status: Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: AWS; Owner: Marcus Lee; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status: Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: GitHub; Owner: Priya Raman; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status: Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: Google Workspace; Owner: Marcus Lee; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status:
+      Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: Kestrelyn Ledger admin console; Owner: Priya Raman; Last review completed: 2026-01-10; Next review due:
+      2026-04-10; Status: Overdue'
+    stance: 'no'
+  conflict_trap: D1
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - D1
+  fills: []
+- code: VSQ-10
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: User access to internal systems is removed within 24 hours of termination.
+    stance: 'yes'
+  - doc: soc2
+    quote: For 2 of 25 terminated users sampled, access was removed 5 days after termination.
+    stance: partial
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-11
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: Access to internal systems is role-based and follows the principle of least privilege.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-12
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: Okta enforces a minimum password length of 14 characters.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-13
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: User access to internal systems is reviewed quarterly.
+    stance: 'yes'
+  - doc: arr
+    quote: 'System: Okta; Owner: Marcus Lee; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status: Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: AWS; Owner: Marcus Lee; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status: Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: GitHub; Owner: Priya Raman; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status: Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: Google Workspace; Owner: Marcus Lee; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status:
+      Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: Kestrelyn Ledger admin console; Owner: Priya Raman; Last review completed: 2026-01-10; Next review due:
+      2026-04-10; Status: Overdue'
+    stance: 'no'
+  conflict_trap: D1
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - D1
+  fills: []
+- code: VSQ-14
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: Multi-factor authentication (MFA) is required for all internal systems.
+    stance: 'yes'
+  - doc: pentest
+    quote: MFA is not yet enforced for customer administrator accounts in Kestrelyn Ledger.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: true
+  honest_negative: false
+  traps:
+  - N1
+  - S1
+  fills: []
+- code: VSQ-15
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M10
+  fills: []
+- code: VSQ-16
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M9
+  fills: []
+- code: VSQ-17
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: crypto
+    quote: Customer data at rest is encrypted with AES-256 using AWS KMS.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-18
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: crypto
+    quote: Data in transit is encrypted using TLS 1.2 or higher.
+    stance: 'yes'
+  - doc: crypto
+    quote: The Kestrelyn application is served only over HTTPS, and HTTP requests are redirected to HTTPS.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-19
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: crypto
+    quote: AWS KMS encryption keys are rotated annually.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-20
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: dcp
+    quote: 'Kestrelyn classifies data into four levels: Public, Internal, Confidential and Restricted.'
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-21
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: dcp
+    quote: Customer data is deleted within 30 days after the end of the contract.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-22
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: dcp
+    quote: Kestrelyn Ledger stores all customer data in AWS us-east-1.
+    stance: 'yes'
+  - doc: ainv
+    quote: 'Asset: OFFICE-FS01; Type: On-premises file server; Location: Austin office; Owner: Marcus Lee; Data: Customer
+      invoice exports; Added: 2026-08-12'
+    stance: 'no'
+  conflict_trap: D3
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - D3
+  fills: []
+- code: VSQ-23
+  expected_label: verified
+  expected_value: 'No'
+  must_ask: false
+  evidence:
+  - doc: dcp
+    quote: Kestrelyn does not use customer data to train machine learning models.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: true
+  traps:
+  - H2
+  - I1
+  fills: []
+- code: VSQ-24
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: hb
+    quote: All company laptops must use full-disk encryption.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - R1
+  fills: []
+- code: VSQ-25
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: amp
+    quote: Storage media from retired assets, including media that held production data, is wiped following NIST SP 800-88
+      guidelines or physically destroyed before reuse or disposal.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-26
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M11
+  fills: []
+- code: VSQ-27
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: bcpol
+    quote: Kestrelyn performs daily backups of all production databases.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-28
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: bcpol
+    quote: Backup restores are tested quarterly.
+    stance: 'yes'
+  - doc: bcp
+    quote: Backup restore tests are performed annually; the last test was completed in November 2025.
+    stance: 'no'
+  conflict_trap: X1
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - X1
+  fills: []
+- code: VSQ-29
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: bcp
+    quote: The recovery time objective (RTO) is 8 hours and the recovery point objective (RPO) is 24 hours.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-30
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: bcp
+    quote: Disaster recovery failover is tested annually; the last failover test was completed in November 2025.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-31
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: bcpol
+    quote: Backup restores are tested quarterly.
+    stance: 'yes'
+  - doc: bcp
+    quote: Backup restore tests are performed annually; the last test was completed in November 2025.
+    stance: 'no'
+  conflict_trap: X1
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - X1
+  fills: []
+- code: VSQ-32
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: vmp
+    quote: Authenticated vulnerability scans of all production hosts and container images run weekly.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-33
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: vmp
+    quote: Critical vulnerabilities are patched within 14 days of discovery.
+    stance: 'yes'
+  - doc: vmp
+    quote: Vulnerabilities in third-party libraries and dependencies are remediated within the same timelines as other findings.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-34
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: vmp
+    quote: An independent third party performs a penetration test of Kestrelyn Ledger annually.
+    stance: 'yes'
+  - doc: pentest
+    quote: Sablecrest Security, an independent third party, performed this penetration test of Kestrelyn Ledger in May 2026.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - P1
+  fills: []
+- code: VSQ-35
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: pentest
+    quote: Two medium-severity findings remain open as of the report date.
+    stance: partial
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-36
+  expected_label: verified
+  expected_value: 'No'
+  must_ask: false
+  evidence:
+  - doc: soc2
+    quote: The Company does not currently operate a public bug bounty program.
+    stance: 'no'
+  - doc: faq
+    quote: A public bug bounty program is planned for 2027.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: true
+  traps:
+  - H3
+  - I2
+  - N2
+  fills: []
+- code: VSQ-37
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: faq
+    quote: Security researchers can report vulnerabilities to vulnerability-reports@kestrelyn.example, and Kestrelyn acknowledges
+      each report within two business days.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-38
+  expected_label: verified
+  expected_value: 'No'
+  must_ask: false
+  evidence:
+  - doc: sdp
+    quote: Dynamic application security testing (DAST) is not yet performed.
+    stance: 'no'
+  - doc: faq
+    quote: DAST scanning is planned for the first quarter of 2027.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: true
+  traps:
+  - H4
+  - I2
+  - N3
+  fills: []
+- code: VSQ-39
+  expected_label: verified
+  expected_value: 'No'
+  must_ask: false
+  evidence:
+  - doc: vmp
+    quote: Customer-initiated penetration testing is not permitted.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: true
+  traps:
+  - H5
+  - I1
+  fills: []
+- code: VSQ-40
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: sdp
+    quote: Static application security testing (SAST) runs in CI on every pull request.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-41
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: sdp
+    quote: Every pull request must be reviewed by a second engineer before it is merged.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-42
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M12
+  fills: []
+- code: VSQ-43
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: sdp
+    quote: Developers rely on the built-in protections of the actively maintained application framework for input validation
+      and output encoding, following the OWASP ASVS checklist.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-44
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: sdp
+    quote: Production builds and deployments run exclusively through the CI/CD pipeline from the main branch.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-45
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M13
+  fills: []
+- code: VSQ-46
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: irp
+    quote: Kestrelyn maintains a documented incident response plan.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - R2
+  fills: []
+- code: VSQ-47
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: irp
+    quote: An incident response tabletop exercise is held annually.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-48
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: irp
+    quote: Affected customers are notified within 48 hours of a confirmed breach.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-49
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: vrm
+    quote: Kestrelyn assesses the security risk of each vendor at least annually.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-50
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: vrm
+    quote: Kestrelyn publishes a list of its subprocessors and gives customers 30 days' notice before adding a new one.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-51
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: hrp
+    quote: All employees undergo a background check before their start date.
+    stance: 'yes'
+  - doc: vrm
+    quote: Kestrelyn does not perform background checks on contractor personnel; vendors attest that their staff have been
+      screened.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: true
+  honest_negative: false
+  traps:
+  - S2
+  fills: []
+- code: VSQ-52
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: hrp
+    quote: All employees complete security awareness training annually.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-53
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: lmp
+    quote: Security logs are retained for one year.
+    stance: 'yes'
+  - doc: soc2
+    quote: Security logs are retained for 90 days.
+    stance: 'no'
+  conflict_trap: X2
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - X2
+  fills: []
+- code: VSQ-54
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: lmp
+    quote: Security logs are collected centrally in Datadog.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-55
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: lmp
+    quote: Security events generate alerts that page the on-call rotation.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-56
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: amp
+    quote: Kestrelyn maintains an inventory of its information assets.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-57
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: soc2
+    quote: All of the Company's data processing infrastructure is hosted in Amazon Web Services.
+    stance: 'yes'
+  - doc: ainv
+    quote: 'Asset: OFFICE-FS01; Type: On-premises file server; Location: Austin office; Owner: Marcus Lee; Data: Customer
+      invoice exports; Added: 2026-08-12'
+    stance: 'no'
+  conflict_trap: D2
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - D2
+  fills: []
+- code: VSQ-58
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - F1
+  - M1
+  fills:
+  - VSQ-59
+- code: VSQ-59
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - F1
+  - M2
+  fills: []
+- code: VSQ-60
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - F2
+  - M3
+  fills:
+  - VSQ-61
+- code: VSQ-61
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - F2
+  - M4
+  fills: []
+- code: VSQ-62
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M5
+  fills: []
+- code: VSQ-63
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M6
+  fills: []
+- code: VSQ-64
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M7
+  fills: []

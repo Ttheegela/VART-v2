@@ -1,0 +1,11 @@
+Data in this directory is not covered by the repository's MIT license.
+
+- Policy documents under data/*/src/ and data/*/docs/ whose fact-sheet entry names a `source_template` are
+  adaptations of JupiterOne security-policy-templates and are licensed CC BY-SA 4.0
+  (https://creativecommons.org/licenses/by-sa/4.0/). Adaptations of them must keep that license.
+- data/sources/vsaq/ is from Google VSAQ, Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
+- data/sources/mvsp/ is from the Minimum Viable Secure Product project, CC0 1.0 (public domain dedication).
+- Everything else under data/ was written for this project and is licensed CC BY 4.0
+  (https://creativecommons.org/licenses/by/4.0/).
+
+All companies, people, products and records in this directory are fictional.

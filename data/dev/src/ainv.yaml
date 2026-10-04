@@ -1,0 +1,16 @@
+sheet: Assets
+title: Kestrelyn asset inventory
+as_of: "2026-09-01"
+headers: [Asset, Type, Location, Owner, Data, Added]
+rows:
+  - [kestrelyn-prod, AWS account, AWS us-east-1, Priya Raman, Production workloads, "2025-03-04"]
+  - [kestrelyn-staging, AWS account, AWS us-east-1, Priya Raman, Test workloads, "2025-03-04"]
+  - [ledger-db-prod, Amazon RDS database, AWS us-east-1, Priya Raman, Application database, "2025-04-18"]
+  - [ledger-files-prod, Amazon S3 bucket, AWS us-east-1, Priya Raman, Invoice attachments, "2025-04-18"]
+  - [Kestrelyn Ledger admin console, Internal web application, AWS us-east-1, Priya Raman, Support tooling, "2025-05-02"]
+  - [Engineering laptops, Laptop pool, Remote, Marcus Lee, Engineering workstations, "2025-01-20"]
+  - [Corporate laptops, Laptop pool, Remote, Marcus Lee, Corporate workstations, "2025-01-20"]
+  - [Okta tenant, SaaS application, SaaS, Marcus Lee, Workforce identities, "2025-01-20"]
+  - [GitHub organization, SaaS application, SaaS, Priya Raman, Source code, "2025-01-20"]
+  - [Google Workspace, SaaS application, SaaS, Marcus Lee, Email and documents, "2025-01-20"]
+  - [OFFICE-FS01, On-premises file server, Austin office, Marcus Lee, Customer invoice exports, "2026-08-12"]

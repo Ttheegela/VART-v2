@@ -1,0 +1,82 @@
+{
+  "v01.xlsx": {
+    "answer_col": "B",
+    "comments_col": "C",
+    "header_row": 1,
+    "id_col": null,
+    "question_col": "A",
+    "sheet": "Sheet1"
+  },
+  "v02.xlsx": {
+    "answer_col": "C",
+    "comments_col": "D",
+    "header_row": 6,
+    "id_col": "A",
+    "question_col": "B",
+    "sheet": "Questionnaire"
+  },
+  "v03.xlsx": {
+    "answer_col": "C",
+    "comments_col": "D",
+    "header_row": 2,
+    "id_col": "A",
+    "question_col": "B",
+    "sheet": "Security"
+  },
+  "v04.xlsx": {
+    "answer_col": "B",
+    "comments_col": "C",
+    "header_row": 3,
+    "id_col": null,
+    "question_col": "A",
+    "sheet": "Assessment"
+  },
+  "v05.xlsx": {
+    "answer_col": "C",
+    "comments_col": "D",
+    "header_row": 1,
+    "id_col": "A",
+    "question_col": "B",
+    "sheet": "Controls"
+  },
+  "v06.xlsx": {
+    "answer_col": "B",
+    "comments_col": "C",
+    "header_row": 1,
+    "id_col": null,
+    "question_col": "A",
+    "sheet": "Responses"
+  },
+  "v07.csv": {
+    "answer_col": "2",
+    "comments_col": "3",
+    "header_row": "1",
+    "id_col": null,
+    "question_col": "1",
+    "sheet": null
+  },
+  "v08.csv": {
+    "answer_col": "3",
+    "comments_col": "4",
+    "header_row": "1",
+    "id_col": "1",
+    "question_col": "2",
+    "sheet": null
+  },
+  "v09.xlsx": {
+    "answer_col": "B",
+    "comments_col": "C",
+    "header_row": 1,
+    "id_col": null,
+    "question_col": "A",
+    "sheet": "Cuestionario"
+  },
+  "v10.xlsx": {
+    "answer_col": "D",
+    "comments_col": "E",
+    "header_row": 1,
+    "id_col": "B",
+    "question_col": "C",
+    "sheet": "Scorecard"
+  }
+}

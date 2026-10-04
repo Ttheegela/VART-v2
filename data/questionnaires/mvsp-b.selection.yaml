@@ -1,0 +1,158 @@
+# Questionnaire B: the source of mvsp-b.csv (python -m datakit.questionnaires).
+# One question per MVSP v3.0 control (`section` is the MVSP control title). `control` is the closest fact-sheet control;
+# where the fact sheet had none, a must-ask control was added to data/dev/facts.yaml.
+# A trailing "# nearest topic only" on `source` marks a question that asks something other than its MVSP control.
+questionnaire: mvsp-b
+title: MVSP Short Form
+buyer: Northbeam Health
+items:
+  - code: MVSP-1.1
+    section: External vulnerability reports
+    question: "Do you publish contact details for reporting security vulnerabilities and commit to acknowledging reports within a set time?"
+    source: "mvsp:1.1"
+    csf_id: ID.RA-08
+    control: vuln-disclosure
+  - code: MVSP-1.2
+    section: Customer testing
+    question: "On request, do you let customers or their delegates test the security of your application?"
+    source: "mvsp:1.2"
+    csf_id: ID.IM-02
+    control: customer-pentest
+  - code: MVSP-1.3
+    section: Self-assessment
+    question: "Do you complete a security self-assessment against the latest MVSP release at least annually and make it available to customers?"
+    source: "mvsp:1.3"
+    csf_id: GV.OV-03
+    control: self-assessment
+  - code: MVSP-1.4
+    section: External testing
+    question: "Does an independent security vendor penetration test your product at least annually?"
+    source: "mvsp:1.4"
+    csf_id: ID.RA-01
+    control: pentest
+  - code: MVSP-1.5
+    section: Training
+    question: "Do all employees complete security awareness training at least annually?"
+    source: "mvsp:1.5"  # nearest topic only: MVSP 1.5 asks for role-specific training
+    csf_id: PR.AT-01
+    control: security-training
+  - code: MVSP-1.6
+    section: Compliance
+    question: "Do you hold an independent audit report, such as SOC 2, showing that you comply with an industry security standard?"
+    source: "mvsp:1.6"
+    csf_id: GV.OC-03
+    control: soc2
+  - code: MVSP-1.7
+    section: Incident handling
+    question: "Do you notify affected parties no later than 72 hours after discovering a breach of sensitive information?"
+    source: "mvsp:1.7"
+    csf_id: RS.CO-02
+    control: breach-notification
+  - code: MVSP-1.8
+    section: Data handling
+    question: "Do you sanitize storage media that held production data, following NIST SP 800-88 or an equivalent, before reuse or disposal?"
+    source: "mvsp:1.8"
+    csf_id: ID.AM-08
+    control: media-sanitization
+  - code: MVSP-2.1
+    section: Single sign-on
+    question: "Can your customers sign in to your product through single sign-on with their own identity provider, at no additional cost?"
+    source: "mvsp:2.1"
+    csf_id: PR.AA-04
+    control: customer-sso
+  - code: MVSP-2.2
+    section: HTTPS-only
+    question: "Is your application served only over HTTPS?"
+    source: "mvsp:2.2"
+    csf_id: PR.DS-02
+    control: encryption-in-transit
+  - code: MVSP-2.3
+    section: Security headers
+    question: "Do you apply security headers, such as a Content Security Policy and framing controls, to limit your application's attack surface?"
+    source: "mvsp:2.3"
+    csf_id: PR.PS-01
+    control: security-headers
+  - code: MVSP-2.4
+    section: Password policy
+    question: "For accounts that sign in with a password, do you enforce a password policy such as a minimum length?"
+    source: "mvsp:2.4"  # nearest topic only: MVSP 2.4 covers product password rules
+    csf_id: PR.AA-01
+    control: password-standard
+  - code: MVSP-2.5
+    section: Security libraries
+    question: "Do you build on maintained frameworks or libraries whose built-in protections handle input validation and output encoding?"
+    source: "mvsp:2.5"
+    csf_id: PR.PS-06
+    control: secure-frameworks
+  - code: MVSP-2.6
+    section: Dependency patching
+    question: "Do you patch critical vulnerabilities in your application's third-party dependencies within a defined time frame?"
+    source: "mvsp:2.6"
+    csf_id: PR.PS-02
+    control: patch-sla
+  - code: MVSP-2.7
+    section: Logging
+    question: "Do you keep logs of security-relevant events, such as authentication, and collect them in a central logging system?"
+    source: "mvsp:2.7"
+    csf_id: PR.PS-04
+    control: central-logging
+  - code: MVSP-2.8
+    section: Encryption
+    question: "Do you use modern, industry-standard encryption to protect sensitive data at rest and in transit?"
+    source: "mvsp:2.8"
+    csf_id: PR.DS-01
+    control: encryption-at-rest
+  - code: MVSP-3.1
+    section: List of data
+    question: "Do you classify the sensitive data your application processes into defined sensitivity levels?"
+    source: "mvsp:3.1"  # nearest topic only: MVSP 3.1 asks for a list of sensitive data types
+    csf_id: ID.AM-07
+    control: data-classification
+  - code: MVSP-3.2
+    section: Data flow diagram
+    question: "Do you maintain an up-to-date diagram showing how sensitive data reaches your systems and where it ends up stored?"
+    source: "mvsp:3.2"
+    csf_id: ID.AM-03
+    control: data-flow-diagram
+  - code: MVSP-3.3
+    section: Vulnerability prevention
+    question: "Do you train your developers to prevent authorization bypass, insecure session management, injection, cross-site scripting and cross-site request forgery?"
+    source: "mvsp:3.3"
+    csf_id: PR.AT-02
+    control: developer-training
+  - code: MVSP-3.4
+    section: Time to fix vulnerabilities
+    question: "Do you deploy fixes for critical vulnerabilities within 90 days of discovery?"
+    source: "mvsp:3.4"
+    csf_id: PR.PS-02
+    control: patch-sla
+  - code: MVSP-3.5
+    section: Build and release process
+    question: "Do production builds and deployments run only through an automated CI/CD pipeline?"
+    source: "mvsp:3.5"
+    csf_id: PR.PS-06
+    control: build-release
+  - code: MVSP-4.1
+    section: Physical access
+    question: "Do your facilities have layered physical access controls, entry and exit logs, and a response plan for unauthorized access?"
+    source: "mvsp:4.1"
+    csf_id: PR.AA-06
+    control: physical-access
+  - code: MVSP-4.2
+    section: Logical access
+    question: "Do you limit access to sensitive data to people with a legitimate need?"
+    source: "mvsp:4.2"
+    csf_id: PR.AA-05
+    control: least-privilege
+  - code: MVSP-4.3
+    section: Sub-processors
+    question: "Do you keep a list of third-party companies with access to customer data and make it available to customers?"
+    source: "mvsp:4.3"
+    csf_id: ID.AM-04
+    control: subprocessors
+  - code: MVSP-4.4
+    section: Backup and disaster recovery
+    question: "Do you test your disaster recovery plan at least annually?"
+    source: "mvsp:4.4"
+    csf_id: ID.IM-02
+    control: dr-test
