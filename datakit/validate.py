@@ -12,11 +12,12 @@ from datetime import date
 from pathlib import Path
 
 from app.text import contains
+from datakit.derive_key import derive
 from datakit.extract import lines_of
 from datakit.questionnaires import OUT as QDIR
 from datakit.questionnaires import build_csv, build_xlsx, mapping_json, mvsp_items, vsaq_items
 from datakit.render import render_pack
-from datakit.schemas import Facts, Selection, TrapKind, load_yaml
+from datakit.schemas import Facts, Key, Selection, TrapKind, load_yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -271,6 +272,43 @@ def _docs_stage(pack: str) -> list[str]:
             kept = base / "docs" / fresh.name
             if kept.exists() and fresh.read_bytes() != kept.read_bytes():
                 p.append(f"{fresh.name} is stale: run python -m datakit.render {pack}")
+    return p
+
+
+@stage("keys")
+def _keys_stage(pack: str) -> list[str]:
+    p: list[str] = []
+    base = DATA / pack
+    facts = load_yaml(base / "facts.yaml", Facts)
+    lines = {
+        d.id: lines_of(base / "docs" / d.filename)
+        for d in facts.documents
+        if (base / "docs" / d.filename).exists()
+    }
+    keys: dict[str, Key] = {}
+    for name in ("vsq-a", "mvsp-b"):
+        sel = load_yaml(QDIR / f"{name}.selection.yaml", Selection)
+        path = base / "key" / f"{name}.yaml"
+        key = load_yaml(path, Key) if path.exists() else None
+        if key is None or key != derive(facts, sel):
+            p.append(f"key {name} is stale: run python -m datakit.derive_key {pack}")
+            continue
+        keys[name] = key
+        # a PDF reads back as one joined line (wrapping is not a paragraph break), so this covers PDFs too
+        p += [
+            f"{name} {item.code}: evidence not found in {facts.doc(ev.doc).filename}"
+            for item in key.items
+            for ev in item.evidence
+            if not any(contains(line, ev.quote) for line in lines.get(ev.doc, []))
+        ]
+        p += [
+            f"{name} {item.code}: conflict without a planted trap (unplanned contradiction?)"
+            for item in key.items
+            if item.expected_label == "conflict" and item.conflict_trap is None
+        ]
+    if "vsq-a" in keys:
+        exercised = {t for item in keys["vsq-a"].items for t in item.traps}
+        p += [f"trap {t.id} is not exercised by any vsq-a item" for t in facts.traps if t.id not in exercised]
     return p
 
 
