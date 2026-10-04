@@ -1,0 +1,33 @@
+from collections.abc import Iterator
+from functools import lru_cache
+
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
+
+from app.settings import get_settings
+
+
+def database_url() -> str:
+    url = get_settings().database_url
+    if not url:
+        raise RuntimeError("DATABASE_URL is not set")
+    # Neon and Vercel hand out postgres:// URLs; SQLAlchemy needs the psycopg 3 driver name.
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix) :]
+    return url
+
+
+@lru_cache(maxsize=1)
+def get_engine() -> Engine:
+    # ponytail: NullPool - serverless instances don't keep pools warm; Neon's pooled URL does the pooling
+    # (pgbouncer rejects server-side prepared statements, hence prepare_threshold=None).
+    return create_engine(
+        database_url(), poolclass=NullPool, connect_args={"prepare_threshold": None, "connect_timeout": 10}
+    )
+
+
+def get_session() -> Iterator[Session]:
+    with sessionmaker(get_engine(), expire_on_commit=False)() as session:
+        yield session
