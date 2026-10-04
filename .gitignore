@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+/public/
+web/node_modules/
+web/test-results/
+web/playwright-report/
+.vercel
+.DS_Store
+evals/recorded/candidates/
