@@ -391,7 +391,7 @@ statements:
     doc: vmp
     control: vuln-scanning
     stance: yes
-    text: "Authenticated vulnerability scans are run weekly."
+    text: "Authenticated vulnerability scans of all production hosts and container images run weekly."
   - id: vmp-patch-sla
     doc: vmp
     control: patch-sla
@@ -537,10 +537,17 @@ statements:
     doc: soc2
     control: cloud-only
     stance: yes
-    text: "The Company does not operate any on-premises data processing infrastructure; all systems are hosted in AWS."
+    text: "All of the Company's data processing infrastructure is hosted in Amazon Web Services."
   - id: ainv-office-fs01
     doc: ainv
     control: cloud-only
+    stance: no
+    text: "Asset: OFFICE-FS01; Type: On-premises file server; Location: Austin office; Owner: Marcus Lee; Data: Customer invoice exports; Added: 2026-08-12"
+  # The same row also speaks to data-residency (customer invoice exports outside AWS), so it is registered a second
+  # time with identical text: each control gets its own conflict (D2 for cloud-only, D3 for data-residency).
+  - id: ainv-office-fs01-residency
+    doc: ainv
+    control: data-residency
     stance: no
     text: "Asset: OFFICE-FS01; Type: On-premises file server; Location: Austin office; Owner: Marcus Lee; Data: Customer invoice exports; Added: 2026-08-12"
   # Engagement: only the contract template speaks to uptime, and a template is not evidence
@@ -572,7 +579,11 @@ traps:
   - id: D2
     kind: date
     statements: [soc2-cloud-only, ainv-office-fs01]
-    note: "The SOC 2 summary says there is no on-premises infrastructure; the newer asset inventory lists an on-premises office file server added in August 2026."
+    note: "The SOC 2 summary says all data processing infrastructure is hosted in AWS; the newer asset inventory lists an on-premises office file server added in August 2026."
+  - id: D3
+    kind: date
+    statements: [dcp-residency, ainv-office-fs01-residency]
+    note: "The data classification policy says all customer data is in AWS us-east-1; the newer asset inventory shows customer invoice exports on an on-premises office file server."
   # disagree: two documents that cover the same ground say different things
   - id: X1
     kind: disagree
