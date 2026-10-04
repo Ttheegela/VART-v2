@@ -3,6 +3,7 @@ import hashlib
 import json
 import re
 import shutil
+import sys
 import zipfile
 from pathlib import Path
 
@@ -155,11 +156,15 @@ def test_xlsx_bytes_do_not_depend_on_the_openpyxl_version_or_on_zlib(
     with zipfile.ZipFile(tmp_path / "raw.xlsx") as z:
         # the patch reaches openpyxl's writer, so the comparison below means something
         assert b"9.9.9" in z.read("docProps/app.xml")
-    build_xlsx(_sel("vsq-a"), tmp_path / "later.xlsx")
+    with monkeypatch.context() as windows:
+        # CPython records the creating OS in every zip member: 0 on Windows, 3 elsewhere
+        windows.setattr(sys, "platform", "win32")
+        build_xlsx(_sel("vsq-a"), tmp_path / "later.xlsx")
     assert (tmp_path / "now.xlsx").read_bytes() == (tmp_path / "later.xlsx").read_bytes()
     with zipfile.ZipFile(tmp_path / "now.xlsx") as z:
         # stored members: there is no compressor left to differ between zlib builds
         assert {i.compress_type for i in z.infolist()} == {zipfile.ZIP_STORED}
+        assert {i.create_system for i in z.infolist()} == {3}
         app = z.read("docProps/app.xml")
     assert b"<Application>" not in app and b"<AppVersion>" not in app
 
@@ -201,8 +206,8 @@ MVSP_B = {
     "MVSP-1.4": ("pentest", ["penetration test"], ["comprehensive", "services"]),
     "MVSP-1.5": (
         "security-training",
-        ["security awareness training", "at least annually"],
-        ["role-specific"],
+        ["security awareness training", "at least annually", "employees"],
+        ["role-specific", "personnel"],
     ),
     "MVSP-2.1": ("customer-sso", ["customers"], ["employees", "internal"]),
     "MVSP-2.6": ("patch-sla", ["dependencies", "patch"], ["scan"]),
@@ -232,11 +237,13 @@ def test_contact_questions_ask_for_deal_specific_details() -> None:
         assert all(p in question for p in detail), control
 
 
-def test_mvsp_1_5_says_it_asks_less_than_its_control() -> None:
-    # the evidence is generic annual awareness training; MVSP 1.5 asks for role-specific training
+def test_mvsp_b_items_that_ask_something_else_say_so() -> None:
+    # 1.5: the evidence is generic training, MVSP asks for role-specific; 2.4: workforce password length, MVSP
+    # covers product password rules; 3.1: classification levels, MVSP asks for a list of sensitive data types
     raw = (Q / "mvsp-b.selection.yaml").read_text(encoding="utf-8")
-    marked = r'code: MVSP-1\.5\n(?:    .*\n)*?    source: "mvsp:1\.5"  # nearest topic only'
-    assert re.search(marked, raw)
+    for label in ("1.5", "2.4", "3.1"):
+        marked = rf'code: MVSP-{label}\n(?:    .*\n)*?    source: "mvsp:{label}"  # nearest topic only'
+        assert re.search(marked, raw), label
 
 
 def test_the_dependency_patching_sentence_is_a_plain_yes_beside_the_patch_sla() -> None:

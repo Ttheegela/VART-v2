@@ -73,7 +73,8 @@ def mvsp_items() -> dict[str, str]:
 
 def normalize_zip(path: Path) -> None:
     """Make an Office zip byte-identical on every rebuild, on any machine: fixed timestamps, stored (not
-    deflated) members so no zlib build can differ, and no tool name or version in docProps/app.xml."""
+    deflated) members so no zlib build can differ, one creating OS (CPython records 0 on Windows and 3
+    elsewhere) and no tool name or version in docProps/app.xml."""
     with zipfile.ZipFile(path) as zin:
         parts = [(i.filename, zin.read(i.filename)) for i in zin.infolist()]
     with zipfile.ZipFile(path, "w", zipfile.ZIP_STORED) as zout:
@@ -84,6 +85,7 @@ def normalize_zip(path: Path) -> None:
                 data = _GENERATOR.sub(b"", data)
             info = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_STORED
+            info.create_system = 3
             info.external_attr = 0o644 << 16
             zout.writestr(info, data)
 

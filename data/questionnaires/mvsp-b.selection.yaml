@@ -32,7 +32,7 @@ items:
     control: pentest
   - code: MVSP-1.5
     section: Training
-    question: "Do all personnel complete security awareness training at least annually?"
+    question: "Do all employees complete security awareness training at least annually?"
     source: "mvsp:1.5"  # nearest topic only: MVSP 1.5 asks for role-specific training
     csf_id: PR.AT-01
     control: security-training
@@ -75,7 +75,7 @@ items:
   - code: MVSP-2.4
     section: Password policy
     question: "For accounts that sign in with a password, do you enforce a password policy such as a minimum length?"
-    source: "mvsp:2.4"
+    source: "mvsp:2.4"  # nearest topic only: MVSP 2.4 covers product password rules
     csf_id: PR.AA-01
     control: password-standard
   - code: MVSP-2.5
@@ -105,7 +105,7 @@ items:
   - code: MVSP-3.1
     section: List of data
     question: "Do you classify the sensitive data your application processes into defined sensitivity levels?"
-    source: "mvsp:3.1"
+    source: "mvsp:3.1"  # nearest topic only: MVSP 3.1 asks for a list of sensitive data types
     csf_id: ID.AM-07
     control: data-classification
   - code: MVSP-3.2
