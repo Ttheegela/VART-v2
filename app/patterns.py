@@ -28,8 +28,10 @@ PLACEHOLDER = re.compile(
 )
 # Instructions aimed at a model. The dev pack plants one obvious injection these patterns catch and one subtle
 # one they must not (spec 7.3); the subtle one is left to the stance prompt and decide's rules.
-# Each cue needs an attack shape, and a bare verb no not/never/who/to before it, so policy prose passes.
-_NOT_NEGATED = r"(?<!\bnot )(?<!\bnever )(?<!\bwho )(?<!\bto )"
+# Each cue needs an attack shape, so policy prose on firewall rules, AI tools or jailbreak detection passes.
+# The bare imperative and the system-prompt verbs count only when no negation (not, n't, cannot, never, nor)
+# or "who"/"to" comes right before the verb ("Staff who ignore ...", "trained not to ignore ..." are prose).
+_NOT_NEGATED = r"(?<!\bnot )(?<!n't )(?<!\bcannot )(?<!\bnever )(?<!\bnor )(?<!\bwho )(?<!\bto )"
 INJECTION = re.compile(
     r"\b(?:ignore|disregard|forget|override)\b[^.\n]{0,40}\b(?:previous|prior|above|earlier)\b"
     r"[^.\n]{0,20}\b(?:instructions?|prompts?|rules|directions)\b"

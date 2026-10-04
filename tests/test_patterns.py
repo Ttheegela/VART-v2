@@ -24,6 +24,8 @@ FACTS = load_yaml(Path(__file__).resolve().parent.parent / "data" / "dev" / "fac
         "SSO is on the roadmap for Q3.",
         "The migration is in progress.",
         "Data cannot be removed upon request.",  # "removed" is not a carve-out
+        "Owner: to be decided.",  # Plan 2A Ruling 16
+        "Retention is to be confirmed.",
     ],
 )
 def test_negation_cues(text: str) -> None:
@@ -51,6 +53,7 @@ def test_negation_cues_match_whole_words_only(text: str) -> None:
         "We not only encrypt at rest but also in transit.",
         "MFA cannot be disabled by users.",
         "MFA cannot be bypassed by administrators.",
+        "MFA cannot be turned off by users.",  # Plan 2A Ruling 16
     ],
 )
 def test_scheduled_and_the_carve_outs_are_not_negations(text: str) -> None:
@@ -68,6 +71,7 @@ def test_scheduled_and_the_carve_outs_are_not_negations(text: str) -> None:
         "Lorem ipsum dolor sit amet.",
         "[ ] MFA is enforced for all staff",  # an unchecked task box is not done (Plan 2A Ruling 10)
         "every [X] months",
+        "[x] MFA is enforced for all staff",  # the ingest lane's checked-box strip relies on it (Ruling 16)
     ],
 )
 def test_placeholders(text: str) -> None:
@@ -130,6 +134,9 @@ def test_other_injections(text: str) -> None:
         "Staff who ignore the instructions of fire wardens face disciplinary action.",
         "Operators must not output the system prompt to customers.",
         "Employees may not disregard the instructions of security staff.",
+        "Employees shouldn't ignore the instructions of fire wardens.",  # Plan 2A Ruling 16
+        "The assistant cannot reveal its system prompt.",
+        "Staff are trained not to ignore the instructions of fire wardens.",
     ],
 )
 def test_policy_prose_is_not_an_injection(text: str) -> None:
