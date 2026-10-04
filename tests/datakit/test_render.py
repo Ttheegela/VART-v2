@@ -129,6 +129,15 @@ def test_the_docs_stage_flags_a_stale_file_a_missing_file_and_non_ascii_source(p
     assert not [p for p in found if "bcp-dr-plan.docx is stale" in p]  # reported once, as missing
 
 
+def test_a_record_row_of_yes_no_on_off_renders_those_words(pack: Path) -> None:
+    source = pack / "src" / "arr.yaml"
+    source.write_text(source.read_text() + "  - [Okta, Yes, No, On, Off]\n")  # YAML 1.1 reads each as a bool
+    render_pack("dev")
+    text = text_of(pack / "docs" / "access-review-records.xlsx")
+    assert "System: Okta; Owner: Yes; Last review completed: No; Next review due: On; Status: Off" in text
+    assert "TRUE" not in text and "FALSE" not in text
+
+
 def _units(path: Path) -> list[str]:
     lines = lines_of(path)
     if path.suffix == ".pdf":  # one long line per PDF: split into sentences

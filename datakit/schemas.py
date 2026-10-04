@@ -172,8 +172,12 @@ class _Loader(yaml.SafeLoader):
 _Loader.add_implicit_resolver(_BOOL, re.compile(r"^(?:true|True|TRUE|false|False|FALSE)$"), list("tTfF"))
 
 
+def load_yaml_raw(path: Path) -> Any:
+    return yaml.load(path.read_text(encoding="utf-8"), Loader=_Loader)
+
+
 def load_yaml[M: BaseModel](path: Path, model: type[M]) -> M:
-    return model.model_validate(yaml.load(path.read_text(encoding="utf-8"), Loader=_Loader))
+    return model.model_validate(load_yaml_raw(path))
 
 
 def dump_yaml(obj: BaseModel | dict[str, Any], path: Path) -> None:

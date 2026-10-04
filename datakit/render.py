@@ -13,13 +13,12 @@ from typing import Any
 
 import docx
 import openpyxl
-import yaml
 from fpdf import FPDF
 from openpyxl.styles import Font
 
 from app.text import record_line
 from datakit.questionnaires import normalize_zip
-from datakit.schemas import Facts, load_yaml
+from datakit.schemas import Facts, load_yaml, load_yaml_raw
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXED = datetime(2026, 1, 1, tzinfo=UTC)
@@ -142,7 +141,7 @@ def render_pack(pack: str, out: Path | None = None) -> list[Path]:
     for doc in facts.documents:
         target = out / doc.filename
         if doc.format == "xlsx":
-            render_xlsx(yaml.safe_load((base / "src" / f"{doc.id}.yaml").read_text(encoding="utf-8")), target)
+            render_xlsx(load_yaml_raw(base / "src" / f"{doc.id}.yaml"), target)
         else:
             source = base / "src" / f"{doc.id}.md"
             if doc.format == "md":
