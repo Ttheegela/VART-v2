@@ -1,13 +1,17 @@
+import subprocess
 import sys
 from functools import partial
+from pathlib import Path
 
 import httpx
 import pytest
 
 from scripts.smoke import check, main
 
+SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "smoke.py"
+
 UI = '<div id="root"></div>'
-HEALTHY = {"status": "ok", "db": "ok", "canary": None}
+HEALTHY: dict[str, object] = {"status": "ok", "db": "ok", "canary": None}
 COOKIE = {"set-cookie": "vart_ws=abc; HttpOnly; Path=/"}
 VERSION = {"version": "2.0.0.dev0", "models": {}}
 # (path, the name its FAIL line carries): one row per request check() makes.
@@ -166,3 +170,26 @@ def test_main_stops_with_a_fail_line_when_the_deploy_is_unreachable(monkeypatch:
         _run_main(monkeypatch, _transport(HEALTHY, answers={"/": httpx.ConnectError("refused")}))
     assert isinstance(raised.value.code, str)
     assert raised.value.code.startswith("FAIL: UI: ")
+
+
+@pytest.mark.parametrize(
+    "url", ["http://[::1", "http://ex\x00ample.com"], ids=["bad-port", "control-character"]
+)
+def test_main_stops_with_a_fail_line_for_a_malformed_base_url(
+    monkeypatch: pytest.MonkeyPatch, url: str
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["smoke.py", url])  # the real httpx.Client: nothing is requested
+    with pytest.raises(SystemExit) as raised:
+        main()
+    message = raised.value.code
+    assert isinstance(message, str)
+    assert message.startswith("FAIL: base URL: ") and "\n" not in message
+
+
+def test_a_malformed_base_url_exits_1_with_one_fail_line_and_no_traceback() -> None:
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "http://[::1"], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.startswith("FAIL: base URL: ") and result.stderr.count("\n") == 1

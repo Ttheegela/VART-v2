@@ -60,8 +60,11 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("base_url")
     args = ap.parse_args()
-    with httpx.Client(base_url=args.base_url.rstrip("/"), timeout=60) as c:
-        print(check(c))
+    try:
+        with httpx.Client(base_url=args.base_url.rstrip("/"), timeout=60) as c:
+            print(check(c))
+    except httpx.InvalidURL as e:  # not an HTTPError: a malformed base URL fails before any request is made
+        raise fail("base URL", f"{args.base_url!r} is not a valid URL: {e}") from e
     return 0
 
 
