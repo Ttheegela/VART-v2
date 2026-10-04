@@ -22,6 +22,7 @@ Tarun settled Plan 2's open decisions on 2026-10-04 (one row each in `docs/PROGR
 - **Presidio and spaCy.** They ship in the Vercel function bundle; the lead checks the function size on a preview made with `vercel deploy` (Task 6 Step 6).
 - **Lanes.** Three lanes run in parallel, each in its own worktree: engine (Opus 5.5), ingest (Sonnet 5.5), evals (Sonnet 5.5); this file is the evals lane (Tasks 1-3) and the lead's integration (Tasks 4-6).
 - **Branches.** Tasks 4-6 run on branch `plan2` in `~/Desktop/portfolio/projects/VART-wt-plan2`, not on `main` in the main checkout (`main` stays production); the lead merges the lanes into `plan2` locally, with no approval needed (Task 4 Step 1); pushing and the release (a pull request `plan2` -> `main`, merged by fast-forward after green CI, then the deploy) need Tarun's OK (Task 6 Step 6).
+- **Checkpoint 1 (Plan 2A Rulings 14-15):** the patterns, contract wording and pins were fixed in Part 0; the following steps carry its lane findings: Task 6 Step 6 (M10: the runtime `presidio-analyzer`, `spacy` and `thinc` pinned equal to `requirements-dev.txt` in both `requirements.txt` and `pyproject.toml`; numpy and blis stay ranges at runtime).
 
 ## Global Constraints
 
@@ -1713,6 +1714,7 @@ git commit -m "evals: model bench results, defaults set from them, baseline re-r
 - Modify: `evals/score.py` (`GATES`), `tests/test_eval_score.py` (only if a gate's direction or name changes; values change freely), `evals/results/latest.json` and `evals/results/latest.md` (Step 1's run rewrites their gate targets; committed in Step 1)
 - Modify: `.github/workflows/ci.yml` (backend job), `CLAUDE.md` (map line already added in plan2a Task 2; commands checked; the `ops/` line gains the `migrate` phase), `docs/PROGRESS.md`
 - Modify: `ops/setup.sh` (a `migrate` phase, Step 5)
+- Modify: `requirements.txt`, `pyproject.toml` (the runtime redaction pins, Step 6)
 - Modify (lead, spec sync): `docs/superpowers/specs/2026-10-03-vart-v2-design.md`
 
 **Interfaces:**
@@ -1809,9 +1811,15 @@ Expected: no syntax error, then the four usage lines above. The phase itself is 
 
 - [ ] **Step 6: Commit, final review, release plan**
 
+First pin the runtime redaction stack to what the eval measured (adversary checkpoint 1, M10: CI replays on the dev pins, so production must not resolve a Presidio or spaCy the redacted-upload stage never ran): in `requirements.txt` and in `pyproject.toml`'s `dependencies`, `presidio-analyzer`, `spacy` and `thinc` become `==` the versions `requirements-dev.txt` pins (`thinc` is a new runtime line; `test_pyproject_dependencies_match_requirements_txt` requires both files to list them identically). numpy and blis may stay ranges at runtime.
+
+Run: `pytest -q tests/test_requirements_sync.py`
+Expected: PASS.
+
 ```bash
 git add evals/score.py tests/test_eval_score.py evals/results/latest.json evals/results/latest.md ops/setup.sh \
-  .github/workflows/ci.yml docs/PROGRESS.md CLAUDE.md docs/superpowers/specs/2026-10-03-vart-v2-design.md
+  .github/workflows/ci.yml docs/PROGRESS.md CLAUDE.md docs/superpowers/specs/2026-10-03-vart-v2-design.md \
+  requirements.txt pyproject.toml
 git commit -m "evals: gates enforced in CI; ops/setup.sh migrate phase; progress and spec synced" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
