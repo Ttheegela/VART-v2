@@ -9,8 +9,8 @@ Progress and decisions: `docs/PROGRESS.md`.
    Check (CI only, a name scan; the rule is wider than the check): `scripts/sponsor_check.sh` (Task 7).
 2. No verified or partial answer without a citation. Check: database constraint `ck_answers_cited` (Task 2); the
    real guarantee for what a quote says is decide's containment check.
-3. Tests never touch the network or real keys. Check: pytest-socket blocks every non-localhost connection; use
-   `tests/fakes.py` (Task 4) and `httpx.MockTransport`.
+3. Tests never touch the network or real keys. Check: pytest-socket blocks non-localhost Python-socket
+   connections (httpx, openai clients); use `tests/fakes.py` (Task 4) and `httpx.MockTransport`.
 4. Monochrome UI: black, white, `neutral-*` only. Check: `scripts/check_monochrome.py` (Task 7).
 5. No secrets in files or commits. Check: gitleaks in CI (Task 8).
 6. Frontend API types are generated from the backend. Check: drift of `openapi.json` and `web/src/lib/api-types.ts` (Tasks 6 and 8).
@@ -30,6 +30,7 @@ Progress and decisions: `docs/PROGRESS.md`.
 ## Commands
 - `docker compose up -d db` — Postgres 17 + pgvector on port 5434 (user/password `vart`).
 - `export TEST_DATABASE_URL=postgresql+psycopg://vart:vart@localhost:5434/vart_test` (lanes use `vart_test_<lane>`).
-- Backend: `ruff check . && ruff format --check . && mypy app scripts && pytest -q && alembic check`
+- Backend: `ruff check . && ruff format --check . && mypy app scripts datakit && pytest -q && alembic check`
   (until `scripts/` and `migrations/` exist: `mypy app`, and skip `alembic check`)
 - Frontend: `cd web && npm run lint && npm test && npm run build`
+- Dev data: python -m datakit.validate all (stages: facts, docs, questionnaires, keys, mapper as they land)
