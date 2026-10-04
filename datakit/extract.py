@@ -14,7 +14,7 @@ import pypdfium2
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
-from app.text import normalize, record_line
+from app.text import cell_text, normalize, record_line
 
 _TABLE_RULE = re.compile(r"^\|?\s*:?-{3,}")
 
@@ -85,7 +85,7 @@ def _xlsx_lines(path: Path) -> list[str]:
                 header = [str(v) if v is not None else "" for v in values]
                 continue
             if header is None:
-                out.append(normalize(" ".join(str(v) for v in filled)))
+                out.append(normalize(" ".join(cell_text(v) for v in filled)))
             else:
                 out.append(record_line(header, values))
     return [x for x in out if x]

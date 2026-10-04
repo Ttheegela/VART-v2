@@ -1,3 +1,5 @@
+from datetime import date
+from itertools import pairwise
 from pathlib import Path
 
 import docx
@@ -43,14 +45,27 @@ def test_xlsx_rows_become_record_lines_after_the_header(tmp_path: Path) -> None:
 
 
 def test_pdf_wrapped_lines_still_contain_whole_sentences(tmp_path: Path) -> None:
+    words = [f"word{i:03d}" for i in range(120)]  # distinct, so a split, a lost or a repeated word shows
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", size=11)
-    sentence = "Security logs are retained for 90 days in the central logging platform, " * 3
-    pdf.multi_cell(0, 5, sentence.strip(), new_x="LMARGIN", new_y="NEXT")
+    pdf.multi_cell(0, 5, " ".join(words), new_x="LMARGIN", new_y="NEXT")
     path = tmp_path / "a.pdf"
     pdf.output(str(path))
-    assert "retained for 90 days in the central logging platform, Security logs" in text_of(path)
+    assert lines_of(path) == [" ".join(words)]  # wrapping is not a paragraph break
+    text = text_of(path)
+    assert all(f"{a} {b}" in text for a, b in pairwise(words))
+
+
+def test_xlsx_rows_above_the_header_read_like_record_cells(tmp_path: Path) -> None:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["Zed log", date(2026, 9, 15), 42.0])
+    ws.append(["System", "Status"])
+    ws.append(["Okta", "Overdue"])
+    path = tmp_path / "a.xlsx"
+    wb.save(str(path))
+    assert lines_of(path) == ["Zed log 2026-09-15 42", "System: Okta; Status: Overdue"]
 
 
 def test_markdown_tables_and_bullets(tmp_path: Path) -> None:
