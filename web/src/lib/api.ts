@@ -26,9 +26,11 @@ export function messageOf(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+/** `T` defaults to void for endpoints that answer 204 with no body (POST /api/workspace/reset). */
+export async function request<T = void>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(path, { credentials: "same-origin", ...init });
   if (!res.ok) throw new ApiError(res.status, await errorMessage(res));
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
@@ -54,6 +56,10 @@ export function ensureWorkspace(): Promise<void> {
 /** Health answers 503 with a body when the database is down; both are readable states, not errors. */
 export async function getHealth(): Promise<Health> {
   const res = await fetch("/api/health", { credentials: "same-origin" });
-  if (res.status === 200 || res.status === 503) return (await res.json()) as Health;
+  if (res.status === 200 || res.status === 503) {
+    // A platform error page is not JSON; it falls through to a readable error.
+    const body = await res.clone().json().catch(() => undefined);
+    if (body !== undefined) return body as Health;
+  }
   throw new ApiError(res.status, await errorMessage(res));
 }

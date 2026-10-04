@@ -16,7 +16,11 @@ export default class ErrorBoundary extends Component<{ children: ReactNode }, { 
     return (
       <div role="alert" className="space-y-3 border border-black bg-white p-4">
         <p className="font-medium">Something went wrong on this screen.</p>
-        <button type="button" onClick={() => window.location.reload()} className="rounded bg-black px-3 py-1.5 text-white">
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="rounded bg-black px-3 py-1.5 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+        >
           Reload
         </button>
       </div>

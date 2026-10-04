@@ -31,6 +31,11 @@ TABLES = (
 )
 
 
+def _truncate(engine: Engine) -> None:
+    with engine.begin() as conn:
+        conn.execute(text(f"TRUNCATE {TABLES} RESTART IDENTITY CASCADE"))
+
+
 @pytest.fixture(scope="session")
 def migrated_db() -> Iterator[Engine]:
     engine = get_engine()
@@ -42,11 +47,11 @@ def migrated_db() -> Iterator[Engine]:
             pytest.fail("Postgres is required but not reachable at TEST_DATABASE_URL")
         pytest.skip("Postgres not running: docker compose up -d db")
     command.upgrade(Config("alembic.ini"), "head")
+    _truncate(engine)  # e2e runs share this database and leave rows behind
     yield engine
 
 
 @pytest.fixture
 def db(migrated_db: Engine) -> Iterator[Engine]:
     yield migrated_db
-    with migrated_db.begin() as conn:
-        conn.execute(text(f"TRUNCATE {TABLES} RESTART IDENTITY CASCADE"))
+    _truncate(migrated_db)

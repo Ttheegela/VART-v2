@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import StatusPanel from "./components/StatusPanel";
 import { ensureWorkspace, messageOf } from "./lib/api";
@@ -7,7 +7,8 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // A layout effect runs before StatusPanel's effect, so /api/workspace is requested first (app/api/deps.py).
+  useLayoutEffect(() => {
     ensureWorkspace().then(
       () => setReady(true),
       (e) => setError(messageOf(e)),
@@ -25,19 +26,20 @@ export default function App() {
         </div>
       </header>
       <main className="mx-auto max-w-6xl space-y-4 px-4 py-6">
-        {error ? (
-          <p role="alert" className="border border-black p-3 font-medium">Couldn't start the demo: {error}</p>
-        ) : !ready ? (
-          <p>Loading…</p>
-        ) : (
-          <ErrorBoundary>
-            <StatusPanel />
+        <ErrorBoundary>
+          {error ? (
+            <p role="alert" className="border border-black p-3 font-medium">Couldn't start the demo: {error}</p>
+          ) : !ready ? (
+            <p role="status">Loading…</p>
+          ) : (
             <p className="text-sm text-neutral-700">
               The questionnaire workspace arrives in the next build. This page checks that the app, its database and
               its model connection are alive.
             </p>
-          </ErrorBoundary>
-        )}
+          )}
+          {/* Health needs no workspace, so an outage still shows here when the demo cannot start. */}
+          <StatusPanel />
+        </ErrorBoundary>
       </main>
     </div>
   );
