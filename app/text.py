@@ -59,7 +59,7 @@ def contains(haystack: str, quote: str) -> bool:
     head = r"(?<!\w)" if _WORD.match(needle[0]) else ""
     tail = ""
     if needle[-1].isalpha():
-        tail = r"(?![^\W\d_])"  # no letter may follow; a digit may
+        tail = r"(?![^\W\d])"  # no letter or underscore may follow; a digit may
     elif _WORD.match(needle[-1]):
         tail = r"(?!\w)"
     return re.search(head + re.escape(needle) + tail, text) is not None

@@ -104,6 +104,11 @@ def test_a_quote_may_end_right_before_a_glued_footnote_digit() -> None:
     assert not contains("reviewed quarterlyx", "reviewed quarterly")
 
 
+def test_a_quote_ending_in_a_letter_may_not_end_before_an_underscore() -> None:
+    # Plan 2A Ruling 7: only a digit may follow; letters and underscore are mid-token.
+    assert contains("MFA_enforced: false", "MFA") is False
+
+
 def test_normalize_is_idempotent_on_every_code_point() -> None:
     import sys
 
