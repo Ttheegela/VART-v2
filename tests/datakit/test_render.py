@@ -12,7 +12,7 @@ from datakit import render, validate
 from datakit.extract import lines_of, text_of
 from datakit.render import parse_md, render_docx, render_pack, render_pdf, render_xlsx
 from datakit.schemas import Facts, load_yaml
-from datakit.validate import CONTROL_WORDS, DATA, STAGES
+from datakit.validate import CONTROL_ACRONYMS, CONTROL_STEMS, CONTROL_WORDS, DATA, STAGES
 
 SAMPLE = (
     "# Access Control Policy\n\n"
@@ -146,9 +146,40 @@ def test_no_unregistered_control_keywords() -> None:
         registered = [s.text for s in facts.statements if s.doc == d.id]
         for unit in _units(DATA / "dev" / "docs" / d.filename):
             if (
-                any(w in unit.lower() for w in CONTROL_WORDS)
+                CONTROL_WORDS.search(unit)
                 and unit not in allowed
                 and not any(r in unit or unit in r for r in registered)
             ):
                 loose.append(f"{d.filename}: {unit[:120]}")
     assert loose == []
+
+
+# Leak sentences that a reviewer used to probe the keyword net; each one must be flagged. The last three
+# are the acronyms that only match as whole words.
+PROBES = (
+    "Office key-fob access is logged.",
+    "A diagram of how customer data moves is maintained.",
+    "HSTS and CSP response headers are set.",
+    "Developers are trained on injection flaws.",
+    "Customers sign in using OIDC.",
+    "Kestrelyn holds cyber liability coverage of USD 10,000,000.",
+    "Reports go to the security@ mailbox.",
+    "Employees sign in through SSO.",
+    "Reports are shared under an NDA.",
+    "The contract includes an SLA.",
+)
+# Words that merely contain an acronym: "sso", "nda" and "sla" are inside them.
+LOOKALIKES = ("lesson", "association", "agenda", "islands")
+
+
+def test_the_keyword_net_flags_every_probe_sentence() -> None:
+    assert [p for p in PROBES if not CONTROL_WORDS.search(p)] == []
+    assert CONTROL_WORDS.search("Access is reviewed.")  # a stem matches at a word start, with any ending
+    unmatched = [w for w in (*CONTROL_STEMS, *CONTROL_ACRONYMS) if not CONTROL_WORDS.search(w)]
+    assert unmatched == []  # every stem and acronym finds itself, so the escaping holds
+
+
+def test_the_keyword_net_does_not_match_inside_words() -> None:
+    sentence = "The association shared the lesson and the agenda on the islands."
+    assert [t for t in (*LOOKALIKES, sentence) if CONTROL_WORDS.search(t)] == []
+    assert not CONTROL_WORDS.search("A preview of the roadmap.")  # "review" is a stem, not a substring

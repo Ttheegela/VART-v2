@@ -2,13 +2,6 @@
 
 Kestrelyn, Inc. - Version 1.0 - Effective 2026-02-01
 
-The Kestrelyn development team follows security best practices when developing software, and automates security testing throughout the development lifecycle whenever possible.
-
-Security is integrated into all phases of the Kestrelyn product development lifecycle, including:
-
-- Secure design: application risk classification, security requirement definition, secure application design and threat modeling
-- Secure development and testing: linting with security rules and the security testing described in this policy
-
 Engineering conventions for the Kestrelyn code base are documented on the engineering wiki.
 
 ## Policy Statements
@@ -19,9 +12,7 @@ Kestrelyn policy requires that:
 
 (b) Quality assurance activities must be performed, including unit testing and integration testing.
 
-(c) Threat modeling must be performed for a new product or major changes to an existing product.
-
-(d) Security requirements must be defined, tracked, and implemented.
+(c) Security requirements must be defined, tracked, and implemented.
 
 ## Pull Requests and Testing
 

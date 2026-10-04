@@ -5,9 +5,12 @@ ruff>=0.6
 mypy>=1.11
 uvicorn>=0.30
 alembic>=1.13,<2
-openpyxl>=3.1.5,<4
-python-docx>=1.1,<2
-fpdf2>=2.8,<3
+# The renderers are pinned exactly: data/dev/docs is compared byte for byte (python -m datakit.validate docs),
+# so a new version means re-rendering and committing the pack. lxml is what python-docx serializes through.
+openpyxl==3.1.5
+python-docx==1.2.0
+lxml==6.1.3
+fpdf2==2.8.9
 pypdfium2>=4.30,<6
 pyyaml>=6,<7
 types-PyYAML>=6

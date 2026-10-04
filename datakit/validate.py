@@ -4,6 +4,7 @@ python -m datakit.validate facts|docs|questionnaires|keys|mapper|all [--pack dev
 """
 
 import argparse
+import re
 import sys
 import tempfile
 from collections.abc import Callable
@@ -46,15 +47,16 @@ MIN_TRAPS: dict[TrapKind, int] = {
 }
 
 
-# Lower-case phrases that mark a line as speaking to a control. tests/datakit/test_render.py fails on a
-# rendered line (for a PDF: a sentence) that holds one and is neither inside a registered statement nor listed
-# in data/dev/src/ALLOWED_LINES.txt. The first group is topics with registered statements; the others are
-# topics no document may speak to (the must-ask controls), phrased so that they cannot match a documented
-# control: no bare "sso" (it is inside "association") and no bare "training" (that is the documented
-# awareness training).
-CONTROL_WORDS = (
+# The net for "this line speaks to a control". tests/datakit/test_render.py fails on a rendered line
+# (for a PDF: a sentence) that CONTROL_WORDS finds and that is neither inside a registered statement nor
+# listed in data/dev/src/ALLOWED_LINES.txt. A stem matches at a word start with any ending ("review"
+# finds "reviewed" but not "preview"); an acronym matches only as a whole word ("sla" is not inside
+# "islands", "sso" not inside "association", "nda" not inside "agenda"); "\w@" finds an email address or
+# a mailbox name. The first group of stems is topics with registered statements; the others are topics
+# no document may speak to (the must-ask controls). There is no bare "training" stem: that is the
+# documented awareness training.
+CONTROL_STEMS = (
     "review",
-    "mfa",
     "multi-factor",
     "encrypt",
     "backup",
@@ -64,7 +66,6 @@ CONTROL_WORDS = (
     "background check",
     "on-premises",
     "bug bounty",
-    "dast",
     "tabletop",
     "notify",
     # must-ask, from the MVSP short form
@@ -74,26 +75,40 @@ CONTROL_WORDS = (
     "data flow",
     "data-flow",
     "dataflow",
+    "diagram",
     "security header",
+    "response header",
     "content security policy",
     "x-frame-options",
+    "hsts",
     "physical access",
     "badge",
     "visitor",
+    "reception",
     "key card",
     "keycard",
+    "fob",
     "single sign-on",
     "saml",
+    "oidc",
+    "federat",
     "identity provider",
+    "secure coding",
     "secure coding training",
     "developer security training",
     "developer training",
     "train your developers",
+    "trained",
     # must-ask, about the engagement
     "insurance",
+    "cyber",
+    "coverage",
     "cmek",
+    "byok",
     "customer-managed",
+    "bring your own",
     "uptime",
+    "service level",
     "99.9",
     "security contact",
     "incident contact",
@@ -101,6 +116,17 @@ CONTROL_WORDS = (
     "report sharing",
     "non-disclosure",
     "distribute",
+)
+CONTROL_ACRONYMS = ("mfa", "dast", "sso", "nda", "sla", "csp")
+CONTROL_WORDS = re.compile(
+    "|".join(
+        [
+            *(rf"\b{re.escape(stem)}\w*" for stem in CONTROL_STEMS),
+            *(rf"\b{acronym}\b" for acronym in CONTROL_ACRONYMS),
+            r"\w@",
+        ]
+    ),
+    re.IGNORECASE,
 )
 
 
