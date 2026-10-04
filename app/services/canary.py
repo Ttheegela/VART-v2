@@ -49,7 +49,7 @@ def run_canary(
                 "Reply with JSON only.",
                 'Return {"ok": true}.',
                 CanaryOut,
-                200,
+                2000,  # reasoning models spend max_tokens on thinking; 200 ended in finish_reason=length
             )
             try:
                 complete_model(client, req, CanaryOut)

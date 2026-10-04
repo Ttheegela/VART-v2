@@ -48,6 +48,13 @@ def test_degraded_when_the_canary_is_stale(client: TestClient, db: Engine) -> No
     assert client.get("/api/health").json()["status"] == "degraded"
 
 
+def test_a_passing_canary_inside_the_window_stays_healthy(client: TestClient, db: Engine) -> None:
+    # with the 40 h case above, this pins the 36 h limit from both sides
+    _canary(db, ok=True, age=timedelta(hours=30))
+    r = client.get("/api/health")
+    assert r.status_code == 200 and '"status":"ok"' in r.text
+
+
 def test_503_when_the_database_is_down(monkeypatch: pytest.MonkeyPatch) -> None:
     dead = create_engine(
         "postgresql+psycopg://x:y@127.0.0.1:1/nothing_test", connect_args={"connect_timeout": 1}
@@ -57,6 +64,16 @@ def test_503_when_the_database_is_down(monkeypatch: pytest.MonkeyPatch) -> None:
     assert r.status_code == 503
     assert r.json() == {"status": "degraded", "db": "unavailable"}
     assert "x:y" not in r.text
+
+
+def test_503_when_the_database_url_is_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The uncached factory with DATABASE_URL removed raises the real RuntimeError from database_url().
+    monkeypatch.setattr(main, "get_engine", main.get_engine.__wrapped__)
+    monkeypatch.delenv("DATABASE_URL")
+    r = TestClient(app).get("/api/health")
+    assert r.status_code == 503
+    assert r.json() == {"status": "degraded", "db": "unavailable"}
+    assert "DATABASE_URL" not in r.text
 
 
 def test_version_lists_the_models(client: TestClient) -> None:

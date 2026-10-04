@@ -55,6 +55,34 @@ def test_no_key_fails_the_canary(db: Engine) -> None:
 
 
 @pytest.mark.parametrize(
+    ("payload", "status"),
+    [({"data": {"limit_remaining": None}}, 200), ({"error": "nope"}, 500)],
+    ids=["key_without_a_spend_limit", "credit_call_fails"],
+)
+def test_unknown_credits_neither_fail_the_canary_nor_degrade_health(
+    db: Engine, payload: object, status: int
+) -> None:
+    with Session(db) as s:
+        row = run_canary(s, FakeLLM([OK] * 4), _http(payload, status), get_settings())
+    assert row.ok is True and row.detail["credits_usd"] is None
+    body = TestClient(app).get("/api/health").json()
+    assert body["status"] == "ok" and body["canary"]["credits_usd"] is None
+
+
+def test_a_malformed_model_reply_fails_the_canary_and_says_why(db: Engine) -> None:
+    with Session(db) as s:
+        row = run_canary(s, FakeLLM(["nope", OK, OK, OK]), _http({}), get_settings())
+    assert row.ok is False
+    # complete_model's message is "<step>: output did not match <schema name>"; the other models still run
+    assert row.detail["models"] == {
+        "m/a": "canary: output did not match CanaryOut",
+        "m/b": "ok",
+        "m/c": "ok",
+        "m/d": "ok",
+    }
+
+
+@pytest.mark.parametrize(
     ("payload", "status", "expected"),
     [
         ({"data": {"limit_remaining": 3.5}}, 200, 3.5),
