@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from datakit import validate
+from datakit import derive_key, validate
 from datakit.derive_key import derive, derive_item
 from datakit.schemas import (
     DocSpec,
@@ -129,7 +129,7 @@ def _doc(doc_id: str, **kw: object) -> DocSpec:
     return DocSpec.model_validate(spec)
 
 
-# a, b: no scope; i, i2: the same scope; c: another scope; d: a draft; x: not evidence (template, contract)
+# a, b: no scope; i, i2: the same scope; c: another scope; d, d2: drafts; x: not evidence (template, contract)
 RULE_DOCS = (
     _doc("a"),
     _doc("b"),
@@ -137,9 +137,17 @@ RULE_DOCS = (
     _doc("i2", scope="internal-systems"),
     _doc("c", scope="customer-product"),
     _doc("d", status="draft"),
+    _doc("d2", status="draft"),
     _doc("x", evidence_allowed=False),
 )
-# (document, stance) of every statement about one control -> (label, value, scope note expected)
+# Two date/disagree traps over s0 and s1, the id that sorts last listed first. Every conflict row below puts
+# s0 and s1 in conflict, so each pins that the first trap in fact-sheet order labels it: not the first by id,
+# not the last. Every other row pins that no trap is attached without a conflict.
+RULE_TRAPS = (
+    Trap(id="Z9", kind="disagree", statements=("s0", "s1"), note="Listed first."),
+    Trap(id="A1", kind="date", statements=("s0", "s1"), note="Listed second, sorts first."),
+)
+# (document, stance[, flag]) of every statement about one control -> (label, value, scope note expected)
 RULES = [
     ([], ("unknown", None, False)),
     ([("x", "yes")], ("unknown", None, False)),
@@ -151,27 +159,40 @@ RULES = [
     ([("i", "yes"), ("c", "no")], ("partial", "Partial", True)),  # both sides declare different scopes
     ([("i", "yes"), ("i2", "no")], ("conflict", None, False)),  # the same scope
     ([("i", "yes"), ("a", "no")], ("conflict", None, False)),  # one side declares none
+    ([("a", "yes"), ("b", "no")], ("conflict", None, False)),  # neither declares one
     ([("a", "yes"), ("b", "no"), ("c", "partial")], ("conflict", None, False)),
     ([("d", "yes")], ("partial", "Partial", False)),  # the draft ceiling
     ([("d", "no")], ("partial", "Partial", False)),
     ([("d", "yes"), ("a", "yes")], ("verified", "Yes", False)),  # only when every candidate is in a draft
     ([("d", "yes"), ("a", "no")], ("conflict", None, False)),  # and it does not touch a conflict
+    ([("d", "yes"), ("d2", "no")], ("conflict", None, False)),  # not even when every document is a draft
+    # an undeclared partial document does not undo the scope partial: only yes and no documents vote
+    ([("i", "yes"), ("c", "no"), ("a", "partial")], ("partial", "Partial", True)),
+    ([("a", "yes", "injection")], ("unknown", None, False)),  # an injection is never evidence
+    ([("a", "yes"), ("b", "no", "injection")], ("verified", "Yes", False)),  # nor one side of a conflict
 ]
 
 
 @pytest.mark.parametrize(("statements", "expected"), RULES)
 def test_the_decision_rules(
-    statements: list[tuple[str, str]], expected: tuple[str, str | None, bool]
+    statements: list[tuple[str, ...]], expected: tuple[str, str | None, bool]
 ) -> None:
     facts = _facts().model_copy(
         update={
             "documents": RULE_DOCS,
-            "traps": (),
+            "traps": RULE_TRAPS,
             "statements": tuple(
                 Statement.model_validate(
-                    {"id": f"s{n}", "doc": doc, "text": f"Sentence {n}.", "control": "c", "stance": stance}
+                    {
+                        "id": f"s{n}",
+                        "doc": doc,
+                        "text": f"Sentence {n}.",
+                        "control": "c",
+                        "stance": stance,
+                        "flags": flags,
+                    }
                 )
-                for n, (doc, stance) in enumerate(statements)
+                for n, (doc, stance, *flags) in enumerate(statements)
             ),
         }
     )
@@ -179,6 +200,8 @@ def test_the_decision_rules(
     got = derive_item(facts, item, Selection(questionnaire="t", title="T", buyer="B", items=(item,)))
     assert (got.expected_label, got.expected_value, got.scope_note_expected) == expected
     assert got.must_ask is (expected[0] == "unknown")
+    # the first trap in sheet order labels a conflict (see RULE_TRAPS), never the first by id
+    assert got.conflict_trap == ("Z9" if expected[0] == "conflict" else None)
 
 
 @pytest.fixture
@@ -217,11 +240,23 @@ def test_the_keys_stage_flags_evidence_missing_from_its_document(pack: Path) -> 
 def test_the_keys_stage_flags_an_unplanned_conflict_and_an_unexercised_trap(pack: Path) -> None:
     facts = load_yaml(pack / "facts.yaml", Facts)
     spare = Trap(id="Z1", kind="must_ask", note="Nothing asks about this.")
-    changed = facts.model_copy(update={"traps": (*(t for t in facts.traps if t.id != "X2"), spare)})
+    # D3, not a disagree trap: the sheet must stay valid (minimum trap counts) or the stage stops early
+    changed = facts.model_copy(update={"traps": (*(t for t in facts.traps if t.id != "D3"), spare)})
     dump_yaml(changed, pack / "facts.yaml")
     for name in ("vsq-a", "mvsp-b"):
         dump_yaml(derive(changed, _selection(name)), pack / "key" / f"{name}.yaml")
     assert STAGES["keys"]("dev") == [
-        "vsq-a VSQ-53: conflict without a planted trap (unplanned contradiction?)",
+        "vsq-a VSQ-22: conflict without a planted trap (unplanned contradiction?)",
         "trap Z1 is not exercised by any vsq-a item",
     ]
+
+
+def test_the_keys_stage_points_to_the_facts_stage_when_the_sheet_is_invalid(pack: Path) -> None:
+    facts = load_yaml(pack / "facts.yaml", Facts)
+    dangling = facts.statements[0].model_copy(update={"id": "dangling", "doc": "nope"})
+    dump_yaml(facts.model_copy(update={"statements": (*facts.statements, dangling)}), pack / "facts.yaml")
+    assert STAGES["keys"]("dev") == ["fact sheet invalid: run python -m datakit.validate facts"]
+
+
+def test_the_facts_stage_and_the_keys_share_one_evidence_predicate() -> None:
+    assert validate.is_usable_evidence is derive_key.is_usable_evidence

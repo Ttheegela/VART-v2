@@ -12,7 +12,7 @@ from datetime import date
 from pathlib import Path
 
 from app.text import contains
-from datakit.derive_key import derive
+from datakit.derive_key import derive, is_usable_evidence
 from datakit.extract import lines_of
 from datakit.questionnaires import OUT as QDIR
 from datakit.questionnaires import build_csv, build_xlsx, mapping_json, mvsp_items, vsaq_items
@@ -72,10 +72,8 @@ CONTROL_STEMS = (
     "notify",
     # must-ask, from the MVSP short form
     "self-assessment",
-    "self assessment",
     "mvsp",
     "data flow",
-    "data-flow",
     "dataflow",
     "diagram",
     "security header",
@@ -96,7 +94,6 @@ CONTROL_STEMS = (
     "federat",
     "identity provider",
     "secure coding",
-    "secure coding training",
     "developer security training",
     "developer training",
     "train your developers",
@@ -165,15 +162,13 @@ def check_facts(f: Facts) -> list[str]:
             p.append(f"statement {s.id}: unknown control {s.control}")
         if not s.text.isascii():
             p.append(f"statement {s.id}: text must be ASCII")
+        if "negation" in s.flags and s.stance == "yes":
+            p.append(f"statement {s.id}: a statement flagged negation cannot have stance yes")
     if any(p):
         return p  # the checks below assume references resolve
 
     def evidence(control: str) -> list[str]:
-        return [
-            s.id
-            for s in f.statements_for(control)
-            if f.doc(s.doc).evidence_allowed and not {"placeholder", "injection"} & set(s.flags)
-        ]
+        return [s.id for s in f.statements_for(control) if is_usable_evidence(f, s)]
 
     for t in f.traps:
         ss = [stmts[i] for i in t.statements if i in stmts]
@@ -288,6 +283,8 @@ def _keys_stage(pack: str) -> list[str]:
     p: list[str] = []
     base = DATA / pack
     facts = load_yaml(base / "facts.yaml", Facts)
+    if check_facts(facts):
+        return ["fact sheet invalid: run python -m datakit.validate facts"]
     lines = {
         d.id: lines_of(base / "docs" / d.filename)
         for d in facts.documents

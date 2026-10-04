@@ -21,12 +21,13 @@ from datakit.schemas import (
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def is_usable_evidence(f: Facts, s: Statement) -> bool:
+    """The one rule for what can back an answer; the keys and the facts stage (validate.py) both use it."""
+    return f.doc(s.doc).evidence_allowed and not {"placeholder", "injection"} & set(s.flags)
+
+
 def _candidates(f: Facts, control: str) -> list[Statement]:
-    return [
-        s
-        for s in f.statements_for(control)
-        if f.doc(s.doc).evidence_allowed and not {"placeholder", "injection"} & set(s.flags)
-    ]
+    return [s for s in f.statements_for(control) if is_usable_evidence(f, s)]
 
 
 def derive_item(f: Facts, item: SelectionItem, sel: Selection) -> KeyItem:

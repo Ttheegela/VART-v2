@@ -30,6 +30,14 @@ def test_a_broken_fact_sheet_is_reported() -> None:
     assert any("nope" in p for p in check_facts(broken))
 
 
+def test_a_negation_statement_cannot_say_yes_anywhere_in_the_sheet() -> None:
+    # in no trap: spec 6.7 rule 4 would turn it into a partial, which the key derivation does not do
+    f = _facts()
+    bad = f.statements[0].model_copy(update={"id": "bad", "flags": ("negation",), "stance": "yes"})
+    broken = f.model_copy(update={"statements": (*f.statements, bad)})
+    assert check_facts(broken) == ["statement bad: a statement flagged negation cannot have stance yes"]
+
+
 @pytest.mark.parametrize("stance", ["yes", "no", "partial"])
 def test_a_bare_stance_loads_as_the_string(tmp_path: Path, stance: str) -> None:
     path = tmp_path / "s.yaml"
