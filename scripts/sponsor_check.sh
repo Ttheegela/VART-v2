@@ -12,18 +12,30 @@ esac
 git rev-parse --git-dir > /dev/null
 top=$(git rev-parse --show-toplevel)
 cd "$top" # scan the whole repository, whatever directory this runs from
+# Every git read below must fail the script when git fails. In a pipe or an if, a git error reads as "no match" and
+# the check prints "clean", so git writes to a file on a line of its own, where set -e stops it.
+# The explicit template is deliberate: a bare mktemp -d ignores $TMPDIR on macOS.
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/sponsor-check.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT
 found=0
-if git grep -l -I -i -F -e "$name" -- . ; then
-  echo "sponsor-check: the name appears in the files above" >&2
-  found=1
-fi
+# git grep exits 0 when it finds the name, 1 when it does not, and anything else (usually 128) when it fails.
+grep_status=0
+git grep -l -I -i -F -e "$name" -- . || grep_status=$?
+case "$grep_status" in
+  0) echo "sponsor-check: the name appears in the files above" >&2; found=1 ;;
+  1) ;;
+  *) echo "sponsor-check: git grep failed" >&2; exit "$grep_status" ;;
+esac
 # core.quotePath=false: git otherwise prints non-ASCII paths as octal escapes, which hides a non-ASCII name.
-if git -c core.quotePath=false ls-files | grep -i -F -e "$name" ; then
+git -c core.quotePath=false ls-files > "$tmp/files"
+if grep -i -F -e "$name" "$tmp/files" ; then
   echo "sponsor-check: the name appears in the file names above" >&2
   found=1
 fi
-# No grep -q: an early exit would SIGPIPE git log, and pipefail would turn a match into a miss.
-if git -c core.quotePath=false log --all -p | grep -i -F -e "$name" > /dev/null ; then
+git -c core.quotePath=false log --all -p > "$tmp/history"
+# The history is read from a file, so there is no pipe for grep to close early. Its output is still discarded: the
+# matching lines would show the name.
+if grep -i -F -e "$name" "$tmp/history" > /dev/null ; then
   echo "sponsor-check: the name appears in git history" >&2
   found=1
 fi

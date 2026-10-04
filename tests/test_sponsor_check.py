@@ -1,5 +1,7 @@
 import os
+import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -13,13 +15,15 @@ def _env() -> dict[str, str]:
     return {k: v for k, v in os.environ.items() if k != "SPONSOR_NAME" and not k.startswith("GIT_")}
 
 
-def _git(repo: Path, *args: str) -> None:
-    subprocess.run(
+def _git(repo: Path, *args: str) -> str:
+    result = subprocess.run(
         ["git", "-C", str(repo), "-c", "user.email=t@example.com", "-c", "user.name=t", *args],
         check=True,
         capture_output=True,
+        text=True,
         env=_env(),
     )
+    return result.stdout.strip()
 
 
 def _repo(tmp_path: Path, files: dict[str, str]) -> Path:
@@ -33,15 +37,49 @@ def _repo(tmp_path: Path, files: dict[str, str]) -> Path:
     return tmp_path
 
 
-def _run(
-    cwd: Path, name: str | None = "Acmecorp", ceiling: Path | None = None
-) -> subprocess.CompletedProcess[str]:
-    env = _env()
+def _run(cwd: Path, name: str | None = "Acmecorp", **extra_env: str) -> subprocess.CompletedProcess[str]:
+    env = _env() | extra_env
     if name is not None:
         env["SPONSOR_NAME"] = name
-    if ceiling is not None:
-        env["GIT_CEILING_DIRECTORIES"] = str(ceiling)  # git must not look for a repository above this
     return subprocess.run(["bash", str(SCRIPT)], cwd=cwd, env=env, capture_output=True, text=True)
+
+
+def _delete_object(repo: Path, rev: str) -> None:
+    sha = _git(repo, "rev-parse", rev)
+    (repo / ".git" / "objects" / sha[:2] / sha[2:]).unlink()
+
+
+def _git_failing_on(directory: Path, subcommand: str) -> str:
+    """A PATH whose `git` is the real one, except that `git <subcommand>` fails with status 128."""
+    directory.mkdir()
+    shim = directory / "git"
+    shim.write_text(
+        "#!/bin/sh\n"
+        'for arg in "$@"; do\n'
+        f'  if [ "$arg" = "{subcommand}" ]; then\n'
+        f'    echo "fatal: simulated {subcommand} failure" >&2; exit 128\n'
+        "  fi\n"
+        "done\n"
+        f'exec "{shutil.which("git")}" "$@"\n'
+    )
+    shim.chmod(0o755)
+    return f"{directory}{os.pathsep}{os.environ['PATH']}"
+
+
+def _leak_in_the_working_tree(repo: Path) -> None:
+    (repo / "a.md").write_text("built for Acmecorp")  # edited, not committed: only `git grep` sees it
+
+
+def _leak_in_the_index(repo: Path) -> None:
+    (repo / "acmecorp.txt").write_text("x")
+    _git(repo, "add", "acmecorp.txt")  # staged, not committed: only `git ls-files` sees it
+
+
+def _leak_in_history(repo: Path) -> None:
+    (repo / "a.md").write_text("copied from Acmecorp")
+    _git(repo, "commit", "-qam", "leak")
+    (repo / "a.md").write_text("hello")
+    _git(repo, "commit", "-qam", "scrub")  # only `git log` sees it
 
 
 def _printed(result: subprocess.CompletedProcess[str]) -> str:
@@ -129,7 +167,7 @@ def test_a_directory_git_cannot_read_is_an_error_not_a_pass(tmp_path: Path) -> N
     plain = tmp_path / "plain"
     plain.mkdir()
     (plain / "a.md").write_text("built for Acmecorp")
-    result = _run(plain, ceiling=tmp_path)
+    result = _run(plain, GIT_CEILING_DIRECTORIES=str(tmp_path))  # git must not look above tmp_path
     assert result.returncode != 0
     assert "sponsor-check: clean" not in result.stdout
 
@@ -161,6 +199,63 @@ def test_a_non_ascii_name_is_found_in_file_names_and_in_history(tmp_path: Path) 
     assert result.returncode == 1
     assert "git history" in result.stderr
     assert "file names above" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ({"a.md": "copied from Acmecorp"}, {"a.md": "clean now"}),
+        ({"a.md": "hello"}, {"b.md": "built for Acmecorp"}),
+    ],
+    ids=["the name only in history", "the name in a tracked file"],
+)
+def test_a_repository_with_a_missing_object_is_an_error_not_a_pass(
+    tmp_path: Path, first: dict[str, str], second: dict[str, str]
+) -> None:
+    # git log cannot show a commit whose blob is gone. Reading that as "no match" passes history it never saw.
+    repo = _repo(tmp_path, first)
+    for name, text in second.items():
+        (repo / name).write_text(text)
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "second")
+    _delete_object(repo, "HEAD~1:a.md")
+    result = _run(repo)
+    assert result.returncode != 0
+    assert "sponsor-check: clean" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("subcommand", "leak", "found", "error"),
+    [
+        ("grep", _leak_in_the_working_tree, "files above", "sponsor-check: git grep failed"),
+        ("ls-files", _leak_in_the_index, "file names above", "simulated ls-files failure"),
+        ("log", _leak_in_history, "git history", "simulated log failure"),
+    ],
+    ids=["git grep", "git ls-files", "git log"],
+)
+def test_a_git_read_that_fails_is_an_error_not_a_pass(
+    tmp_path: Path, subcommand: str, leak: Callable[[Path], None], found: str, error: str
+) -> None:
+    # Each leak is visible to one git read only, so taking that read's failure for "no match" prints "clean".
+    repo = _repo(tmp_path / "repo", {"a.md": "hello"})
+    leak(repo)
+    assert found in _run(repo).stderr  # with a working git the leak is found
+    result = _run(repo, PATH=_git_failing_on(tmp_path / "shim", subcommand))
+    assert result.returncode == 128  # git's own status
+    assert error in result.stderr
+    assert "sponsor-check: clean" not in result.stdout
+
+
+def test_it_leaves_no_temporary_files_behind(tmp_path: Path) -> None:
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    clean = _repo(tmp_path / "clean", {"a.md": "hello"})
+    leaky = _repo(tmp_path / "leaky", {"a.md": "built for Acmecorp"})
+    broken_git = _git_failing_on(tmp_path / "shim", "log")
+    assert _run(clean, TMPDIR=str(scratch)).returncode == 0
+    assert _run(leaky, TMPDIR=str(scratch)).returncode == 1
+    assert _run(clean, TMPDIR=str(scratch), PATH=broken_git).returncode == 128
+    assert list(scratch.iterdir()) == []
 
 
 def test_the_helpers_ignore_the_git_environment_of_an_outer_hook(
