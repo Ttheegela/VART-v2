@@ -51,7 +51,7 @@ def current_workspace(request: Request, response: Response, session: SessionDep)
 
     FastAPI drops headers set on the injected Response when an endpoint raises (404, 422) or returns a
     Response itself, so such a request never delivers a new cookie. The frontend must therefore call
-    GET /api/workspace (ensureWorkspace) before any other endpoint.
+    GET /api/workspace (ensureWorkspace) before any workspace-dependent endpoint.
     """
     ws = live_workspace(request, session)
     if ws is not None:
