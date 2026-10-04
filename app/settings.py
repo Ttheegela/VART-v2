@@ -2,12 +2,17 @@
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Provisional defaults (PriorPath-proven model IDs); Plan 2's model bench replaces them with measured choices.
+# Every default comes from the model pool (spec 6.14): cheap Chinese or open-weight models on OpenRouter
+# that support structured outputs. These are starting values; Plan 2's model bench replaces them with
+# measured picks. Claude Sonnet 5.5 runs only in the bench, as the quality reference, and is never a
+# default. The judge's family differs from the drafter's: when the drafter is a Qwen model, the judge is
+# moonshotai/kimi-k2.5.
 DEFAULT_MODELS = {
-    "stance": "google/gemini-2.5-flash-lite",
+    "stance": "qwen/qwen3.5-flash-02-23",
     "draft": "deepseek/deepseek-v4-flash",
-    "classify": "google/gemini-2.5-flash-lite",
-    "judge": "google/gemini-2.5-flash",
+    "classify": "qwen/qwen3.5-flash-02-23",
+    "judge": "qwen/qwen3.7-plus",
+    "recheck": "qwen/qwen3.5-flash-02-23",  # the stance prompt on a visitor's statement
 }
 
 
@@ -22,6 +27,7 @@ class Settings(BaseSettings):
     draft_model: str = DEFAULT_MODELS["draft"]
     classify_model: str = DEFAULT_MODELS["classify"]
     judge_model: str = DEFAULT_MODELS["judge"]
+    recheck_model: str = ""  # empty: the stance model
     canary_min_credits_usd: float = 2.0
 
     def models(self) -> dict[str, str]:
@@ -30,6 +36,7 @@ class Settings(BaseSettings):
             "draft": self.draft_model,
             "classify": self.classify_model,
             "judge": self.judge_model,
+            "recheck": self.recheck_model or self.stance_model,
         }
 
 

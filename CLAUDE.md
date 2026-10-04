@@ -21,6 +21,12 @@ Progress and the decisions table: `docs/PROGRESS.md`. The detailed per-task ledg
    (review; no automated check)
 9. `app/text.py` is frozen after adversary checkpoint 1. Changing it means recomputing the pinned digest in
    `tests/test_text.py`, re-deriving the eval keys and re-recording evals. Check: `test_normalize_is_pinned`.
+10. `app/contracts.py`, `app/patterns.py` and the signatures in `docs/CONTRACTS.md` are frozen after Plan 2's
+    adversary checkpoint 1: a change needs the lead's OK, a change-log line in `docs/CONTRACTS.md`, and a
+    re-recording when a prompt or a label can change. (review; no automated check)
+11. Engine code spends the budget before every model call (`app.services.llm_budget.spender`) and never holds a
+    database transaction across one. Check: `tests/test_pipeline.py::test_no_transaction_is_open_while_a_model_runs`
+    (Plan 2A Task 8).
 
 ## Map
 - `app/` FastAPI: `settings.py`, `text.py` (quote + record-line rules), `db/`, `api/`, `services/`, `llm/`, `observability.py`, `main.py`
@@ -32,6 +38,12 @@ Progress and the decisions table: `docs/PROGRESS.md`. The detailed per-task ledg
 - `scripts/` sponsor_check, check_monochrome, export_openapi, smoke. `tests/` pytest (needs Postgres).
 - `ops/` `setup.sh` runs the infrastructure phases (accounts, release, uptime, status). Tarun runs it in his terminal;
   secrets go only through its hidden prompts.
+- Engine (Plan 2): `app/contracts.py` (frozen unit types; signatures in `docs/CONTRACTS.md`), `app/patterns.py`,
+  `app/ingest/` (parse, pdf, store), `app/redact.py`, `app/classify.py`, `app/chunk.py`, `app/retrieve.py`,
+  `app/stance.py`, `app/decide.py`, `app/draft.py`, `app/grounding.py`, `app/pipeline.py` (`answer_item`),
+  `app/interview.py`.
+- `evals/`: `run.py` (harness), `score.py` (metrics, gates), `bench.py` (model bench), `recorded/` (replayed model
+  outputs), `results/` (committed results; CI fails on drift).
 
 ## Commands
 - `docker compose up -d db` — Postgres 17 + pgvector on port 5434 (user/password `vart`).
@@ -41,3 +53,7 @@ Progress and the decisions table: `docs/PROGRESS.md`. The detailed per-task ledg
 - Frontend: `cd web && npm run lint && npm test && npm run build`
 - Gates: `python scripts/check_monochrome.py` (the sponsor check is CI-only: it needs the secret)
 - Dev data: `python -m datakit.validate all` (stages: facts, docs, questionnaires, keys, mapper)
+- Evals, no network: `python -m evals.run --pack dev`. Recording (`--mode record|live`) and `python -m evals.bench`
+  use the eval key, never the production key. The lead, or an agent it names, runs them without asking Tarun, never
+  prints the key, and asks before spending past its $5 cap:
+  `(set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.run --pack dev --mode record)`

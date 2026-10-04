@@ -79,7 +79,7 @@ def test_503_when_the_database_url_is_unset(monkeypatch: pytest.MonkeyPatch) -> 
 def test_version_lists_the_models(client: TestClient) -> None:
     body = client.get("/api/version").json()
     assert body["version"] == "2.0.0.dev0"
-    assert set(body["models"]) == {"stance", "draft", "classify", "judge"}
+    assert set(body["models"]) == {"stance", "draft", "classify", "judge", "recheck"}
 
 
 def test_ui_is_served_when_built(tmp_path: Path) -> None:

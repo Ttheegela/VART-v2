@@ -104,6 +104,8 @@ class Chunk(Base):
     heading: Mapped[str | None] = mapped_column(Text, default=None)
     flags: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list, server_default="{}")
     as_of: Mapped[date | None] = mapped_column(Date, default=None)
+    # One spreadsheet or table row: decide asks its quotes for whole "Header: value" fields (adversary F10).
+    record: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     tsv: Mapped[Any] = mapped_column(
         TSVECTOR,
         Computed("to_tsvector('english', coalesce(heading, '') || ' ' || text)", persisted=True),

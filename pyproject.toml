@@ -13,6 +13,13 @@ dependencies = [
     "httpx>=0.27,<1",
     "itsdangerous>=2.2,<3",
     "langfuse>=4,<5",
+    "openpyxl>=3.1.5,<4",
+    "python-docx>=1.2,<2",
+    "pypdfium2>=5.13,<6",
+    "presidio-analyzer>=2.2,<3",
+    "spacy>=3.8,<4",
+    # spaCy small English model; 3.8.0 is the release for spaCy 3.8.x
+    "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
 ]
 
 [tool.ruff]
@@ -29,7 +36,10 @@ strict = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["openpyxl", "openpyxl.*", "docx", "docx.*", "pypdfium2", "pypdfium2.*", "fpdf", "fpdf.*"]
+module = [
+    "openpyxl", "openpyxl.*", "docx", "docx.*", "pypdfium2", "pypdfium2.*", "fpdf", "fpdf.*",
+    "presidio_analyzer", "presidio_analyzer.*", "spacy", "spacy.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
