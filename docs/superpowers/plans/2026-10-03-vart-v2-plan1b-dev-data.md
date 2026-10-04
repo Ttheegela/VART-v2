@@ -769,7 +769,7 @@ Controls (id · topic · truth) and the statements each must have (doc: stance, 
 | dr-test | BC/DR | Failover tested annually, last in November 2025 | bcp: yes |
 | vuln-scanning | Vulnerability | Weekly authenticated scans | vmp: yes |
 | patch-sla | Vulnerability | Critical within 14 days | vmp: yes |
-| pentest | Vulnerability | Annual third-party test | vmp: yes · pentest: yes (performed by Ironbark Security, a fictional firm) · tmpl: yes, **placeholder** "[Company Name] performs penetration tests [frequency]." [P1] |
+| pentest | Vulnerability | Annual third-party test | vmp: yes · pentest: yes (performed by Sablecrest Security, a fictional firm) · tmpl: yes, **placeholder** "[Company Name] performs penetration tests [frequency]." [P1] |
 | pentest-remediation | Vulnerability | Two medium findings still open | pentest: partial "Two medium-severity findings remain open as of the report date." |
 | bug-bounty | Vulnerability | No bug bounty; planned for 2027 | soc2: no, **negation** "The Company does not currently operate a public bug bounty program." · faq: no, **negation** "A public bug bounty program is planned for 2027." [H3, N2] |
 | dast | Vulnerability | No DAST yet; planned | sdp: no, **negation** "Dynamic application security testing (DAST) is not yet performed." · faq: no, **negation** "DAST scanning is planned for the first quarter of 2027." [H4, N3] |
@@ -1078,7 +1078,8 @@ if __name__ == "__main__":
 `data/questionnaires/vsq-a.selection.yaml` — `questionnaire: vsq-a`, `title: Vendor Security Questionnaire (VSQ-A)`, `buyer: Northbeam Health`, and 55–65 items. Each item: `code` (`VSQ-01`…), `section` (one of: Governance, Access Control, Data Security, Business Continuity, Vulnerability Management, Secure Development, Incident Response, Vendor Management, Human Resources, Logging and Monitoring, Asset Management, Engagement), `question` (one clear yes/no-style question in modern wording, reworded from its source), `source` (a key from `vsaq_items()`, or `mvsp:<label>` when VSAQ has nothing close), `csf_id` (the NIST CSF 2.0 subcategory, e.g. `PR.AA-05`; `null` for engagement items) and `control` (a control id from the fact sheet). Rules:
 - Every control in the fact sheet appears at least once. Ask about `mfa`, `access-review` and `backup-restore-test` twice in different words (e.g. "Is MFA required for all users, including customer administrators?" and "Do employees use MFA for internal systems?").
 - Questions must not leak the answer ("We know you don't have a bug bounty..." is wrong).
-- Engagement items ask about this deal: cyber insurance (yes/no) and its limit, the named security contact and the incident contact, customer-managed encryption keys, the contractual uptime SLA, and sharing the latest pentest report under NDA.
+- Engagement items ask about this deal: cyber insurance (yes/no) and its limit, the security contact for Northbeam Health's account (name, email and a 24/7 phone number) and the incident contact, customer-managed encryption keys, the contractual uptime SLA, and sharing the latest pentest report under NDA. Word them so no document can answer them: the documents name a Head of Security, so the contact questions must ask for engagement-specific contact details that no document prints.
+- Questions about controls with a conflict trap must carry the threshold the documents disagree on, in every wording: access reviews "at least quarterly", backup restore tests "at least quarterly", security log retention "at least 12 months"; otherwise a reader can answer Yes from either side.
 
 `data/questionnaires/mvsp-b.selection.yaml` — `questionnaire: mvsp-b`, `title: MVSP Short Form`, `buyer: Northbeam Health`, exactly 25 items, one per MVSP control, `code` `MVSP-<label>`, `source` `mvsp:<label>`, a question that asks whether the vendor meets that control, `csf_id`, and the closest fact-sheet `control`. If an MVSP control has no close control (e.g. physical access, data flow diagrams), add a control to `facts.yaml` with `truth: (not in any document)` and a `must_ask` trap entry for it, then re-run `validate facts`.
 
@@ -1132,7 +1133,7 @@ Expected: 0 problems; tests PASS.
 
 **Files:**
 - Create: `data/dev/src/<doc id>.md` for every docx/pdf/md document, `data/dev/src/arr.yaml`, `data/dev/src/ainv.yaml`, `datakit/render.py`, generated `data/dev/docs/*` (22 files)
-- Modify: `datakit/validate.py` (add the `docs` stage)
+- Modify: `datakit/validate.py` (add the `docs` stage); `data/dev/facts.yaml` (only to register sentences the documents add about listed controls; never change an existing statement's text, stance or trap)
 - Test: `tests/datakit/test_render.py`
 
 **Interfaces:**
