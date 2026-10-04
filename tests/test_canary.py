@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
@@ -5,7 +7,7 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_llm
-from app.db.models import CanaryRun
+from app.db.models import CanaryRun, Workspace
 from app.llm.client import LLMError
 from app.main import app
 from app.services import canary
@@ -121,4 +123,25 @@ def test_canary_endpoint_needs_the_cron_secret_and_feeds_health(
     finally:
         app.dependency_overrides.clear()
     with Session(db) as s:
+        assert len(s.scalars(select(CanaryRun)).all()) == 1
+
+
+def test_the_canary_cron_also_sweeps_expired_data(db: Engine, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The cleanup cron sweeps once a day; the canary cron is a second daily sweep.
+    monkeypatch.setattr(canary, "remaining_credits", lambda http, key: 9.0)
+    now = datetime.now(UTC)
+    with Session(db) as s:
+        s.add_all(
+            [Workspace(created_at=now - timedelta(hours=25)), Workspace(created_at=now - timedelta(hours=1))]
+        )
+        s.commit()
+    app.dependency_overrides[get_llm] = lambda: FakeLLM([OK] * 4)
+    try:
+        r = TestClient(app).get("/api/internal/canary", headers={"Authorization": "Bearer test-cron-secret"})
+    finally:
+        app.dependency_overrides.clear()
+    assert r.status_code == 200 and r.json()["ok"] is True  # the canary still ran
+    with Session(db) as s:
+        ages = [now - created for created in s.scalars(select(Workspace.created_at))]
+        assert len(ages) == 1 and ages[0] < timedelta(hours=2)  # only the live workspace is left
         assert len(s.scalars(select(CanaryRun)).all()) == 1

@@ -29,6 +29,7 @@ def cleanup(_: CronDep, session: SessionDep) -> dict[str, int]:
 
 @router.get("/api/internal/canary")
 def run_daily_canary(_: CronDep, session: SessionDep, llm: LLMDep) -> dict[str, object]:
+    cleanup_expired(session)  # a second daily sweep, besides the cleanup cron (times: vercel.json)
     with httpx.Client() as http:
         row = run_canary(session, llm, http, get_settings())
     return {"ok": row.ok, "detail": row.detail}
