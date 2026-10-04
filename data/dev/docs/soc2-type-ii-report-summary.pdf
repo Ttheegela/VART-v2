@@ -1,0 +1,184 @@
+%PDF-1.3
+%יכס¿
+1 0 obj
+<<
+/Count 2
+/Kids [3 0 R
+5 0 R]
+/MediaBox [0 0 595.28 841.89]
+/Type /Pages
+>>
+endobj
+2 0 obj
+<<
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+/Pages 1 0 R
+/Type /Catalog
+>>
+endobj
+3 0 obj
+<<
+/Contents 4 0 R
+/Parent 1 0 R
+/Resources 9 0 R
+/Type /Page
+>>
+endobj
+4 0 obj
+<<
+/Length 4247
+>>
+stream
+2 J
+0.57 w
+BT /F1 15.00 Tf ET
+BT 31.18 799.12 Td (SOC 2 Type II Report Summary) Tj ET
+BT /F2 10.50 Tf ET
+BT 31.18 780.63 Td (Kestrelyn, Inc. - Examination period: 2025-07-01 to 2026-06-30) Tj ET
+BT 31.18 760.79 Td (Scope: this report covers the production environment.) Tj ET
+q BT 31.18 740.94 Td 3.294 Tw (This summary describes the independent service auditor's examination of the Kestrelyn Ledger production) Tj ET Q
+BT 31.18 726.77 Td (environment and the main results of that examination. It does not replace the full report.) Tj ET
+BT /F1 13.00 Tf ET
+BT 31.18 703.34 Td (Independent Service Auditor's Opinion) Tj ET
+BT /F2 10.50 Tf ET
+q BT 31.18 684.25 Td 1.432 Tw (The service auditor issued an unqualified opinion on the Company's SOC 2 Type II examination for the period) Tj ET Q
+BT 31.18 670.08 Td (2025-07-01 to 2026-06-30.) Tj ET
+q BT 31.18 650.24 Td 1.138 Tw (The examination covered the Security category of the AICPA trust services criteria. A Type II examination tests) Tj ET Q
+q BT 31.18 636.06 Td 1.088 Tw (whether controls were suitably designed and whether they operated effectively throughout the whole period, not) Tj ET Q
+BT 31.18 621.89 Td (only on a single date.) Tj ET
+q BT 31.18 602.05 Td 1.406 Tw (Management is responsible for preparing the description of the system and for the design, implementation and) Tj ET Q
+BT 31.18 587.87 Td (operation of the controls. The service auditor is responsible for expressing an opinion based on the examination.) Tj ET
+BT /F1 13.00 Tf ET
+BT 31.18 564.45 Td (System Description) Tj ET
+BT /F2 10.50 Tf ET
+q BT 31.18 545.35 Td 2.117 Tw (Kestrelyn, Inc. \(the Company\) provides Kestrelyn Ledger, a cloud-based application that helps finance teams) Tj ET Q
+q BT 31.18 531.18 Td 4.801 Tw (capture, approve and pay supplier invoices. The description follows the five components of a service) Tj ET Q
+BT 31.18 517.01 Td (organization's system: infrastructure, software, people, procedures and data.) Tj ET
+BT /F1 11.00 Tf ET
+BT 31.18 494.18 Td (Infrastructure) Tj ET
+BT /F2 10.50 Tf ET
+BT 31.18 474.49 Td (All of the Company's data processing infrastructure is hosted in Amazon Web Services.) Tj ET
+BT /F1 11.00 Tf ET
+BT 31.18 451.66 Td (Software) Tj ET
+BT /F2 10.50 Tf ET
+q BT 31.18 431.97 Td 1.602 Tw (Kestrelyn Ledger is a multi-tenant web application with a public API. Internal services support invoice capture,) Tj ET Q
+BT 31.18 417.80 Td (approval workflows and payment file generation.) Tj ET
+BT /F1 11.00 Tf ET
+BT 31.18 394.97 Td (People) Tj ET
+BT /F2 10.50 Tf ET
+q BT 31.18 375.28 Td 1.466 Tw (The Company has 85 employees, organized into engineering, product, customer success, security and IT, and) Tj ET Q
+BT 31.18 361.10 Td (finance and people teams.) Tj ET
+BT /F1 11.00 Tf ET
+BT 31.18 338.28 Td (Procedures) Tj ET
+BT /F2 10.50 Tf ET
+BT 31.18 318.58 Td (Management has written procedures for operating and supporting the system.) Tj ET
+BT /F1 11.00 Tf ET
+BT 31.18 295.76 Td (Data) Tj ET
+BT /F2 10.50 Tf ET
+q BT 31.18 276.06 Td 1.172 Tw (The system processes supplier invoice data on behalf of customers, together with the user accounts needed to) Tj ET Q
+BT 31.18 261.89 Td (sign in.) Tj ET
+BT /F1 13.00 Tf ET
+BT 31.18 238.46 Td (System Operations) Tj ET
+BT /F2 10.50 Tf ET
+BT 31.18 219.37 Td (Security logs are retained for 90 days.) Tj ET
+BT /F1 13.00 Tf ET
+BT 31.18 195.94 Td (Tests of Controls) Tj ET
+BT /F2 10.50 Tf ET
+q BT 31.18 176.85 Td 1.014 Tw (The auditor tested the design of controls and the operating effectiveness of controls throughout the examination) Tj ET Q
+q BT 31.18 162.68 Td 0.902 Tw (period, using inquiry, observation, inspection of records and re-performance. Samples of 25 items were used for) Tj ET Q
+BT 31.18 148.50 Td (tests that draw from a population of events, such as terminated users.) Tj ET
+q BT 31.18 128.66 Td 2.232 Tw (The controls tested are organized under the nine common criteria series, CC1 through CC9, of the Security) Tj ET Q
+BT 31.18 114.49 Td (category.) Tj ET
+BT /F1 13.00 Tf ET
+BT 31.18 91.06 Td (Exceptions Noted) Tj ET
+BT /F2 10.50 Tf ET
+BT 31.18 71.97 Td (The auditor noted one exception during testing.) Tj ET
+BT 31.18 52.13 Td (For 2 of 25 terminated users sampled, access was removed 5 days after termination.) Tj ET
+
+endstream
+endobj
+5 0 obj
+<<
+/Contents 6 0 R
+/Parent 1 0 R
+/Resources 10 0 R
+/Type /Page
+>>
+endobj
+6 0 obj
+<<
+/Length 456
+>>
+stream
+2 J
+0.57 w
+BT /F2 10.50 Tf ET
+BT 31.18 803.31 Td (Management's response to the exception is included in the full report.) Tj ET
+BT /F1 13.00 Tf ET
+BT 31.18 779.88 Td (Other Information Provided by the Company) Tj ET
+BT /F2 10.50 Tf ET
+BT 31.18 760.79 Td (The following information was provided by the Company. It is not covered by the auditor's opinion.) Tj ET
+BT 31.18 740.94 Td (The Company does not currently operate a public bug bounty program.) Tj ET
+
+endstream
+endobj
+7 0 obj
+<<
+/BaseFont /Helvetica-Bold
+/Encoding /WinAnsiEncoding
+/Subtype /Type1
+/Type /Font
+>>
+endobj
+8 0 obj
+<<
+/BaseFont /Helvetica
+/Encoding /WinAnsiEncoding
+/Subtype /Type1
+/Type /Font
+>>
+endobj
+9 0 obj
+<<
+/Font <</F1 7 0 R
+/F2 8 0 R>>
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+>>
+endobj
+10 0 obj
+<<
+/Font <</F1 7 0 R
+/F2 8 0 R>>
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+>>
+endobj
+11 0 obj
+<<
+/CreationDate (D:20260101000000Z)
+>>
+endobj
+xref
+0 12
+0000000000 65535 f 
+0000000015 00000 n 
+0000000108 00000 n 
+0000000211 00000 n 
+0000000291 00000 n 
+0000004590 00000 n 
+0000004671 00000 n 
+0000005178 00000 n 
+0000005280 00000 n 
+0000005377 00000 n 
+0000005474 00000 n 
+0000005572 00000 n 
+trailer
+<<
+/Size 12
+/Root 2 0 R
+/Info 11 0 R
+/ID [<F91831F366585D48176AAFE718565026><F91831F366585D48176AAFE718565026>]
+>>
+startxref
+5628
+%%EOF

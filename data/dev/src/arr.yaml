@@ -1,0 +1,10 @@
+sheet: Access reviews
+title: Kestrelyn access review log
+as_of: "2026-09-15"
+headers: [System, Owner, Last review completed, Next review due, Status]
+rows:
+  - [Okta, Marcus Lee, "2026-01-10", "2026-04-10", Overdue]
+  - [AWS, Marcus Lee, "2026-01-10", "2026-04-10", Overdue]
+  - [GitHub, Priya Raman, "2026-01-10", "2026-04-10", Overdue]
+  - [Google Workspace, Marcus Lee, "2026-01-10", "2026-04-10", Overdue]
+  - [Kestrelyn Ledger admin console, Priya Raman, "2026-01-10", "2026-04-10", Overdue]

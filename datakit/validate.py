@@ -10,8 +10,11 @@ from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 
+from app.text import contains
+from datakit.extract import lines_of
 from datakit.questionnaires import OUT as QDIR
 from datakit.questionnaires import build_csv, build_xlsx, mapping_json, mvsp_items, vsaq_items
+from datakit.render import render_pack
 from datakit.schemas import Facts, Selection, TrapKind, load_yaml
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -41,6 +44,64 @@ MIN_TRAPS: dict[TrapKind, int] = {
     "must_ask": 5,
     "fills": 2,
 }
+
+
+# Lower-case phrases that mark a line as speaking to a control. tests/datakit/test_render.py fails on a
+# rendered line (for a PDF: a sentence) that holds one and is neither inside a registered statement nor listed
+# in data/dev/src/ALLOWED_LINES.txt. The first group is topics with registered statements; the others are
+# topics no document may speak to (the must-ask controls), phrased so that they cannot match a documented
+# control: no bare "sso" (it is inside "association") and no bare "training" (that is the documented
+# awareness training).
+CONTROL_WORDS = (
+    "review",
+    "mfa",
+    "multi-factor",
+    "encrypt",
+    "backup",
+    "retain",
+    "retention",
+    "penetration",
+    "background check",
+    "on-premises",
+    "bug bounty",
+    "dast",
+    "tabletop",
+    "notify",
+    # must-ask, from the MVSP short form
+    "self-assessment",
+    "self assessment",
+    "mvsp",
+    "data flow",
+    "data-flow",
+    "dataflow",
+    "security header",
+    "content security policy",
+    "x-frame-options",
+    "physical access",
+    "badge",
+    "visitor",
+    "key card",
+    "keycard",
+    "single sign-on",
+    "saml",
+    "identity provider",
+    "secure coding training",
+    "developer security training",
+    "developer training",
+    "train your developers",
+    # must-ask, about the engagement
+    "insurance",
+    "cmek",
+    "customer-managed",
+    "uptime",
+    "99.9",
+    "security contact",
+    "incident contact",
+    "24/7",
+    "report sharing",
+    "non-disclosure",
+    "distribute",
+)
 
 
 def _dupes(values: list[str]) -> list[str]:
@@ -156,6 +217,34 @@ def _questionnaires_stage(pack: str) -> list[str]:
         p.append("vsq-a.mapping.json is stale: run python -m datakit.questionnaires")
     covered = {i.control for i in load_yaml(QDIR / "vsq-a.selection.yaml", Selection).items}
     p += [f"vsq-a never asks about control {c}" for c in sorted(controls - covered)]
+    return p
+
+
+@stage("docs")
+def _docs_stage(pack: str) -> list[str]:
+    p: list[str] = []
+    base = DATA / pack
+    facts = load_yaml(base / "facts.yaml", Facts)
+    lines = {
+        d.id: lines_of(base / "docs" / d.filename)
+        for d in facts.documents
+        if (base / "docs" / d.filename).exists()
+    }
+    p += [f"missing rendered file {d.filename}" for d in facts.documents if d.id not in lines]
+    for s in facts.statements:
+        # a PDF reads back as one joined line (wrapping is not a paragraph break), so this covers PDFs too
+        if s.doc in lines and not any(contains(line, s.text) for line in lines[s.doc]):
+            p.append(f"statement {s.id} not found verbatim in {facts.doc(s.doc).filename}")
+    p += [
+        f"{src.name} is not ASCII"
+        for src in sorted((base / "src").glob("*"))
+        if not src.read_bytes().isascii()
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        for fresh in render_pack(pack, Path(tmp)):
+            kept = base / "docs" / fresh.name
+            if kept.exists() and fresh.read_bytes() != kept.read_bytes():
+                p.append(f"{fresh.name} is stale: run python -m datakit.render {pack}")
     return p
 
 
