@@ -1,10 +1,10 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import delete
 
-from app.api.deps import COOKIE_NAME, SessionDep, WorkspaceDep
+from app.api.deps import COOKIE_NAME, SessionDep, WorkspaceDep, live_workspace
 from app.db.models import Workspace
 
 router = APIRouter()
@@ -20,7 +20,11 @@ def read_workspace(ws: WorkspaceDep) -> WorkspaceOut:
 
 
 @router.post("/api/workspace/reset", status_code=204)
-def reset_workspace(ws: WorkspaceDep, session: SessionDep, response: Response) -> None:
-    session.execute(delete(Workspace).where(Workspace.id == ws.id))
-    session.commit()
+def reset_workspace(request: Request, session: SessionDep, response: Response) -> None:
+    # Not WorkspaceDep: that would create a workspace for a visitor who has none, and charge the network's
+    # new-session limit, only to delete it again. Without a live workspace there is nothing to wipe.
+    ws = live_workspace(request, session)
+    if ws is not None:
+        session.execute(delete(Workspace).where(Workspace.id == ws.id))
+        session.commit()
     response.delete_cookie(COOKIE_NAME)

@@ -40,6 +40,12 @@ def _load(session: Session, raw: str) -> Workspace | None:
     return ws
 
 
+def live_workspace(request: Request, session: Session) -> Workspace | None:
+    """The workspace the request's cookie names while it is still live; never creates one."""
+    raw = request.cookies.get(COOKIE_NAME)
+    return _load(session, raw) if raw else None
+
+
 def current_workspace(request: Request, response: Response, session: SessionDep) -> Workspace:
     """The visitor's workspace; a first visit creates one and sets the cookie on `response`.
 
@@ -47,8 +53,7 @@ def current_workspace(request: Request, response: Response, session: SessionDep)
     Response itself, so such a request never delivers a new cookie. The frontend must therefore call
     GET /api/workspace (ensureWorkspace) before any other endpoint.
     """
-    raw = request.cookies.get(COOKIE_NAME)
-    ws = _load(session, raw) if raw else None
+    ws = live_workspace(request, session)
     if ws is not None:
         return ws
     # Hash first (fails before any write when SESSION_SECRET is unset), then the per-network limit, and only

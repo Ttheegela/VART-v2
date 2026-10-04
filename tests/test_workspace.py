@@ -70,6 +70,50 @@ def test_reset_deletes_the_workspace_and_clears_the_cookie(client: TestClient, d
     assert _count(db) == 0
 
 
+def _new_session_hits(db: Engine) -> int:
+    """Everything counted so far against the per-network new-session limit."""
+    with Session(db) as s:
+        hits = s.scalar(select(func.coalesce(func.sum(IpLimit.hits), 0)).where(IpLimit.kind == "workspace"))
+        return int(hits or 0)
+
+
+@pytest.mark.parametrize("state", ["no cookie", "tampered cookie", "deleted workspace", "expired workspace"])
+def test_reset_without_a_live_workspace_creates_nothing_and_charges_nothing(
+    client: TestClient, db: Engine, state: str
+) -> None:
+    if state == "tampered cookie":
+        client.cookies.set("vart_ws", "not-a-signed-value")
+    elif state != "no cookie":
+        client.get("/api/workspace")  # one workspace, one counted new session
+        with db.begin() as conn:
+            if state == "deleted workspace":
+                conn.execute(text("delete from workspaces"))
+            else:  # the stale row waits for the cleanup job
+                conn.execute(text("update workspaces set created_at = now() - interval '25 hours'"))
+    rows, hits = _count(db), _new_session_hits(db)
+    r = client.post("/api/workspace/reset")
+    assert r.status_code == 204
+    cookies = r.headers.get_list("set-cookie")  # only the clearing one, no fresh cookie before it
+    assert len(cookies) == 1
+    assert 'vart_ws=""' in cookies[0] or "max-age=0" in cookies[0].lower()
+    assert (_count(db), _new_session_hits(db)) == (rows, hits)
+
+
+def test_twenty_load_and_reset_cycles_do_not_lock_the_network_out(client: TestClient, db: Engine) -> None:
+    headers = {"x-real-ip": "203.0.113.7"}
+    limit = ip_limits.LIMITS["workspace"][0]
+    for cycle in range(limit):
+        assert client.get("/api/workspace", headers=headers).status_code == 200, cycle
+        # a double click or a retry: the second reset has no cookie left to go on
+        resets = [client.post("/api/workspace/reset", headers=headers).status_code for _ in range(2)]
+        assert resets == [204, 204], cycle
+    assert _new_session_hits(db) == limit  # one per load, none per reset
+    # The limit is on new sessions and every load after a reset is one, so the next load is refused ...
+    assert client.get("/api/workspace", headers=headers).status_code == 429
+    # ... but a wipe never is.
+    assert client.post("/api/workspace/reset", headers=headers).status_code == 204
+
+
 def test_new_workspaces_per_ip_are_limited(db: Engine, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(ip_limits.LIMITS, "workspace", (2, timedelta(hours=1)))
     statuses = []
