@@ -1,4 +1,5 @@
 import hashlib
+import re
 import shutil
 import time
 import zipfile
@@ -12,7 +13,7 @@ from datakit import render, validate
 from datakit.extract import lines_of, text_of
 from datakit.render import parse_md, render_docx, render_pack, render_pdf, render_xlsx
 from datakit.schemas import Facts, load_yaml
-from datakit.validate import CONTROL_ACRONYMS, CONTROL_STEMS, CONTROL_WORDS, DATA, STAGES
+from datakit.validate import CONTROL_ACRONYMS, CONTROL_STEMS, CONTROL_WORDS, DATA, STAGES, _stem_pattern
 
 SAMPLE = (
     "# Access Control Policy\n\n"
@@ -189,3 +190,30 @@ def test_the_keyword_net_does_not_match_inside_words() -> None:
     sentence = "The association shared the lesson and the agenda on the islands."
     assert [t for t in (*LOOKALIKES, sentence) if CONTROL_WORDS.search(t)] == []
     assert not CONTROL_WORDS.search("A preview of the roadmap.")  # "review" is a stem, not a substring
+
+
+def _covered_stems(stems: tuple[str, ...]) -> list[tuple[str, str]]:
+    """(stem, other): the whole text of `stem` is already matched by the pattern of another entry `other`."""
+    return [
+        (a, b)
+        for i, a in enumerate(stems)
+        for j, b in enumerate(stems)
+        if i != j and re.fullmatch(_stem_pattern(b), a, re.IGNORECASE)
+    ]
+
+
+def test_no_keyword_stem_is_covered_by_another_stem() -> None:
+    assert _covered_stems(CONTROL_STEMS) == []
+
+
+def test_the_stem_overlap_check_finds_what_it_is_for() -> None:
+    # an ending, an un- form, a space/hyphen twin and a repeat: each is a stem another one already matches
+    stems = ("encrypt", "encrypted", "unencrypt", "bug bounty", "bug-bounty", "backup", "backup", "review")
+    assert sorted(_covered_stems(stems)) == [
+        ("backup", "backup"),
+        ("backup", "backup"),
+        ("bug bounty", "bug-bounty"),
+        ("bug-bounty", "bug bounty"),
+        ("encrypted", "encrypt"),
+        ("unencrypt", "encrypt"),
+    ]

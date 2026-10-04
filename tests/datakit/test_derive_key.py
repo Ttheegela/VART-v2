@@ -124,6 +124,38 @@ def test_the_committed_keys_match_the_derivation() -> None:
         assert load_yaml(DATA / "dev" / "key" / f"{name}.yaml", Key) == _key(name), name
 
 
+def _copy_of_the_data(root: Path) -> Path:
+    """The pieces derive_key.main reads (the fact sheet and the selections), under a fake repository root."""
+    shutil.copytree(DATA / "questionnaires", root / "data" / "questionnaires")
+    (root / "data" / "dev").mkdir(parents=True)
+    shutil.copy(DATA / "dev" / "facts.yaml", root / "data" / "dev" / "facts.yaml")
+    return root / "data" / "dev"
+
+
+def test_main_writes_the_committed_keys(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    dev = _copy_of_the_data(tmp_path)
+    monkeypatch.setattr(derive_key, "ROOT", tmp_path)
+    derive_key.main("dev")
+    for name in ("vsq-a", "mvsp-b"):
+        assert (dev / "key" / f"{name}.yaml").read_bytes() == (
+            DATA / "dev" / "key" / f"{name}.yaml"
+        ).read_bytes()
+
+
+def test_main_stops_with_a_message_when_the_fact_sheet_is_invalid(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dev = _copy_of_the_data(tmp_path)
+    facts = load_yaml(dev / "facts.yaml", Facts)
+    dangling = facts.statements[0].model_copy(update={"id": "dangling", "doc": "nope"})
+    dump_yaml(facts.model_copy(update={"statements": (*facts.statements, dangling)}), dev / "facts.yaml")
+    monkeypatch.setattr(derive_key, "ROOT", tmp_path)
+    with pytest.raises(SystemExit) as stopped:  # not the StopIteration of Facts.doc("nope")
+        derive_key.main("dev")
+    assert stopped.value.code == "fact sheet invalid: run python -m datakit.validate facts"
+    assert not (dev / "key").exists()  # nothing derived from a broken sheet was written
+
+
 def _doc(doc_id: str, **kw: object) -> DocSpec:
     spec = {"id": doc_id, "filename": f"{doc_id}.md", "format": "md", "kind": "policy", **kw}
     return DocSpec.model_validate(spec)

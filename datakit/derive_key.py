@@ -85,7 +85,11 @@ def derive(f: Facts, sel: Selection) -> Key:
 
 
 def main(pack: str) -> None:
+    from datakit.validate import check_facts  # validate imports this module, so it cannot be imported above
+
     facts = load_yaml(ROOT / "data" / pack / "facts.yaml", Facts)
+    if check_facts(facts):  # a dangling reference would otherwise end in a StopIteration traceback
+        raise SystemExit("fact sheet invalid: run python -m datakit.validate facts")
     for name in ("vsq-a", "mvsp-b"):
         sel = load_yaml(ROOT / "data" / "questionnaires" / f"{name}.selection.yaml", Selection)
         dump_yaml(derive(facts, sel), ROOT / "data" / pack / "key" / f"{name}.yaml")
