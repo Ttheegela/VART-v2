@@ -41,7 +41,7 @@ def _by_control(name: str) -> dict[str, list[KeyItem]]:
     return out
 
 
-# the control each conflict trap is planted on
+# the control each trap is planted on: the vsq-a items asking about it carry the expected outcome
 CONFLICTS = {
     "D1": "access-review",
     "D2": "cloud-only",
@@ -49,27 +49,46 @@ CONFLICTS = {
     "X1": "backup-restore-test",
     "X2": "log-retention",
 }
+SCOPE_PARTIALS = {"S1": "mfa", "S2": "background-checks"}
+HONEST_NOS = {
+    "H1": "iso27001",
+    "H2": "ml-training",
+    "H3": "bug-bounty",
+    "H4": "dast",
+    "H5": "customer-pentest",
+}
+DRAFT_ONLY = {"R1": "laptop-encryption", "R2": "ir-plan"}
 
 
 def test_planted_traps_come_out_as_designed() -> None:
     k = _by_control("vsq-a")
     for trap, control in CONFLICTS.items():
         assert all(
-            x.expected_label == "conflict" and x.expected_value is None and x.conflict_trap == trap
+            trap in x.traps and x.expected_label == "conflict" and x.expected_value is None
             for x in k[control]
         ), trap
-    assert all(x.expected_label == "partial" and x.scope_note_expected for x in k["mfa"])
-    assert all(x.expected_label == "partial" and x.scope_note_expected for x in k["background-checks"])
-    for c in ("iso27001", "ml-training", "bug-bounty", "dast", "customer-pentest"):
+        assert all(x.conflict_trap == trap for x in k[control]), trap
+    for trap, control in SCOPE_PARTIALS.items():
         assert all(
-            x.expected_label == "verified" and x.expected_value == "No" and x.honest_negative for x in k[c]
-        ), c
-    for c in ("laptop-encryption", "ir-plan"):
-        assert all(x.expected_label == "partial" for x in k[c]), c
-    must_ask = [c for t in _facts().traps if t.kind == "must_ask" for c in t.controls]
+            trap in x.traps and x.expected_label == "partial" and x.scope_note_expected for x in k[control]
+        ), trap
+    for trap, control in HONEST_NOS.items():
+        assert all(
+            trap in x.traps
+            and x.expected_label == "verified"
+            and x.expected_value == "No"
+            and x.honest_negative
+            for x in k[control]
+        ), trap
+    for trap, control in DRAFT_ONLY.items():
+        assert all(trap in x.traps and x.expected_label == "partial" for x in k[control]), trap
+    must_ask = [t for t in _facts().traps if t.kind == "must_ask"]
     assert len(must_ask) == 13
-    for c in must_ask:
-        assert all(x.expected_label == "unknown" and x.must_ask for x in k[c]), c
+    for trap in must_ask:
+        for control in trap.controls:
+            assert all(
+                trap.id in x.traps and x.expected_label == "unknown" and x.must_ask for x in k[control]
+            ), trap.id
     assert all(x.expected_label == "verified" and x.expected_value == "Yes" for x in k["pentest"])
     assert [x.fills for x in k["cyber-insurance"]] == [("VSQ-59",)]
     assert [x.fills for x in k["security-contact"]] == [("VSQ-61",)]
@@ -129,10 +148,7 @@ RULES = [
     ([("a", "partial")], ("partial", "Partial", False)),
     ([("a", "yes"), ("b", "partial")], ("partial", "Partial", False)),
     ([("a", "no"), ("b", "partial")], ("partial", "Partial", False)),
-    (
-        [("i", "yes"), ("c", "no")],
-        ("partial", "Partial", True),
-    ),  # both sides declare a scope and the scopes differ
+    ([("i", "yes"), ("c", "no")], ("partial", "Partial", True)),  # both sides declare different scopes
     ([("i", "yes"), ("i2", "no")], ("conflict", None, False)),  # the same scope
     ([("i", "yes"), ("a", "no")], ("conflict", None, False)),  # one side declares none
     ([("a", "yes"), ("b", "no"), ("c", "partial")], ("conflict", None, False)),
