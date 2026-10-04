@@ -18,7 +18,9 @@ class ReplayMiss(LLMError):
 def _load(path: Path) -> dict[str, dict[str, Any]]:
     rows: dict[str, dict[str, Any]] = {}
     if path.exists():
-        for line in path.read_text(encoding="utf-8").splitlines():
+        # Not splitlines(): it also splits on U+2028, U+2029 and U+0085, which json.dumps(ensure_ascii=False)
+        # writes raw, so a row containing one would be cut in half.
+        for line in path.read_text(encoding="utf-8").split("\n"):
             if line.strip():
                 row = json.loads(line)
                 rows[row["key"]] = row
