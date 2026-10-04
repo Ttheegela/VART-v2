@@ -423,7 +423,7 @@ cell; the interview fills an item), and the live smoke script against production
 
 ## 10. Operations and deployment
 
-Vercel (one project, Git-connected, `main` = production, previews per branch), Neon Postgres with pgvector, Vercel
+Vercel Hobby plan (one project, Git-connected, `main` = production, previews per branch), Neon Postgres with pgvector, Vercel
 cron for cleanup, `/api/health` (database check under a 2 s statement timeout, 503 when degraded), UptimeRobot,
 Langfuse. Migrations run from Tarun's terminal against a Neon branch first, additive changes before code that needs
 them, risky ones back to back with the deploy (PriorPath RUNBOOK rules). After any packaging or middleware change,
@@ -459,9 +459,9 @@ in Plan 1, not at the end.
 | Key verifier | Sonnet 5.5 | re-derives keys from documents alone |
 | Database | Sonnet 5.5 | schema, migrations, constraints, isolation tests |
 | Backend: ingest | Sonnet 5.5 | parsers, redaction, classification, chunking |
-| Backend: engine | Sonnet 5.5 | retrieval, stance, decide, draft, interview |
+| Backend: engine | Opus 5.5 | retrieval, stance, decide, draft, interview |
 | Backend: API | Sonnet 5.5 | endpoints, runs, limits, export |
-| Frontend | Sonnet 5.5 | React UI, mock API, Vitest |
+| Frontend | Opus 5.5 | React UI, mock API, Vitest |
 | Evals | Sonnet 5.5 | harness, record/replay, metrics, bench |
 | QA | Sonnet 5.5 | Playwright, real-browser checks on every preview |
 | Security | Sonnet 5.5 | redaction and injection review, limits, `SECURITY.md` |
@@ -544,6 +544,7 @@ created. (Alternative with no such risk: give the new repo a different name.)
 | Synthetic packs can be too easy | traps table is a minimum; holdout built after freeze; key verified independently |
 | Swarm merge conflicts | file ownership per task, contracts frozen first, at most 6 parallel agents |
 | Public uploads abused | per-IP limits, budgets, size caps, 24 h deletion, redaction |
+| Vercel Hobby allotments are shared by every project on the account (4 Active CPU hours, 360 GB-hours of memory, 1,000,000 function invocations, 100 GB data transfer a month; going over pauses the account's usage for up to 30 days) | parse and redact once per upload, lazy-load Presidio, precomputed sample run, size and per-IP caps; watch the usage page after launch; Hobby is for non-commercial use, which a portfolio demo is |
 
 ## 14. Out of scope (re-stated)
 
