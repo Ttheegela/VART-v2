@@ -6,4 +6,5 @@ do not cover.
 
 Status: under construction (Plan 1: foundation and dev data). Design: `docs/superpowers/specs/2026-10-03-vart-v2-design.md`.
 
-Code is MIT-licensed. Files under `data/` carry their own licenses; see `data/NOTICE.md`.
+Code is MIT-licensed. Files under `data/` carry their own licenses: the terms are in `data/LICENSE`, the attributions
+in `data/NOTICE.md`.
