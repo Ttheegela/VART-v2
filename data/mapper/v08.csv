@@ -1,0 +1,35 @@
+Question ID,Question,Answer,Comments
+VSQ-01,"Does your company run a documented information security program that
+senior management has approved?",,
+VSQ-02,Are your security policies reviewed at least annually?,,
+VSQ-03,"Has your company assigned a named individual or team to own the
+information security program?",,
+VSQ-04,Is your company certified to ISO/IEC 27001?,,
+VSQ-05,"Do you hold a current SOC 2 Type II report from an independent
+auditor?",,
+VSQ-06,"Do you complete a documented security self-assessment of your product
+at least annually?",,
+VSQ-07,"Do employees reach your internal systems through a single sign-on
+service?",,
+VSQ-08,"Is multi-factor authentication required for all users, including
+customer administrators of your product?",,
+VSQ-09,"Do you review who has access to your internal systems at least
+quarterly?",,
+VSQ-10,"Is a leaver's access to your internal systems removed within 24 hours
+of their departure?",,
+VSQ-11,"Is access to internal systems granted by role and limited to what each
+person needs for their job?",,
+VSQ-12,Do you enforce a minimum password length for employee accounts?,,
+VSQ-13,"Does the owner of each system confirm at least quarterly that everyone
+with access still needs it?",,
+VSQ-14,"Do both your own staff and your customers' administrators have to use
+multi-factor authentication to sign in?",,
+VSQ-15,"Do you have an auditable process for granting and revoking physical
+access to your office facilities?",,
+VSQ-16,"Can your customers sign in to your product through single sign-on with
+their own identity provider?",,
+VSQ-17,Is customer data encrypted at rest in your production environment?,,
+VSQ-18,Do you encrypt customer data in transit using TLS 1.2 or higher?,,
+VSQ-19,Are your encryption keys rotated at least annually?,,
+VSQ-20,"Do you have a data classification scheme that assigns each type of
+data you handle a sensitivity level?",,

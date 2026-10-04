@@ -1,0 +1,21 @@
+Question;Answer;Comment
+Does your company run a documented information security program that senior management has approved?;;
+Are your security policies reviewed at least annually?;;
+Has your company assigned a named individual or team to own the information security program?;;
+Is your company certified to ISO/IEC 27001?;;
+Do you hold a current SOC 2 Type II report from an independent auditor?;;
+Do you complete a documented security self-assessment of your product at least annually?;;
+Do employees reach your internal systems through a single sign-on service?;;
+Is multi-factor authentication required for all users, including customer administrators of your product?;;
+Do you review who has access to your internal systems at least quarterly?;;
+Is a leaver's access to your internal systems removed within 24 hours of their departure?;;
+Is access to internal systems granted by role and limited to what each person needs for their job?;;
+Do you enforce a minimum password length for employee accounts?;;
+Does the owner of each system confirm at least quarterly that everyone with access still needs it?;;
+Do both your own staff and your customers' administrators have to use multi-factor authentication to sign in?;;
+Do you have an auditable process for granting and revoking physical access to your office facilities?;;
+Can your customers sign in to your product through single sign-on with their own identity provider?;;
+Is customer data encrypted at rest in your production environment?;;
+Do you encrypt customer data in transit using TLS 1.2 or higher?;;
+Are your encryption keys rotated at least annually?;;
+Do you have a data classification scheme that assigns each type of data you handle a sensitivity level?;;

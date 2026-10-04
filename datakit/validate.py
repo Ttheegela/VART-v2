@@ -14,6 +14,7 @@ from pathlib import Path
 from app.text import contains
 from datakit.derive_key import derive, is_usable_evidence
 from datakit.extract import lines_of
+from datakit.mapper_variants import build_all
 from datakit.questionnaires import OUT as QDIR
 from datakit.questionnaires import build_csv, build_xlsx, mapping_json, mvsp_items, vsaq_items
 from datakit.render import render_pack
@@ -314,6 +315,26 @@ def _keys_stage(pack: str) -> list[str]:
     if "vsq-a" in keys:
         exercised = {t for item in keys["vsq-a"].items for t in item.traps}
         p += [f"trap {t.id} is not exercised by any vsq-a item" for t in facts.traps if t.id not in exercised]
+    return p
+
+
+@stage("mapper")
+def _mapper_stage(pack: str) -> list[str]:
+    with tempfile.TemporaryDirectory() as tmp:
+        fresh = Path(tmp)
+        expected = build_all(fresh)
+
+        def stale(name: str) -> bool:
+            kept = DATA / "mapper" / name
+            return not kept.exists() or kept.read_bytes() != (fresh / name).read_bytes()
+
+        p = [
+            f"mapper/{name} is stale: run python -m datakit.mapper_variants"
+            for name in expected
+            if stale(name)
+        ]
+        if stale("expected.json"):
+            p.append("mapper/expected.json is stale")
     return p
 
 
