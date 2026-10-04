@@ -29,7 +29,8 @@ Progress and decisions: `docs/PROGRESS.md`.
 
 ## Commands
 - `docker compose up -d db` — Postgres 17 + pgvector on port 5434 (user/password `vart`).
-- `export TEST_DATABASE_URL=postgresql+psycopg://vart:vart@localhost:5434/vart_test` (lanes use `vart_test_<lane>`).
+- `export TEST_DATABASE_URL=postgresql+psycopg://vart:vart@localhost:5434/vart_test && export DATABASE_URL=$TEST_DATABASE_URL`
+  (lanes use `vart_test_<lane>`). pytest reads `TEST_DATABASE_URL`; `alembic check` and the app read `DATABASE_URL`.
 - Backend: `ruff check . && ruff format --check . && mypy app scripts && pytest -q && alembic check`
   (until `scripts/` and `migrations/` exist: `mypy app`, and skip `alembic check`)
 - Frontend: `cd web && npm run lint && npm test && npm run build`
