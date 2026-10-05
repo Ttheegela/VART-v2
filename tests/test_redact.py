@@ -31,6 +31,8 @@ from app.redact import redact_lines, redact_text
         ("AWS_SECRET_ACCESS_KEY=" + "wJalrXUtnFEMI/K7MDENG/bPxRfiCY" + "EXAMPLEKEY", "<SECRET>"),
         ("aws_secret_access_key = " + "wJalrXUtnFEMI/K7MDENG/bPxRfiCY" + "EXAMPLEKEY", "<SECRET>"),
         ("DB_PASSWORD=hunter2hunter2", "<SECRET>"),
+        ("secretKey: abcdefgh12345678", "<SECRET>"),
+        ("accessToken: abcdefgh12345678", "<SECRET>"),
         ("client_secret: abcdefgh12345678", "<SECRET>"),
         ("pwd: hunter2hunter2", "<SECRET>"),
         ("Authorization: Bearer " + "abcdefghijklmnopqrstuvwxyz012345", "Authorization: <SECRET>"),
@@ -60,6 +62,11 @@ def test_private_data_and_secrets_are_replaced(text: str, expected: str) -> None
         "secret = see vault",
         "API key: rotated-every-90-days",
         "INFORMATION SECURITY POLICY",
+        "Passwords: bcrypt-hashed with per-user salts",
+        "Tokenisation: Format-preserving encryption for card data",
+        "Secrets: HashiCorp Vault",
+        "Session tokens: HttpOnly-and-Secure",
+        "token_count: 1000000000",
     ],
 )
 def test_business_text_is_left_alone(text: str) -> None:
