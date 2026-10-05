@@ -36,7 +36,15 @@ class LLMRequest:
 
     def key(self) -> str:
         payload = json.dumps(
-            [self.model, self.prompt_version, self.system, self.user, self.schema_name, self.schema],
+            [
+                self.model,
+                self.prompt_version,
+                self.system,
+                self.user,
+                self.schema_name,
+                self.schema,
+                self.max_tokens,
+            ],
             sort_keys=True,
             ensure_ascii=False,
         )
