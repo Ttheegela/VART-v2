@@ -6,6 +6,7 @@ from pathlib import Path
 import docx
 import openpyxl
 import pytest
+from docx.oxml import parse_xml
 
 import app.ingest.parse as parse_module
 from app.ingest.parse import (
@@ -123,6 +124,24 @@ def _bomb() -> bytes:
     return buf.getvalue()
 
 
+_OLE2 = bytes.fromhex("D0CF11E0A1B11AE1")  # legacy .doc/.xls and password-protected Office files
+
+
+def _bad_member_name(real_member: str) -> bytes:
+    """A zip with a member whose name bytes (ff fe) are not UTF-8 although the UTF-8 flag (0x800) is set."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr(real_member, "<root/>")
+        z.writestr("xx", "x")
+    data = bytearray(buf.getvalue())
+    for header, name_at, flags_at in ((b"PK\x03\x04", 30, 6), (b"PK\x01\x02", 46, 8)):
+        start = data.rindex(header)  # the last header of each kind belongs to the member "xx"
+        assert data[start + name_at : start + name_at + 2] == b"xx"
+        data[start + flags_at + 1] |= 0x08  # flag bit 11
+        data[start + name_at : start + name_at + 2] = b"\xff\xfe"
+    return bytes(data)
+
+
 @pytest.mark.parametrize(
     ("name", "data", "message"),
     [
@@ -135,6 +154,12 @@ def _bomb() -> bytes:
         ("long.txt", b"line.\n\n" * (MAX_LINES + 1), "20,000 lines"),
         ("wide.txt", b"x" * (MAX_LINE_CHARS + 1), "20,000 characters"),
         ("empty.md", b"\n\n   \n", "No text"),
+        ("x.text", b"MFA is enforced.", "content must match"),
+        ("x.binary", b"MFA\x00is enforced.", "content must match"),
+        ("a.docx", _bad_member_name("word/document.xml"), "damaged"),
+        ("a.xlsx", _bad_member_name("xl/workbook.xml"), "damaged"),
+        ("a.doc", _OLE2 + b"\x00" * 64, "old-format or password-protected"),
+        ("a.xlsx", _OLE2 + b"\x00" * 64, "old-format or password-protected"),
     ],
 )
 def test_files_the_app_will_not_read_get_a_readable_reason(name: str, data: bytes, message: str) -> None:
@@ -303,3 +328,135 @@ def test_a_workbook_with_too_many_lines_across_sheets_stops_reading_early(
     with pytest.raises(IngestError, match="50 lines"):
         parse("many.xlsx", buf.getvalue())
     assert len(seen) <= 60
+
+
+# Fix round 1 (review of 1317e38): resource limits, tracked changes, whole-word headers.
+def _xlsx_of_empty_far_cells(rows: int) -> bytes:
+    wb = openpyxl.Workbook()
+    saved = io.BytesIO()
+    wb.save(saved)
+    sheet = (
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'
+        + '<row><c r="XFD1"/></row>' * rows
+        + "</sheetData></worksheet>"
+    )
+    out = io.BytesIO()
+    with zipfile.ZipFile(saved) as zin, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
+        for info in zin.infolist():
+            data = sheet.encode() if info.filename == "xl/worksheets/sheet1.xml" else zin.read(info.filename)
+            zout.writestr(info.filename, data)
+    return out.getvalue()
+
+
+def test_the_xlsx_budget_is_charged_per_cell_not_per_row(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A row naming column XFD is padded to 16,384 cells: 3 such rows cost 3 row units but 49,152 cells.
+    monkeypatch.setattr(parse_module, "MAX_CELLS", 20_000)
+    with pytest.raises(IngestError, match="more than 20,000 cells"):
+        parse("wide.xlsx", _xlsx_of_empty_far_cells(3))
+
+
+_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+
+def _docx_table(rows: list[list[str]], mutate=None) -> bytes:  # type: ignore[no-untyped-def]
+    doc = docx.Document()
+    table = doc.add_table(rows=len(rows), cols=len(rows[0]))
+    for r, texts in zip(table.rows, rows, strict=True):
+        for c, text in zip(r.cells, texts, strict=True):
+            c.text = text
+    if mutate:
+        mutate(table)
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def test_a_docx_cell_spanning_two_columns_fills_both() -> None:
+    def span(table) -> None:  # type: ignore[no-untyped-def]
+        tr = table.rows[1]._tr
+        tr.tc_lst[0].grid_span = 2
+        tr.remove(tr.tc_lst[1])
+
+    lines = parse("s.docx", _docx_table([["System", "Owner"], ["Okta", "-"]], span)).lines
+    assert [x.text for x in lines] == ["System: Okta; Owner: Okta"]
+
+
+def test_a_docx_cell_merged_vertically_repeats_the_text_above_it() -> None:
+    def merge(table) -> None:  # type: ignore[no-untyped-def]
+        table.rows[1]._tr.tc_lst[0].vMerge = "restart"
+        table.rows[2]._tr.tc_lst[0].vMerge = "continue"
+        table.rows[3]._tr.tc_lst[0].vMerge = "continue"
+
+    data = _docx_table([["Owner", "System"], ["IT", "Okta"], ["", "Jira"], ["", "Slack"]], merge)
+    assert [x.text for x in parse("m.docx", data).lines] == [
+        "Owner: IT; System: Okta",
+        "Owner: IT; System: Jira",
+        "Owner: IT; System: Slack",
+    ]
+
+
+def test_a_huge_declared_span_is_bounded_by_the_table_grid() -> None:
+    def span(table) -> None:  # type: ignore[no-untyped-def]
+        tr = table.rows[1]._tr
+        tr.tc_lst[0].grid_span = 100_000
+        tr.remove(tr.tc_lst[1])
+
+    lines = parse("h.docx", _docx_table([["System", "Owner"], ["Okta", "-"]], span)).lines
+    assert [x.text for x in lines] == ["System: Okta; Owner: Okta"]
+
+
+def test_a_plain_docx_table_reads_as_before() -> None:
+    data = _docx_table([["System", "Owner"], ["Okta", "IT"], ["Jira", ""]])
+    assert [x.text for x in parse("p.docx", data).lines] == ["System: Okta; Owner: IT", "System: Jira"]
+
+
+def test_docx_paragraph_styles_are_resolved_once_per_document(monkeypatch: pytest.MonkeyPatch) -> None:
+    from docx.styles.styles import Styles
+
+    calls = {"default": 0, "get_by_id": 0}
+    real_default, real_get = Styles.default, Styles.get_by_id
+
+    def default(self, style_type):  # type: ignore[no-untyped-def]
+        calls["default"] += 1
+        return real_default(self, style_type)
+
+    def get_by_id(self, style_id, style_type):  # type: ignore[no-untyped-def]
+        calls["get_by_id"] += 1
+        return real_get(self, style_id, style_type)
+
+    doc = docx.Document()
+    doc.add_heading("Access", level=1)
+    for i in range(40):
+        doc.add_paragraph(f"Line {i}.")
+        doc.add_paragraph(f"Item {i}.", style="List Bullet")
+    buf = io.BytesIO()
+    doc.save(buf)
+    monkeypatch.setattr(Styles, "default", default)  # counted from here: building the file used them too
+    monkeypatch.setattr(Styles, "get_by_id", get_by_id)
+    lines = parse("styles.docx", buf.getvalue()).lines
+    assert [x.text for x in lines if x.kind == "heading"] == ["Access"]
+    assert calls["get_by_id"] == 0
+    assert calls["default"] <= 1
+
+
+def test_a_docx_part_larger_than_the_cap_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    buf = io.BytesIO()
+    docx.Document().save(buf)
+    monkeypatch.setattr(parse_module, "MAX_DOCX_PART", 1_000)
+    with pytest.raises(IngestError, match="too large to read"):
+        parse("big.docx", buf.getvalue())
+
+
+def test_a_docx_with_tracked_changes_is_refused() -> None:
+    doc = docx.Document()
+    p = doc.add_paragraph("MFA is required for admins.")
+    p._p.append(parse_xml(f'<w:ins xmlns:w="{_W}" w:id="1" w:author="a"><w:r><w:t> not</w:t></w:r></w:ins>'))
+    buf = io.BytesIO()
+    doc.save(buf)
+    with pytest.raises(IngestError, match="tracked changes. Accept or reject them"):
+        parse("t.docx", buf.getvalue())
+
+
+def test_a_header_that_only_contains_a_date_word_still_dates_the_row() -> None:
+    data = "System,Overdue since" + NL + "Okta,2026-01-10" + NL
+    assert parse("o.csv", data.encode()).lines[0].as_of == date(2026, 1, 10)

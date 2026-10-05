@@ -16,6 +16,7 @@ from app.text import normalize
 
 MAX_PAGES = 200  # spec 9: 20,000 lines is about 200 pages
 MIN_CHARS = 20  # fewer letters than this in the whole file: a scan with no text layer
+MAX_PARAGRAPH = 1_500  # characters after which a sentence end starts a new paragraph even without a gap
 GAP = 1.6  # a vertical gap wider than this many font sizes can start a paragraph
 _TERMINAL = re.compile(r"[.!?:;][\"')\]]?$")
 _BULLET = re.compile(r"^(?:[-*\N{BULLET}\N{BLACK SMALL SQUARE}\N{EN DASH}]\s|\(?[0-9a-z]{1,3}[.)]\s)")
@@ -63,17 +64,36 @@ def _starts_paragraph(prev: Visual, cur: Visual) -> bool:
     return prev.bottom - cur.bottom > GAP * max(prev.size, 1.0) and (ends or opens)
 
 
+def _long_enough_to_split(prev: Visual, cur: Visual, length: int) -> bool:
+    """With even line spacing no gap ever starts a paragraph; past MAX_PARAGRAPH characters a sentence end
+    does (a paragraph is one line, so a page-long one would carry the flags of every sentence in it)."""
+    return (
+        length > MAX_PARAGRAPH
+        and _TERMINAL.search(prev.text) is not None
+        and (cur.text[:1].isupper() or cur.text[:1].isdigit())
+    )
+
+
 def join_lines(visual: list[Visual]) -> list[tuple[str, float]]:
     """Paragraphs as (text, font size). pdfium already joins a word hyphenated across a line break and marks
     the hyphen U+FFFE; it becomes a plain hyphen, so 'multi-factor' survives (a syllable break reads
     'quar-terly', which the model then quotes as stored). Adversary F15."""
-    paras: list[tuple[str, float]] = []
+    groups: list[list[str]] = []  # the visual lines of each paragraph; joined once
+    sizes: list[float] = []
+    length = 0
     for i, cur in enumerate(visual):
-        if i and not _starts_paragraph(visual[i - 1], cur):
-            text, size = paras[-1]
-            paras[-1] = (f"{text} {cur.text}", size)
+        if (
+            i
+            and not _starts_paragraph(visual[i - 1], cur)
+            and not _long_enough_to_split(visual[i - 1], cur, length)
+        ):
+            groups[-1].append(cur.text)
+            length += len(cur.text) + 1
         else:
-            paras.append((cur.text, cur.size))
+            groups.append([cur.text])
+            sizes.append(cur.size)
+            length = len(cur.text)
+    paras = [(" ".join(g), s) for g, s in zip(groups, sizes, strict=True)]
     return [(t.replace(chr(0xFFFE), "-"), s) for t, s in paras]
 
 

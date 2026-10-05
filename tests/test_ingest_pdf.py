@@ -98,3 +98,18 @@ def test_a_password_protected_pdf_is_refused() -> None:
     pdf.cell(0, 5, "Text that would otherwise be long enough to read.")
     with pytest.raises(IngestError, match="password"):
         parse("locked.pdf", bytes(pdf.output()))
+
+
+def test_a_pdf_with_even_line_spacing_still_splits_into_paragraphs_at_sentence_ends() -> None:
+    lines = [
+        v(f"Sentence number {i} ends here.", bottom=780 - 5 * i) for i in range(100)
+    ]  # 3,000+ characters
+    joined = [t for t, _ in join_lines(lines)]
+    assert len(joined) > 1
+    assert all(len(t) < 1_500 + 40 for t in joined)
+    assert " ".join(joined) == " ".join(x.text for x in lines)
+
+
+def test_a_long_paragraph_without_sentence_ends_is_not_split() -> None:
+    lines = [v(f"and the clause number {i} continues", bottom=780 - 5 * i) for i in range(80)]
+    assert len(join_lines(lines)) == 1
