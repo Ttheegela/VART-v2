@@ -7,12 +7,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # measured picks. Claude Sonnet 5.5 runs only in the bench, as the quality reference, and is never a
 # default. The judge's family differs from the drafter's: when the drafter is a Qwen model, the judge is
 # moonshotai/kimi-k2.5.
+# Interim: stance, classify and recheck left qwen/qwen3.5-flash-02-23, whose only provider downgrades strict
+# json_schema to json_object and does not enforce the schema (first live recording, 2026-10-05).
 DEFAULT_MODELS = {
-    "stance": "qwen/qwen3.5-flash-02-23",
+    "stance": "deepseek/deepseek-v4-flash",
     "draft": "deepseek/deepseek-v4-flash",
-    "classify": "qwen/qwen3.5-flash-02-23",
+    "classify": "deepseek/deepseek-v4-flash",
     "judge": "qwen/qwen3.7-plus",
-    "recheck": "qwen/qwen3.5-flash-02-23",  # the stance prompt on a visitor's statement
+    "recheck": "deepseek/deepseek-v4-flash",  # the stance prompt on a visitor's statement
 }
 
 

@@ -53,8 +53,23 @@ def test_sends_a_strict_json_schema_request() -> None:
     assert fmt["type"] == "json_schema" and fmt["json_schema"]["strict"] is True
     assert fmt["json_schema"]["name"] == "Out"
     assert seen["usage"] == {"include": True}
+    # only providers that honour every parameter we send (strict json_schema among them)
+    assert seen["provider"] == {"require_parameters": True}
     assert result.text == '{"ok": true, "note": null}'
     assert (result.input_tokens, result.output_tokens, result.cost_usd) == (12, 3, 0.0001)
+
+
+def test_every_structured_request_says_json() -> None:
+    # A provider that downgrades json_schema to json_object (Alibaba) refuses messages without "json".
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.update(json.loads(request.content))
+        return httpx.Response(200, json=_reply('{"ok": true, "note": null}'))
+
+    _client(handler).complete(_req())
+    assert "response_format" in seen
+    assert "json" in " ".join(m["content"] for m in seen["messages"]).lower()
 
 
 def test_truncated_reply_is_an_error() -> None:
@@ -200,7 +215,7 @@ class Golden(BaseModel):
     note: str | None
 
 
-GOLDEN_KEY = "663b2eb7d62c8f698e33b5ab07f06c25d27b82a1299bae379485c3d26e4905d7"
+GOLDEN_KEY = "8fa38bbee92e2d7899e7716a81c34c6b07c11dfe6a090e05e0dea9fd0837e5a2"
 
 
 def _golden(user: str = "Is data encrypted at rest?") -> Any:
@@ -297,7 +312,7 @@ def test_error_paths_name_the_offending_definition() -> None:
         build_request("stance", "m", "p", "s", "u", Outer)
 
 
-GOLDEN_KEY_NON_ASCII = "792a58e0e8b79ee385c5e534c625c54015553dd4c9069490be211be4ebc415cd"
+GOLDEN_KEY_NON_ASCII = "48800d90065cb9de4b06b22e74ff554cedbb3ba3770e652987f04400f667ab8e"
 
 
 def test_a_non_ascii_request_key_is_pinned() -> None:

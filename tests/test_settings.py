@@ -49,3 +49,8 @@ POOL = ("deepseek/", "qwen/", "z-ai/", "moonshotai/", "minimax/", "xiaomi/", "op
 def test_defaults_come_from_the_model_pool_and_the_judge_is_from_another_family() -> None:
     assert all(model.startswith(POOL) for model in DEFAULT_MODELS.values())
     assert DEFAULT_MODELS["judge"].split("/")[0] != DEFAULT_MODELS["draft"].split("/")[0]
+
+
+def test_interim_defaults_avoid_a_provider_that_ignores_the_schema() -> None:
+    # qwen3.5-flash's only provider does not enforce strict json_schema; interim until the bench.
+    assert {DEFAULT_MODELS[s] for s in ("stance", "classify", "recheck")} == {"deepseek/deepseek-v4-flash"}

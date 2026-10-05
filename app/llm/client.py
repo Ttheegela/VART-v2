@@ -16,6 +16,8 @@ from app.observability import Step, trace_llm
 from app.settings import get_settings
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+# A provider that downgrades json_schema to json_object (Alibaba) refuses messages without the word "json".
+JSON_LINE = "\n\nReply with JSON only."
 
 
 class LLMError(Exception):
@@ -111,6 +113,8 @@ def build_request(
         )
     schema = out.model_json_schema()
     _assert_strict(schema)
+    # Added here, not in complete(), so key() covers what is actually sent.
+    system += JSON_LINE
     return LLMRequest(step, model, prompt_version, system, user, out.__name__, schema, max_tokens, item_id)
 
 
@@ -178,7 +182,8 @@ class OpenRouterClient:
                         "type": "json_schema",
                         "json_schema": {"name": req.schema_name, "strict": True, "schema": req.schema},
                     },
-                    extra_body={"usage": {"include": True}},
+                    # require_parameters: route only to providers that support every parameter sent here
+                    extra_body={"usage": {"include": True}, "provider": {"require_parameters": True}},
                 )
                 choice = response.choices[0]
                 tokens_in, tokens_out, cost = _usage(response)

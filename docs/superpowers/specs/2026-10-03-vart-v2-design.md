@@ -321,8 +321,9 @@ frozen contracts, then wired to the real one. Keyboard-usable grid and drawer; l
 - Every default model comes from the model pool: cheap Chinese or open-weight models on OpenRouter that support
   structured outputs (provider prefixes `deepseek/`, `qwen/`, `z-ai/`, `moonshotai/`, `minimax/`, `xiaomi/`,
   `openai/gpt-oss-`). Claude Sonnet 5.5 (`anthropic/claude-sonnet-5.5`) runs only in the bench, as the quality
-  reference, and is never a default. Until the bench picks, the defaults are stance and classify
-  `qwen/qwen3.5-flash-02-23`, draft `deepseek/deepseek-v4-flash` and judge `qwen/qwen3.7-plus`; when the drafter is a
+  reference, and is never a default. Until the bench picks, the defaults are stance, classify and
+  recheck `deepseek/deepseek-v4-flash` (interim: `qwen/qwen3.5-flash-02-23`'s only provider does not enforce strict
+  schemas), draft `deepseek/deepseek-v4-flash` and judge `qwen/qwen3.7-plus`; when the drafter is a
   Qwen model, the judge default is `moonshotai/kimi-k2.5`.
 - Langfuse: metadata only (model, prompt version, latency, tokens, finish reason, item id, step); never prompts,
   document text or answers. No-op without keys; failures never affect a request.
