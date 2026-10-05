@@ -127,3 +127,40 @@ def test_the_prompt_asks_for_the_whole_sentence_with_its_limiting_words() -> Non
     clause_rule = flat[flat.index("longer than 30 words") : flat.index("spreadsheet row")]
     for cue in ('"not"', '"not yet"', '"pending"', '"planned"'):
         assert cue in clause_rule
+
+
+def _flat() -> str:
+    return " ".join(SYSTEM.split())
+
+
+def test_the_prompt_is_version_p2() -> None:
+    assert PROMPT_VERSION == "stance@p2"
+
+
+def test_a_record_rows_failing_status_reads_as_no_and_is_quoted() -> None:
+    # Tune round 1, clause A: a row whose status field says Overdue shows the answer is No as of that row; a
+    # quote of its dates alone hides that.
+    flat = _flat()
+    rule = flat[flat.index("A spreadsheet row states") :]
+    for cue in ("Overdue", "Expired", "Failed", "Open", "status field", '"no"', "include that status field"):
+        assert cue in rule
+
+
+def test_a_passage_on_another_subject_or_audience_is_irrelevant() -> None:
+    # Clause B.
+    assert "different subject, system, product or audience" in _flat()
+    assert 'is "irrelevant", not "partial" and not "yes"' in _flat()
+
+
+def test_partial_needs_a_limit_the_passage_itself_states() -> None:
+    # Clause C.
+    flat = _flat()
+    assert 'Use "partial" only when the passage itself states a limit, an exception or a narrower' in flat
+    assert "states no limit is" in flat
+
+
+def test_the_new_clauses_are_generic() -> None:
+    # No item ids, no company or product names, no dev-pack sentences.
+    import re
+
+    assert not re.search(r"VSQ|MVSP|Kestrelyn|Okta|Sablecrest|\d{4}-\d{2}", SYSTEM)

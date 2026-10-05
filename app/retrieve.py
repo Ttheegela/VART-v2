@@ -34,6 +34,10 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
     "pentest": ("penetration test",),
     "sast": ("static analysis",),
     "dast": ("dynamic application security testing",),
+    # People leaving: questionnaires say leaver or offboarding, audit reports say termination.
+    **{w: ("terminated", "termination") for w in ("leaver", "leaver's", "leavers", "departure")},
+    "offboarding": ("terminated", "termination"),
+    **{w: ("leaver", "departure", "offboarding") for w in ("terminated", "termination")},
 }
 _WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9.'-]*[A-Za-z0-9]|[A-Za-z0-9]")
 _FIRST_VALUE = re.compile(r"[^:;]+: ([^;]+)")
@@ -60,11 +64,15 @@ _DOCUMENT = text(
 
 def build_query(question: str, topic: str | None) -> str:
     """The question's and topic's distinct words, at most MAX_QUERY_WORDS, OR-ed (websearch_to_tsquery would
-    AND them), plus synonyms. Repeats change no rank (ts_rank_cd counts an operand once) but cost the database
-    memory per operand, so one long cell could fail the item (adversary checkpoint 3, I2)."""
+    AND them), plus the joined and spaced forms of hyphenated words and synonyms. Repeats change no rank
+    (ts_rank_cd counts an operand once) but cost the database memory per operand, so one long cell could fail
+    the item (adversary checkpoint 3, I2)."""
     source = f"{question} {topic or ''}"[:MAX_QUERY_CHARS]  # one hyphenated word parses into many operands
     words = list(dict.fromkeys(_WORD.findall(source)))[:MAX_QUERY_WORDS]
+    # "re-certification" also searches "recertification" and "re certification" (the parser keeps the parts)
+    words += [v for w in words if "-" in w for v in (w.replace("-", ""), w.replace("-", " "))]
     words += [s for w in words for s in SYNONYMS.get(w.lower(), ())]
+    words = list(dict.fromkeys(words))
     return " or ".join(f'"{w}"' if " " in w else w for w in words)
 
 

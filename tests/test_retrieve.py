@@ -48,6 +48,38 @@ def test_the_query_ors_every_word_and_adds_synonyms() -> None:
     assert build_query("Single sign-on (SSO) used?", None).endswith('or "single sign-on"')
 
 
+def test_leaver_and_departure_also_search_termination_and_back() -> None:
+    q = build_query("Is a leaver's access removed on departure?", None)
+    assert q.endswith("or terminated or termination")
+    assert build_query("Offboarding", None) == "Offboarding or terminated or termination"
+    terminated = "Terminated or users or leaver or departure or offboarding"
+    assert build_query("Terminated users", None) == terminated
+
+
+def test_hyphenated_words_also_search_joined_and_spaced() -> None:
+    query = 're-certification or recertification or "re certification"'
+    assert build_query("re-certification", None) == query
+
+
+def test_a_hyphenated_question_finds_the_joined_and_the_spaced_word(s: Session) -> None:
+    ws = f.workspace(s)
+    _doc(s, ws, "a.docx", "Subprocessors are listed publicly.")
+    _doc(s, ws, "b.docx", "Done by re certification yearly.")
+    s.commit()
+    names = {p.doc.filename for p in retrieve(s, ws.id, "Sub-processors?", None).passages}
+    assert "a.docx" in names
+    names = {p.doc.filename for p in retrieve(s, ws.id, "Re-certification?", None).passages}
+    assert "b.docx" in names
+
+
+def test_a_leaver_question_finds_the_termination_passage(s: Session) -> None:
+    ws = f.workspace(s)
+    _doc(s, ws, "soc2.pdf", "Access was removed 5 days after termination.")
+    s.commit()
+    r = retrieve(s, ws.id, "A leaver's departure?", None)
+    assert [p.doc.filename for p in r.passages] == ["soc2.pdf"]
+
+
 def test_the_best_passage_comes_first_with_its_lines_and_document(s: Session) -> None:
     ws = f.workspace(s)
     _doc(

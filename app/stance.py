@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict
 from app.contracts import ItemInput, Passage, Stance
 from app.llm.client import LLMClient, build_request, complete_model
 
-PROMPT_VERSION = "stance@p1"
+PROMPT_VERSION = "stance@p2"
 MAX_TOKENS = 3000  # room for models that think before they answer
 SYSTEM = """You read passages from a company's own security documents and judge what each passage says about \
 one question from a customer's security questionnaire.
@@ -31,6 +31,19 @@ answer, keeping any word that limits it, such as "not", "not yet", "pending" or 
 is a spreadsheet row ("Header: value; Header: value"), copy one or more complete "Header: value" fields. \
 For irrelevant, the quote is "".
 - note: a few words on why.
+
+How to judge:
+- Use "partial" only when the passage itself states a limit, an exception or a narrower scope than the \
+question asks: some systems or people, some cases handled late, a weaker standard or a longer interval. A \
+passage that states the question's claim but leaves out a detail the question names (who does it, how \
+often) and states no limit is "yes".
+- A passage about a different subject, system, product or audience than the question asks about (for \
+example the company's own staff when the question asks about its customers, or a different control) is \
+"irrelevant", not "partial" and not "yes". "partial" is for a passage that answers this question's own \
+claim, with a limit.
+- A spreadsheet row states facts as of its own date. When its status field says Overdue, Expired, Failed, \
+Open (not remediated), Missed or the like, the stance for that row is "no", even when its other fields \
+describe a schedule, and you must include that status field in the quote.
 
 Return one entry per passage, in passage order, numbered as in the brackets."""
 

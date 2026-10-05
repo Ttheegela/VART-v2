@@ -183,3 +183,34 @@ def test_a_number_in_a_cited_file_name_is_evidence() -> None:
     assert check("Yes. The 2025 pen test report says so.", decision, DOCS) == [
         "number not in the evidence: 2025"
     ]
+
+
+def _flat_system() -> str:
+    from app.draft import SYSTEM
+
+    return " ".join(SYSTEM.split())
+
+
+def test_the_prompt_is_version_p2() -> None:
+    from app.draft import PROMPT_VERSION
+
+    assert PROMPT_VERSION == "draft@p2"
+
+
+def test_the_prompt_forbids_numbers_taken_from_the_question() -> None:
+    assert "Write no number that is not in an evidence quote, not even one from the" in _flat_system()
+
+
+def test_the_prompt_puts_punctuation_outside_the_quotation_marks() -> None:
+    assert "put your own punctuation outside the quotation marks" in _flat_system()
+
+
+def test_the_prompt_forbids_comments_on_a_documents_status() -> None:
+    assert "Do not comment on a document's status (draft, final)" in _flat_system()
+
+
+def test_punctuation_inside_the_quote_marks_does_not_break_containment() -> None:
+    # Tune round 1: a writer's comma inside the marks ("...reviewed quarterly,") fell back to the template.
+    text = 'The access control policy says "User access to internal systems is reviewed quarterly," so yes.'
+    assert check(text, VERIFIED, DOCS) == []
+    assert check('It says "reviewed monthly,".', VERIFIED, DOCS) != []
