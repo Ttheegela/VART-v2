@@ -43,6 +43,12 @@ _TEMPLATE = re.compile(r"\btemplate\b", re.IGNORECASE)
 _DRAFT = re.compile(r"\bDRAFT\b|\bdraft\b[^.]{0,40}\bnot (?:yet )?approved\b")
 _VERSIONED = re.compile(r"\bversion\b.{0,30}?\b(?:effective|draft)\b", re.IGNORECASE)
 _QUESTIONNAIRE = re.compile(r"\bquestionnaire\b", re.IGNORECASE)
+_CELLS = re.compile(r"\s*[|\t,;]\s*")
+_QUESTION_COL = re.compile(r"questions?", re.IGNORECASE)
+_ANSWER_COL = re.compile(r"(?:answers?|responses?)", re.IGNORECASE)
+_QUESTION_CELL = re.compile(
+    r"(?:^|; )question:", re.IGNORECASE
+)  # parse() writes a row as "Header: value; ..."
 _TITLE_KINDS: tuple[tuple[DocKind, re.Pattern[str]], ...] = (
     ("report", re.compile(r"\breport\b", re.IGNORECASE)),
     ("plan", re.compile(r"\bplan\b", re.IGNORECASE)),
@@ -92,6 +98,18 @@ def _scope_of(texts: Sequence[str]) -> str | None:
     return None
 
 
+def _is_questionnaire(fmt: str, texts: Sequence[str]) -> bool:
+    """A questionnaire word in the opening lines, or a header row naming a question and an answer column.
+    parse() drops empty cells: an unanswered csv/xlsx row carries only a "Question:" cell."""
+    if any(_QUESTIONNAIRE.search(t) for t in texts[:OPENING]):
+        return True
+    for t in texts[:HEAD]:  # a header row: whole cells "Question" and "Answer"/"Response", not a sentence
+        cells = _CELLS.split(t.strip())
+        if any(_QUESTION_COL.fullmatch(c) for c in cells) and any(_ANSWER_COL.fullmatch(c) for c in cells):
+            return True
+    return fmt in ("xlsx", "csv") and any(_QUESTION_CELL.search(t) for t in texts[:HEAD])
+
+
 def rules(fmt: str, texts: Sequence[str]) -> tuple[DocMeta, bool]:
     """(metadata, sure). Not sure only when no rule recognises the kind."""
     title, opening = (texts[0] if texts else ""), texts[:OPENING]
@@ -102,7 +120,7 @@ def rules(fmt: str, texts: Sequence[str]) -> tuple[DocMeta, bool]:
         kind = "contract"
     elif template:
         kind = "other"
-    elif _QUESTIONNAIRE.search(title):  # before the spreadsheet rule: a questionnaire is never evidence
+    elif _is_questionnaire(fmt, texts):  # before the spreadsheet rule: a questionnaire is never evidence
         kind = "questionnaire"
     elif fmt in ("xlsx", "csv"):
         kind = "record"
@@ -141,4 +159,7 @@ def classify(
     except LLMError:
         return meta  # the rules' answer ("other") stands; the visitor can correct it
     evidence = not out.template and out.kind not in ("contract", "questionnaire")
-    return DocMeta(out.kind, out.status, _iso(out.effective_date), meta.scope, evidence, "model")
+    status = "draft" if meta.status == "draft" else out.status  # what the rules found wins over the model
+    return DocMeta(
+        out.kind, status, meta.effective_date or _iso(out.effective_date), meta.scope, evidence, "model"
+    )

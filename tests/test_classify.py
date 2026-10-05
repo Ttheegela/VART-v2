@@ -121,3 +121,51 @@ def test_without_a_model_budget_or_answer_the_rules_stand() -> None:
     assert classify("x.md", unknown, FakeLLM([LLMError("classify: timeout")]), "m", _yes).source == "rule"
     with pytest.raises(ReplayMiss):
         classify("x.md", unknown, FakeLLM([ReplayMiss("classify: none")]), "m", _yes)
+
+
+@pytest.mark.parametrize(
+    "name", sorted(p.name for p in (ROOT / "data" / "questionnaires").glob("*.[cx][sl]*"))
+)
+def test_every_questionnaire_file_is_a_questionnaire_and_not_evidence(name: str) -> None:
+    parsed = parse(name, (ROOT / "data" / "questionnaires" / name).read_bytes())
+    meta, sure = rules(parsed.format, [x.text for x in parsed.lines])
+    assert (meta.kind, meta.evidence_allowed, sure) == ("questionnaire", False, True)
+
+
+def test_a_name_line_then_questionnaire_is_a_questionnaire() -> None:
+    meta, sure = rules("docx", ["Kestrelyn, Inc.", "Security Questionnaire", "Please answer below."])
+    assert (meta.kind, meta.evidence_allowed, sure) == ("questionnaire", False, True)
+
+
+def test_a_question_and_answer_header_row_makes_a_questionnaire_but_a_plain_sheet_stays_a_record() -> None:
+    meta, _ = rules("xlsx", ["Controls", "ID | Question | Response | Notes", "1 | Is MFA on? | |"])
+    assert (meta.kind, meta.evidence_allowed) == ("questionnaire", False)
+    meta, _ = rules("xlsx", ["Access review log", "Reviewer | Date | Result", "Ana | 2026-01-01 | ok"])
+    assert (meta.kind, meta.evidence_allowed) == ("record", True)
+
+
+@pytest.mark.parametrize("no_model", ["no llm", "no budget", "llm error"])
+@pytest.mark.parametrize(
+    ("lines", "status", "evidence"),
+    [
+        (["Kestrelyn 2026", "DRAFT - not approved", "We met."], "draft", True),
+        (["Kestrelyn [Company Name]", "We met."], "final", False),
+        (["Kestrelyn 2026 template", "We met."], "final", False),
+    ],
+)
+def test_no_model_keeps_other_and_draft_and_template_flags(
+    no_model: str, lines: list[str], status: str, evidence: bool
+) -> None:
+    doc = ParsedDocument("md", tuple(Line(t) for t in lines))
+    llm = None if no_model == "no llm" else FakeLLM([LLMError("classify: timeout")])
+    meta = classify("x.md", doc, llm, "m", (lambda step: False) if no_model == "no budget" else _yes)
+    assert (meta.kind, meta.status, meta.evidence_allowed) == ("other", status, evidence)
+
+
+def test_a_rule_found_draft_and_date_win_over_the_model() -> None:
+    doc = ParsedDocument("md", (Line("Kestrelyn 2026"), Line("DRAFT"), Line("Effective 2026-02-02")))
+    reply = json.dumps(
+        {"kind": "policy", "status": "final", "effective_date": "2027-01-01", "template": False}
+    )
+    meta = classify("x.md", doc, FakeLLM([reply]), "m", _yes)
+    assert (meta.kind, meta.status, meta.effective_date) == ("policy", "draft", date(2026, 2, 2))
