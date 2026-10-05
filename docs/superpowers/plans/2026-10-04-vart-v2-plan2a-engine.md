@@ -32,7 +32,7 @@ Where the steps below differ from these lines, these lines describe what was bui
 - **Ruling 8.** Task 1's pattern false positives were left to the reviewer and checkpoint 1, not changed in Task 1.
 - **Ruling 9.** INJECTION uses the reviewer's regex with its counterexamples as negative tests (a cue needs an attack shape).
 - **Ruling 10.** PLACEHOLDER matches an unchecked box `[ ]`; plan2b Task 1 strips a leading checked box.
-- **Ruling 11.** The PLACEHOLDER bracket alternative skips Markdown reference links.
+- **Ruling 11.** Withdrawn. The shipped bracket lookahead `(?![(\[])` does skip Markdown reference links, but it came with Ruling 14's PLACEHOLDER bracket guards.
 - **Ruling 12.** `normalize` folds U+02BC to an apostrophe (new digest); U+2032 stays.
 - **Ruling 13.** "SHA" contained in "SHA1" is accepted.
 - **Ruling 14.** The Part 0 fix batch: adversary checkpoint 1's INJECTION, NEGATION cues and carve-outs (`not only`, `cannot be disabled`, …), the PLACEHOLDER bracket guards, the `Stance.passage` and `spend()` contract notes, pydantic pins in `requirements-dev.txt`.
