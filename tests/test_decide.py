@@ -91,6 +91,12 @@ def test_a_failed_quote_is_dropped_and_costs_confidence(quote: str, reason: str)
     assert d.confidence == 0.7
 
 
+def test_a_dropped_quote_is_stripped_like_a_cited_one() -> None:
+    # M14: a dropped quote is the same stripped text a citation keeps
+    d = decide([QUARTERLY], [yes(1, "  reviewed monthly by the team  ")])
+    assert d.dropped[0].quote == "reviewed monthly by the team"
+
+
 def test_a_record_quote_must_be_whole_fields() -> None:
     assert decide([OVERDUE], [no(1, "Status: Overdue")]).label == "verified"
     assert decide([OVERDUE], [no(1, "System: Okta; Owner: Marcus Lee;")]).label == "verified"
@@ -216,6 +222,62 @@ def test_rows_of_the_record_sheet_on_the_other_side_still_give_the_date_rule() -
     newer, older = d.conflict.sides
     assert (newer.stance, [c.line_start for c in newer.citations]) == ("no", [12])
     assert older.stance == "yes"
+    # Plan 2A Ruling 20: the older side is dated by what the rule compared, not by its own inventory row
+    assert (newer.date, older.date) == (date(2026, 9, 1), date(2026, 1, 15))
+
+
+def test_a_stale_row_of_the_same_file_is_not_the_newer_record() -> None:
+    # Plan 2A Ruling 20: a sheet is one snapshot (document and as_of); a CSV's rows can carry their own dates
+    reviews = doc("access-reviews.csv", kind="record", effective=None)
+    done = passage(
+        reviews,
+        "System: Okta; Last review completed: 2026-03-01; Status: Done",
+        start=2,
+        as_of=date(2026, 3, 1),
+        record=True,
+    )
+    overdue = passage(
+        reviews,
+        "System: AWS; Next review due: 2026-09-01; Status: Overdue",
+        start=3,
+        as_of=date(2026, 9, 1),
+        record=True,
+    )
+    memo = passage(
+        doc("security-memo.docx", effective=date(2026, 2, 1)),
+        "Quarterly access reviews were not completed this year.",
+    )
+    d = decide(
+        [done, overdue, memo],
+        [
+            yes(1, "System: Okta; Last review completed: 2026-03-01; Status: Done"),
+            no(2, "System: AWS; Next review due: 2026-09-01; Status: Overdue"),
+            no(3, "Quarterly access reviews were not completed this year."),
+        ],
+    )
+    assert d.conflict is not None and d.conflict.rule == "date"
+    newer, older = d.conflict.sides
+    assert (newer.stance, newer.date) == ("no", date(2026, 9, 1))
+    assert (older.stance, older.date) == ("yes", date(2026, 3, 1))
+
+
+def test_when_both_sides_hold_the_newest_sheet_the_documents_disagree() -> None:
+    # Plan 2A Ruling 20: each side is then newer than the other, so the newest sheet itself disagrees
+    done = passage(LOG, "System: AWS; Status: Done", start=5, as_of=date(2026, 9, 15), record=True)
+    stale = passage(
+        doc("old-policy.docx", effective=date(2025, 1, 1)), "Access reviews have stopped for now."
+    )
+    d = decide(
+        [QUARTERLY, done, stale, OVERDUE],
+        [
+            yes(1, "User access to internal systems is reviewed quarterly."),
+            yes(2, "System: AWS; Status: Done"),
+            no(3, "Access reviews have stopped for now."),
+            no(4, "Status: Overdue"),
+        ],
+    )
+    assert d.conflict is not None
+    assert (d.conflict.rule, [s.stance for s in d.conflict.sides]) == ("documents-disagree", ["yes", "no"])
 
 
 def test_two_documents_that_disagree_without_a_newer_record() -> None:

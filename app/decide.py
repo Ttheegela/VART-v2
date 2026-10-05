@@ -4,6 +4,7 @@ in the spec's order; tests/test_decide.py covers every branch, tests/test_decide
 invariants."""
 
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import date
 
 from app.contracts import (
@@ -89,20 +90,18 @@ def _side(stance: str, pairs: list[Pair]) -> ConflictSide:
 
 def _conflict(yes: list[Pair], no: list[Pair]) -> Conflict:
     """Rule 6: a dated record newer than every dated document on the other side is the 'date' rule, newer
-    side first; anything else is 'documents-disagree'. Rows of the record's own sheet on the other side are
-    not another document (Plan 2A Ruling 18)."""
+    side first and the other side dated by what the record was compared with; anything else, or both sides
+    newer than each other, is 'documents-disagree'. Rows of the record's own sheet snapshot (document and
+    as_of) on the other side are not another document (Plan 2A Rulings 18 and 20)."""
+    dated: list[Conflict] = []
     for newer, older in ((yes, no), (no, yes)):
-        records = [(p.as_of, p.doc.id) for p, _ in newer if p.record and p.as_of is not None]
-        sheets = {doc_id for _, doc_id in records}
-        others = [d for p, _ in older if p.doc.id not in sheets and (d := _date(p)) is not None]
-        if records and others and max(day for day, _ in records) > max(others):
-            return Conflict(
-                "date",
-                (
-                    _side("yes" if newer is yes else "no", newer),
-                    _side("yes" if older is yes else "no", older),
-                ),
-            )
+        snapshots = {(p.doc.id, p.as_of) for p, _ in newer if p.record and p.as_of is not None}
+        others = [d for p, _ in older if (p.doc.id, p.as_of) not in snapshots and (d := _date(p)) is not None]
+        if snapshots and others and max(day for _, day in snapshots) > max(others):
+            older_side = replace(_side("yes" if older is yes else "no", older), date=max(others))
+            dated.append(Conflict("date", (_side("yes" if newer is yes else "no", newer), older_side)))
+    if len(dated) == 1:  # one newer side; both newer means the newest sheet disagrees with itself
+        return dated[0]
     return Conflict("documents-disagree", (_side("yes", yes), _side("no", no)))
 
 
