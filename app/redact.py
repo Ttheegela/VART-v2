@@ -150,11 +150,21 @@ def _looks_like_a_name(span: str) -> bool:
     )
 
 
-def spans(text: str) -> list[tuple[int, int, str]]:
-    """(start, end, label) of everything to redact, left to right, never overlapping."""
+def _person_results(texts: list[str]) -> list[list[Any]]:
+    """Presidio's PERSON results per text, analysed in one batch (spaCy pipe): the same spans as one call per
+    text, and faster. Never join the texts: that changes the spans."""
+    from presidio_analyzer import BatchAnalyzerEngine
+
+    batch = BatchAnalyzerEngine(_engine())
+    return batch.analyze_iterator(
+        texts, language="en", batch_size=64, entities=["PERSON"], score_threshold=SCORE_THRESHOLD
+    )
+
+
+def _spans(text: str, people: list[Any]) -> list[tuple[int, int, str]]:
     found = [(m.start(), m.end(), label) for label, rx in _PATTERNS for m in rx.finditer(text)]
     # Presidio's EmailRecognizer would fetch the Public Suffix List over HTTP; emails are the regex above.
-    for r in _engine().analyze(text, language="en", entities=["PERSON"], score_threshold=SCORE_THRESHOLD):
+    for r in people:
         if _looks_like_a_name(text[r.start : r.end]):
             found.append((r.start, r.end, "PERSON"))
     kept: list[tuple[int, int, str]] = []
@@ -164,13 +174,29 @@ def spans(text: str) -> list[tuple[int, int, str]]:
     return kept
 
 
-def redact_text(text: str) -> str:
-    """Each span becomes <LABEL>: <PERSON>, <EMAIL>, <PHONE>, <ADDRESS> or <SECRET>. These never look like the
-    [bracketed] placeholders that app/patterns.py flags."""
-    for start, end, label in reversed(spans(text)):
+def spans(text: str) -> list[tuple[int, int, str]]:
+    """(start, end, label) of everything to redact, left to right, never overlapping."""
+    return _spans(
+        text, _engine().analyze(text, language="en", entities=["PERSON"], score_threshold=SCORE_THRESHOLD)
+    )
+
+
+def _apply(text: str, found: list[tuple[int, int, str]]) -> str:
+    for start, end, label in reversed(found):
         text = f"{text[:start]}<{label}>{text[end:]}"
     return text
 
 
+def redact_text(text: str) -> str:
+    """Each span becomes <LABEL>: <PERSON>, <EMAIL>, <PHONE>, <ADDRESS> or <SECRET>. These never look like the
+    [bracketed] placeholders that app/patterns.py flags."""
+    return _apply(text, spans(text))
+
+
 def redact_lines(lines: Sequence[Line]) -> tuple[Line, ...]:
-    return tuple(replace(line, text=redact_text(line.text)) for line in lines)
+    texts = [line.text for line in lines]
+    people = _person_results(texts) if texts else []
+    return tuple(
+        replace(line, text=_apply(line.text, _spans(line.text, found)))
+        for line, found in zip(lines, people, strict=True)
+    )

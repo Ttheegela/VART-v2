@@ -6,6 +6,7 @@ Ruling 19)."""
 
 import hashlib
 import logging
+import re
 import uuid
 from collections.abc import Sequence
 from dataclasses import replace
@@ -27,14 +28,18 @@ from app.text import normalize
 
 log = logging.getLogger(__name__)
 
-MAX_DOCUMENTS = 20  # spec 9, per workspace (statements excluded)
+MAX_DOCUMENTS = 20  # spec 9, per workspace (uploads and drive files only)
 MAX_WORKSPACE_LINES = 20_000  # spec 9, per workspace
+
+
+def _words(filename: str) -> str:
+    return re.sub(r"[\W_]+", " ", re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", normalize(filename)))
 
 
 def _check_limits(session: Session, workspace_id: uuid.UUID, new_lines: int) -> None:
     docs, lines = session.execute(
         select(func.count(Document.id), func.coalesce(func.sum(Document.line_count), 0)).where(
-            Document.workspace_id == workspace_id, Document.source != "statement"
+            Document.workspace_id == workspace_id, Document.source.in_(("upload", "drive"))
         )
     ).one()
     if docs >= MAX_DOCUMENTS:
@@ -111,14 +116,15 @@ def ingest_document(
     spend: Spend,
 ) -> Document:
     """Raises IngestError (shown to the visitor as is) for a file the app will not take."""
-    # The name is printed in every model prompt; "_" is a word character to the regex, so read it as a space.
-    if source != "sample" and INJECTION.search(normalize(filename).replace("_", " ")):
+    # The name is printed in every model prompt. Read separators as spaces and split camelCase,
+    # so "ignore.all.previous.instructions" and "IgnoreAllPrevious..." are caught like the spaced name.
+    if source != "sample" and INJECTION.search(_words(filename)):
         raise IngestError("The file name reads like an instruction; rename the file.")
     try:
         parsed = parse(filename, data)
     except IngestError as exc:
         if exc.__cause__ is not None:  # parse's catch-all hides a parser bug as "damaged": keep the cause
-            log.warning("ingest of %r refused: %s", filename, exc, exc_info=exc.__cause__)
+            log.warning("ingest of %r refused: %s", redact_text(filename), exc, exc_info=exc.__cause__)
         raise
     if source != "sample":
         _check_limits(session, workspace_id, len(parsed.lines))
