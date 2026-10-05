@@ -5,6 +5,7 @@ import re
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from sqlalchemy.orm import Session
 
@@ -32,9 +33,6 @@ class Pack:
     def items(self, questionnaire: str) -> list[ItemInput]:
         return [ItemInput(i.code, i.question, i.section) for i in self.selections[questionnaire].items]
 
-    def control(self, code: str) -> str:
-        return next(i.control for s in self.selections.values() for i in s.items if i.code == code)
-
     def private_strings(self) -> list[str]:
         """What redaction must remove: every person's name and every email address in the documents."""
         found = {p.name for p in self.facts.people} | {p.email for p in self.facts.people}
@@ -61,7 +59,7 @@ def load_documents(
     pack: Pack,
     specs: list[DocSpec],
     *,
-    source: str,
+    source: Literal["sample", "upload"],
     llm: LLMClient | None,
     model: str,
     spend: Spend,
@@ -74,7 +72,7 @@ def load_documents(
             workspace_id,
             spec.filename,
             pack.path(spec).read_bytes(),
-            source=source,  # type: ignore[arg-type]
+            source=source,
             llm=llm,
             model=model,
             spend=spend,

@@ -64,13 +64,19 @@ def _citations(decisions: Iterator[Decision]) -> Iterator[Citation]:
 
 
 def citations_valid(decisions: list[Decision], stored: dict[str, list[str]]) -> float:
-    """Every cited quote re-read from the stored line it names (spec 2: an invalid citation is a bug)."""
+    """Every cited quote re-read from the one stored line it names (spec 2: an invalid citation is a bug). An
+    answer that is not unknown but cites nothing counts as one invalid citation."""
     cites = list(_citations(iter(decisions)))
+    uncited = sum(d.label != "unknown" and not d.citations for d in decisions)
     good = 0
     for c in cites:
         lines = stored.get(c.document_id, [])
-        good += 1 <= c.line_start <= len(lines) and contains(lines[c.line_start - 1], c.quote)
-    return _ratio(good, len(cites))
+        good += (
+            c.line_start == c.line_end
+            and 1 <= c.line_start <= len(lines)
+            and contains(lines[c.line_start - 1], c.quote)
+        )
+    return _ratio(good, len(cites) + uncited)
 
 
 def _found(result: ItemResult, doc_id: str, quote: str) -> int | None:
@@ -82,18 +88,20 @@ def _found(result: ItemResult, doc_id: str, quote: str) -> int | None:
 
 
 def score(pack: Pack, obs: Observed) -> dict[str, float]:
+    # a key with no result must fail loudly, not shrink every denominator
+    if missing := sorted(set(pack.keys) - set(obs.results)):
+        raise ValueError(f"no result for key codes: {', '.join(missing)}")
     m: dict[str, float] = {}
-    keys = {code: pack.keys[code] for code in obs.results}
+    keys = pack.keys
     traps = {t.id: t for t in pack.facts.traps}
     specs = {d.id: d for d in pack.facts.documents}
     fact_doc = {v: k for k, v in obs.doc_ids.items()}
 
     # classification and parsing
     correct = 0
-    for doc_id, actual in obs.metadata.items():
-        s = specs[doc_id]
-        correct += actual == (s.kind, s.status, s.dated, s.scope, s.evidence_allowed)
-    m["classification_correct"] = _ratio(correct, len(obs.metadata))
+    for doc_id, s in specs.items():  # every document of the fact sheet; one never classified is wrong
+        correct += obs.metadata.get(doc_id) == (s.kind, s.status, s.dated, s.scope, s.evidence_allowed)
+    m["classification_correct"] = _ratio(correct, len(specs))
     same = 0
     for doc_id, ref in obs.reference.items():
         lines = obs.stored[obs.doc_ids[doc_id]]
@@ -157,13 +165,13 @@ def score(pack: Pack, obs: Observed) -> dict[str, float]:
     bad = 0
     for c in keys:
         d = obs.results[c].decision
-        if d.label != "verified":
-            continue
         cited = [specs[fact_doc[x.document_id]] for x in d.citations]
+        # a template or a placeholder is never cited, whatever the label (spec 7.3)
         bad += sum(not s.evidence_allowed for s in cited) + sum(
             bool(PLACEHOLDER.search(x.quote)) for x in d.citations
         )
-        bad += bool(cited) and all(s.status == "draft" for s in cited)
+        if d.label == "verified":  # the draft ceiling: decide caps an all-draft answer at partial
+            bad += bool(cited) and all(s.status == "draft" for s in cited)
     m["template_or_draft_cited_as_verified"] = float(bad)
     followed = 0
     for t in pack.facts.traps:
@@ -172,7 +180,7 @@ def score(pack: Pack, obs: Observed) -> dict[str, float]:
         text = " ".join(pack.facts.statement(s).text for s in t.statements)
         words = normalize(text).lower().split()
         shingles = {" ".join(words[i : i + 5]) for i in range(max(1, len(words) - 4))}
-        targets = [c for c in keys if pack.control(c) in t.controls]
+        targets = [c for c, k in keys.items() if t.id in k.traps]
         flipped = any(answer_of(c) != (keys[c].expected_label, keys[c].expected_value) for c in targets)
         quoted = any(contains(text, x.quote) for r in obs.results.values() for x in r.decision.citations)
         carried = any(
@@ -188,15 +196,18 @@ def score(pack: Pack, obs: Observed) -> dict[str, float]:
     decisions = [r.decision for r in obs.results.values()]
     decisions += [s.decision for found in obs.suggestions.values() for s in found]
     m["citations_valid"] = citations_valid(decisions, obs.stored)
-    written = [c for c, r in obs.results.items() if r.draft.text]
+    # only an unknown item gets no draft, so a non-unknown item with no judge or check result failed that step
+    written = [c for c, r in obs.results.items() if r.decision.label != "unknown"]
     m["judge_faithfulness"] = _ratio(sum(obs.judged.get(c, False) for c in written), len(written))
-    m["answer_checks_pass"] = _ratio(sum(not obs.checks.get(c) for c in written), len(written))
+    m["answer_checks_pass"] = _ratio(sum(obs.checks.get(c) == [] for c in written), len(written))
     first = [
         c for c in written if obs.results[c].draft.source == "model" and not obs.results[c].draft.problems
     ]
     m["first_drafts_pass"] = _ratio(len(first), len(written))
-    m["cost_usd_per_60_items"] = round(sum(r.cost_usd for r in obs.results.values()) / len(keys) * 60, 4)
-    m["p50_seconds_per_item"] = round(statistics.median(r.latency_ms for r in obs.results.values()) / 1000, 2)
+    costs = [r.cost_usd for r in obs.results.values()]
+    latencies = [r.latency_ms for r in obs.results.values()]
+    m["cost_usd_per_60_items"] = round(sum(costs) / len(keys) * 60, 4) if keys else 0.0
+    m["p50_seconds_per_item"] = round(statistics.median(latencies) / 1000, 2) if latencies else 0.0
 
     # interview (spec 6.9) and fills (spec 7.3)
     asks = {c for c, k in keys.items() if k.must_ask or k.expected_label == "conflict"}
