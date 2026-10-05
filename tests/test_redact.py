@@ -25,6 +25,22 @@ from app.redact import redact_lines, redact_text
         ("key sk-or-v1-abcdefghijklmnopqrstuvwxyz012345", "key <SECRET>"),
         ("aws AKIAIOSFODNN7EXAMPLE", "aws <SECRET>"),
         ("password = hunter2hunter2", "<SECRET>"),
+        ("José Álvarez signed the policy.", "<PERSON> signed the policy."),
+        ("Owner: Dana M. Ortiz; Status: Open", "Owner: <PERSON>; Status: Open"),
+        ("Signed by DANA ORTIZ", "Signed by <PERSON>"),
+        ("AWS_SECRET_ACCESS_KEY=" + "wJalrXUtnFEMI/K7MDENG/bPxRfiCY" + "EXAMPLEKEY", "<SECRET>"),
+        ("aws_secret_access_key = " + "wJalrXUtnFEMI/K7MDENG/bPxRfiCY" + "EXAMPLEKEY", "<SECRET>"),
+        ("DB_PASSWORD=hunter2hunter2", "<SECRET>"),
+        ("client_secret: abcdefgh12345678", "<SECRET>"),
+        ("pwd: hunter2hunter2", "<SECRET>"),
+        ("Authorization: Bearer " + "abcdefghijklmnopqrstuvwxyz012345", "Authorization: <SECRET>"),
+        ("key " + "sk_" + "live_" + "abcdefghijklmnopqrstuvwx", "key <SECRET>"),
+        ("key " + "sk_" + "test_" + "abcdefghijklmnopqrstuvwx", "key <SECRET>"),
+        ("key " + "rk_" + "live_" + "abcdefghijklmnopqrstuvwx", "key <SECRET>"),
+        ("token " + "github_" + "pat_" + "abcdefghijklmnopqrstuvwxyz0123", "token <SECRET>"),
+        ("token " + "ghp_" + "abcdefghijklmnopqrstuvwxyz0123456789", "token <SECRET>"),
+        ("hook " + "https://hooks.slack" + ".com/services/T000/B000/abcdefgh", "hook <SECRET>"),
+        ("url?" + "sig=" + "abcdefghijklmnop%2Bqrstu&se=1", "url?<SECRET>&se=1"),
     ],
 )
 def test_private_data_and_secrets_are_replaced(text: str, expected: str) -> None:
@@ -40,6 +56,10 @@ def test_private_data_and_secrets_are_replaced(text: str, expected: str) -> None
         "Customer data is stored in Ireland.",  # place names stay: data-residency answers need them
         "Version 2.0 was released on 2026-01-10 for ISO 27001:2022.",  # dates and versions are not phones
         "Google Workspace and GitHub are reviewed quarterly.",
+        "password complexity: minimum 12 characters",
+        "secret = see vault",
+        "API key: rotated-every-90-days",
+        "INFORMATION SECURITY POLICY",
     ],
 )
 def test_business_text_is_left_alone(text: str) -> None:

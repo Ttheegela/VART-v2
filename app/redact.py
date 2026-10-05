@@ -65,7 +65,6 @@ _NOT_A_NAME = {
     "management",
     "description",
 }
-_NAME_WORD = re.compile(r"[A-Z][a-z]+(?:[-'][A-Z]?[a-z]+)*")
 _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "SECRET",
@@ -79,13 +78,17 @@ _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "SECRET",
         re.compile(
-            r"\b(?:sk|pk|rk)-[A-Za-z0-9_-]{16,}|\b(?:AKIA|ASIA)[A-Z0-9]{16}\b|\bgh[pousr]_[A-Za-z0-9]{30,}\b"
+            r"\b(?:sk|pk|rk)[-_](?:(?:live|test)_)?[A-Za-z0-9_-]{16,}|\bgithub_pat_\w{20,}|\b(?:AKIA|ASIA)[A-Z0-9]{16}\b|\bgh[pousr]_[A-Za-z0-9]{30,}\b"
             r"|\bxox[abprs]-[A-Za-z0-9-]{10,}|\bAIza[\w-]{35}\b|\bglpat-[\w-]{20,}"
+            r"|\bBearer\s+[\w.~+/-]{16,}=*|(?:https?://)?\bhooks\.slack\.com/services/\S+|\bsig=[\w%]{16,}"
         ),
     ),
     (
         "SECRET",
-        re.compile(r"\b(?:api[_-]?key|secret|token|password|passwd)\b\s*[:=]\s*\S{8,}", re.IGNORECASE),
+        re.compile(  # an underscore or hyphen is a separator: DB_PASSWORD=, aws_secret_access_key =
+            r"(?<![A-Za-z0-9])[\w-]*(?:api[_-]?key|secret|token|password|passwd|pwd)[\w-]*\s*[:=]\s*\S{8,}",
+            re.IGNORECASE,
+        ),
     ),
     ("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b")),
     (
@@ -123,11 +126,23 @@ def _engine() -> Any:
         return _analyzer
 
 
+def _is_name_word(word: str) -> bool:
+    """Capitalised (Unicode letters, hyphen or apostrophe parts), or ALL CAPS."""
+    parts = re.split(r"[-']", word)
+    if not all(p.isalpha() for p in parts):
+        return False
+    return word.isupper() or all(p[0].isupper() and p[1:] == p[1:].lower() for p in parts)
+
+
 def _looks_like_a_name(span: str) -> bool:
+    """Two or more words, each capitalised or ALL CAPS (DANA ORTIZ), a middle initial (Dana M. Ortiz) allowed,
+    at least two of them real words, none an organisation or product word. Single names stay a known gap."""
     words = [w.strip(",.") for w in span.split()]
+    full = [w for w in words if len(w) > 1]
     return (
         len(words) >= 2
-        and all(_NAME_WORD.fullmatch(w) for w in words)
+        and len(full) >= 2
+        and all(_is_name_word(w) for w in words)
         and not {w.lower() for w in words} & _NOT_A_NAME
     )
 
