@@ -54,9 +54,10 @@ def test_defaults_come_from_the_model_pool_and_the_judge_is_from_another_family(
     assert DEFAULT_MODELS["judge"].split("/")[0] != DEFAULT_MODELS["draft"].split("/")[0]
 
 
-def test_interim_defaults_avoid_a_provider_that_ignores_the_schema() -> None:
-    # qwen3.5-flash's only provider does not enforce strict json_schema; interim until the bench.
-    assert {DEFAULT_MODELS[s] for s in ("stance", "classify", "recheck")} == {"deepseek/deepseek-v4-flash"}
+def test_defaults_avoid_a_provider_that_ignores_the_schema() -> None:
+    # qwen3.5-flash's only provider does not enforce strict json_schema; no default may use it.
+    assert "qwen/qwen3.5-flash-02-23" not in DEFAULT_MODELS.values()
+    assert DEFAULT_MODELS["recheck"] == DEFAULT_MODELS["stance"]
 
 
 def test_mandatory_reasoning_set_matches_the_catalog_snapshot() -> None:
@@ -71,4 +72,5 @@ def test_mandatory_reasoning_set_matches_the_catalog_snapshot() -> None:
 def test_off_means_lowest_effort_only_where_reasoning_is_mandatory() -> None:
     assert reasoning_for("stance", "anthropic/claude-sonnet-5.5") == {"effort": "low"}
     assert reasoning_for("stance", "deepseek/deepseek-v4-flash") == {"enabled": False}  # keys unchanged
-    assert reasoning_for("draft", "openai/gpt-oss-120b") is None  # the model's default stays the default
+    assert reasoning_for("draft", "z-ai/glm-5.3-flash") == {"effort": "low"}  # draft is off too (Ruling 11)
+    assert reasoning_for("draft", "deepseek/deepseek-v4-flash") == {"enabled": False}

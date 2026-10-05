@@ -58,13 +58,13 @@
       "op": ">=",
       "pass": true,
       "target": 0.9,
-      "value": 0.9306
+      "value": 0.971
     },
     "label_accuracy": {
       "op": ">=",
       "pass": true,
       "target": 0.8,
-      "value": 0.8764
+      "value": 0.9213
     },
     "redaction_citations_valid": {
       "op": ">=",
@@ -136,7 +136,7 @@
     },
     "MVSP-1.7": {
       "citations": 1,
-      "draft": "template",
+      "draft": "model",
       "dropped": [
         "not-evidence"
       ],
@@ -172,11 +172,11 @@
       "value": null
     },
     "MVSP-2.4": {
-      "citations": 1,
-      "draft": "model",
+      "citations": 0,
+      "draft": "none",
       "dropped": [],
-      "label": "verified",
-      "value": "Yes"
+      "label": "unknown",
+      "value": null
     },
     "MVSP-2.5": {
       "citations": 1,
@@ -196,18 +196,18 @@
       "citations": 2,
       "draft": "model",
       "dropped": [],
-      "label": "conflict",
-      "value": null
-    },
-    "MVSP-2.8": {
-      "citations": 2,
-      "draft": "model",
-      "dropped": [],
       "label": "partial",
       "value": "Partial"
     },
+    "MVSP-2.8": {
+      "citations": 1,
+      "draft": "model",
+      "dropped": [],
+      "label": "verified",
+      "value": "Yes"
+    },
     "MVSP-3.1": {
-      "citations": 2,
+      "citations": 4,
       "draft": "model",
       "dropped": [],
       "label": "verified",
@@ -249,18 +249,18 @@
       "value": null
     },
     "MVSP-4.2": {
-      "citations": 2,
+      "citations": 1,
       "draft": "model",
       "dropped": [],
-      "label": "partial",
-      "value": "Partial"
+      "label": "verified",
+      "value": "Yes"
     },
     "MVSP-4.3": {
-      "citations": 2,
+      "citations": 1,
       "draft": "model",
       "dropped": [],
-      "label": "partial",
-      "value": "Partial"
+      "label": "verified",
+      "value": "Yes"
     },
     "MVSP-4.4": {
       "citations": 1,
@@ -270,11 +270,11 @@
       "value": "Yes"
     },
     "VSQ-01": {
-      "citations": 1,
+      "citations": 2,
       "draft": "model",
       "dropped": [],
-      "label": "verified",
-      "value": "Yes"
+      "label": "conflict",
+      "value": null
     },
     "VSQ-02": {
       "citations": 1,
@@ -300,20 +300,18 @@
       "value": "No"
     },
     "VSQ-05": {
-      "citations": 1,
+      "citations": 2,
       "draft": "model",
-      "dropped": [
-        "containment"
-      ],
+      "dropped": [],
       "label": "verified",
       "value": "Yes"
     },
     "VSQ-06": {
-      "citations": 1,
-      "draft": "model",
+      "citations": 0,
+      "draft": "none",
       "dropped": [],
-      "label": "verified",
-      "value": "No"
+      "label": "unknown",
+      "value": null
     },
     "VSQ-07": {
       "citations": 1,
@@ -344,11 +342,11 @@
       "value": "Partial"
     },
     "VSQ-11": {
-      "citations": 4,
+      "citations": 1,
       "draft": "model",
       "dropped": [],
-      "label": "conflict",
-      "value": null
+      "label": "verified",
+      "value": "Yes"
     },
     "VSQ-12": {
       "citations": 1,
@@ -358,11 +356,11 @@
       "value": "Yes"
     },
     "VSQ-13": {
-      "citations": 4,
+      "citations": 3,
       "draft": "model",
       "dropped": [],
-      "label": "conflict",
-      "value": null
+      "label": "verified",
+      "value": "No"
     },
     "VSQ-14": {
       "citations": 2,
@@ -407,7 +405,7 @@
       "value": "Yes"
     },
     "VSQ-20": {
-      "citations": 4,
+      "citations": 7,
       "draft": "model",
       "dropped": [],
       "label": "verified",
@@ -485,7 +483,7 @@
     },
     "VSQ-31": {
       "citations": 2,
-      "draft": "model",
+      "draft": "template",
       "dropped": [],
       "label": "conflict",
       "value": null
@@ -505,7 +503,7 @@
       "value": "Yes"
     },
     "VSQ-34": {
-      "citations": 2,
+      "citations": 1,
       "draft": "model",
       "dropped": [],
       "label": "verified",
@@ -547,11 +545,11 @@
       "value": "No"
     },
     "VSQ-40": {
-      "citations": 2,
+      "citations": 1,
       "draft": "model",
       "dropped": [],
-      "label": "partial",
-      "value": "Partial"
+      "label": "verified",
+      "value": "Yes"
     },
     "VSQ-41": {
       "citations": 1,
@@ -703,11 +701,11 @@
       "value": null
     },
     "VSQ-62": {
-      "citations": 1,
-      "draft": "model",
+      "citations": 0,
+      "draft": "none",
       "dropped": [],
-      "label": "verified",
-      "value": "No"
+      "label": "unknown",
+      "value": null
     },
     "VSQ-63": {
       "citations": 0,
@@ -727,55 +725,51 @@
     }
   },
   "label_misses": [
-    "VSQ-06: expected unknown, got verified No",
+    "VSQ-01: expected verified Yes, got conflict",
     "VSQ-08: expected partial Partial, got verified No",
-    "VSQ-11: expected verified Yes, got conflict",
+    "VSQ-13: expected conflict, got verified No",
     "VSQ-35: expected partial Partial, got verified No",
-    "VSQ-40: expected verified Yes, got partial Partial",
-    "VSQ-62: expected unknown, got verified No",
     "MVSP-1.4: expected verified Yes, got partial Partial",
-    "MVSP-2.7: expected verified Yes, got conflict",
-    "MVSP-2.8: expected verified Yes, got partial Partial",
-    "MVSP-4.2: expected verified Yes, got partial Partial",
-    "MVSP-4.3: expected verified Yes, got partial Partial"
+    "MVSP-2.4: expected verified Yes, got unknown",
+    "MVSP-2.7: expected verified Yes, got partial Partial"
   ],
   "metrics": {
     "answer_checks_pass": 1.0,
-    "ask_precision": 0.6154,
-    "ask_recall": 0.9231,
+    "ask_precision": 0.6757,
+    "ask_recall": 0.9615,
     "asked_twice": 0.0,
     "citations_valid": 1.0,
     "classification_correct": 1.0,
-    "conflict_items_recall": 1.0,
-    "conflict_precision": 0.7778,
+    "conflict_items_recall": 0.8571,
+    "conflict_precision": 0.8571,
     "conflict_recall": 1.0,
-    "cost_usd_per_60_items": 0.0209,
+    "cost_usd_per_60_items": 0.0361,
     "date_rule_correct": 1.0,
-    "date_rule_items_correct": 1.0,
+    "date_rule_items_correct": 0.75,
     "fills_false": 0.0,
     "fills_suggested": 1.0,
-    "first_drafts_pass": 0.9306,
+    "first_drafts_pass": 0.9565,
     "honest_negatives_kept": 1.0,
     "injections_followed": 0.0,
-    "judge_faithfulness": 0.9306,
-    "label_accuracy": 0.8764,
-    "p50_seconds_per_item": 16.41,
+    "judge_faithfulness": 0.971,
+    "label_accuracy": 0.9213,
+    "p50_seconds_per_item": 10.35,
     "parsing_documents_match": 1.0,
     "parsing_key_quotes_in_one_line": 1.0,
     "redaction_citations_valid": 1.0,
-    "redaction_label_accuracy": 0.88,
+    "redaction_label_accuracy": 0.92,
     "redaction_private_leaks": 0.0,
     "retrieval_recall_at_8": 0.9738,
     "scope_notes_on_scope_traps": 0.3333,
-    "stance_accuracy": 0.9362,
+    "stance_accuracy": 0.9149,
     "template_or_draft_cited_as_verified": 0.0
   },
   "models": {
     "classify": "deepseek/deepseek-v4-flash",
-    "draft": "deepseek/deepseek-v4-flash",
+    "draft": "z-ai/glm-5.3-flash",
     "judge": "qwen/qwen3.7-plus",
-    "recheck": "deepseek/deepseek-v4-flash",
-    "stance": "deepseek/deepseek-v4-flash"
+    "recheck": "deepseek/deepseek-v4-pro",
+    "stance": "deepseek/deepseek-v4-pro"
   },
   "pack": "dev",
   "prompts": [

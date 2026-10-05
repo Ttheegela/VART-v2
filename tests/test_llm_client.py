@@ -86,9 +86,8 @@ def test_sends_the_step_reasoning_setting() -> None:
     for step in ("stance", "classify", "recheck", "judge", "draft"):
         client.complete(build_request(step, "m", "p1", "s", "u", Out))
     by_step = dict(zip(("stance", "classify", "recheck", "judge", "draft"), sent, strict=True))
-    for step in ("stance", "classify", "recheck", "judge"):
+    for step in ("stance", "classify", "recheck", "judge", "draft"):  # draft off too (Ruling 11)
         assert by_step[step]["reasoning"] == {"enabled": False}, step
-    assert "reasoning" not in by_step["draft"]  # the model's default
     assert all(body["provider"] == {"require_parameters": True} for body in sent)
 
 
