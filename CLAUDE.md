@@ -36,8 +36,8 @@ Progress and the decisions table: `docs/PROGRESS.md`. The detailed per-task ledg
   routes by query string.
 - `datakit/` dev-data tools (schemas, renderers, key derivation, validators). `data/` questionnaires, company packs, keys.
 - `scripts/` sponsor_check, check_monochrome, export_openapi, smoke. `tests/` pytest (needs Postgres).
-- `ops/` `setup.sh` runs the infrastructure phases (accounts, release, uptime, status). Tarun runs it in his terminal;
-  secrets go only through its hidden prompts.
+- `ops/` `setup.sh` runs the infrastructure phases (accounts, release, migrate, uptime, status). Tarun runs it in his
+  terminal; secrets go only through its hidden prompts.
 - Engine (Plan 2): `app/contracts.py` (frozen unit types; signatures in `docs/CONTRACTS.md`), `app/patterns.py`,
   `app/ingest/` (parse, pdf, store), `app/redact.py`, `app/classify.py`, `app/chunk.py`, `app/retrieve.py`,
   `app/stance.py`, `app/decide.py`, `app/draft.py`, `app/grounding.py`, `app/pipeline.py` (`answer_item`),
@@ -49,7 +49,7 @@ Progress and the decisions table: `docs/PROGRESS.md`. The detailed per-task ledg
 - `docker compose up -d db` — Postgres 17 + pgvector on port 5434 (user/password `vart`).
 - `export TEST_DATABASE_URL=postgresql+psycopg://vart:vart@localhost:5434/vart_test && export DATABASE_URL=$TEST_DATABASE_URL`
   (lanes use `vart_test_<lane>`). pytest reads `TEST_DATABASE_URL`; `alembic check` and the app read `DATABASE_URL`.
-- Backend: `ruff check . && ruff format --check . && mypy app scripts datakit && pytest -q && alembic check`
+- Backend: `ruff check . && ruff format --check . && mypy app scripts datakit evals && pytest -q && alembic check`
 - Frontend: `cd web && npm run lint && npm test && npm run build`
 - Gates: `python scripts/check_monochrome.py` (the sponsor check is CI-only: it needs the secret)
 - Dev data: `python -m datakit.validate all` (stages: facts, docs, questionnaires, keys, mapper)

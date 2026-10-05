@@ -61,6 +61,10 @@ Phases (each is safe to re-run):
   release   Run on $PROD_BRANCH after the app is merged and pushed (Plan 1A Task 9). Checks the branch is clean and
             equal to origin, then: alembic upgrade head (Neon direct URL), fresh CRON_SECRET, connect Git, deploy
             production, scripts/smoke.py, /api/internal/canary, /api/health. No prompts.
+  migrate   Run on the branch being released, after its pull request's CI is green and before main moves
+            (Plan 2 onward). Checks the tools and logins, a clean tree, HEAD equal to its upstream and a green
+            CI run for HEAD, then: alembic upgrade head (Neon direct URL). No CRON_SECRET change, no deploy,
+            no prompts.
   uptime    UptimeRobot monitors on the production domain: HTTP on / every ${UI_INTERVAL_S}s, keyword on /api/health
             every ${HEALTH_INTERVAL_S}s that alerts when ${HEALTH_KEYWORD} is absent. Hidden prompt: UptimeRobot
             API key (just press Enter to get the manual steps instead).
@@ -678,6 +682,39 @@ phase_release() {
   fi
 }
 
+# ---------------------------------------------------------------- phase: migrate
+phase_migrate() {
+  local head upstream ci
+  echo "Migrates Neon to alembic head from a clean, pushed, CI-green HEAD. No CRON_SECRET change, no deploy."
+  check_tools
+  check_vercel
+  check_neon
+  step "Branch"
+  [ -z "$(git status --porcelain)" ] || fail "the working tree is not clean: commit or stash first"
+  upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null) ||
+    fail "HEAD has no upstream branch: push it first"
+  git fetch --quiet "${upstream%%/*}" || fail "git fetch ${upstream%%/*} failed"
+  head=$(git rev-parse HEAD)
+  [ "$head" = "$(git rev-parse '@{u}')" ] || fail "HEAD is not equal to $upstream: push or pull first"
+  # the same query as release_checks: every CI run for HEAD must have succeeded
+  ci=$(gh run list -R "$GH_REPO" --commit "$head" --json status,conclusion 2>/dev/null | python3 -c '
+import json, sys
+print(",".join(sorted({r.get("conclusion") or r.get("status") or "?" for r in json.load(sys.stdin)})))' 2>/dev/null) ||
+    fail "gh run list failed. Check: gh run list -R $GH_REPO --commit $head"
+  case $ci in
+    success) ;;
+    "") fail "no CI run for $head yet (gh run list -R $GH_REPO --commit $head)" ;;
+    *) fail "CI is not green for $head (runs: $ci; every run must be success)" ;;
+  esac
+  ok "clean, equal to $upstream, CI green for ${head:0:7}"
+  step "Vercel project" # what phase_release runs before migrate()
+  vercel_has_project || fail "Vercel project '$VERCEL_PROJECT' not found. Run: ops/setup.sh accounts"
+  load_project
+  ensure_link
+  migrate
+  ok "migrate done: the database is at alembic head. Next: fast-forward main to this HEAD and push"
+}
+
 # ---------------------------------------------------------------- phase: uptime
 UR_CODE="" UR_BODY=""
 ur() { # METHOD PATH [JSON]: sets UR_CODE and UR_BODY. Bodies can carry per-monitor API keys: parse them, never print them.
@@ -888,9 +925,10 @@ main() {
   case $phase in
     accounts) phase_accounts ;;
     release) phase_release ;;
+    migrate) phase_migrate ;;
     uptime) phase_uptime ;;
     status) phase_status ;;
-    *) fail "unknown phase '$phase' (accounts, release, uptime, status)" ;;
+    *) fail "unknown phase '$phase' (accounts, release, migrate, uptime, status)" ;;
   esac
 }
 
