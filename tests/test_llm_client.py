@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from types import SimpleNamespace
 from typing import Annotated, Any, Literal
 
@@ -7,6 +8,7 @@ import pytest
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from app.llm.client import LLMError, OpenRouterClient, _plain, build_request, complete_model
+from app.settings import REASONING
 from tests.fakes import FakeLLM
 
 
@@ -70,6 +72,31 @@ def test_every_structured_request_says_json() -> None:
     _client(handler).complete(_req())
     assert "response_format" in seen
     assert "json" in " ".join(m["content"] for m in seen["messages"]).lower()
+
+
+def test_sends_the_step_reasoning_setting() -> None:
+    # Reasoning tokens on short JSON answers overflowed max_tokens (judge) and drove latency (Ruling 7).
+    sent: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return httpx.Response(200, json=_reply('{"ok": true, "note": null}'))
+
+    client = _client(handler)
+    for step in ("stance", "classify", "recheck", "judge", "draft"):
+        client.complete(build_request(step, "m", "p1", "s", "u", Out))
+    by_step = dict(zip(("stance", "classify", "recheck", "judge", "draft"), sent, strict=True))
+    for step in ("stance", "classify", "recheck", "judge"):
+        assert by_step[step]["reasoning"] == {"enabled": False}, step
+    assert "reasoning" not in by_step["draft"]  # the model's default
+    assert all(body["provider"] == {"require_parameters": True} for body in sent)
+
+
+def test_the_reasoning_setting_is_part_of_the_key() -> None:
+    # A recording made with thinking on must never replay for a request with thinking off.
+    req = build_request("stance", "m", "p1", "s", "u", Out)
+    assert req.reasoning == REASONING["stance"]
+    assert req.key() != replace(req, reasoning=None).key()
 
 
 def test_truncated_reply_is_an_error() -> None:
@@ -215,7 +242,7 @@ class Golden(BaseModel):
     note: str | None
 
 
-GOLDEN_KEY = "8fa38bbee92e2d7899e7716a81c34c6b07c11dfe6a090e05e0dea9fd0837e5a2"
+GOLDEN_KEY = "882db033f9a183d5f887dc0b71941ab34e3785a6c995d772fc992f52a46d6356"
 
 
 def _golden(user: str = "Is data encrypted at rest?") -> Any:
@@ -312,7 +339,7 @@ def test_error_paths_name_the_offending_definition() -> None:
         build_request("stance", "m", "p", "s", "u", Outer)
 
 
-GOLDEN_KEY_NON_ASCII = "48800d90065cb9de4b06b22e74ff554cedbb3ba3770e652987f04400f667ab8e"
+GOLDEN_KEY_NON_ASCII = "0755b470206c3f14b82c2a718640ffdae8e6c3bb591564e3624276682f639d02"
 
 
 def test_a_non_ascii_request_key_is_pinned() -> None:

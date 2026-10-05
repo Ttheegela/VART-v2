@@ -18,6 +18,20 @@ DEFAULT_MODELS = {
 }
 
 
+# OpenRouter's unified `reasoning` parameter, per step; None sends nothing (the model's default). DeepSeek and
+# Qwen3 thinking is on/off only, so any effort level means "on": off is the only way to cut it. Thinking spent
+# 700-2200 tokens on short structured judgements and overflowed the judge's max_tokens (Ruling 7); the bench
+# measures any quality cost, and a step can be switched back on here. Part of every recording key.
+REASONING: dict[str, dict[str, bool] | None] = {
+    "stance": {"enabled": False},
+    "classify": {"enabled": False},
+    "recheck": {"enabled": False},
+    "judge": {"enabled": False},
+    "canary": {"enabled": False},
+    "draft": None,
+}
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore", env_ignore_empty=True)
 

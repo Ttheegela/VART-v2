@@ -13,7 +13,7 @@ from openai import APIError, OpenAI
 from pydantic import BaseModel, ValidationError
 
 from app.observability import Step, trace_llm
-from app.settings import get_settings
+from app.settings import REASONING, get_settings
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 # A provider that downgrades json_schema to json_object (Alibaba) refuses messages without the word "json".
@@ -34,6 +34,7 @@ class LLMRequest:
     schema_name: str
     schema: dict[str, Any]
     max_tokens: int = 1200
+    reasoning: dict[str, bool] | None = None  # OpenRouter `reasoning`; None sends nothing
     item_id: str | None = None  # trace metadata only: deliberately not part of key()
 
     def key(self) -> str:
@@ -46,6 +47,7 @@ class LLMRequest:
                 self.schema_name,
                 self.schema,
                 self.max_tokens,
+                self.reasoning,
             ],
             sort_keys=True,
             ensure_ascii=False,
@@ -115,7 +117,18 @@ def build_request(
     _assert_strict(schema)
     # Added here, not in complete(), so key() covers what is actually sent.
     system += JSON_LINE
-    return LLMRequest(step, model, prompt_version, system, user, out.__name__, schema, max_tokens, item_id)
+    return LLMRequest(
+        step,
+        model,
+        prompt_version,
+        system,
+        user,
+        out.__name__,
+        schema,
+        max_tokens,
+        REASONING[step],
+        item_id,
+    )
 
 
 def complete_model[M: BaseModel](client: LLMClient, req: LLMRequest, out: type[M]) -> M:
@@ -183,7 +196,11 @@ class OpenRouterClient:
                         "json_schema": {"name": req.schema_name, "strict": True, "schema": req.schema},
                     },
                     # require_parameters: route only to providers that support every parameter sent here
-                    extra_body={"usage": {"include": True}, "provider": {"require_parameters": True}},
+                    extra_body={
+                        "usage": {"include": True},
+                        "provider": {"require_parameters": True},
+                        **({} if req.reasoning is None else {"reasoning": req.reasoning}),
+                    },
                 )
                 choice = response.choices[0]
                 tokens_in, tokens_out, cost = _usage(response)
