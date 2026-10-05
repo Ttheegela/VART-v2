@@ -1,1 +1,67 @@
+/* Hallmark · genre: modern-minimal · macrostructure: Index-First (Home) + app shell (Run grid)
+ * theme: custom · vibe: "audit ledger, dense, monochrome, every line cited"
+ * paper: neutral-50 · surface: white · ink: neutral-950 · accent: none (ink is the accent)
+ * display: IBM Plex Sans 600 · body: IBM Plex Sans 400 · mono: IBM Plex Mono 400/500
+ * axes: light / grotesk-sans / neutral · nav: N9 edge-aligned tab bar · footer: Ft2 inline single line
+ * Locked in /design.md. Colours alias Tailwind's neutral scale only (scripts/check_monochrome.py).
+ */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;600&display=swap");
 @import "tailwindcss";
+
+@theme {
+  /* Surfaces and ink: aliases, never new values. */
+  --color-paper: var(--color-neutral-50); /* page */
+  --color-surface: var(--color-white); /* grid, drawer, inputs: the ledger sheet */
+  --color-sunken: var(--color-neutral-100); /* row hover, header band, context lines */
+  --color-mark: var(--color-neutral-200); /* the quoted span inside a passage */
+  --color-rule: var(--color-neutral-200); /* hairline between rows */
+  --color-rule-strong: var(--color-neutral-300); /* panel edges, input borders */
+  --color-ink: var(--color-neutral-950); /* text, primary fill, focus ring */
+  --color-ink-2: var(--color-neutral-700); /* secondary text */
+  --color-ink-3: var(--color-neutral-500); /* metadata on surface or paper only; on sunken use ink-2 */
+  --color-on-ink: var(--color-white); /* text on a filled ink control */
+
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* Density: the grid is set at text-sm (14px); prose at text-base. Labels at 12px, never smaller. */
+  --text-label: 0.75rem;
+  --text-label--line-height: 1rem;
+  --text-label--letter-spacing: 0.06em;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+}
+
+@layer base {
+  html,
+  body {
+    overflow-x: clip;
+  }
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Instant, never animated; 2px ink with offset so it reads on filled ink controls too. */
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+  table,
+  code,
+  kbd,
+  samp {
+    font-variant-numeric: tabular-nums;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 120ms !important;
+      transition-property: opacity !important;
+      animation: none !important;
+    }
+  }
+}
