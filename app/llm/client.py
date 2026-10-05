@@ -13,7 +13,7 @@ from openai import APIError, OpenAI
 from pydantic import BaseModel, ValidationError
 
 from app.observability import Step, trace_llm
-from app.settings import REASONING, get_settings
+from app.settings import get_settings, reasoning_for
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 # A provider that downgrades json_schema to json_object (Alibaba) refuses messages without the word "json".
@@ -34,7 +34,7 @@ class LLMRequest:
     schema_name: str
     schema: dict[str, Any]
     max_tokens: int = 1200
-    reasoning: dict[str, bool] | None = None  # OpenRouter `reasoning`; None sends nothing
+    reasoning: dict[str, bool | str] | None = None  # OpenRouter `reasoning`; None sends nothing
     item_id: str | None = None  # trace metadata only: deliberately not part of key()
 
     def key(self) -> str:
@@ -126,7 +126,7 @@ def build_request(
         out.__name__,
         schema,
         max_tokens,
-        REASONING[step],
+        reasoning_for(step, model),
         item_id,
     )
 

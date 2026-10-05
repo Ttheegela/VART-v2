@@ -99,6 +99,11 @@ def test_the_reasoning_setting_is_part_of_the_key() -> None:
     assert req.key() != replace(req, reasoning=None).key()
 
 
+def test_a_mandatory_reasoning_model_gets_its_lowest_effort_instead_of_off() -> None:
+    # Such a model answers 400 to {"enabled": false}: every stance call failed in the bench (2026-10-05).
+    assert build_request("stance", "openai/gpt-oss-120b", "p1", "s", "u", Out).reasoning == {"effort": "low"}
+
+
 def test_truncated_reply_is_an_error() -> None:
     client = _client(lambda r: httpx.Response(200, json=_reply('{"ok": tr', finish="length")))
     with pytest.raises(LLMError, match="finish_reason"):

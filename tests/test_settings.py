@@ -1,6 +1,9 @@
+import json
+from pathlib import Path
+
 import pytest
 
-from app.settings import DEFAULT_MODELS, get_settings
+from app.settings import DEFAULT_MODELS, REASONING_MANDATORY, get_settings, reasoning_for
 
 
 def test_reads_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -54,3 +57,18 @@ def test_defaults_come_from_the_model_pool_and_the_judge_is_from_another_family(
 def test_interim_defaults_avoid_a_provider_that_ignores_the_schema() -> None:
     # qwen3.5-flash's only provider does not enforce strict json_schema; interim until the bench.
     assert {DEFAULT_MODELS[s] for s in ("stance", "classify", "recheck")} == {"deepseek/deepseek-v4-flash"}
+
+
+def test_mandatory_reasoning_set_matches_the_catalog_snapshot() -> None:
+    # Snapshot of OpenRouter /models for the bench candidates (2026-10-05); refresh it when the pool changes.
+    snap = json.loads((Path(__file__).parent / "openrouter_catalog_snapshot.json").read_text())
+    mandatory = {m for m, e in snap.items() if (e["reasoning"] or {}).get("mandatory")}
+    assert mandatory == REASONING_MANDATORY
+    assert all("low" in snap[m]["reasoning"]["supported_efforts"] for m in mandatory)
+    assert all("reasoning" in e["supported_parameters"] for e in snap.values())
+
+
+def test_off_means_lowest_effort_only_where_reasoning_is_mandatory() -> None:
+    assert reasoning_for("stance", "anthropic/claude-sonnet-5.5") == {"effort": "low"}
+    assert reasoning_for("stance", "deepseek/deepseek-v4-flash") == {"enabled": False}  # keys unchanged
+    assert reasoning_for("draft", "openai/gpt-oss-120b") is None  # the model's default stays the default

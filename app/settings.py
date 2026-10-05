@@ -22,7 +22,7 @@ DEFAULT_MODELS = {
 # Qwen3 thinking is on/off only, so any effort level means "on": off is the only way to cut it. Thinking spent
 # 700-2200 tokens on short structured judgements and overflowed the judge's max_tokens (Ruling 7); the bench
 # measures any quality cost, and a step can be switched back on here. Part of every recording key.
-REASONING: dict[str, dict[str, bool] | None] = {
+REASONING: dict[str, dict[str, bool | str] | None] = {
     "stance": {"enabled": False},
     "classify": {"enabled": False},
     "recheck": {"enabled": False},
@@ -30,6 +30,18 @@ REASONING: dict[str, dict[str, bool] | None] = {
     "canary": {"enabled": False},
     "draft": None,
 }
+
+# Models whose catalog entry says reasoning.mandatory (OpenRouter /models, 2026-10-05): they answer 400
+# "Reasoning is mandatory for this endpoint and cannot be disabled" to {"enabled": False}, so "off" means
+# their lowest effort.
+# tests/test_settings.py pins this set to tests/openrouter_catalog_snapshot.json.
+REASONING_MANDATORY = frozenset({"anthropic/claude-sonnet-5.5", "openai/gpt-oss-120b", "z-ai/glm-5.3-flash"})
+LOWEST_EFFORT: dict[str, bool | str] = {"effort": "low"}  # every model in REASONING_MANDATORY lists "low"
+
+
+def reasoning_for(step: str, model: str) -> dict[str, bool | str] | None:
+    setting = REASONING[step]
+    return LOWEST_EFFORT if setting == {"enabled": False} and model in REASONING_MANDATORY else setting
 
 
 class Settings(BaseSettings):

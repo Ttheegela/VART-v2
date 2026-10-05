@@ -1,0 +1,237 @@
+{
+ "anthropic/claude-sonnet-5.5": {
+  "reasoning": {
+   "default_effort": "high",
+   "mandatory": true,
+   "supported_efforts": [
+    "max",
+    "xhigh",
+    "high",
+    "medium",
+    "low"
+   ]
+  },
+  "supported_parameters": [
+   "include_reasoning",
+   "max_completion_tokens",
+   "max_tokens",
+   "reasoning",
+   "reasoning_effort",
+   "response_format",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "verbosity"
+  ]
+ },
+ "deepseek/deepseek-v4-flash": {
+  "reasoning": {
+   "default_effort": "high",
+   "mandatory": false,
+   "supported_efforts": [
+    "xhigh",
+    "high"
+   ]
+  },
+  "supported_parameters": [
+   "frequency_penalty",
+   "include_reasoning",
+   "logit_bias",
+   "logprobs",
+   "max_completion_tokens",
+   "max_tokens",
+   "min_p",
+   "presence_penalty",
+   "reasoning",
+   "reasoning_effort",
+   "repetition_penalty",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_a",
+   "top_k",
+   "top_logprobs",
+   "top_p"
+  ]
+ },
+ "deepseek/deepseek-v4-pro": {
+  "reasoning": {
+   "default_effort": "high",
+   "mandatory": false,
+   "supported_efforts": [
+    "xhigh",
+    "high"
+   ]
+  },
+  "supported_parameters": [
+   "frequency_penalty",
+   "include_reasoning",
+   "logit_bias",
+   "logprobs",
+   "max_completion_tokens",
+   "max_tokens",
+   "min_p",
+   "presence_penalty",
+   "reasoning",
+   "reasoning_effort",
+   "repetition_penalty",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_k",
+   "top_logprobs",
+   "top_p"
+  ]
+ },
+ "moonshotai/kimi-k2.5": {
+  "reasoning": {
+   "default_enabled": true,
+   "mandatory": false
+  },
+  "supported_parameters": [
+   "frequency_penalty",
+   "include_reasoning",
+   "logit_bias",
+   "logprobs",
+   "max_tokens",
+   "min_p",
+   "presence_penalty",
+   "reasoning",
+   "repetition_penalty",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_k",
+   "top_logprobs",
+   "top_p"
+  ]
+ },
+ "openai/gpt-oss-120b": {
+  "reasoning": {
+   "default_effort": "medium",
+   "mandatory": true,
+   "supported_efforts": [
+    "high",
+    "medium",
+    "low"
+   ]
+  },
+  "supported_parameters": [
+   "frequency_penalty",
+   "include_reasoning",
+   "logit_bias",
+   "logprobs",
+   "max_tokens",
+   "min_p",
+   "presence_penalty",
+   "reasoning",
+   "reasoning_effort",
+   "repetition_penalty",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_a",
+   "top_k",
+   "top_logprobs",
+   "top_p"
+  ]
+ },
+ "qwen/qwen3.5-flash-02-23": {
+  "reasoning": {
+   "mandatory": false
+  },
+  "supported_parameters": [
+   "frequency_penalty",
+   "include_reasoning",
+   "max_tokens",
+   "presence_penalty",
+   "reasoning",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_k",
+   "top_p"
+  ]
+ },
+ "qwen/qwen3.7-plus": {
+  "reasoning": {
+   "default_enabled": true,
+   "mandatory": false
+  },
+  "supported_parameters": [
+   "frequency_penalty",
+   "include_reasoning",
+   "logprobs",
+   "max_tokens",
+   "presence_penalty",
+   "reasoning",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_k",
+   "top_logprobs",
+   "top_p"
+  ]
+ },
+ "z-ai/glm-5.3-flash": {
+  "reasoning": {
+   "default_effort": "max",
+   "default_enabled": true,
+   "mandatory": true,
+   "supported_efforts": [
+    "max",
+    "high",
+    "low"
+   ]
+  },
+  "supported_parameters": [
+   "frequency_penalty",
+   "include_reasoning",
+   "logit_bias",
+   "logprobs",
+   "max_tokens",
+   "min_p",
+   "parallel_tool_calls",
+   "presence_penalty",
+   "reasoning",
+   "reasoning_effort",
+   "repetition_penalty",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_k",
+   "top_logprobs",
+   "top_p"
+  ]
+ }
+}
