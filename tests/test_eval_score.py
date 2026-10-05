@@ -367,3 +367,39 @@ def test_load_documents_ingests_in_the_order_given_and_maps_fact_sheet_ids(
     options = {"source": "upload", "llm": llm, "model": "m", "spend": spend}
     assert calls == [(session, workspace, s.filename, PACK.path(s).read_bytes(), options) for s in specs]
     assert list(ids.items()) == [(s.id, str(doc_id)) for s, doc_id in zip(specs, made, strict=True)]
+
+
+@pytest.mark.parametrize(
+    "gate",
+    [
+        "classification_correct",
+        "retrieval_recall_at_8",
+        "conflict_recall",
+        "date_rule_correct",
+        "citations_valid",
+        "honest_negatives_kept",
+        "fills_suggested",
+        "judge_faithfulness",
+        "answer_checks_pass",
+    ],
+)
+def test_a_gate_with_nothing_to_measure_fails_instead_of_passing_vacuously(gate: str) -> None:
+    unknown = Decision("unknown", None, (), (), None, None, 0.0)
+    results = {
+        c: ItemResult(ItemInput(c, "q", None), Retrieval((), ()), (), unknown, Draft("", "none"), 0.0, 0)
+        for c in PACK.keys
+    }
+    # the pack's keys minus every trap kind: nothing to recall, flag, date, keep or fill
+    bare = {c: k for c, k in PACK.keys.items() if not k.evidence and not k.fills and not k.honest_negative}
+    pack = dataclasses.replace(PACK, keys=bare, facts=PACK.facts.model_copy(update={"documents": ()}))
+    obs = _observed(
+        results={c: results[c] for c in bare},
+        doc_ids={},
+        stored={},
+        metadata={},
+        reference={},
+        queue=[],
+        suggestions={},
+    )
+    g = gates(score(pack, obs))[gate]
+    assert g["pass"] is False and "nothing to measure" in g["reason"]

@@ -29,7 +29,7 @@ from app.draft import PROMPT_VERSION as DRAFT_PROMPT
 from app.draft import check
 from app.ingest.store import store_statement
 from app.interview import plan_queue, recheck
-from app.llm.client import LLMClient, LLMRequest, LLMResult, OpenRouterClient
+from app.llm.client import LLMClient, LLMError, LLMRequest, LLMResult, OpenRouterClient
 from app.llm.recorder import RecordingClient, ReplayClient, ReplayMiss
 from app.pipeline import answer_item
 from app.settings import get_settings
@@ -87,6 +87,19 @@ def keep_used(path: Path, keys: set[str]) -> None:
     path.write_text(text, encoding="utf-8", errors="surrogatepass")
 
 
+def drop_steps(path: Path, steps: set[str]) -> None:
+    """Record mode with --refresh: forget the recorded rows of these steps, so they are requested again (a row
+    whose text failed validation would otherwise be replayed for ever)."""
+    if not path.exists():
+        return
+    rows = [
+        x
+        for x in path.read_text(encoding="utf-8", errors="surrogatepass").split("\n")
+        if x.strip() and json.loads(x)["step"] not in steps
+    ]
+    path.write_text("".join(x + "\n" for x in rows), encoding="utf-8", errors="surrogatepass")
+
+
 def _stored(session: Session, workspace_id: uuid.UUID) -> dict[str, list[str]]:
     rows = session.execute(
         select(DocumentLine.document_id, DocumentLine.text)
@@ -126,12 +139,14 @@ def _interview(
     results: dict[str, ItemResult],
     llm: LLMClient,
     models: dict[str, str],
-) -> tuple[list[str], int, dict[str, list[Any]]]:
-    """The queue, how often any item came back after being asked, and the fills a scripted answer suggests."""
+) -> tuple[list[str], int, dict[str, list[Any]], list[str]]:
+    """The queue, how often any item came back after being asked, the fills a scripted answer suggests, and
+    the ids of the stored statement documents."""
     scripted: dict[str, str] = json.loads((ANSWERS / f"{pack.name}-answers.json").read_text(encoding="utf-8"))
     queue: list[str] = []
     asked_twice = 0
     suggestions: dict[str, list[Any]] = {}
+    statements: list[str] = []
     for q in packs.QUESTIONNAIRES:
         items = [
             OpenItem(i, results[i.key].decision.label, 0, results[i.key].draft.text) for i in pack.items(q)
@@ -153,12 +168,13 @@ def _interview(
             statement = store_statement(
                 session, workspace_id, answer, filename=f"answer-{code}.txt", today=STATEMENT_DATE
             )
+            statements.append(str(statement.id))
             topic = next(i.topic for i in pack.items(q) if i.key == code)
             open_items = [o for o in items if o.item.key != code]
             suggestions[code] = recheck(
                 session, workspace_id, statement.id, topic, open_items, llm, models["recheck"], always
             )
-    return queue, asked_twice, suggestions
+    return queue, asked_twice, suggestions, statements
 
 
 def _redaction(pack: packs.Pack, llm: LLMClient, models: dict[str, str]) -> score.RedactionObserved:
@@ -187,14 +203,17 @@ def _redaction(pack: packs.Pack, llm: LLMClient, models: dict[str, str]) -> scor
     if not results:  # score() reads 0 of 0 as 1.0, so an empty stage would pass every redaction gate
         raise ValueError("the redaction stage answered no items: its gates would pass on nothing")
     sent = [r.user for r in log.requests]
-    leaks = sum(
-        s in text for s in private for text in [*sent, *(x for lines in stored.values() for x in lines)]
-    )
+    leaks = _leaks(private, [*sent, *(x for lines in stored.values() for x in lines)])
     return score.RedactionObserved(results, doc_ids, stored, leaks)
+
+
+def _leaks(private: Sequence[str], texts: Sequence[str]) -> int:
+    return sum(s in text for s in private for text in texts)
 
 
 def run(pack_name: str, llm: LLMClient, models: dict[str, str]) -> dict[str, Any]:
     pack = packs.load(pack_name)
+    log = Log(llm)  # the interview's requests are scanned for the visitor's private strings
     with Session(get_engine()) as session:
         ws = Workspace()
         session.add(ws)
@@ -213,11 +232,14 @@ def run(pack_name: str, llm: LLMClient, models: dict[str, str]) -> dict[str, Any
                 if r.draft.text:
                     judged[item.key] = judge(llm, item, r.decision, r.draft.text, models["judge"]).faithful
                     checks[item.key] = check(r.draft.text, r.decision, documents)
-            queue, asked_twice, suggestions = _interview(session, ws.id, pack, results, llm, models)
+            queue, asked_twice, suggestions, statements = _interview(
+                session, ws.id, pack, results, log, models
+            )
+            stored = _stored(session, ws.id)
             observed = score.Observed(
                 results=results,
                 doc_ids=doc_ids,
-                stored=_stored(session, ws.id),
+                stored=stored,
                 metadata=_metadata(session, doc_ids),
                 reference={d.id: lines_of(pack.path(d)) for d in specs},
                 judged=judged,
@@ -229,7 +251,16 @@ def run(pack_name: str, llm: LLMClient, models: dict[str, str]) -> dict[str, Any
         finally:
             session.execute(delete(Workspace).where(Workspace.id == ws.id))
             session.commit()
-    observed.redaction = _redaction(pack, llm, models)
+    # sample documents legitimately name people; the visitor's statements and the rechecks about them must not
+    interview_leaks = _leaks(
+        pack.private_strings(),
+        [
+            *(x for sid in statements for x in stored.get(sid, [])),
+            *(r.user for r in log.requests if r.step == "recheck"),
+        ],
+    )
+    red = _redaction(pack, llm, models)
+    observed.redaction = replace(red, leaks=red.leaks + interview_leaks)
     metrics = score.score(pack, observed)
     return {
         "pack": pack_name,
@@ -255,7 +286,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0] if __doc__ else None)
     parser.add_argument("--pack", default="dev")
     parser.add_argument("--mode", choices=("replay", "record", "live"), default="replay")
+    parser.add_argument(
+        "--refresh",
+        default="",
+        help="record mode: comma-separated steps whose recorded rows are requested again",
+    )
     args = parser.parse_args(argv)
+    refresh = {x.strip() for x in args.refresh.split(",") if x.strip()}
+    if refresh and args.mode != "record":
+        print("--refresh needs --mode record", file=sys.stderr)
+        return 2
     if "test" not in (make_url(database_url()).database or ""):
         print("refusing to run: DATABASE_URL must point at a test database", file=sys.stderr)
         return 2
@@ -266,11 +306,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 2
     path = RECORDED / f"{args.pack}.jsonl"
+    if refresh:
+        drop_steps(path, refresh)
     log = Log(client(args.mode, path))
     try:
         report = run(args.pack, log, models)
     except ReplayMiss as exc:
         print(f"recording missing ({exc}); re-record with --mode record", file=sys.stderr)
+        return 2
+    except LLMError as exc:  # exit 1 is the gate-failure code
+        print(
+            f"model call failed ({exc}); if a recorded reply is unusable, re-record that step with "
+            "--mode record --refresh STEP",
+            file=sys.stderr,
+        )
         return 2
     if args.mode == "record":
         keep_used(path, {r.key() for r in log.requests})

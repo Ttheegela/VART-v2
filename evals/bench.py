@@ -153,13 +153,14 @@ def _parallel(fn: Callable[[ItemInput], Any], items: Sequence[ItemInput], worker
 
 def _row(model: str, scores: dict[str, float], usages: Sequence[Usage], failures: int) -> dict[str, Any]:
     calls = [c for u in usages for c in u.calls]
+    failed = not calls or 0 < scores.get("items", 0) <= failures  # a model that failed everything ranks last
     latencies = [ms for _, ms in calls] or [0]
     return {
         "model": model,
         **scores,
         "failures": failures,
-        "cost_usd": round(sum(c for c, _ in calls), 4),
-        "p50_seconds": round(statistics.median(latencies) / 1000, 2),
+        "cost_usd": None if failed else round(sum(c for c, _ in calls), 4),
+        "p50_seconds": None if failed else round(statistics.median(latencies) / 1000, 2),
     }
 
 
@@ -256,6 +257,10 @@ def bench_draft(
         ) -> tuple[str, bool, list[bool]] | None:
             try:
                 draft = write_draft(usage, item, decisions[item.key], model, always, documents)
+                if (
+                    draft.source != "model"
+                ):  # write_draft swallows LLMError: a template is not this model's work
+                    return "template", False, [False] * len(judges)
                 verdicts = [
                     judge(judge_usage, item, decisions[item.key], draft.text, j).faithful for j in judges
                 ]
@@ -268,13 +273,14 @@ def bench_draft(
         except BenchStop:
             break  # this model's rows would be incomplete
         out = {k: v for k, v in results.items() if v is not None}
-        failures = len(results) - len(out)
+        fallbacks = sum(src == "template" for src, _, _ in out.values())
+        failures = len(results) - len(out) + fallbacks  # a template fallback is a failed draft
         n = len(judged_items) or 1
         for k, judge_model in enumerate(judges):  # the reference gets one row per judge
             scores = {
                 "items": len(judged_items),
                 "first_drafts_pass": round(sum(first for _, first, _ in out.values()) / n, 4),
-                "fallbacks": sum(src == "template" for src, _, _ in out.values()),
+                "fallbacks": fallbacks,
                 "judge_faithfulness": round(sum(v[k] for _, _, v in out.values()) / n, 4),
             }
             rows.append({**_row(model, scores, [usage, judge_usage], failures), "judge": judge_model})
@@ -295,7 +301,7 @@ def markdown(step: str, pack: str, rows: list[dict[str, Any]], partial: str | No
         "| " + " | ".join(columns) + " |",
         "|" + "---|" * len(columns),
     ]
-    lines += ["| " + " | ".join(str(r[c]) for c in columns) + " |" for r in rows]
+    lines += ["| " + " | ".join("-" if r[c] is None else str(r[c]) for c in columns) + " |" for r in rows]
     return "\n".join(lines) + "\n"
 
 

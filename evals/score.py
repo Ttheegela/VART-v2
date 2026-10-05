@@ -58,14 +58,18 @@ def _ratio(hits: int, total: int) -> float:
     return round(hits / total, 4) if total else 1.0
 
 
+def _gated(hits: int, total: int) -> float | None:
+    """A gated ratio over nothing is None, which gates() fails: a pack without the trap must not pass it."""
+    return round(hits / total, 4) if total else None
+
+
 def _citations(decisions: Iterator[Decision]) -> Iterator[Citation]:
     for d in decisions:
         yield from d.citations
 
 
-def citations_valid(decisions: list[Decision], stored: dict[str, list[str]]) -> float:
-    """Every cited quote re-read from the one stored line it names (spec 2: an invalid citation is a bug). An
-    answer that is not unknown but cites nothing counts as one invalid citation."""
+def _citation_counts(decisions: list[Decision], stored: dict[str, list[str]]) -> tuple[int, int]:
+    """(valid citations, citations plus uncited answers)."""
     cites = list(_citations(iter(decisions)))
     uncited = sum(d.label != "unknown" and not d.citations for d in decisions)
     good = 0
@@ -76,7 +80,13 @@ def citations_valid(decisions: list[Decision], stored: dict[str, list[str]]) -> 
             and 1 <= c.line_start <= len(lines)
             and contains(lines[c.line_start - 1], c.quote)
         )
-    return _ratio(good, len(cites) + uncited)
+    return good, len(cites) + uncited
+
+
+def citations_valid(decisions: list[Decision], stored: dict[str, list[str]]) -> float:
+    """Every cited quote re-read from the one stored line it names (spec 2: an invalid citation is a bug). An
+    answer that is not unknown but cites nothing counts as one invalid citation."""
+    return _ratio(*_citation_counts(decisions, stored))
 
 
 def _found(result: ItemResult, doc_id: str, quote: str) -> int | None:
@@ -87,11 +97,11 @@ def _found(result: ItemResult, doc_id: str, quote: str) -> int | None:
     return None
 
 
-def score(pack: Pack, obs: Observed) -> dict[str, float]:
+def score(pack: Pack, obs: Observed) -> dict[str, float | None]:
     # a key with no result must fail loudly, not shrink every denominator
     if missing := sorted(set(pack.keys) - set(obs.results)):
         raise ValueError(f"no result for key codes: {', '.join(missing)}")
-    m: dict[str, float] = {}
+    m: dict[str, float | None] = {}
     keys = pack.keys
     traps = {t.id: t for t in pack.facts.traps}
     specs = {d.id: d for d in pack.facts.documents}
@@ -101,7 +111,7 @@ def score(pack: Pack, obs: Observed) -> dict[str, float]:
     correct = 0
     for doc_id, s in specs.items():  # every document of the fact sheet; one never classified is wrong
         correct += obs.metadata.get(doc_id) == (s.kind, s.status, s.dated, s.scope, s.evidence_allowed)
-    m["classification_correct"] = _ratio(correct, len(specs))
+    m["classification_correct"] = _gated(correct, len(specs))
     same = 0
     for doc_id, ref in obs.reference.items():
         lines = obs.stored[obs.doc_ids[doc_id]]
@@ -127,7 +137,7 @@ def score(pack: Pack, obs: Observed) -> dict[str, float]:
             given = next((s.stance for s in r.stances if s.passage == idx), "irrelevant")
             stance_hits += given == e.stance
         recalls.append(hits / len(k.evidence))
-    m["retrieval_recall_at_8"] = round(statistics.fmean(recalls), 4) if recalls else 1.0
+    m["retrieval_recall_at_8"] = round(statistics.fmean(recalls), 4) if recalls else None
     m["stance_accuracy"] = _ratio(stance_hits, stance_total)
 
     # labels, conflicts, date rule, honest negatives, scope notes
@@ -135,12 +145,12 @@ def score(pack: Pack, obs: Observed) -> dict[str, float]:
         d = obs.results[code].decision
         return d.label, d.value
 
-    m["label_accuracy"] = _ratio(
+    m["label_accuracy"] = _gated(
         sum(answer_of(c) == (k.expected_label, k.expected_value) for c, k in keys.items()), len(keys)
     )
     expected = {c for c, k in keys.items() if k.expected_label == "conflict"}
     flagged = {c for c in keys if obs.results[c].decision.label == "conflict"}
-    m["conflict_recall"] = _ratio(len(expected & flagged), len(expected))
+    m["conflict_recall"] = _gated(len(expected & flagged), len(expected))
     m["conflict_precision"] = _ratio(len(expected & flagged), len(flagged))
     dated = [c for c, k in keys.items() if k.conflict_trap and traps[k.conflict_trap].kind == "date"]
     good_dates = 0
@@ -152,9 +162,9 @@ def score(pack: Pack, obs: Observed) -> dict[str, float]:
             and conflict.rule == "date"
             and any(specs[fact_doc[x.document_id]].kind == "record" for x in newer)
         )
-    m["date_rule_correct"] = _ratio(good_dates, len(dated))
+    m["date_rule_correct"] = _gated(good_dates, len(dated))
     honest = [c for c, k in keys.items() if k.honest_negative]
-    m["honest_negatives_kept"] = _ratio(sum(answer_of(c) == ("verified", "No") for c in honest), len(honest))
+    m["honest_negatives_kept"] = _gated(sum(answer_of(c) == ("verified", "No") for c in honest), len(honest))
     scoped = [c for c, k in keys.items() if any(traps[t].kind == "scope" for t in k.traps)]
     m["scope_notes_on_scope_traps"] = _ratio(
         sum(answer_of(c)[0] == "partial" and bool(obs.results[c].decision.scope_note) for c in scoped),
@@ -195,11 +205,11 @@ def score(pack: Pack, obs: Observed) -> dict[str, float]:
     # citations, answer text, cost and speed
     decisions = [r.decision for r in obs.results.values()]
     decisions += [s.decision for found in obs.suggestions.values() for s in found]
-    m["citations_valid"] = citations_valid(decisions, obs.stored)
+    m["citations_valid"] = _gated(*_citation_counts(decisions, obs.stored))
     # only an unknown item gets no draft, so a non-unknown item with no judge or check result failed that step
     written = [c for c, r in obs.results.items() if r.decision.label != "unknown"]
-    m["judge_faithfulness"] = _ratio(sum(obs.judged.get(c, False) for c in written), len(written))
-    m["answer_checks_pass"] = _ratio(sum(obs.checks.get(c) == [] for c in written), len(written))
+    m["judge_faithfulness"] = _gated(sum(obs.judged.get(c, False) for c in written), len(written))
+    m["answer_checks_pass"] = _gated(sum(obs.checks.get(c) == [] for c in written), len(written))
     first = [
         c for c in written if obs.results[c].draft.source == "model" and not obs.results[c].draft.problems
     ]
@@ -217,13 +227,13 @@ def score(pack: Pack, obs: Observed) -> dict[str, float]:
     m["asked_twice"] = float(obs.asked_twice)
     wanted = {(c, f) for c, k in keys.items() for f in k.fills}
     offered = {(c, s.key) for c, found in obs.suggestions.items() for s in found}
-    m["fills_suggested"] = _ratio(len(wanted & offered), len(wanted))
+    m["fills_suggested"] = _gated(len(wanted & offered), len(wanted))
     m["fills_false"] = float(len(offered - wanted))
 
     if obs.redaction is not None:
         red = obs.redaction
-        m["redaction_citations_valid"] = citations_valid(
-            [r.decision for r in red.results.values()], red.stored
+        m["redaction_citations_valid"] = _gated(
+            *_citation_counts([r.decision for r in red.results.values()], red.stored)
         )
         m["redaction_private_leaks"] = float(red.leaks)
         m["redaction_label_accuracy"] = _ratio(
@@ -237,12 +247,16 @@ def score(pack: Pack, obs: Observed) -> dict[str, float]:
     return m
 
 
-def gates(metrics: dict[str, float]) -> dict[str, dict[str, Any]]:
+def gates(metrics: dict[str, float | None]) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     for name, (op, target) in GATES.items():
         value = metrics.get(name)
         ok = value is not None and (value >= target if op == ">=" else value <= target)
         out[name] = {"op": op, "target": target, "value": value, "pass": ok}
+        if value is None:
+            out[name]["reason"] = (
+                "nothing to measure (0 of 0, or the stage did not run): the gate would pass on nothing"
+            )
     return out
 
 
@@ -270,7 +284,8 @@ def markdown(report: dict[str, Any]) -> str:
         "|---|---|---|---|",
     ]
     for name, g in report["gates"].items():
-        lines.append(f"| {name} | {g['op']} {g['target']} | {g['value']} | {'yes' if g['pass'] else 'NO'} |")
+        verdict = "yes" if g["pass"] else "NO" + (f" ({g['reason']})" if "reason" in g else "")
+        lines.append(f"| {name} | {g['op']} {g['target']} | {g['value']} | {verdict} |")
     lines += ["", "| Reported | Value |", "|---|---|"]
     lines += [f"| {k} | {v} |" for k, v in sorted(report["metrics"].items()) if k not in report["gates"]]
     misses = [f"- {x}" for x in report["label_misses"]] or ["- none"]

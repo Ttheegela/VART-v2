@@ -167,3 +167,33 @@ def test_the_spend_cap_stops_the_run(rig) -> None:  # type: ignore[no-untyped-de
     rows = bench.bench_stance(pack, items, found, ["m/one"], "k", 1, guard)
     assert rows == [] and guard.reason and "cap" in guard.reason
     assert rig.calls == 3  # no call after the cap was reached
+
+
+def test_a_drafter_that_only_falls_back_to_the_template_loses_to_a_working_one(rig, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    def draft(llm, item, decision, model, spend, documents):  # type: ignore[no-untyped-def]
+        llm.complete(build_request("draft", model, "p", "s", item.key, JudgeOut))
+        source = "template" if model == "deepseek/broken" else "model"
+        return SimpleNamespace(text="t", source=source, problems=())
+
+    monkeypatch.setattr(bench, "write_draft", draft)
+    pack, items, found = _inputs("a", "b", "c")
+    rows = {
+        r["model"]: r
+        for r in bench.bench_draft(
+            pack, items, found, ["deepseek/broken", "deepseek/ok"], "k", 1, [], bench.Guard(100.0)
+        )
+    }
+    broken, ok = rows["deepseek/broken"], rows["deepseek/ok"]
+    assert broken["judge_faithfulness"] == 0.0 and broken["failures"] == 3 and broken["fallbacks"] == 3
+    assert ok["judge_faithfulness"] == 1.0 and ok["failures"] == 0
+    assert broken["cost_usd"] is None  # all failed: no cost or speed to rank
+
+
+def test_a_row_where_every_call_failed_has_no_cost_or_speed_to_rank() -> None:
+    row = bench._row("m/x", {"items": 2}, [Usage(SimpleNamespace())], failures=2)
+    assert row["cost_usd"] is None and row["p50_seconds"] is None
+    assert "| m/x | 2 | 2 | - | - |" in markdown("stance", "dev", [row])
+    usage = Usage(SimpleNamespace(complete=lambda req: LLMResult("{}", 1, 1, 0.5, 2000)))
+    usage.complete(build_request("judge", "m/y", "p", "s", "u", JudgeOut))
+    ok = bench._row("m/y", {"items": 2}, [usage], failures=1)
+    assert ok["cost_usd"] == 0.5 and ok["p50_seconds"] == 2.0
