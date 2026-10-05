@@ -34,7 +34,7 @@
       "op": ">=",
       "pass": false,
       "target": 1.0,
-      "value": 0.5
+      "value": 0.75
     },
     "fills_suggested": {
       "op": ">=",
@@ -56,15 +56,15 @@
     },
     "judge_faithfulness": {
       "op": ">=",
-      "pass": false,
+      "pass": true,
       "target": 0.9,
-      "value": 0.8816
+      "value": 0.9452
     },
     "label_accuracy": {
       "op": ">=",
       "pass": true,
       "target": 0.8,
-      "value": 0.8539
+      "value": 0.8652
     },
     "redaction_citations_valid": {
       "op": ">=",
@@ -82,7 +82,7 @@
       "op": ">=",
       "pass": true,
       "target": 0.9,
-      "value": 0.9524
+      "value": 0.9738
     },
     "template_or_draft_cited_as_verified": {
       "op": "<=",
@@ -107,11 +107,11 @@
       "value": "No"
     },
     "MVSP-1.3": {
-      "citations": 1,
-      "draft": "model",
+      "citations": 0,
+      "draft": "none",
       "dropped": [],
-      "label": "partial",
-      "value": "Partial"
+      "label": "unknown",
+      "value": null
     },
     "MVSP-1.4": {
       "citations": 2,
@@ -193,14 +193,14 @@
       "value": "Yes"
     },
     "MVSP-2.7": {
-      "citations": 1,
+      "citations": 3,
       "draft": "model",
       "dropped": [],
-      "label": "verified",
-      "value": "Yes"
+      "label": "partial",
+      "value": "Partial"
     },
     "MVSP-2.8": {
-      "citations": 2,
+      "citations": 3,
       "draft": "model",
       "dropped": [],
       "label": "partial",
@@ -210,8 +210,8 @@
       "citations": 3,
       "draft": "model",
       "dropped": [],
-      "label": "verified",
-      "value": "Yes"
+      "label": "partial",
+      "value": "Partial"
     },
     "MVSP-3.2": {
       "citations": 0,
@@ -259,11 +259,11 @@
       "citations": 1,
       "draft": "model",
       "dropped": [],
-      "label": "partial",
-      "value": "Partial"
+      "label": "verified",
+      "value": "Yes"
     },
     "MVSP-4.4": {
-      "citations": 2,
+      "citations": 1,
       "draft": "model",
       "dropped": [],
       "label": "verified",
@@ -300,18 +300,18 @@
       "value": "No"
     },
     "VSQ-05": {
-      "citations": 1,
+      "citations": 2,
       "draft": "model",
       "dropped": [],
       "label": "verified",
       "value": "Yes"
     },
     "VSQ-06": {
-      "citations": 0,
-      "draft": "none",
+      "citations": 1,
+      "draft": "model",
       "dropped": [],
-      "label": "unknown",
-      "value": null
+      "label": "partial",
+      "value": "Partial"
     },
     "VSQ-07": {
       "citations": 1,
@@ -331,22 +331,22 @@
       "citations": 6,
       "draft": "model",
       "dropped": [],
-      "label": "verified",
-      "value": "Yes"
+      "label": "conflict",
+      "value": null
     },
     "VSQ-10": {
-      "citations": 1,
+      "citations": 2,
       "draft": "model",
       "dropped": [],
-      "label": "verified",
-      "value": "Yes"
+      "label": "partial",
+      "value": "Partial"
     },
     "VSQ-11": {
-      "citations": 1,
+      "citations": 4,
       "draft": "model",
       "dropped": [],
-      "label": "verified",
-      "value": "Yes"
+      "label": "conflict",
+      "value": null
     },
     "VSQ-12": {
       "citations": 1,
@@ -377,11 +377,11 @@
       "value": null
     },
     "VSQ-16": {
-      "citations": 1,
-      "draft": "model",
+      "citations": 0,
+      "draft": "none",
       "dropped": [],
-      "label": "verified",
-      "value": "Yes"
+      "label": "unknown",
+      "value": null
     },
     "VSQ-17": {
       "citations": 1,
@@ -405,7 +405,7 @@
       "value": "Yes"
     },
     "VSQ-20": {
-      "citations": 7,
+      "citations": 1,
       "draft": "model",
       "dropped": [],
       "label": "verified",
@@ -447,11 +447,11 @@
       "value": "Yes"
     },
     "VSQ-26": {
-      "citations": 3,
-      "draft": "model",
+      "citations": 0,
+      "draft": "none",
       "dropped": [],
-      "label": "partial",
-      "value": "Partial"
+      "label": "unknown",
+      "value": null
     },
     "VSQ-27": {
       "citations": 1,
@@ -485,8 +485,8 @@
       "citations": 2,
       "draft": "model",
       "dropped": [],
-      "label": "conflict",
-      "value": null
+      "label": "partial",
+      "value": "Partial"
     },
     "VSQ-32": {
       "citations": 1,
@@ -503,7 +503,7 @@
       "value": "Yes"
     },
     "VSQ-34": {
-      "citations": 1,
+      "citations": 3,
       "draft": "model",
       "dropped": [],
       "label": "verified",
@@ -513,8 +513,8 @@
       "citations": 2,
       "draft": "model",
       "dropped": [],
-      "label": "partial",
-      "value": "Partial"
+      "label": "verified",
+      "value": "No"
     },
     "VSQ-36": {
       "citations": 2,
@@ -580,11 +580,11 @@
       "value": "Yes"
     },
     "VSQ-45": {
-      "citations": 1,
-      "draft": "model",
+      "citations": 0,
+      "draft": "none",
       "dropped": [],
-      "label": "partial",
-      "value": "Partial"
+      "label": "unknown",
+      "value": null
     },
     "VSQ-46": {
       "citations": 1,
@@ -602,7 +602,7 @@
     },
     "VSQ-48": {
       "citations": 1,
-      "draft": "template",
+      "draft": "model",
       "dropped": [
         "not-evidence"
       ],
@@ -624,7 +624,7 @@
       "value": "Yes"
     },
     "VSQ-51": {
-      "citations": 2,
+      "citations": 5,
       "draft": "model",
       "dropped": [],
       "label": "partial",
@@ -659,14 +659,14 @@
       "value": "Yes"
     },
     "VSQ-56": {
-      "citations": 5,
-      "draft": "template",
+      "citations": 4,
+      "draft": "model",
       "dropped": [],
       "label": "verified",
       "value": "Yes"
     },
     "VSQ-57": {
-      "citations": 2,
+      "citations": 4,
       "draft": "model",
       "dropped": [],
       "label": "conflict",
@@ -694,8 +694,8 @@
       "value": null
     },
     "VSQ-61": {
-      "citations": 2,
-      "draft": "template",
+      "citations": 1,
+      "draft": "model",
       "dropped": [
         "not-evidence"
       ],
@@ -727,47 +727,46 @@
     }
   },
   "label_misses": [
-    "VSQ-09: expected conflict, got verified Yes",
-    "VSQ-10: expected partial Partial, got verified Yes",
+    "VSQ-06: expected unknown, got partial Partial",
+    "VSQ-11: expected verified Yes, got conflict",
     "VSQ-13: expected conflict, got partial Partial",
-    "VSQ-16: expected unknown, got verified Yes",
-    "VSQ-26: expected unknown, got partial Partial",
-    "VSQ-45: expected unknown, got partial Partial",
+    "VSQ-31: expected conflict, got partial Partial",
+    "VSQ-35: expected partial Partial, got verified No",
     "VSQ-61: expected unknown, got partial Partial",
-    "MVSP-1.3: expected unknown, got partial Partial",
     "MVSP-1.4: expected verified Yes, got partial Partial",
     "MVSP-2.1: expected unknown, got partial Partial",
+    "MVSP-2.7: expected verified Yes, got partial Partial",
     "MVSP-2.8: expected verified Yes, got partial Partial",
-    "MVSP-4.2: expected verified Yes, got partial Partial",
-    "MVSP-4.3: expected verified Yes, got partial Partial"
+    "MVSP-3.1: expected verified Yes, got partial Partial",
+    "MVSP-4.2: expected verified Yes, got partial Partial"
   ],
   "metrics": {
     "answer_checks_pass": 1.0,
-    "ask_precision": 0.6486,
-    "ask_recall": 0.9231,
+    "ask_precision": 0.6341,
+    "ask_recall": 1.0,
     "asked_twice": 0.0,
     "citations_valid": 1.0,
     "classification_correct": 1.0,
-    "conflict_precision": 1.0,
+    "conflict_precision": 0.8333,
     "conflict_recall": 0.7143,
-    "cost_usd_per_60_items": 0.0154,
-    "date_rule_correct": 0.5,
+    "cost_usd_per_60_items": 0.0167,
+    "date_rule_correct": 0.75,
     "fills_false": 0.0,
     "fills_suggested": 1.0,
-    "first_drafts_pass": 0.9079,
+    "first_drafts_pass": 0.9315,
     "honest_negatives_kept": 1.0,
     "injections_followed": 0.0,
-    "judge_faithfulness": 0.8816,
-    "label_accuracy": 0.8539,
-    "p50_seconds_per_item": 12.31,
+    "judge_faithfulness": 0.9452,
+    "label_accuracy": 0.8652,
+    "p50_seconds_per_item": 13.49,
     "parsing_documents_match": 1.0,
     "parsing_key_quotes_in_one_line": 1.0,
     "redaction_citations_valid": 1.0,
-    "redaction_label_accuracy": 0.88,
+    "redaction_label_accuracy": 0.76,
     "redaction_private_leaks": 0.0,
-    "retrieval_recall_at_8": 0.9524,
-    "scope_notes_on_scope_traps": 0.6667,
-    "stance_accuracy": 0.8696,
+    "retrieval_recall_at_8": 0.9738,
+    "scope_notes_on_scope_traps": 0.0,
+    "stance_accuracy": 0.9149,
     "template_or_draft_cited_as_verified": 0.0
   },
   "models": {
@@ -780,8 +779,8 @@
   "pack": "dev",
   "prompts": [
     "classify@p1",
-    "stance@p1",
-    "draft@p1",
+    "stance@p2",
+    "draft@p2",
     "judge@p2"
   ]
 }
