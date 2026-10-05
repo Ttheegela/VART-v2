@@ -3,95 +3,106 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VART — Home (mockup)</title>
+<title>VART — Home, direction C (mockup)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<!-- Mockup only. The app self-hosts the face: @fontsource/jetbrains-mono -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
 <style>
-/* Hallmark · genre: modern-minimal · macrostructure: Index-First · nav: N9 · footer: Ft2 · enrichment: none
- * theme: custom · vibe: "audit ledger, dense, monochrome, every line cited" · axes: light / grotesk-sans / neutral
- * display: IBM Plex Sans 600 · body: IBM Plex Sans 400 · mono: IBM Plex Mono · context: user-provided
- * pre-emit critique: P5 H4 E4 S5 R5 V4
+/* Hallmark · direction C "console" · genre: modern-minimal · macrostructure: Index-First, in the Workbench chrome
+ * nav: N8 terminal bar (wordmark only on Home) · footer: status line · enrichment: none · context: user-provided
+ * theme: custom · vibe: "an instrument you drive from the keyboard" · axes: light body, dark chrome / mono / neutral
+ * single family by design: JetBrains Mono 400/500/700 · pre-emit critique: P5 H4 E4 S5 R5 V4
  * Static mockup. Token values are the Tailwind neutral scale that web/src/index.css aliases (see /design.md).
  */
 :root {
-  --n-50: #fafafa; --n-100: #f5f5f5; --n-200: #e5e5e5; --n-300: #d4d4d4; --n-400: #a3a3a3;
-  --n-500: #737373; --n-700: #404040; --n-800: #262626; --n-950: #0a0a0a; --white: #ffffff;
-  --color-paper: var(--n-50); --color-surface: var(--white); --color-sunken: var(--n-100);
+  --n-100: #f5f5f5; --n-200: #e5e5e5; --n-300: #d4d4d4; --n-400: #a3a3a3; --n-500: #737373;
+  --n-600: #525252; --n-700: #404040; --n-800: #262626; --n-900: #171717; --n-950: #0a0a0a; --n-50: #fafafa; --white: #ffffff;
+  --color-paper: var(--white); --color-sunken: var(--n-100); --color-mark: var(--n-200);
   --color-rule: var(--n-200); --color-rule-strong: var(--n-300);
-  --color-ink: var(--n-950); --color-ink-2: var(--n-700); --color-ink-3: var(--n-500); --color-on-ink: var(--white);
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
-  --text-label: 0.75rem; --text-sm: 0.875rem; --text-base: 1rem; --text-lg: 1.125rem; --text-2xl: 1.5rem;
+  --color-ink: var(--n-950); --color-ink-2: var(--n-700); --color-ink-3: var(--n-600);
+  --color-chrome: var(--n-950); --color-chrome-2: var(--n-900); --color-chrome-rule: var(--n-800);
+  --color-on-chrome: var(--n-50); --color-on-chrome-2: var(--n-400);
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --text-xs: 0.6875rem; --text-sm: 0.8125rem; --text-base: 0.875rem;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px; --space-10: 40px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --bar-h: 36px; --status-h: 28px;
 }
 *, *::before, *::after { box-sizing: border-box; }
 html, body { overflow-x: clip; }
-body { margin: 0; background: var(--color-paper); color: var(--color-ink); font: 400 var(--text-base)/1.55 var(--font-sans); -webkit-font-smoothing: antialiased; }
-:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }
-.mono { font-family: var(--font-mono); }
-.label { font: 500 var(--text-label)/1rem var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; }
+body { margin: 0; min-height: 100dvh; display: flex; flex-direction: column; background: var(--color-paper); color: var(--color-ink); font: 400 var(--text-sm)/1.55 var(--font-mono); font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 1px; }
+[data-chrome] :focus-visible { outline-color: var(--color-on-chrome); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+kbd { display: inline-block; min-width: 1.5em; padding: 0 var(--space-1); font: 500 var(--text-xs)/1.5 var(--font-mono); text-align: center; border: 1px solid currentColor; }
 
-/* N9 edge-aligned bar */
-.bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; height: 44px; padding: 0 16px; border-bottom: 1px solid var(--color-ink); background: var(--color-surface); }
-.wordmark { font: 500 var(--text-sm)/1 var(--font-mono); letter-spacing: 0.18em; text-decoration: none; color: var(--color-ink); }
-.bar .meta { color: var(--color-ink-3); white-space: nowrap; }
+/* N8 terminal bar, inverted; Home shows the wordmark only */
+.bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); height: var(--bar-h); padding: 0 var(--space-4); background: var(--color-chrome); color: var(--color-on-chrome-2); }
+.wordmark { font-weight: 700; letter-spacing: 0.12em; color: var(--color-on-chrome); text-decoration: none; }
+.bar .meta { white-space: nowrap; }
 
-main { max-width: 48rem; margin: 0 auto; padding: 40px 16px 56px; }
-h1 { font-size: var(--text-2xl); line-height: 1.25; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 12px; overflow-wrap: anywhere; min-width: 0; }
-.lede { color: var(--color-ink-2); max-width: 62ch; margin: 0 0 32px; }
-h2 { font-size: var(--text-base); font-weight: 600; margin: 0 0 8px; }
-section + section { margin-top: 40px; }
+main { flex: 1; width: 100%; max-width: 48rem; margin: 0 auto; padding: var(--space-10) var(--space-4); }
+h1 { margin: 0 0 var(--space-3); font: 500 var(--text-base)/1.45 var(--font-mono); overflow-wrap: anywhere; min-width: 0; }
+.lede { margin: 0 0 var(--space-6); max-width: 72ch; color: var(--color-ink-2); }
+.sub { margin: 0 0 var(--space-2); padding-bottom: var(--space-1); font: 500 var(--text-xs)/1.4 var(--font-mono); color: var(--color-ink-2); border-bottom: 1px solid var(--color-ink); }
+section + section { margin-top: var(--space-10); }
 
-/* Index-First rows: the links are the buttons */
-.ways { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-ink); }
-.ways li { border-bottom: 1px solid var(--color-ink); }
-.way { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 24px; padding: 16px 12px; color: inherit; text-decoration: none; background: var(--color-surface); transition: background-color 100ms var(--ease-out); }
+/* Index-First rows: each way in is a row with its key */
+.ways { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--color-ink); }
+.ways li { border-bottom: 1px solid var(--color-rule-strong); }
+.way { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-1) var(--space-3); align-items: baseline; padding: var(--space-3) var(--space-2); color: inherit; text-decoration: none; transition: background-color 100ms var(--ease-out); }
 .way:hover { background: var(--color-sunken); }
-.way:active { background: var(--n-200); }
-.way strong { font-weight: 600; white-space: nowrap; }
-.way .go { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-family: var(--font-mono); font-size: var(--text-sm); white-space: nowrap; }
-.way p { margin: 0; font-size: var(--text-sm); color: var(--color-ink-2); }
+.way:active { background: var(--color-mark); }
+.way kbd { color: var(--color-ink-3); border-color: var(--color-rule-strong); }
+.way strong { font-weight: 500; white-space: nowrap; }
+.way p { grid-column: 2 / 4; margin: 0; color: var(--color-ink-2); }
+.way .go { font-size: var(--text-xs); color: var(--color-ink-3); white-space: nowrap; }
 
-/* F3 tabular spec sheet */
-.sheet { width: 100%; border-collapse: collapse; background: var(--color-surface); font-size: var(--text-sm); font-variant-numeric: tabular-nums; border: 1px solid var(--color-rule-strong); }
-.sheet th { text-align: left; background: var(--color-sunken); color: var(--color-ink-2); padding: 8px 12px; border-bottom: 1px solid var(--color-rule-strong); }
-.sheet td { padding: 8px 12px; border-bottom: 1px solid var(--color-rule); vertical-align: top; }
-.sheet tr:last-child td { border-bottom: 0; }
-.sheet td:first-child { width: 11rem; }
-.sheet .val { font-family: var(--font-mono); white-space: nowrap; }
+/* Label table: same chips as the Run grid */
 .scroll { overflow-x: auto; }
-.note { font-size: var(--text-sm); color: var(--color-ink-3); margin: 8px 0 0; }
+.sheet { width: 100%; min-width: 34rem; border-collapse: collapse; }
+.sheet th { height: 24px; padding: 0 var(--space-2); text-align: left; font: 500 var(--text-xs)/1 var(--font-mono); color: var(--color-ink-2); border-bottom: 1px solid var(--color-ink); white-space: nowrap; }
+.sheet td { padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--color-rule); vertical-align: top; }
+.sheet td:first-child { width: 19ch; }
+.sheet td:last-child { width: 8ch; white-space: nowrap; }
+.note { margin: var(--space-2) 0 0; font-size: var(--text-xs); color: var(--color-ink-3); }
 
-/* Status labels — words first, border style second */
-.st { display: inline-block; padding: 2px 6px; font: 500 var(--text-label)/1rem var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; border: 1px solid transparent; }
-.st-verified { background: var(--color-ink); color: var(--color-on-ink); }
-.st-confirmed { background: var(--n-700); color: var(--color-on-ink); }
+.st { display: inline-block; min-width: 9ch; padding: 0 var(--space-1); font: 500 var(--text-xs)/18px var(--font-mono); text-transform: lowercase; white-space: nowrap; border: 1px solid transparent; }
+.st-verified { background: var(--color-chrome); color: var(--color-on-chrome); }
+.st-confirmed { background: var(--n-700); color: var(--color-on-chrome); }
 .st-partial { border-color: var(--color-ink); }
-.st-conflict { border: 2px solid var(--color-ink); padding: 1px 5px; font-weight: 600; }
+.st-conflict { border: 2px solid var(--color-ink); line-height: 16px; font-weight: 700; text-transform: uppercase; }
 .st-unknown { border: 1px dashed var(--n-400); color: var(--color-ink-2); }
-.st-na { color: var(--color-ink-3); padding-left: 0; }
+.st-na { color: var(--color-ink-3); }
 
-.status { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 24px; margin: 0; font-size: var(--text-sm); background: var(--color-surface); border: 1px solid var(--color-rule-strong); padding: 12px; }
-.status dt { color: var(--color-ink-2); }
-.status dd { margin: 0; font-family: var(--font-mono); }
+.kv { display: grid; grid-template-columns: 14ch minmax(0, 1fr); gap: 2px var(--space-3); margin: 0; }
+.kv dt { color: var(--color-ink-3); }
+.kv dd { margin: 0; }
 
-footer { border-top: 1px solid var(--color-rule-strong); padding: 16px; font-size: var(--text-sm); color: var(--color-ink-3); }
-footer p { max-width: 48rem; margin: 0 auto; }
-footer a { color: inherit; white-space: nowrap; }
+/* Status line, inverted */
+.status { display: flex; align-items: center; gap: var(--space-4); height: var(--status-h); padding: 0 var(--space-4); background: var(--color-chrome); color: var(--color-on-chrome-2); font-size: var(--text-xs); white-space: nowrap; overflow: hidden; }
+.status .mode { padding: 0 var(--space-2); background: var(--color-on-chrome); color: var(--color-ink); font-weight: 700; }
+.status .keys { display: flex; gap: var(--space-3); min-width: 0; overflow: hidden; }
+.status kbd { border-color: var(--color-chrome-rule); color: var(--color-on-chrome); }
+.status .end { margin-left: auto; }
+.status a { color: inherit; }
 
+@media (max-width: 899px) { .status .end { display: none; } }
 @media (max-width: 480px) {
-  .way { grid-template-columns: minmax(0, 1fr); }
-  .way .go { grid-row: auto; grid-column: 1; }
+  .way { grid-template-columns: auto minmax(0, 1fr); }
+  .way .go { display: none; }
+  .way p { grid-column: 1 / 3; }
   .bar .meta { display: none; }
+  .status .keys span:nth-child(n+3) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition-duration: 120ms !important; transition-property: opacity !important; } }
 </style>
 </head>
 <body>
-<header class="bar">
+<header class="bar" data-chrome>
   <a class="wordmark" href="#">VART</a>
-  <span class="label meta">Synthetic demo data</span>
+  <span class="meta">synthetic demo data</span>
 </header>
 
 <main>
@@ -103,55 +114,56 @@ footer a { color: inherit; white-space: nowrap; }
 
     <ul class="ways">
       <li>
-        <a class="way" href="run-grid.html">
-          <strong>Try with a sample company</strong>
+        <a class="way" href="run-grid-c.html" aria-keyshortcuts="s">
+          <kbd aria-hidden="true">s</kbd><strong>Try with a sample company</strong><span class="go">open</span>
           <p>Kestrelyn, a fictional SaaS company: 22 documents and the bundled Vendor Security Questionnaire. The run
             is precomputed, so it opens instantly and costs nothing.</p>
-          <span class="go">Open →</span>
         </a>
       </li>
       <li>
-        <a class="way" href="#">
-          <strong>Use your own files</strong>
+        <a class="way" href="#" aria-keyshortcuts="o">
+          <kbd aria-hidden="true">o</kbd><strong>Use your own files</strong><span class="go">upload</span>
           <p>An xlsx or csv questionnaire, plus documents in docx, pdf, md or xlsx. Your workspace is private, stops
             working after 24 hours and is deleted within about 37.</p>
-          <span class="go">Upload →</span>
         </a>
       </li>
     </ul>
   </section>
 
   <section aria-labelledby="labels">
-    <h2 id="labels">How a label is decided</h2>
+    <h2 class="sub" id="labels">how a label is decided</h2>
     <div class="scroll">
       <table class="sheet">
-        <thead><tr><th scope="col" class="label">Label</th><th scope="col" class="label">When</th><th scope="col" class="label">Value</th></tr></thead>
+        <thead><tr><th scope="col">label</th><th scope="col">when</th><th scope="col">value</th></tr></thead>
         <tbody>
-          <tr><td><span class="st st-verified">Verified</span></td><td>Every surviving quote says the same thing, from a final document.</td><td class="val">Yes / No</td></tr>
-          <tr><td><span class="st st-partial">Partial</span></td><td>Mixed evidence, a negation in the quote, a scope difference, or draft documents only.</td><td class="val">Partial</td></tr>
-          <tr><td><span class="st st-conflict">Conflict</span></td><td>Two documents disagree. A newer record is listed first, and you are asked which is current.</td><td class="val">—</td></tr>
-          <tr><td><span class="st st-unknown">Unknown</span></td><td>No evidence survived the checks. The item goes to Questions for you.</td><td class="val">—</td></tr>
-          <tr><td><span class="st st-confirmed">Confirmed by you</span></td><td>You answered it; your answer is kept as a dated statement and cited.</td><td class="val">Yours</td></tr>
-          <tr><td><span class="st st-na">Not applicable</span></td><td>You marked it so, with a reason in the audit log.</td><td class="val">N/A</td></tr>
+          <tr><td><span class="st st-verified">verified</span></td><td>Every surviving quote says the same thing, from a final document.</td><td>Yes / No</td></tr>
+          <tr><td><span class="st st-partial">partial</span></td><td>Mixed evidence, a negation in the quote, a scope difference, or draft documents only.</td><td>Partial</td></tr>
+          <tr><td><span class="st st-conflict">conflict</span></td><td>Two documents disagree. A newer record is listed first, and you are asked which is current.</td><td>—</td></tr>
+          <tr><td><span class="st st-unknown">unknown</span></td><td>No evidence survived the checks. The item goes to Questions for you.</td><td>—</td></tr>
+          <tr><td><span class="st st-confirmed">confirmed by you</span></td><td>You answered it; your answer is kept as a dated statement and cited.</td><td>Yours</td></tr>
+          <tr><td><span class="st st-na">not applicable</span></td><td>You marked it so, with a reason in the audit log.</td><td>N/A</td></tr>
         </tbody>
       </table>
     </div>
     <p class="note">A quote that is not found word for word in its source, or that comes from a template, a contract or
-      a flagged injection, is dropped before any label is set.</p>
+      a flagged injection, is dropped before any label is set. Every answer stays “Draft, not approved” until a
+      person approves it.</p>
   </section>
 
   <section aria-labelledby="status">
-    <h2 id="status">System status</h2>
-    <dl class="status">
-      <dt>Overall</dt><dd>OK</dd>
-      <dt>Database</dt><dd>OK</dd>
-      <dt>Model check</dt><dd>OK (2026-10-05)</dd>
+    <h2 class="sub" id="status">system status</h2>
+    <dl class="kv">
+      <dt>overall</dt><dd>OK</dd>
+      <dt>database</dt><dd>OK</dd>
+      <dt>model check</dt><dd>OK (2026-10-05)</dd>
     </dl>
   </section>
 </main>
 
-<footer>
-  <p>VART · labels decided by code · synthetic demo data · <a href="#">MIT licensed</a></p>
+<footer class="status" data-chrome>
+  <span class="mode">HOME</span>
+  <span class="keys"><span><kbd>s</kbd> sample</span><span><kbd>o</kbd> own files</span><span><kbd>?</kbd> all keys</span></span>
+  <span class="end">VART · labels decided by code · synthetic demo data · <a href="#">MIT</a></span>
 </footer>
 </body>
 </html>

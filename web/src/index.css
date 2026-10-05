@@ -1,33 +1,41 @@
-/* Hallmark · genre: modern-minimal · macrostructure: Index-First (Home) + app shell (Run grid)
- * theme: custom · vibe: "audit ledger, dense, monochrome, every line cited"
- * paper: neutral-50 · surface: white · ink: neutral-950 · accent: none (ink is the accent)
- * display: IBM Plex Sans 600 · body: IBM Plex Sans 400 · mono: IBM Plex Mono 400/500
- * axes: light / grotesk-sans / neutral · nav: N9 edge-aligned tab bar · footer: Ft2 inline single line
- * Locked in /design.md. Colours alias Tailwind's neutral scale only (scripts/check_monochrome.py).
+/* Hallmark · direction C "console" · genre: modern-minimal · macrostructure: Workbench (command line, one dense
+ * list, inspector drawer, status line) for app views; Index-First for Home
+ * theme: custom · vibe: "an instrument you drive from the keyboard" · axes: light body, dark chrome / mono / neutral
+ * single family by design: JetBrains Mono 400/500/700, self-hosted (@fontsource/jetbrains-mono, imported in main.tsx)
+ * nav: N8 terminal bar (numbered views, inverted) · footer: status line (mode, cursor, keys)
+ * Locked in /design.md. Colours alias Tailwind's neutral scale, black and white only (scripts/check_monochrome.py).
  */
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;600&display=swap");
 @import "tailwindcss";
 
 @theme {
-  /* Surfaces and ink: aliases, never new values. */
-  --color-paper: var(--color-neutral-50); /* page */
-  --color-surface: var(--color-white); /* grid, drawer, inputs: the ledger sheet */
-  --color-sunken: var(--color-neutral-100); /* row hover, header band, context lines */
-  --color-mark: var(--color-neutral-200); /* the quoted span inside a passage */
+  /* Body: light, ruled. Aliases, never new values. */
+  --color-paper: var(--color-white); /* page, list, drawer body, inputs */
+  --color-sunken: var(--color-neutral-100); /* row hover, selected row, filter line, cited lines */
+  --color-mark: var(--color-neutral-200); /* the quoted span inside a cited line */
   --color-rule: var(--color-neutral-200); /* hairline between rows */
-  --color-rule-strong: var(--color-neutral-300); /* panel edges, input borders */
-  --color-ink: var(--color-neutral-950); /* text, primary fill, focus ring */
-  --color-ink-2: var(--color-neutral-700); /* secondary text */
-  --color-ink-3: var(--color-neutral-500); /* metadata on surface or paper only; on sunken use ink-2 */
-  --color-on-ink: var(--color-white); /* text on a filled ink control */
+  --color-rule-strong: var(--color-neutral-300); /* panel edges, input borders, kbd on paper */
+  --color-ink: var(--color-neutral-950); /* text, header rule, focus ring on paper, selected outline */
+  --color-ink-2: var(--color-neutral-700); /* answers, secondary text */
+  --color-ink-3: var(--color-neutral-600); /* metadata; 7.8:1 on paper, 7.2:1 on sunken */
 
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  /* Chrome: the inverted top bar, drawer header, source captions and status line. */
+  --color-chrome: var(--color-neutral-950); /* bar, status line, drawer header, primary button */
+  --color-chrome-2: var(--color-neutral-900); /* hover on chrome, source caption band */
+  --color-chrome-rule: var(--color-neutral-800); /* kbd borders on chrome */
+  --color-on-chrome: var(--color-neutral-50); /* text and focus ring on chrome; current view fill */
+  --color-on-chrome-2: var(--color-neutral-400); /* secondary text on chrome; 7.9:1 on chrome, 7.1:1 on chrome-2 */
 
-  /* Density: the grid is set at text-sm (14px); prose at text-base. Labels at 12px, never smaller. */
-  --text-label: 0.75rem;
-  --text-label--line-height: 1rem;
-  --text-label--letter-spacing: 0.06em;
+  /* One family. font-sans aliases mono so nothing falls back to a sans by accident. */
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-sans: var(--font-mono);
+
+  /* Type scale: three sizes. Mono runs wide, so the steps are small. */
+  --text-xs: 0.6875rem; /* 11px: kbd, labels, column heads, line listings, status line */
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.8125rem; /* 13px: list rows, buttons, inputs, drawer body */
+  --text-sm--line-height: 1.55;
+  --text-base: 0.875rem; /* 14px: the command-line path, the question in the drawer, Home prose */
+  --text-base--line-height: 1.45;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
@@ -41,19 +49,28 @@
   body {
     background-color: var(--color-paper);
     color: var(--color-ink);
-    font-family: var(--font-sans);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
+    font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
   }
-  /* Instant, never animated; 2px ink with offset so it reads on filled ink controls too. */
+  /* Instant, never animated. Ink on paper; inside chrome ([data-chrome]) it turns on-chrome. */
   :focus-visible {
     outline: 2px solid var(--color-ink);
-    outline-offset: 2px;
+    outline-offset: 1px;
   }
-  table,
-  code,
-  kbd,
-  samp {
-    font-variant-numeric: tabular-nums;
+  [data-chrome] :focus-visible {
+    outline-color: var(--color-on-chrome);
+  }
+  /* Key hint: shown next to every action it drives; the border takes the text colour of its context. */
+  kbd {
+    display: inline-block;
+    min-width: 1.5em;
+    padding: 0 0.25rem;
+    font: 500 var(--text-xs) / 1.5 var(--font-mono);
+    text-align: center;
+    border: 1px solid currentColor;
   }
   @media (prefers-reduced-motion: reduce) {
     *,
