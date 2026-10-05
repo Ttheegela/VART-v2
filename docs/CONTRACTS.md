@@ -52,6 +52,11 @@ example `stances jsonb`); the passages are rebuilt from those chunks with the do
 - 2026-10-05: `stance@p1` -> `stance@p2` (Plan 2C Task 4 Step 7, tune round 1, Ruling 9): partial only for a limit the
   passage states; another subject or audience is irrelevant; a record row's failing status field (Overdue, Expired,
   Failed, Open) is no, quoted with that field. Signatures unchanged; re-record.
+  Revised before acceptance (round 2, Ruling 10; still `stance@p2`, the round-1 recordings were never accepted):
+  no "narrower scope" in partial (scope stays decide's rule 5); only a missing actor reads yes, a missing
+  threshold stays partial; another subject means clearly different, and a claim for one of several groups is
+  judged on that group.
 - 2026-10-05: `draft@p1` -> `draft@p2` (same round): no number taken from the question, punctuation outside the
-  quotation marks, no comment on a document's status. `check` now ignores trailing `,;:.` inside quotation marks.
+  quotation marks, no comment on a document's status. `check` now ignores trailing `,;:` inside quotation marks
+  (round 2, Ruling 10: revised before acceptance from `,;:.`; still `draft@p2`).
   Signatures unchanged; re-record.

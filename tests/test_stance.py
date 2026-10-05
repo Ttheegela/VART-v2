@@ -148,15 +148,24 @@ def test_a_record_rows_failing_status_reads_as_no_and_is_quoted() -> None:
 
 def test_a_passage_on_another_subject_or_audience_is_irrelevant() -> None:
     # Clause B.
-    assert "different subject, system, product or audience" in _flat()
-    assert 'is "irrelevant", not "partial" and not "yes"' in _flat()
+    # Round 2 (Ruling 10, I1): a different population is decide's scope rule, not irrelevance.
+    flat = _flat()
+    assert "different subject, product or audience" in flat
+    assert "only the company's own staff when the question asks only about its customers" in flat
+    assert 'is "irrelevant", not "partial" and not "yes"' in flat
+    assert "judge it on what it states for that one" in flat
 
 
 def test_partial_needs_a_limit_the_passage_itself_states() -> None:
     # Clause C.
     flat = _flat()
-    assert 'Use "partial" only when the passage itself states a limit, an exception or a narrower' in flat
-    assert "states no limit is" in flat
+    # Round 2 (Ruling 10, I1 and I2): no "narrower scope" (scope is decide's job); only a missing actor makes
+    # yes, a missing threshold stays partial.
+    assert 'Use "partial" only when the passage itself states a limit or an exception' in flat
+    assert "narrower scope" not in flat and "how often) and states no limit" not in flat
+    assert 'leaves out only who carries it out is "yes"' in flat
+    assert "the question sets a threshold (at least how often, within how long, how strong)" in flat
+    assert 'the passage states none, the stance is "partial"' in flat
 
 
 def test_the_new_clauses_are_generic() -> None:

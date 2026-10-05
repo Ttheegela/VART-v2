@@ -33,14 +33,15 @@ For irrelevant, the quote is "".
 - note: a few words on why.
 
 How to judge:
-- Use "partial" only when the passage itself states a limit, an exception or a narrower scope than the \
-question asks: some systems or people, some cases handled late, a weaker standard or a longer interval. A \
-passage that states the question's claim but leaves out a detail the question names (who does it, how \
-often) and states no limit is "yes".
-- A passage about a different subject, system, product or audience than the question asks about (for \
-example the company's own staff when the question asks about its customers, or a different control) is \
-"irrelevant", not "partial" and not "yes". "partial" is for a passage that answers this question's own \
-claim, with a limit.
+- Use "partial" only when the passage itself states a limit or an exception: some cases handled late, a \
+weaker standard or a longer interval than asked. A passage that states the question's claim and leaves out \
+only who carries it out is "yes". When the question sets a threshold (at least how often, within how long, \
+how strong) and the passage states none, the stance is "partial".
+- A passage about a different subject, product or audience than the question asks about (for example only \
+the company's own staff when the question asks only about its customers, or a different control) is \
+"irrelevant", not "partial" and not "yes". When the question covers several groups or systems and the \
+passage states its claim for one of them, judge it on what it states for that one; do not call it \
+"partial" for leaving the others out.
 - A spreadsheet row states facts as of its own date. When its status field says Overdue, Expired, Failed, \
 Open (not remediated), Missed or the like, the stance for that row is "no", even when its other fields \
 describe a schedule, and you must include that status field in the quote.

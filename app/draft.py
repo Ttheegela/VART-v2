@@ -86,7 +86,8 @@ def check(text: str, decision: Decision, documents: Sequence[str]) -> list[str]:
         return ["the answer is empty"]
     flat = normalize(text)
     for quoted in _QUOTED.findall(flat):
-        words = quoted.rstrip(",;:.")  # the writer's own punctuation inside the marks adds no word
+        # A writer's comma inside the marks adds no word; a full stop would claim the sentence ends there.
+        words = quoted.rstrip(",;:")
         if not any(contains(c.quote, words) for c in decision.citations):
             problems.append(f'quote not in the evidence: "{quoted}"')
     cited = {plain_name(c.filename) for c in decision.citations}

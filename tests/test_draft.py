@@ -214,3 +214,19 @@ def test_punctuation_inside_the_quote_marks_does_not_break_containment() -> None
     text = 'The access control policy says "User access to internal systems is reviewed quarterly," so yes.'
     assert check(text, VERIFIED, DOCS) == []
     assert check('It says "reviewed monthly,".', VERIFIED, DOCS) != []
+
+
+def test_a_full_stop_inside_the_quote_marks_is_still_checked() -> None:
+    # Round 2 (Ruling 10, M1): only , ; : are the writer's; a full stop claims the sentence ends there.
+    quote = "Customer data is encrypted at rest, except legacy backups."
+    cited = Decision(
+        "partial",
+        "Partial",
+        (Citation("c", "d", "crypto.docx", 1, 1, quote, "partial"),),
+        (),
+        None,
+        None,
+        0.6,
+    )
+    assert check('The crypto policy says "Customer data is encrypted at rest."', cited, DOCS) != []
+    assert check('The crypto policy says "Customer data is encrypted at rest,"', cited, DOCS) == []

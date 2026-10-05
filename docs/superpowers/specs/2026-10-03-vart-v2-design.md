@@ -230,7 +230,8 @@ stances already collected, with no model call.
 One structured call per item that has surviving evidence: one or two plain sentences naming the documents in plain
 words. It may use only the decide step's citations and may not add new ones. For conflicts it writes the question
 for the person; for unknowns it writes the question to ask. A code check then confirms every quoted string is in a
-citation, every document named is a cited document, and every number in the text appears in a cited quote (reusing
+citation (a trailing comma, semicolon or colon inside the quotation marks is the writer's punctuation and is ignored;
+the drafter is told to put its punctuation outside them), every document named is a cited document, and every number in the text appears in a cited quote (reusing
 PriorPath's `grounding.unsupported_numbers`). A failed check retries once, then falls back to a template answer built
 from the citations.
 
