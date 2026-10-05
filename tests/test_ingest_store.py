@@ -1,10 +1,13 @@
+import io
 import json
 import threading
+import zipfile
 from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
 from typing import Any
 
+import openpyxl
 import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
@@ -207,16 +210,35 @@ def test_uploads_still_load_after_the_sample_pack(s: Session) -> None:
     assert _ingest(s, ws.id, "mine.md", "upload", b"# Mine\n\nText.\n").source == "upload"
 
 
-def test_the_cause_of_a_wrapped_parse_error_is_logged_server_side(
+def _xlsx_with_text_in_a_number_cell() -> bytes:
+    """openpyxl raises float()'s ValueError, whose message quotes the cell (adversary checkpoint 3, I2)."""
+    wb = openpyxl.Workbook()
+    wb.active.append(["Owner", "Phone"])
+    raw = io.BytesIO()
+    wb.save(raw)
+    with zipfile.ZipFile(raw) as z:
+        parts = {n: z.read(n) for n in z.namelist()}
+    sheet = parts["xl/worksheets/sheet1.xml"].decode()
+    cell = '<c r="C1" t="n"><v>Dana Ortiz dana@kestrelyn.example</v></c>'
+    parts["xl/worksheets/sheet1.xml"] = sheet.replace("</row>", cell + "</row>", 1).encode()
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, data in parts.items():
+            z.writestr(name, data)
+    return out.getvalue()
+
+
+def test_a_wrapped_parse_error_is_logged_by_type_and_place_never_by_its_message(
     s: Session, caplog: pytest.LogCaptureFixture
 ) -> None:
     ws = f.workspace(s)
     with caplog.at_level("WARNING", logger="app.ingest.store"), pytest.raises(IngestError) as info:
-        _ingest(s, ws.id, "Dana Ortiz notes.pdf", "upload", b"%PDF-1.4 broken")
+        _ingest(s, ws.id, "Dana Ortiz owners.xlsx", "upload", _xlsx_with_text_in_a_number_cell())
     cause = info.value.__cause__
-    assert cause is not None
-    assert any(r.exc_info and r.exc_info[1] is cause for r in caplog.records)
-    assert "Dana" not in caplog.text and "<PERSON>" in caplog.text
+    assert cause is not None and "Dana Ortiz" in str(cause)  # the parser's message quotes the cell
+    assert f"cause {type(cause).__name__} at " in caplog.text and ".py:" in caplog.text
+    assert "Dana" not in caplog.text and "kestrelyn" not in caplog.text and "<PERSON>" in caplog.text
+    assert all(r.exc_info is None for r in caplog.records)  # no traceback: its last line is the message
     assert str(cause) not in str(info.value)  # the visitor-facing message stays generic
 
 
@@ -252,3 +274,56 @@ def test_two_uploads_at_once_lock_the_workspace_row(s: Session, db: Engine) -> N
         holder.rollback()
     thread.join(10)
     assert done.is_set()
+
+
+def test_an_answer_with_a_line_too_long_or_too_many_lines_is_refused(s: Session) -> None:
+    # adversary checkpoint 3, I3: a 1.2 MB answer was spaCy's E088 ValueError, a 500
+    ws = f.workspace(s)
+    s.commit()
+    today = date(2026, 10, 5)
+    with pytest.raises(IngestError, match="too long"):
+        store_statement(s, ws.id, "x" * 1_200_000, filename="answer-1.txt", today=today)
+    many = "\n".join(f"line {i}" for i in range(store.MAX_ANSWER_LINES + 1))
+    with pytest.raises(IngestError, match="too long"):
+        store_statement(s, ws.id, many, filename="answer-2.txt", today=today)
+    s.rollback()
+    assert s.scalars(select(Document).where(Document.workspace_id == ws.id)).all() == []
+    many = "\n".join(f"line {i}" for i in range(store.MAX_ANSWER_LINES))
+    assert store_statement(s, ws.id, many, filename="answer-3.txt", today=today).line_count == 200
+
+
+def test_statement_lines_count_toward_the_line_cap_but_not_the_document_cap(s: Session) -> None:
+    ws = f.workspace(s)
+    today = date(2026, 10, 5)
+    for i in range(MAX_DOCUMENTS):
+        f.document(s, ws, filename=f"u{i}.md", line_count=1)
+    f.document(s, ws, filename="big.md", line_count=MAX_WORKSPACE_LINES - MAX_DOCUMENTS - 1)
+    s.commit()
+    assert store_statement(s, ws.id, "Yes.", filename="answer-1.txt", today=today).line_count == 1  # fits
+    with pytest.raises(IngestError, match="20,000 lines"):
+        store_statement(s, ws.id, "Yes.", filename="answer-2.txt", today=today)
+
+
+def test_statement_lines_are_counted_against_a_later_upload(s: Session) -> None:
+    ws = f.workspace(s)
+    f.document(
+        s, ws, filename="answer.txt", source="statement", kind="statement", line_count=MAX_WORKSPACE_LINES
+    )
+    s.commit()
+    with pytest.raises(IngestError, match="20,000 lines"):
+        _ingest(s, ws.id, "one.md", "upload", b"Just one line.\n")
+
+
+def test_a_file_name_is_normalized_and_cut_before_it_is_used(s: Session) -> None:
+    # adversary checkpoint 3, Minor 1: a NUL was a psycopg DataError (500) and the classify prompt got the
+    # full-length name
+    ws = f.workspace(s)
+    assert _ingest(s, ws.id, "notes\x00.md", "upload", b"# T\n\nText here.\n").filename == "notes.md"
+    reply = json.dumps({"kind": "other", "status": "final", "effective_date": "", "template": False})
+    llm = FakeLLM([reply])
+    body = b"Kestrelyn 2026\n\nWe met and talked.\n"
+    doc = ingest_document(
+        s, ws.id, "n" * 5_000 + ".md", body, source="upload", llm=llm, model="m", spend=_yes
+    )
+    assert (len(doc.filename), doc.filename[-4:]) == (255, "n.md")
+    assert "n" * 256 not in llm.requests[0].user

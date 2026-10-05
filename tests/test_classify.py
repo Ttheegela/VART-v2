@@ -105,6 +105,15 @@ def test_a_line_that_reads_like_an_instruction_never_reaches_the_model() -> None
     assert injected not in llm.requests[0].user and "We met and talked." in llm.requests[0].user
 
 
+def test_the_classify_prompt_is_capped_at_8000_characters() -> None:
+    # adversary checkpoint 3, I4: 40 lines of 19,000 characters made a 760,000-character prompt
+    unknown = ParsedDocument("md", tuple(Line("w" * 19_000) for _ in range(45)))
+    reply = json.dumps({"kind": "other", "status": "final", "effective_date": "", "template": False})
+    llm = FakeLLM([reply])
+    classify("x.md", unknown, llm, "m", _yes)
+    assert len(llm.requests[0].user) == 8_000
+
+
 def test_the_model_never_sets_scope_and_a_template_is_never_evidence() -> None:
     unknown = ParsedDocument(
         "md", (Line("Kestrelyn 2026"), Line("Scope: this policy applies to all employees."))

@@ -1,9 +1,14 @@
+import io
 import time
 from datetime import date
 
+import docx
+import openpyxl
 import pytest
 
+from app import redact
 from app.contracts import Line
+from app.ingest.parse import IngestError, parse
 from app.patterns import PLACEHOLDER
 from app.redact import redact_lines, redact_text
 
@@ -80,6 +85,18 @@ def test_private_data_and_secrets_are_replaced(text: str, expected: str) -> None
         "Secrets: HashiCorp Vault",
         "Session tokens: HttpOnly-and-Secure",
         "token_count: 1000000000",
+        # adversary checkpoint 3, I5: addresses, years and counts are not phones; policy values not secrets
+        "Internal range 192.168.100.200 and 172.16.254.100 are segmented.",
+        "Allowed egress: 10.100.200.0/24 only.",
+        "Years covered: 2024 2025 2026",
+        "Budget: 10 000 000 records.",
+        "Password: Required; MFA: Yes",
+        "Password: bcrypt-hashed, rotated every 90 days.",
+        "Secret: HashiCorp Vault, rotated quarterly.",
+        "Token: RS256-signed",
+        # I1: a hash is not a key body (one case: hex is single-case)
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "commit 9298371c0ffee0ddba11ad5eed0f00dfacade123 merged",
     ],
 )
 def test_business_text_is_left_alone(text: str) -> None:
@@ -122,3 +139,55 @@ def test_a_crafted_line_is_redacted_in_linear_time(line: str) -> None:
     redact_text(line)
     # generous: about 1.5 s of this is spaCy on 20,000 characters; the keyed-secret regex was cubic (minutes)
     assert time.monotonic() - started < 10.0
+
+
+# Built in pieces so that no file holds a whole fake key block for gitleaks to match (Plan 2 addendum).
+_PEM = [
+    "-----BEGIN RSA " + "PRIVATE KEY-----",
+    *["MIIEowIBAAKCAQEA" + "x" * 48] * 3,
+    "-----END RSA " + "PRIVATE KEY-----",
+]
+
+
+def _docx_key() -> bytes:
+    d = docx.Document()
+    d.add_paragraph("Deployment notes")
+    for row in _PEM:
+        d.add_paragraph(row)
+    out = io.BytesIO()
+    d.save(out)
+    return out.getvalue()
+
+
+def _xlsx_key() -> bytes:
+    wb = openpyxl.Workbook()
+    sheet = wb.active
+    sheet.append(["Name", "Value"])
+    sheet.append(["deploy key", _PEM[0]])
+    for row in _PEM[1:]:
+        sheet.append(["", row])
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
+
+
+@pytest.mark.parametrize(
+    ("name", "data"), [("notes.docx", _docx_key()), ("keys.xlsx", _xlsx_key())], ids=["docx", "xlsx"]
+)
+def test_a_private_key_body_split_over_lines_is_redacted(name: str, data: bytes) -> None:
+    # adversary checkpoint 3, I1: docx and xlsx give one line per key row, so the BEGIN line alone matched
+    lines = redact_lines(parse(name, data).lines)
+    assert not any("MIIE" in line.text for line in lines)
+    assert sum("<SECRET>" in line.text for line in lines) >= 4
+
+
+def test_redaction_past_its_time_budget_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    # adversary checkpoint 3, I6: a crafted upload cost ~590 s of spaCy; a deadline between slices stops it
+    monkeypatch.setattr(redact, "DEADLINE_S", -1.0)
+    with pytest.raises(IngestError, match="too long to process"):
+        redact_lines([Line("Owner: Marcus Lee")] * 20)
+
+
+def test_lines_redacted_in_slices_match_one_by_one() -> None:
+    texts = [f"Row {i}: owner Marcus Lee, phone 512 555 01{i:02d}." for i in range(20)]
+    assert [x.text for x in redact_lines([Line(t) for t in texts])] == [redact_text(t) for t in texts]

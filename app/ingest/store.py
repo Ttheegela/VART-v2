@@ -6,7 +6,9 @@ Ruling 19)."""
 
 import hashlib
 import logging
+import os
 import re
+import traceback
 import uuid
 from collections.abc import Sequence
 from dataclasses import replace
@@ -20,7 +22,7 @@ from app.chunk import chunk_lines
 from app.classify import classify
 from app.contracts import DocMeta, Line, Spend
 from app.db.models import Chunk, Document, DocumentLine, Workspace
-from app.ingest.parse import IngestError, parse
+from app.ingest.parse import MAX_LINE_CHARS, IngestError, parse
 from app.llm.client import LLMClient
 from app.patterns import INJECTION
 from app.redact import redact_lines, redact_text
@@ -29,7 +31,8 @@ from app.text import normalize
 log = logging.getLogger(__name__)
 
 MAX_DOCUMENTS = 20  # spec 9, per workspace (uploads and drive files only)
-MAX_WORKSPACE_LINES = 20_000  # spec 9, per workspace
+MAX_WORKSPACE_LINES = 20_000  # spec 9, per workspace (uploads, drive files and statements)
+MAX_ANSWER_LINES = 200  # per interview answer
 
 
 def _name_reads_like_an_instruction(filename: str) -> bool:
@@ -41,13 +44,17 @@ def _name_reads_like_an_instruction(filename: str) -> bool:
     return bool(INJECTION.search(plain) or INJECTION.search(re.sub(r"[\W\d_]+", " ", split)))
 
 
-def _check_limits(session: Session, workspace_id: uuid.UUID, new_lines: int) -> None:
+def _check_limits(
+    session: Session, workspace_id: uuid.UUID, new_lines: int, *, new_document: bool = True
+) -> None:
+    """Documents count uploads and drive files; lines count statements too. Sample packs count for neither."""
     docs, lines = session.execute(
-        select(func.count(Document.id), func.coalesce(func.sum(Document.line_count), 0)).where(
-            Document.workspace_id == workspace_id, Document.source.in_(("upload", "drive"))
-        )
+        select(
+            func.count(Document.id).filter(Document.source.in_(("upload", "drive"))),
+            func.coalesce(func.sum(Document.line_count), 0),
+        ).where(Document.workspace_id == workspace_id, Document.source.in_(("upload", "drive", "statement")))
     ).one()
-    if docs >= MAX_DOCUMENTS:
+    if new_document and docs >= MAX_DOCUMENTS:
         raise IngestError(f"A workspace can hold at most {MAX_DOCUMENTS} documents.")
     if lines + new_lines > MAX_WORKSPACE_LINES:
         raise IngestError(f"A workspace can hold at most {MAX_WORKSPACE_LINES:,} lines of text.")
@@ -62,14 +69,14 @@ def _store(
     meta: DocMeta,
     lines: Sequence[Line],
 ) -> Document:
-    if source in ("upload", "drive"):
+    if source != "sample":
         # Lock the workspace row and count again: ingest_document committed its first check before classify
         # (and the spender commits too), so two uploads at once could otherwise both pass it.
         session.execute(select(Workspace.id).where(Workspace.id == workspace_id).with_for_update())
-        _check_limits(session, workspace_id, len(lines))
+        _check_limits(session, workspace_id, len(lines), new_document=source != "statement")
     doc = Document(
         workspace_id=workspace_id,
-        filename=filename[:255],
+        filename=filename,
         source=source,
         sha256=sha256,
         kind=meta.kind,
@@ -121,6 +128,11 @@ def ingest_document(
     spend: Spend,
 ) -> Document:
     """Raises IngestError (shown to the visitor as is) for a file the app will not take."""
+    # a NUL is a psycopg DataError (a 500), and the name also goes into the classify prompt
+    filename = normalize(filename)
+    if len(filename) > 255:  # the column's width; keep the extension, parse reads the format from it
+        root, ext = os.path.splitext(filename)
+        filename = root[: max(0, 255 - len(ext))] + ext[:255]
     # The name is printed in every model prompt. Read separators as spaces and split camelCase,
     # so "ignore.all.previous.instructions" and "IgnoreAllPrevious..." are caught like the spaced name.
     if source != "sample" and _name_reads_like_an_instruction(filename):
@@ -128,8 +140,18 @@ def ingest_document(
     try:
         parsed = parse(filename, data)
     except IngestError as exc:
-        if exc.__cause__ is not None:  # parse's catch-all hides a parser bug as "damaged": keep the cause
-            log.warning("ingest of %r refused: %s", redact_text(filename), exc, exc_info=exc.__cause__)
+        cause = exc.__cause__
+        if cause is not None:  # parse's catch-all hides a parser bug as "damaged": log where it came from.
+            # Never the cause's message or traceback: they quote the document (float() of a cell's text).
+            where = traceback.extract_tb(cause.__traceback__)[-1]
+            log.warning(
+                "ingest of %r refused: %s (cause %s at %s:%d)",
+                redact_text(filename),
+                exc,
+                type(cause).__name__,
+                where.filename,
+                where.lineno,
+            )
         raise
     if source != "sample":
         _check_limits(session, workspace_id, len(parsed.lines))
@@ -147,7 +169,10 @@ def store_statement(
     """The visitor's accepted interview answer as a dated statement (spec 6.9): kind and source 'statement',
     evidence, dated `today`, redacted like an upload. One plain line per non-empty line, not Markdown: an
     answer such as "#1 priority: ..." is a statement, not a heading."""
-    lines = redact_lines([Line(t) for p in text.splitlines() if (t := normalize(p))])
+    lines = [Line(t) for p in text.splitlines() if (t := normalize(p))]
+    if len(lines) > MAX_ANSWER_LINES or any(len(x.text) > MAX_LINE_CHARS for x in lines):
+        raise IngestError("The answer is too long.")
+    lines = list(redact_lines(lines))
     if not lines:
         raise IngestError("The answer is empty.")
     meta = DocMeta("statement", "final", today, None, True, "rule")

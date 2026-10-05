@@ -7,13 +7,19 @@ Sample packs are not redacted (Plan 1A Ruling 10); uploads and the visitor's own
 
 import re
 import threading
+import time
 from collections.abc import Sequence
 from dataclasses import replace
 from typing import Any
 
 from app.contracts import Line
+from app.ingest.parse import IngestError
 
 SCORE_THRESHOLD = 0.5
+# spaCy costs up to ~3 s per crafted 20,000-character line (adversary checkpoint 3, I6): stop well inside the
+# function's 300 s. Checked between slices, so the worst overrun is one slice (8 such lines, ~24 s).
+DEADLINE_S = 120.0
+SLICE = 8
 _SPACY_IGNORED = [  # spaCy labels with no Presidio entity: silences a warning per match
     "CARDINAL",
     "DATE",
@@ -70,6 +76,14 @@ _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         "SECRET",
         re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)"),
     ),
+    (  # a PEM body row on its own line (docx, xlsx and csv give one line per row): a run of 40+ base64
+        # characters with both cases, not touching a word, dot, colon, hyphen or percent. A hex hash or
+        # base32 is single-case, an English word is never 40 letters, and a URL path touches a dot or colon.
+        "SECRET",
+        re.compile(
+            r"(?<![\w+/=.:%-])(?=[A-Za-z0-9+/]*[a-z])(?=[A-Za-z0-9+/]*[A-Z])[A-Za-z0-9+/]{40,}={0,2}(?![\w+/=.:%-])"
+        ),
+    ),
     (
         "SECRET",
         re.compile(r"\b[a-z][a-z0-9+.-]*://[^\s:/@]+:[^\s@]+@\S+", re.IGNORECASE),
@@ -87,16 +101,23 @@ _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         "SECRET",
         re.compile(  # an underscore or hyphen is a separator: DB_PASSWORD=, aws_secret_access_key =
             # start at a word start and bound every [\w-] run: linear time, not cubic, on a crafted line;
-            # all-digit values are skipped (token_count: 1000000000)
+            # the value must mix letters and digits (Password: Required; Secret: HashiCorp Vault and
+            # token_count: 1000000000 are evidence) and not end in a hyphenated word (Token: RS256-signed);
+            # lookaheads are bounded so a failed start costs at most 200 characters
             r"(?<![\w-])[\w-]{0,64}(?:api[_-]?key|secret|token|password|passwd|pwd)"
-            r"(?:[_-][\w-]{0,64}|(?-i:[A-Z])\w{0,64})?\s*[:=]\s*(?!\d+(?!\S))\S{8,}",
+            r"(?:[_-][\w-]{0,64}|(?-i:[A-Z])\w{0,64})?\s*[:=]\s*"
+            r"(?=[^\s\d]{0,200}\d)(?=[^\sa-z]{0,200}[a-z])(?![^\s-]{0,200}-[a-z]{3,}\b)\S{8,}",
             re.IGNORECASE,
         ),
     ),
     ("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b")),
     (
         "PHONE",
-        re.compile(r"(?<![\w+])(?:\+\d{1,3}[ .-]?)?(?:\(\d{2,4}\)|\d{2,4})[ .-]\d{3,4}[ .-]\d{3,4}(?!\w)"),
+        re.compile(  # not inside an IP address or CIDR, not a run of years, not a thousands-grouped number
+            r"(?<![\w+])(?<!\d\.)(?!(?:(?:19|20)\d\d[ .-]){2}(?:19|20)\d\d(?!\w))"
+            r"(?!\d{1,3}(?:[ .]\d{3}){2,}(?![\w.]))"
+            r"(?:\+\d{1,3}[ .-]?)?(?:\(\d{2,4}\)|\d{2,4})[ .-]\d{3,4}[ .-]\d{3,4}(?!\w|\.\d|/\d)"
+        ),
     ),
     (
         "ADDRESS",
@@ -194,9 +215,16 @@ def redact_text(text: str) -> str:
 
 
 def redact_lines(lines: Sequence[Line]) -> tuple[Line, ...]:
-    texts = [line.text for line in lines]
-    people = _person_results(texts) if texts else []
-    return tuple(
-        replace(line, text=_apply(line.text, _spans(line.text, found)))
-        for line, found in zip(lines, people, strict=True)
-    )
+    """Raises IngestError when the lines take longer than DEADLINE_S (a crafted file, not a real document)."""
+    deadline = time.monotonic() + DEADLINE_S
+    out: list[Line] = []
+    for start in range(0, len(lines), SLICE):
+        if time.monotonic() > deadline:
+            raise IngestError("This file takes too long to process; split it and upload the parts.")
+        part = lines[start : start + SLICE]
+        people = _person_results([line.text for line in part])
+        out += [
+            replace(line, text=_apply(line.text, _spans(line.text, found)))
+            for line, found in zip(part, people, strict=True)
+        ]
+    return tuple(out)
