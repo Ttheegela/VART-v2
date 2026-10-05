@@ -137,6 +137,7 @@ def test_other_injections(text: str) -> None:
         "Employees shouldn't ignore the instructions of fire wardens.",  # Plan 2A Ruling 16
         "The assistant cannot reveal its system prompt.",
         "Staff are trained not to ignore the instructions of fire wardens.",
+        "Staff must neither ignore nor disregard the instructions of fire wardens.",  # the nor guard
     ],
 )
 def test_policy_prose_is_not_an_injection(text: str) -> None:

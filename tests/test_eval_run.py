@@ -1,3 +1,4 @@
+import contextlib
 import json
 import uuid
 from datetime import date
@@ -497,6 +498,24 @@ def test_a_model_error_is_exit_2_with_the_step_and_the_refresh_advice(
     assert run.main(["--pack", "dev", "--mode", "record"]) == 2
     err = capsys.readouterr().err
     assert "judge: output did not match JudgeOut" in err and "--refresh" in err
+
+
+def test_a_record_run_whose_live_call_failed_exits_2_and_writes_no_results(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # plan2c Ruling 11 carry: write_draft swallows a failed call (template fallback), so the run passes, but
+    # the failed request has no row and the recording would not replay.
+    def swallowing(pack: str, llm: Any, models: Any) -> dict[str, Any]:
+        with contextlib.suppress(LLMError):
+            judge(llm, ItemInput("VSQ-01", "Q?", None), UNKNOWN, "A.", "m/j")
+        return _report(True)
+
+    _record_main(monkeypatch, tmp_path, swallowing)
+    failed = LLMError("draft: finish_reason=length")
+    monkeypatch.setattr(run, "client", lambda mode, p: RecordingClient(FakeLLM([failed]), p))
+    assert run.main(["--pack", "dev", "--mode", "record"]) == 2
+    assert "1 request went unrecorded" in capsys.readouterr().err
+    assert not (tmp_path / "latest.json").exists()
 
 
 def test_refresh_needs_record_mode(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

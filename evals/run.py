@@ -4,8 +4,8 @@
     python -m evals.run --pack dev --mode record    # needs OPENROUTER_API_KEY: the eval key, see CLAUDE.md
 
 Writes evals/results/latest.{json,md}; exits 0 when every gate passes, 1 when one fails, 2 when a recording
-is missing or the setup is wrong. Replay never calls a model; a missing recording stops the run (Plan 1A
-Task 4: ReplayMiss is caught before any other LLMError)."""
+is missing, a record run left a request unrecorded, or the setup is wrong. Replay never calls a model; a
+missing recording stops the run (Plan 1A Task 4: ReplayMiss is caught before any other LLMError)."""
 
 import argparse
 import json
@@ -76,14 +76,16 @@ def client(mode: str, path: Path) -> LLMClient:
     return live if mode == "live" else RecordingClient(live, path)
 
 
+def _rows(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    text = path.read_text(encoding="utf-8", errors="surrogatepass")
+    return [json.loads(x) for x in text.split("\n") if x.strip()]
+
+
 def keep_used(path: Path, keys: set[str]) -> None:
     """After a record run: drop recordings no request used, sort the rest by key (stable diffs)."""
-    rows = [
-        json.loads(x)
-        for x in path.read_text(encoding="utf-8", errors="surrogatepass").split("\n")
-        if x.strip()
-    ]
-    kept = sorted((r for r in rows if r["key"] in keys), key=lambda r: r["key"])
+    kept = sorted((r for r in _rows(path) if r["key"] in keys), key=lambda r: r["key"])
     text = "".join(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n" for r in kept)
     path.write_text(text, encoding="utf-8", errors="surrogatepass")
 
@@ -334,7 +336,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 2
     if args.mode == "record":
-        keep_used(path, {r.key() for r in log.requests})
+        # a failed live call the engine swallowed (write_draft's template fallback) leaves no row: the run
+        # passes, but its recording would not replay
+        keys = {r.key() for r in log.requests}
+        if unrecorded := keys - {r["key"] for r in _rows(path)}:
+            n = len(unrecorded)
+            print(
+                f"{n} request{'s' if n > 1 else ''} went unrecorded (a live call failed and was swallowed); "
+                "the recording would not replay: record again",
+                file=sys.stderr,
+            )
+            return 2
+        keep_used(path, keys)
     RESULTS.mkdir(parents=True, exist_ok=True)
     (RESULTS / "latest.json").write_text(json.dumps(jsonable(report), indent=2, sort_keys=True) + "\n")
     (RESULTS / "latest.md").write_text(score.markdown(report))

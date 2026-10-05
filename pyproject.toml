@@ -16,8 +16,9 @@ dependencies = [
     "openpyxl>=3.1.5,<4",
     "python-docx>=1.2,<2",
     "pypdfium2>=5.13,<6",
-    "presidio-analyzer>=2.2,<3",
-    "spacy>=3.8,<4",
+    "presidio-analyzer==2.2.364",
+    "spacy==3.8.16",
+    "thinc==8.3.13",
     # spaCy small English model; 3.8.0 is the release for spaCy 3.8.x
     "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
 ]
