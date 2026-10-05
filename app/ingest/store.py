@@ -32,8 +32,13 @@ MAX_DOCUMENTS = 20  # spec 9, per workspace (uploads and drive files only)
 MAX_WORKSPACE_LINES = 20_000  # spec 9, per workspace
 
 
-def _words(filename: str) -> str:
-    return re.sub(r"[\W_]+", " ", re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", normalize(filename)))
+def _name_reads_like_an_instruction(filename: str) -> bool:
+    """Separators (any non-letter) read as spaces; also tried with camelCase split, so "IgnoreAll..." and
+    "IGNOREAll..." match, while "iGnOrE all ..." matches in the plain form."""
+    name = normalize(filename)
+    plain = re.sub(r"[\W\d_]+", " ", name)
+    split = re.sub(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", " ", name)
+    return bool(INJECTION.search(plain) or INJECTION.search(re.sub(r"[\W\d_]+", " ", split)))
 
 
 def _check_limits(session: Session, workspace_id: uuid.UUID, new_lines: int) -> None:
@@ -118,7 +123,7 @@ def ingest_document(
     """Raises IngestError (shown to the visitor as is) for a file the app will not take."""
     # The name is printed in every model prompt. Read separators as spaces and split camelCase,
     # so "ignore.all.previous.instructions" and "IgnoreAllPrevious..." are caught like the spaced name.
-    if source != "sample" and INJECTION.search(_words(filename)):
+    if source != "sample" and _name_reads_like_an_instruction(filename):
         raise IngestError("The file name reads like an instruction; rename the file.")
     try:
         parsed = parse(filename, data)
