@@ -502,3 +502,38 @@ def test_a_model_error_is_exit_2_with_the_step_and_the_refresh_advice(
 def test_refresh_needs_record_mode(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _record_main(monkeypatch, tmp_path, lambda *a: _report(True))
     assert run.main(["--pack", "dev", "--refresh", "judge"]) == 2
+
+
+# --- round 3: the release run follows the bench rule for template drafts ---
+
+
+@pytest.mark.parametrize(
+    ("sources", "faithful", "judged"), [(("template", "template"), 0.0, 0), (("model", "template"), 0.5, 1)]
+)
+def test_template_drafts_are_not_judged_and_count_as_unfaithful(
+    db: Engine, monkeypatch: pytest.MonkeyPatch, sources: tuple[str, str], faithful: float, judged: int
+) -> None:
+    pack = packs.load("dev")
+    _wire_interview(monkeypatch, pack, db, True, False)
+    written = {"VSQ-01": sources[0], "VSQ-02": sources[1]}
+
+    def answer_item(session: Any, ws: Any, item: ItemInput, llm: Any, models: Any, spend: Any) -> Any:
+        if item.key not in written:
+            return _unknown(item)
+        decision = Decision("verified", "Yes", (), (), None, None, 0.9)
+        return ItemResult(item, Retrieval((), ()), (), decision, Draft("We do.", written[item.key]), 0.0, 0)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(run, "answer_item", answer_item)
+    llm = FakeLLM([FAITHFUL] * 6)
+    report = run.run("dev", llm, MODELS)
+    assert report["metrics"]["judge_faithfulness"] == faithful
+    assert report["gates"]["judge_faithfulness"]["pass"] is (faithful >= 0.9)
+    assert sum(r.step == "judge" for r in llm.requests) == judged
+
+
+def test_refresh_rejects_an_unknown_step(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _record_main(monkeypatch, tmp_path, lambda *a: _report(True))
+    assert run.main(["--pack", "dev", "--mode", "record", "--refresh", "judg"]) == 2
+    assert "judg" in capsys.readouterr().err

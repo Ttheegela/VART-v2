@@ -15,7 +15,7 @@ from collections.abc import Sequence
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 from sqlalchemy import delete, select
 from sqlalchemy.engine import make_url
@@ -31,6 +31,7 @@ from app.ingest.store import store_statement
 from app.interview import plan_queue, recheck
 from app.llm.client import LLMClient, LLMError, LLMRequest, LLMResult, OpenRouterClient
 from app.llm.recorder import RecordingClient, ReplayClient, ReplayMiss
+from app.observability import Step
 from app.pipeline import answer_item
 from app.settings import get_settings
 from app.stance import PROMPT_VERSION as STANCE_PROMPT
@@ -230,7 +231,12 @@ def run(pack_name: str, llm: LLMClient, models: dict[str, str]) -> dict[str, Any
             for item in items:
                 r = results[item.key]
                 if r.draft.text:
-                    judged[item.key] = judge(llm, item, r.decision, r.draft.text, models["judge"]).faithful
+                    # a template is not the drafter's work (write_draft swallows its failures): not judged, so
+                    # it counts as unfaithful, the same rule as the draft bench
+                    if r.draft.source == "model":
+                        judged[item.key] = judge(
+                            llm, item, r.decision, r.draft.text, models["judge"]
+                        ).faithful
                     checks[item.key] = check(r.draft.text, r.decision, documents)
             queue, asked_twice, suggestions, statements = _interview(
                 session, ws.id, pack, results, log, models
@@ -295,6 +301,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     refresh = {x.strip() for x in args.refresh.split(",") if x.strip()}
     if refresh and args.mode != "record":
         print("--refresh needs --mode record", file=sys.stderr)
+        return 2
+    if unknown := sorted(refresh - set(get_args(Step))):
+        print(
+            f"--refresh: unknown step {', '.join(unknown)} (steps: {', '.join(get_args(Step))})",
+            file=sys.stderr,
+        )
         return 2
     if "test" not in (make_url(database_url()).database or ""):
         print("refusing to run: DATABASE_URL must point at a test database", file=sys.stderr)
