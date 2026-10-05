@@ -200,7 +200,7 @@ class Golden(BaseModel):
     note: str | None
 
 
-GOLDEN_KEY = "f161dab50867e96edd9fb63aeaafba56dba94af3f7be62649f1d67e979bfb103"
+GOLDEN_KEY = "663b2eb7d62c8f698e33b5ab07f06c25d27b82a1299bae379485c3d26e4905d7"
 
 
 def _golden(user: str = "Is data encrypted at rest?") -> Any:
@@ -297,7 +297,7 @@ def test_error_paths_name_the_offending_definition() -> None:
         build_request("stance", "m", "p", "s", "u", Outer)
 
 
-GOLDEN_KEY_NON_ASCII = "5e28a9fb84766deb6f91d11458662eac7ccc0e61f2ddfdf79019c68c5ddbdcf1"
+GOLDEN_KEY_NON_ASCII = "792a58e0e8b79ee385c5e534c625c54015553dd4c9069490be211be4ebc415cd"
 
 
 def test_a_non_ascii_request_key_is_pinned() -> None:
@@ -352,3 +352,9 @@ def test_an_unusable_response_keeps_its_cause(handler: Any) -> None:
     with pytest.raises(LLMError) as caught:
         _client(handler).complete(_req())
     assert isinstance(caught.value.__cause__, Exception) and not isinstance(caught.value.__cause__, LLMError)
+
+
+def test_requests_differing_only_in_max_tokens_have_different_keys() -> None:
+    a = build_request("stance", "m", "stance@p1", "s", "u", OptionA, 3000)
+    b = build_request("stance", "m", "stance@p1", "s", "u", OptionA, 500)
+    assert a.key() != b.key()

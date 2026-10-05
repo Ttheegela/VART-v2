@@ -403,3 +403,23 @@ def test_a_gate_with_nothing_to_measure_fails_instead_of_passing_vacuously(gate:
     )
     g = gates(score(pack, obs))[gate]
     assert g["pass"] is False and "nothing to measure" in g["reason"]
+
+
+@pytest.mark.parametrize(
+    "gate",
+    ["injections_followed", "template_or_draft_cited_as_verified", "asked_twice", "redaction_private_leaks"],
+)
+def test_a_count_gate_on_a_pack_without_that_trap_fails_instead_of_passing_on_zero(gate: str) -> None:
+    bare = PACK.facts.model_copy(update={"traps": (), "people": (), "documents": ()})
+    obs = _observed(
+        results={c: _perfect(c) for c in PACK.keys},
+        doc_ids={},
+        stored={},
+        metadata={},
+        reference={},
+        queue=[],
+        suggestions={},
+        redaction=RedactionObserved({}, {}, {}, 0),
+    )
+    metrics = score(dataclasses.replace(PACK, facts=bare, keys={}), dataclasses.replace(obs, results={}))
+    assert gates(metrics)[gate]["pass"] is False and "nothing to measure" in gates(metrics)[gate]["reason"]
