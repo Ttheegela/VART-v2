@@ -261,6 +261,35 @@ def test_a_stale_row_of_the_same_file_is_not_the_newer_record() -> None:
     assert (older.stance, older.date) == ("yes", date(2026, 3, 1))
 
 
+def test_a_sheets_own_title_passage_is_not_another_document() -> None:
+    # Plan 2A Ruling 21: a sheet's title and "As of:" lines (no as_of, dated by the file) are the sheet
+    inventory = doc("asset-inventory.xlsx", kind="record", effective=date(2026, 9, 1))
+    residency = passage(
+        doc("data-classification-policy.md", effective=date(2026, 1, 15)),
+        "Kestrelyn Ledger stores all customer data in AWS us-east-1.",
+    )
+    title = passage(inventory, "Kestrelyn asset inventory", "As of: 2026-09-01", start=1)
+    office = passage(
+        inventory,
+        "Asset: OFFICE-FS01; Location: Austin office; Data: Customer invoice exports",
+        start=12,
+        as_of=date(2026, 9, 1),
+        record=True,
+    )
+    d = decide(
+        [residency, title, office],
+        [
+            yes(1, "Kestrelyn Ledger stores all customer data in AWS us-east-1."),
+            yes(2, "Kestrelyn asset inventory"),
+            no(3, "Data: Customer invoice exports"),
+        ],
+    )
+    assert d.conflict is not None and d.conflict.rule == "date"
+    newer, older = d.conflict.sides
+    assert (newer.stance, newer.date) == ("no", date(2026, 9, 1))
+    assert (older.stance, older.date) == ("yes", date(2026, 1, 15))
+
+
 def test_when_both_sides_hold_the_newest_sheet_the_documents_disagree() -> None:
     # Plan 2A Ruling 20: each side is then newer than the other, so the newest sheet itself disagrees
     done = passage(LOG, "System: AWS; Status: Done", start=5, as_of=date(2026, 9, 15), record=True)

@@ -92,11 +92,19 @@ def _conflict(yes: list[Pair], no: list[Pair]) -> Conflict:
     """Rule 6: a dated record newer than every dated document on the other side is the 'date' rule, newer
     side first and the other side dated by what the record was compared with; anything else, or both sides
     newer than each other, is 'documents-disagree'. Rows of the record's own sheet snapshot (document and
-    as_of) on the other side are not another document (Plan 2A Rulings 18 and 20)."""
+    as_of) on the other side are not another document, nor are that sheet's undated passages, such as its
+    title and "As of:" lines (Plan 2A Rulings 18, 20 and 21)."""
     dated: list[Conflict] = []
     for newer, older in ((yes, no), (no, yes)):
         snapshots = {(p.doc.id, p.as_of) for p, _ in newer if p.record and p.as_of is not None}
-        others = [d for p, _ in older if (p.doc.id, p.as_of) not in snapshots and (d := _date(p)) is not None]
+        sheets = {doc_id for doc_id, _ in snapshots}
+        others = [
+            d
+            for p, _ in older
+            if (p.doc.id, p.as_of) not in snapshots
+            and (p.as_of is not None or p.doc.id not in sheets)
+            and (d := _date(p)) is not None
+        ]
         if snapshots and others and max(day for _, day in snapshots) > max(others):
             older_side = replace(_side("yes" if older is yes else "no", older), date=max(others))
             dated.append(Conflict("date", (_side("yes" if newer is yes else "no", newer), older_side)))
