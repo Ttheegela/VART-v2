@@ -1,3 +1,5 @@
+import time
+import uuid
 from collections.abc import Iterator
 from datetime import date
 
@@ -5,10 +7,13 @@ import pytest
 from sqlalchemy import Engine, event
 from sqlalchemy.orm import Session
 
+import app.retrieve
 from app.db.models import Chunk, Document, Workspace
 from app.retrieve import (
     HOP,
     HOP_MAX_CHUNKS,
+    HOP_MAX_IDENTIFIERS,
+    MAX_QUERY_CHARS,
     MAX_QUERY_WORDS,
     RECORD_CAP,
     TEXT_CAP,
@@ -368,3 +373,80 @@ def test_the_adversary_questions_complete(s: Session) -> None:
     s.commit()
     for question in ("mfa " * 4400, "mfa " + " ".join(f"w{i}" for i in range(19000))):
         assert [p.doc.filename for p in retrieve(s, ws.id, question, None).passages] == ["p.md"]
+
+
+def _rows(s: Session, doc: Document, texts: list[str]) -> None:
+    s.add_all(
+        Chunk(
+            workspace_id=doc.workspace_id,
+            document_id=doc.id,
+            line_start=n + 1,
+            line_end=n + 1,
+            text=t,
+            record=True,
+        )
+        for n, t in enumerate(texts)
+    )
+
+
+def test_long_record_rows_naming_thousands_of_systems_hop_quickly(s: Session) -> None:
+    # Adversary 3 re-review, N1: chosen record rows of up to 20,000 characters named 14,250 systems,
+    # each with its own inventory row, and the hop counted every one (111 s for one item).
+    ws = f.workspace(s)
+    per_line, lines = 2850, 5
+    scopes = [f.document(s, ws, filename=f"mfa-scope{j}.csv", kind="record") for j in range(2)]
+    for j, doc in enumerate(scopes):
+        _rows(
+            s,
+            doc,
+            [
+                "Control: MFA enforced; Systems: " + " ".join(f"s{n * per_line + k}" for k in range(per_line))
+                for n in range(lines)
+                if n // 3 == j
+            ],
+        )
+    _rows(
+        s,
+        f.document(s, ws, filename="inventory.csv", kind="record"),
+        [f"System: s{i}; Owner: t{i}" for i in range(per_line * lines)],
+    )
+    s.commit()
+    start = time.perf_counter()
+    r = retrieve(s, ws.id, "Is MFA enforced?", None)
+    assert time.perf_counter() - start < 10  # 111 s before the fix
+    hopped = [p.lines[0] for p in r.passages if p.lines[0].startswith("System:")]
+    # s1 to s31 sit inside s10, s100, ...: each is in over HOP_MAX_CHUNKS chunks, and the cap stops the walk
+    assert hopped == ["System: s0; Owner: t0"]
+
+
+def test_the_hop_counts_at_most_hop_max_identifiers(s: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    # N1: identifiers too common to hop never stop the walk early, so their number is capped.
+    ws = f.workspace(s)
+    ids = [f"sys{i}" for i in range(HOP_MAX_IDENTIFIERS + 20)]
+    _doc(s, ws, "acp.docx", "Quarterly reviews cover " + " ".join(ids) + ".")
+    _doc(s, ws, "notes.docx", *[" ".join(ids) + f" note {n}." for n in range(HOP_MAX_CHUNKS)])
+    _doc(s, ws, "assets.xlsx", *[f"Asset: {i}; Owner: IT" for i in ids], record=True, kind="record")
+    s.commit()
+    asked: list[str] = []
+    real = app.retrieve._chunks_naming
+
+    def spy(session: Session, ws_id: uuid.UUID, identifier: str) -> int:
+        asked.append(identifier)
+        return real(session, ws_id, identifier)
+
+    monkeypatch.setattr(app.retrieve, "_chunks_naming", spy)
+    r = retrieve(s, ws.id, "Are reviews quarterly?", None)
+    assert len(asked) == HOP_MAX_IDENTIFIERS
+    assert not any(p.record for p in r.passages)  # every identifier is in too many chunks
+
+
+def test_a_huge_hyphenated_cell_is_cut_before_it_is_parsed(s: Session) -> None:
+    # N2: one regex word w0-w1-...-w18999 parses into ~38,000 tsquery operands (a 1.2 GB allocation).
+    ws = f.workspace(s)
+    _doc(s, ws, "p.md", "MFA is enforced for every employee account.")
+    s.commit()
+    question = "Is MFA enforced? " + "-".join(f"w{i}" for i in range(19000))
+    assert [p.doc.filename for p in retrieve(s, ws.id, question, None).passages] == ["p.md"]
+    assert build_query("x" * (MAX_QUERY_CHARS - 4) + " mfa", "Access") == build_query(
+        "x" * (MAX_QUERY_CHARS - 4) + " mfa", None
+    )  # the topic falls past the cut; the question's words up to it are kept
