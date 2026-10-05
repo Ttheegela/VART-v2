@@ -50,6 +50,7 @@ plan's "Execution notes").
 | 2026-10-04 | Plan 2 runs three lanes in parallel, each in its own worktree: engine (Opus 5.5), ingest (Sonnet 5.5), evals (Sonnet 5.5) |
 | 2026-10-04 | Eval key `VART_EVAL_OPENROUTER_API_KEY` lives in `~/.config/vart/eval.env` (mode 600, outside every repo, $5 credit limit); the lead, or an agent it names, runs recordings and the bench with it without asking Tarun, spending past the cap needs him, and the production key stays in Vercel only (spec 8) |
 | 2026-10-04 | Plan 2 integrates on branch `plan2` (worktree `VART-wt-plan2`), so `main` stays production: the lead merges lanes into it locally; pushing and the release (PR to `main`, fast-forward after green CI, deploy) need Tarun's OK (spec 11.3-11.5) |
+| 2026-10-05 | Tarun: the conflict gate counts planted conflict traps, as spec 8 says (5 in the dev pack), not keyed items; a trap is caught when at least one of its items is labelled conflict, and the date rule is gated per planted date trap the same way. The per-item numbers stay in the report, ungated (spec 8) |
 
 ## How to run
 See `CLAUDE.md` (commands) and `README.md`.

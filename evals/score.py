@@ -153,21 +153,34 @@ def score(pack: Pack, obs: Observed) -> dict[str, float | None]:
     m["label_accuracy"] = _gated(
         sum(answer_of(c) == (k.expected_label, k.expected_value) for c, k in keys.items()), len(keys)
     )
+    # Spec 8 "recall on planted conflicts" (Tarun's decision 2026-10-05): the gates count the fact sheet's
+    # conflict traps; a trap is caught when at least one of its keyed items is. A trap no item is keyed to is
+    # missed; a pack without conflict traps has nothing to measure. Per-item numbers are reported, ungated.
     expected = {c for c, k in keys.items() if k.expected_label == "conflict"}
     flagged = {c for c in keys if obs.results[c].decision.label == "conflict"}
-    m["conflict_recall"] = _gated(len(expected & flagged), len(expected))
+    conflict_traps = [t.id for t in pack.facts.traps if t.kind in ("date", "disagree")]
+    date_traps = [t.id for t in pack.facts.traps if t.kind == "date"]
+    items_of = {t: [c for c, k in keys.items() if k.conflict_trap == t] for t in conflict_traps}
+    m["conflict_recall"] = _gated(
+        sum(bool(set(items_of[t]) & flagged) for t in conflict_traps), len(conflict_traps)
+    )
+    m["conflict_items_recall"] = _ratio(len(expected & flagged), len(expected))
     m["conflict_precision"] = _ratio(len(expected & flagged), len(flagged))
-    dated = [c for c, k in keys.items() if k.conflict_trap and traps[k.conflict_trap].kind == "date"]
-    good_dates = 0
-    for c in dated:
+
+    def date_rule_ok(c: str) -> bool:
         conflict = obs.results[c].decision.conflict
         newer = conflict.sides[0].citations if conflict else ()
-        good_dates += bool(
+        return bool(
             conflict
             and conflict.rule == "date"
             and any(specs[fact_doc[x.document_id]].kind == "record" for x in newer)
         )
-    m["date_rule_correct"] = _gated(good_dates, len(dated))
+
+    dated = [c for t in date_traps for c in items_of[t]]
+    m["date_rule_correct"] = _gated(
+        sum(any(map(date_rule_ok, items_of[t])) for t in date_traps), len(date_traps)
+    )
+    m["date_rule_items_correct"] = _ratio(sum(map(date_rule_ok, dated)), len(dated))
     honest = [c for c, k in keys.items() if k.honest_negative]
     m["honest_negatives_kept"] = _gated(sum(answer_of(c) == ("verified", "No") for c in honest), len(honest))
     scoped = [c for c, k in keys.items() if any(traps[t].kind == "scope" for t in k.traps)]

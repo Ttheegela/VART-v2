@@ -14,7 +14,7 @@ the change log at the end, and a re-recording of the evals when a prompt or a la
 | chunk | `app/chunk.py` (plan2b) | `chunk_lines(lines) -> list[ChunkSpec]`; `flags_of(text) -> tuple[Flag, ...]` | no |
 | store | `app/ingest/store.py` (plan2b) | `ingest_document(session, workspace_id, filename, data, *, source, llm, model, spend) -> Document`; `store_statement(session, workspace_id, text, *, filename, today) -> Document` | via classify |
 | retrieve | `app/retrieve.py` (2A) | `build_query(question, topic) -> str`; `retrieve(session, workspace_id, question, topic) -> Retrieval`; `document_passages(session, workspace_id, document_id) -> tuple[Passage, ...]` | no |
-| stance | `app/stance.py` (2A) | `PROMPT_VERSION = "stance@p2"`; `user_prompt(item, passages) -> str`; `stance(llm, item, passages, model, step="stance") -> tuple[Stance, ...]` | yes |
+| stance | `app/stance.py` (2A) | `PROMPT_VERSION = "stance@p3"`; `user_prompt(item, passages) -> str`; `stance(llm, item, passages, model, step="stance") -> tuple[Stance, ...]` | yes |
 | decide | `app/decide.py` (2A) | `decide(passages, stances, dropped=()) -> Decision` | no |
 | draft | `app/draft.py` (2A) | `PROMPT_VERSION = "draft@p2"`; `plain_name(filename: str) -> str`; `user_prompt(item: ItemInput, decision: Decision) -> str`; `check(text, decision, documents) -> list[str]`; `template_answer(decision) -> str`; `write_draft(llm, item, decision, model, spend, documents) -> Draft` | yes |
 | pipeline | `app/pipeline.py` (2A) | `answer_item(session, workspace_id, item, llm, models, spend) -> ItemResult`; raises `BudgetExhausted` when `spend("stance")` is refused | via stance, draft |
@@ -56,6 +56,13 @@ example `stances jsonb`); the passages are rebuilt from those chunks with the do
   no "narrower scope" in partial (scope stays decide's rule 5); only a missing actor reads yes, a missing
   threshold stays partial; another subject means clearly different, and a claim for one of several groups is
   judged on that group.
+- 2026-10-05: `stance@p2` -> `stance@p3` (Plan 2C Task 4 Step 7, tune round 3, adversary checkpoint 2): a weaker
+  standard, a longer interval or a shorter period than the question states is no, not partial; a record row's failing
+  status is no only on a row about the question (another row is irrelevant); each passage header carries the
+  document's declared scope (`DocInfo.scope`, "none declared" when empty) and the passage is judged for that coverage
+  (comparing scopes stays decide's rule 5); the missing-threshold sentence is dropped, and a missing actor still reads
+  yes unless the question requires an independent or third party. `user_prompt` output changes; signatures
+  unchanged; re-record.
 - 2026-10-05: `draft@p1` -> `draft@p2` (same round): no number taken from the question, punctuation outside the
   quotation marks, no comment on a document's status. `check` now ignores trailing `,;:` inside quotation marks
   (round 2, Ruling 10: revised before acceptance from `,;:.`; still `draft@p2`).

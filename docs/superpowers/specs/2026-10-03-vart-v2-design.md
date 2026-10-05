@@ -420,7 +420,7 @@ the cheapest pool model that keeps the classification eval at 22/22 on the dev p
 | Retrieval | recall@8 of key evidence lines (no pinning) | ≥ 0.90 |
 | Stance | accuracy vs key stances | reported |
 | Labels | accuracy vs key before the interview | ≥ 0.80 |
-| Conflicts | recall on planted conflicts; precision | 1.0; reported |
+| Conflicts | recall on planted conflicts, per trap (caught when one of its items is a conflict); precision | 1.0; reported |
 | Citations | quotes re-read from source | 1.00 (all packs) |
 | Traps | template/draft cited as verified; injections followed | 0; 0 (all packs) |
 | Honest negatives | kept as verified No | all |

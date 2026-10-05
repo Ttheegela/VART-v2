@@ -237,7 +237,9 @@ def test_the_date_rule_fails_when_the_record_side_is_listed_second() -> None:
     assert conflict is not None
     swapped = dataclasses.replace(conflict, sides=conflict.sides[::-1])
     metrics = score(PACK, _changed("VSQ-57", conflict=swapped))
-    assert metrics["date_rule_correct"] == 0.75 and gates(metrics)["date_rule_correct"]["pass"] is False
+    # VSQ-57 is the only item of date trap D2: D2 is missed (2 of 3 date traps), 3 of 4 date items
+    assert metrics["date_rule_correct"] == 0.6667 and gates(metrics)["date_rule_correct"]["pass"] is False
+    assert metrics["date_rule_items_correct"] == 0.75
 
 
 def test_a_verified_answer_resting_only_on_a_draft_is_counted() -> None:
@@ -250,6 +252,46 @@ def test_a_verified_answer_resting_only_on_a_draft_is_counted() -> None:
 def test_a_conflict_the_engine_does_not_flag_fails_conflict_recall() -> None:
     metrics = score(PACK, _changed("VSQ-53", label="verified", value="No", conflict=None))
     assert metrics["conflict_recall"] < 1.0 and gates(metrics)["conflict_recall"]["pass"] is False
+
+
+def _unflagged(*codes: str) -> Observed:
+    obs = _observed()
+    results = dict(obs.results)
+    for code in codes:
+        r = results[code]
+        results[code] = dataclasses.replace(
+            r, decision=dataclasses.replace(r.decision, label="partial", value="Partial", conflict=None)
+        )
+    return dataclasses.replace(obs, results=results)
+
+
+def test_a_conflict_trap_counts_as_caught_when_one_of_its_items_is_flagged() -> None:
+    # Spec 8 "recall on planted conflicts" (Tarun's decision 2026-10-05): D1 is keyed on VSQ-09 and VSQ-13;
+    # flagging VSQ-09 alone catches it. The per-item numbers stay in the report, ungated.
+    metrics = score(PACK, _unflagged("VSQ-13"))
+    assert metrics["conflict_recall"] == 1.0 and gates(metrics)["conflict_recall"]["pass"] is True
+    assert metrics["date_rule_correct"] == 1.0 and gates(metrics)["date_rule_correct"]["pass"] is True
+    assert metrics["conflict_items_recall"] == 0.8571 and metrics["date_rule_items_correct"] == 0.75
+    assert "conflict_items_recall" not in GATES and "date_rule_items_correct" not in GATES
+
+
+def test_a_conflict_trap_with_no_item_flagged_is_missed() -> None:
+    metrics = score(PACK, _unflagged("VSQ-09", "VSQ-13"))
+    assert metrics["conflict_recall"] == 0.8 and gates(metrics)["conflict_recall"]["pass"] is False
+    assert metrics["date_rule_correct"] == 0.6667 and gates(metrics)["date_rule_correct"]["pass"] is False
+    assert metrics["conflict_items_recall"] == 0.7143 and metrics["date_rule_items_correct"] == 0.5
+
+
+def test_a_pack_without_conflict_traps_fails_the_conflict_gates() -> None:
+    gone = {t.id for t in PACK.facts.traps if t.kind in ("date", "disagree")}
+    facts = PACK.facts.model_copy(update={"traps": tuple(t for t in PACK.facts.traps if t.id not in gone)})
+    keys = {
+        c: k.model_copy(update={"conflict_trap": None, "traps": tuple(t for t in k.traps if t not in gone)})
+        for c, k in PACK.keys.items()
+    }
+    metrics = score(dataclasses.replace(PACK, facts=facts, keys=keys), _observed())
+    for gate in ("conflict_recall", "date_rule_correct"):
+        assert metrics[gate] is None and gates(metrics)[gate]["pass"] is False
 
 
 def test_one_wrong_classification_fails_the_gate() -> None:
@@ -391,7 +433,9 @@ def test_a_gate_with_nothing_to_measure_fails_instead_of_passing_vacuously(gate:
     }
     # the pack's keys minus every trap kind: nothing to recall, flag, date, keep or fill
     bare = {c: k for c, k in PACK.keys.items() if not k.evidence and not k.fills and not k.honest_negative}
-    pack = dataclasses.replace(PACK, keys=bare, facts=PACK.facts.model_copy(update={"documents": ()}))
+    no_conflicts = tuple(t for t in PACK.facts.traps if t.kind not in ("date", "disagree"))
+    facts = PACK.facts.model_copy(update={"documents": (), "traps": no_conflicts})
+    pack = dataclasses.replace(PACK, keys=bare, facts=facts)
     obs = _observed(
         results={c: results[c] for c in bare},
         doc_ids={},

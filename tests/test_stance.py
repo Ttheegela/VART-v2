@@ -41,9 +41,13 @@ ITEM = ItemInput("VSQ-09", "Do you review access at least quarterly?", "Access C
 def test_the_prompt_numbers_passages_and_shows_their_lines() -> None:
     text = user_prompt(ITEM, PASSAGES)
     assert text.startswith("Question: Do you review access at least quarterly?\nTopic: Access Control\n")
-    assert '[1] access-control-policy.docx, lines 15-16, under "Policy Statements"\nAccess Control\n' in text
     assert (
-        "[2] access-review-records.xlsx, line 4, a spreadsheet row\nSystem: Okta; Status: Overdue\n" in text
+        '[1] access-control-policy.docx, lines 15-16, under "Policy Statements"; scope: internal systems\n'
+        "Access Control\n" in text
+    )
+    assert (
+        "[2] access-review-records.xlsx, line 4, a spreadsheet row; scope: none declared\n"
+        "System: Okta; Status: Overdue\n" in text
     )
 
 
@@ -133,8 +137,8 @@ def _flat() -> str:
     return " ".join(SYSTEM.split())
 
 
-def test_the_prompt_is_version_p2() -> None:
-    assert PROMPT_VERSION == "stance@p2"
+def test_the_prompt_is_version_p3() -> None:
+    assert PROMPT_VERSION == "stance@p3"
 
 
 def test_a_record_rows_failing_status_reads_as_no_and_is_quoted() -> None:
@@ -153,7 +157,6 @@ def test_a_passage_on_another_subject_or_audience_is_irrelevant() -> None:
     assert "different subject, product or audience" in flat
     assert "only the company's own staff when the question asks only about its customers" in flat
     assert 'is "irrelevant", not "partial" and not "yes"' in flat
-    assert "judge it on what it states for that one" in flat
 
 
 def test_partial_needs_a_limit_the_passage_itself_states() -> None:
@@ -164,8 +167,6 @@ def test_partial_needs_a_limit_the_passage_itself_states() -> None:
     assert 'Use "partial" only when the passage itself states a limit or an exception' in flat
     assert "narrower scope" not in flat and "how often) and states no limit" not in flat
     assert 'leaves out only who carries it out is "yes"' in flat
-    assert "the question sets a threshold (at least how often, within how long, how strong)" in flat
-    assert 'the passage states none, the stance is "partial"' in flat
 
 
 def test_the_new_clauses_are_generic() -> None:
@@ -173,3 +174,53 @@ def test_the_new_clauses_are_generic() -> None:
     import re
 
     assert not re.search(r"VSQ|MVSP|Kestrelyn|Okta|Sablecrest|\d{4}-\d{2}", SYSTEM)
+
+
+def test_a_weaker_standard_or_longer_interval_than_asked_is_no_not_partial() -> None:
+    # Tune round 3 (adversary 2, edit 1): the partial definition no longer describes a value short of the
+    # question's own threshold; that reads no, so two documents that disagree can conflict.
+    flat = _flat()
+    no_rule = flat[flat.index('"no" when') : flat.index('"partial" when')]
+    for cue in ("weaker standard", "longer interval", "than the question asks"):
+        assert cue in no_rule
+    partial_rule = flat[flat.index('"partial" when') : flat.index('"irrelevant" when')]
+    assert "weaker standard" not in partial_rule and "longer interval" not in partial_rule
+    assert "some systems, some people" not in flat
+    judge = flat[flat.index("How to judge") :]
+    assert "does not meet the threshold the question itself states" in judge
+    assert 'is "no" for that passage, not "partial"' in judge
+
+
+def test_a_failing_status_is_no_only_on_a_row_about_the_question() -> None:
+    # Tune round 3 (adversary 2, edit 2): clause A applies only to a relevant row.
+    flat = _flat()
+    rule = flat[flat.index("A spreadsheet row states") :]
+    assert "When a row is about what the question asks and its status field says" in rule
+    assert 'A row about something else is "irrelevant", whatever its status says.' in rule
+
+
+def test_the_passage_is_judged_for_its_documents_declared_scope() -> None:
+    # Tune round 3 (adversary 2, edit 3): the header carries DocInfo.scope; comparing scopes stays decide's
+    # rule 5 (spec 6.7), so the prompt asks only for a judgement within the document's own coverage.
+    flat = _flat()
+    assert "Each passage header shows the scope its document declares" in flat
+    assert "judge the passage's claim for that part" in flat
+    assert 'do not call it "partial" for the people or systems outside it' in flat
+    assert "The program compares the documents' coverages." in flat
+    assert "judge it on what it states for that one" not in flat
+
+
+def test_the_header_shows_the_declared_scope_or_none() -> None:
+    text = user_prompt(ITEM, PASSAGES)
+    assert "; scope: internal systems\n" in text and "; scope: none declared\n" in text
+
+
+def test_a_missing_actor_is_yes_unless_an_independent_party_is_required() -> None:
+    # Tune round 3 (adversary 2, edit 4; round-2 review N1): no threshold sentence, actor rule guarded.
+    flat = _flat()
+    assert "the passage states none, the stance is" not in flat
+    assert "the question sets a threshold (at least how often" not in flat
+    assert (
+        'leaves out only who carries it out is "yes", unless the question requires an independent or '
+        "third party to carry it out" in flat
+    )

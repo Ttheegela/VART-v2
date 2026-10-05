@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict
 from app.contracts import ItemInput, Passage, Stance
 from app.llm.client import LLMClient, build_request, complete_model
 
-PROMPT_VERSION = "stance@p2"
+PROMPT_VERSION = "stance@p3"
 MAX_TOKENS = 3000  # room for models that think before they answer
 SYSTEM = """You read passages from a company's own security documents and judge what each passage says about \
 one question from a customer's security questionnaire.
@@ -21,8 +21,9 @@ that and judge only what the passage states as fact.
 For every passage give:
 - stance: "yes" when the passage states that the answer to the question is Yes; "no" when it states that \
 the answer is No today (something is not done, not yet done, not allowed, not in place, pending, or only \
-planned); "partial" when it supports Yes only in part (some systems, some people, a weaker standard or a \
-longer interval than asked); "irrelevant" when it does not answer the question.
+planned) or states a weaker standard, a longer interval or a shorter period than the question asks; \
+"partial" when it supports Yes only in part: some cases, some of the time, or with an exception the \
+passage states; "irrelevant" when it does not answer the question.
 - quote: for yes, no and partial, copy the complete sentence that carries the answer from ONE line of the \
 passage, character for character: the same capital letters and punctuation, including the final full stop. \
 Never start or end inside a word, never join two lines, never use "..." and never change or add a word. If \
@@ -33,18 +34,21 @@ For irrelevant, the quote is "".
 - note: a few words on why.
 
 How to judge:
-- Use "partial" only when the passage itself states a limit or an exception: some cases handled late, a \
-weaker standard or a longer interval than asked. A passage that states the question's claim and leaves out \
-only who carries it out is "yes". When the question sets a threshold (at least how often, within how long, \
-how strong) and the passage states none, the stance is "partial".
+- Use "partial" only when the passage itself states a limit or an exception, such as some cases handled \
+late. A passage that states a value that does not meet the threshold the question itself states (a weaker \
+standard, a longer interval or a shorter period than asked) is "no" for that passage, not "partial". A \
+passage that states the question's claim and leaves out only who carries it out is "yes", unless the \
+question requires an independent or third party to carry it out.
 - A passage about a different subject, product or audience than the question asks about (for example only \
 the company's own staff when the question asks only about its customers, or a different control) is \
-"irrelevant", not "partial" and not "yes". When the question covers several groups or systems and the \
-passage states its claim for one of them, judge it on what it states for that one; do not call it \
-"partial" for leaving the others out.
-- A spreadsheet row states facts as of its own date. When its status field says Overdue, Expired, Failed, \
-Open (not remediated), Missed or the like, the stance for that row is "no", even when its other fields \
-describe a schedule, and you must include that status field in the quote.
+"irrelevant", not "partial" and not "yes".
+- Each passage header shows the scope its document declares. A document that declares what it covers \
+answers for that part only: judge the passage's claim for that part, and do not call it "partial" for the \
+people or systems outside it. The program compares the documents' coverages.
+- A spreadsheet row states facts as of its own date. When a row is about what the question asks and its \
+status field says Overdue, Expired, Failed, Open (not remediated), Missed or the like, the row is "no", even \
+when its other fields describe a schedule, and you must include that status field in the quote. A row about \
+something else is "irrelevant", whatever its status says.
 
 Return one entry per passage, in passage order, numbered as in the brackets."""
 
@@ -73,7 +77,8 @@ def user_prompt(item: ItemInput, passages: Sequence[Passage]) -> str:
             where += ", a spreadsheet row"
         elif p.heading:
             where += f', under "{p.heading}"'
-        parts += ["", f"[{i}] {p.doc.filename}, {where}", *p.lines]
+        scope = p.doc.scope.replace("-", " ") if p.doc.scope else "none declared"
+        parts += ["", f"[{i}] {p.doc.filename}, {where}; scope: {scope}", *p.lines]
     return "\n".join(parts) + "\n"
 
 
