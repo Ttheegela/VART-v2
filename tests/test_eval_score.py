@@ -1,4 +1,5 @@
 import dataclasses
+import math
 import uuid
 from types import SimpleNamespace
 
@@ -186,7 +187,7 @@ def test_the_markdown_lists_gates_and_misses() -> None:
             "label_misses": [],
         }
     )
-    assert "| label_accuracy | >= 0.8 | 1.0 | yes |" in text and "- none" in text
+    assert "| label_accuracy | >= 0.9 | 1.0 | yes |" in text and "- none" in text
 
 
 def test_every_gate_has_a_known_direction() -> None:
@@ -230,6 +231,22 @@ def test_no_gate_is_flipped_or_looser_than_the_spec() -> None:
 
     assert set(GATES) == set(SPEC_GATES)
     assert [name for name in SPEC_GATES if not holds(name)] == []
+
+
+# The accepted baseline (plan2c Task 5, a216b50 latest.json) of the gates whose spec value is below 1.0.
+BASELINE = {"retrieval_recall_at_8": 0.9738, "label_accuracy": 0.9213, "judge_faithfulness": 0.971}
+
+
+def test_gates_are_tightened_to_the_spec_value_or_the_baseline_less_two_points() -> None:
+    # Decision of 2026-10-04: max(spec value, baseline - 0.02), rounded down to two decimals; 0 and 1.0 stay.
+    def tightened(name: str) -> float:
+        _, spec = SPEC_GATES[name]
+        if name not in BASELINE:
+            return spec
+        return max(spec, math.floor(round((BASELINE[name] - 0.02) * 100, 6)) / 100)
+
+    targets = {name: target for name, (_, target) in GATES.items()}
+    assert targets == {name: tightened(name) for name in SPEC_GATES}
 
 
 def test_the_date_rule_fails_when_the_record_side_is_listed_second() -> None:

@@ -57,13 +57,13 @@
     "judge_faithfulness": {
       "op": ">=",
       "pass": true,
-      "target": 0.9,
+      "target": 0.95,
       "value": 0.971
     },
     "label_accuracy": {
       "op": ">=",
       "pass": true,
-      "target": 0.8,
+      "target": 0.9,
       "value": 0.9213
     },
     "redaction_citations_valid": {
@@ -81,7 +81,7 @@
     "retrieval_recall_at_8": {
       "op": ">=",
       "pass": true,
-      "target": 0.9,
+      "target": 0.95,
       "value": 0.9738
     },
     "template_or_draft_cited_as_verified": {

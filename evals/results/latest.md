@@ -8,8 +8,8 @@ Prompts: classify@p1, draft@p2, judge@p2, stance@p3.
 | Gate | Target | Value | Pass |
 |---|---|---|---|
 | classification_correct | >= 1.0 | 1.0 | yes |
-| retrieval_recall_at_8 | >= 0.9 | 0.9738 | yes |
-| label_accuracy | >= 0.8 | 0.9213 | yes |
+| retrieval_recall_at_8 | >= 0.95 | 0.9738 | yes |
+| label_accuracy | >= 0.9 | 0.9213 | yes |
 | conflict_recall | >= 1.0 | 1.0 | yes |
 | date_rule_correct | >= 1.0 | 1.0 | yes |
 | citations_valid | >= 1.0 | 1.0 | yes |
@@ -18,7 +18,7 @@ Prompts: classify@p1, draft@p2, judge@p2, stance@p3.
 | honest_negatives_kept | >= 1.0 | 1.0 | yes |
 | asked_twice | <= 0.0 | 0.0 | yes |
 | fills_suggested | >= 1.0 | 1.0 | yes |
-| judge_faithfulness | >= 0.9 | 0.971 | yes |
+| judge_faithfulness | >= 0.95 | 0.971 | yes |
 | answer_checks_pass | >= 1.0 | 1.0 | yes |
 | redaction_citations_valid | >= 1.0 | 1.0 | yes |
 | redaction_private_leaks | <= 0.0 | 0.0 | yes |

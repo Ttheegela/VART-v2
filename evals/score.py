@@ -14,8 +14,8 @@ from evals.pack import Pack
 
 GATES: dict[str, tuple[str, float]] = {
     "classification_correct": (">=", 1.0),
-    "retrieval_recall_at_8": (">=", 0.90),
-    "label_accuracy": (">=", 0.80),
+    "retrieval_recall_at_8": (">=", 0.95),
+    "label_accuracy": (">=", 0.90),
     "conflict_recall": (">=", 1.0),
     "date_rule_correct": (">=", 1.0),
     "citations_valid": (">=", 1.0),
@@ -24,7 +24,7 @@ GATES: dict[str, tuple[str, float]] = {
     "honest_negatives_kept": (">=", 1.0),
     "asked_twice": ("<=", 0.0),
     "fills_suggested": (">=", 1.0),
-    "judge_faithfulness": (">=", 0.90),
+    "judge_faithfulness": (">=", 0.95),
     "answer_checks_pass": (">=", 1.0),
     "redaction_citations_valid": (">=", 1.0),
     "redaction_private_leaks": ("<=", 0.0),
