@@ -89,11 +89,13 @@ def _side(stance: str, pairs: list[Pair]) -> ConflictSide:
 
 def _conflict(yes: list[Pair], no: list[Pair]) -> Conflict:
     """Rule 6: a dated record newer than every dated document on the other side is the 'date' rule, newer
-    side first; anything else is 'documents-disagree'."""
+    side first; anything else is 'documents-disagree'. Rows of the record's own sheet on the other side are
+    not another document (Plan 2A Ruling 18)."""
     for newer, older in ((yes, no), (no, yes)):
-        records = [p.as_of for p, _ in newer if p.record and p.as_of is not None]
-        others = [d for p, _ in older if (d := _date(p)) is not None]
-        if records and others and max(records) > max(others):
+        records = [(p.as_of, p.doc.id) for p, _ in newer if p.record and p.as_of is not None]
+        sheets = {doc_id for _, doc_id in records}
+        others = [d for p, _ in older if p.doc.id not in sheets and (d := _date(p)) is not None]
+        if records and others and max(day for day, _ in records) > max(others):
             return Conflict(
                 "date",
                 (

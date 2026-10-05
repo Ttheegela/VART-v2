@@ -183,6 +183,41 @@ def test_a_newer_record_on_the_yes_side_goes_first_too() -> None:
     assert [s.stance for s in d.conflict.sides] == ["yes", "no"]
 
 
+def test_rows_of_the_record_sheet_on_the_other_side_still_give_the_date_rule() -> None:
+    # Plan 2A Ruling 18 (the D3 shape): rows of the newer record's own sheet are not "the other document"
+    inventory = doc("asset-inventory.xlsx", kind="record", effective=date(2026, 9, 1))
+    residency = passage(
+        doc("data-classification-policy.md", effective=date(2026, 1, 15)),
+        "Kestrelyn Ledger stores all customer data in AWS us-east-1.",
+    )
+    rds = passage(
+        inventory,
+        "Asset: ledger-db-prod; Type: Amazon RDS database; Location: AWS us-east-1",
+        start=4,
+        as_of=date(2026, 9, 1),
+        record=True,
+    )
+    office = passage(
+        inventory,
+        "Asset: OFFICE-FS01; Location: Austin office; Data: Customer invoice exports",
+        start=12,
+        as_of=date(2026, 9, 1),
+        record=True,
+    )
+    d = decide(
+        [residency, rds, office],
+        [
+            yes(1, "Kestrelyn Ledger stores all customer data in AWS us-east-1."),
+            yes(2, "Location: AWS us-east-1"),
+            no(3, "Data: Customer invoice exports"),
+        ],
+    )
+    assert d.conflict is not None and d.conflict.rule == "date"
+    newer, older = d.conflict.sides
+    assert (newer.stance, [c.line_start for c in newer.citations]) == ("no", [12])
+    assert older.stance == "yes"
+
+
 def test_two_documents_that_disagree_without_a_newer_record() -> None:
     quarterly = passage(
         doc("business-continuity-policy.md", scope="production"), "Backup restores are tested quarterly."
