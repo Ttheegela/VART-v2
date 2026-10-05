@@ -1,3 +1,4 @@
+import time
 from datetime import date
 
 import pytest
@@ -31,6 +32,18 @@ from app.redact import redact_lines, redact_text
         ("AWS_SECRET_ACCESS_KEY=" + "wJalrXUtnFEMI/K7MDENG/bPxRfiCY" + "EXAMPLEKEY", "<SECRET>"),
         ("aws_secret_access_key = " + "wJalrXUtnFEMI/K7MDENG/bPxRfiCY" + "EXAMPLEKEY", "<SECRET>"),
         ("DB_PASSWORD=hunter2hunter2", "<SECRET>"),
+        ("API_KEY_PROD=abcdefgh12345678", "<SECRET>"),
+        ("API_KEY_LIVE=abcdefgh12345678", "<SECRET>"),
+        ("X-Api-Key-Prod=abcdefgh12345678", "<SECRET>"),
+        ("SECRET_KEY_BASE=abcdefgh12345678", "<SECRET>"),
+        ("CLIENT_SECRET_V2=abcdefgh12345678", "<SECRET>"),
+        ("access_token_v2=abcdefgh12345678", "<SECRET>"),
+        ("DB_PASSWORD_PROD=abcdefgh12345678", "<SECRET>"),
+        ("DB_PASSWORD_FILE=abcdefgh12345678", "<SECRET>"),
+        ("PASSWORD_HASH=abcdefgh12345678", "<SECRET>"),
+        ("PASSWORD_SALT=abcdefgh12345678", "<SECRET>"),
+        ("SECRET_PASSPHRASE=abcdefgh12345678", "<SECRET>"),
+        ("SECRET_BASE64=abcdefgh12345678", "<SECRET>"),
         ("secretKey: abcdefgh12345678", "<SECRET>"),
         ("accessToken: abcdefgh12345678", "<SECRET>"),
         ("client_secret: abcdefgh12345678", "<SECRET>"),
@@ -97,3 +110,15 @@ def test_overlapping_matches_collapse_to_one_token() -> None:
 
 def test_digits_glued_to_a_word_are_not_a_phone() -> None:
     assert redact_text("order A512 555 0142 shipped") == "order A512 555 0142 shipped"
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["token_" * 3333, "api-key-" * 2500, "password_" * 2200, "secret=" * 2800, "a" * 20000, "A1 " * 6666],
+    ids=["token_", "api-key-", "password_", "secret=", "a", "A1 "],
+)
+def test_a_crafted_line_is_redacted_in_linear_time(line: str) -> None:
+    started = time.monotonic()
+    redact_text(line)
+    # generous: about 1.5 s of this is spaCy on 20,000 characters; the keyed-secret regex was cubic (minutes)
+    assert time.monotonic() - started < 10.0

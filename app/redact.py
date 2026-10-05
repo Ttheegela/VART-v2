@@ -86,8 +86,10 @@ _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "SECRET",
         re.compile(  # an underscore or hyphen is a separator: DB_PASSWORD=, aws_secret_access_key =
-            r"(?<![A-Za-z0-9])[\w-]*(?:api[_-]?key|secret|token|password|passwd|pwd)"
-            r"(?:[_-][\w-]*(?:key|id|secret|token|value)|(?-i:[A-Z])\w*)?\s*[:=]\s*\S{8,}",
+            # start at a word start and bound every [\w-] run: linear time, not cubic, on a crafted line;
+            # all-digit values are skipped (token_count: 1000000000)
+            r"(?<![\w-])[\w-]{0,64}(?:api[_-]?key|secret|token|password|passwd|pwd)"
+            r"(?:[_-][\w-]{0,64}|(?-i:[A-Z])\w{0,64})?\s*[:=]\s*(?!\d+(?!\S))\S{8,}",
             re.IGNORECASE,
         ),
     ),
