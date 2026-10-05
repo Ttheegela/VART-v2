@@ -43,6 +43,53 @@ from evals.run import RECORDED, RESULTS, always
 CANDIDATES = RECORDED / "candidates"
 JUDGE_FALLBACK = "moonshotai/kimi-k2.5"  # judges a candidate drafter from the default judge's family
 REFERENCE = "anthropic/claude-sonnet-5.5"  # the quality reference (spec 8), never a default
+MAX_BENCH_USD = 4.0  # live spend at which a run stops; the eval key's own cap is $5
+OUT_OF_CREDIT = 402  # the HTTP status OpenRouter answers when a key's credit limit is used up
+
+
+class BenchStop(Exception):
+    """The run must stop (spend cap or out of credit); what finished is still written, marked partial."""
+
+
+class Guard:
+    """Live spend of the whole run (recorded replays cost nothing) and why the run stopped, if it did."""
+
+    def __init__(self, max_usd: float = MAX_BENCH_USD) -> None:
+        self.max_usd = max_usd
+        self.total = 0.0
+        self.reason: str | None = None
+        self._lock = threading.Lock()
+
+    def stop(self, reason: str) -> None:
+        with self._lock:
+            self.reason = self.reason or reason
+
+    def add(self, usd: float) -> None:
+        with self._lock:
+            self.total += usd
+            if self.total >= self.max_usd and not self.reason:
+                self.reason = f"spend cap ${self.max_usd:.2f} reached"
+
+
+class Guarded:
+    """Sits on the live client only: counts what is really spent and stops the run at the cap or at a 402."""
+
+    def __init__(self, inner: LLMClient, guard: Guard) -> None:
+        self.inner = inner
+        self.guard = guard
+
+    def complete(self, req: LLMRequest) -> LLMResult:
+        if self.guard.reason:
+            raise BenchStop(self.guard.reason)
+        try:
+            result = self.inner.complete(req)
+        except LLMError as exc:
+            if getattr(exc.__cause__, "status_code", None) == OUT_OF_CREDIT:
+                self.guard.stop("out of credit (the key's limit)")
+                raise BenchStop(self.guard.reason) from exc
+            raise
+        self.guard.add(result.cost_usd or 0.0)
+        return result
 
 
 class Usage:
@@ -104,13 +151,14 @@ def _parallel(fn: Callable[[ItemInput], Any], items: Sequence[ItemInput], worker
         return dict(zip((i.key for i in items), pool.map(fn, items), strict=True))
 
 
-def _row(model: str, scores: dict[str, float], usage: Usage, failures: int) -> dict[str, Any]:
-    latencies = [ms for _, ms in usage.calls] or [0]
+def _row(model: str, scores: dict[str, float], usages: Sequence[Usage], failures: int) -> dict[str, Any]:
+    calls = [c for u in usages for c in u.calls]
+    latencies = [ms for _, ms in calls] or [0]
     return {
         "model": model,
         **scores,
         "failures": failures,
-        "cost_usd": round(sum(c for c, _ in usage.calls), 4),
+        "cost_usd": round(sum(c for c, _ in calls), 4),
         "p50_seconds": round(statistics.median(latencies) / 1000, 2),
     }
 
@@ -122,11 +170,14 @@ def bench_stance(
     models: list[str],
     key: str,
     workers: int,
+    guard: Guard,
 ) -> list[dict[str, Any]]:
     rows = []
     for model in models:
         usage = Usage(
-            RecordingClient(OpenRouterClient(key), CANDIDATES / f"stance-{model.replace('/', '_')}.jsonl")
+            RecordingClient(
+                Guarded(OpenRouterClient(key), guard), CANDIDATES / f"stance-{model.replace('/', '_')}.jsonl"
+            )
         )
 
         def one(item: ItemInput, model: str = model, usage: Usage = usage) -> Decision | None:
@@ -137,7 +188,10 @@ def bench_stance(
                 return None
             return decide(passages, stances, found[item.key].dropped)
 
-        decisions = _parallel(one, items, workers)
+        try:
+            decisions = _parallel(one, items, workers)
+        except BenchStop:
+            break  # this model's row would be incomplete
         good = {c: d for c, d in decisions.items() if d is not None}
         keys = pack.keys
         scores = {
@@ -157,7 +211,7 @@ def bench_stance(
                 (d.label, d.value) == ("verified", "No") for c, d in good.items() if keys[c].honest_negative
             ),
         }
-        rows.append(_row(model, scores, usage, len(items) - len(good)))
+        rows.append(_row(model, scores, [usage], len(items) - len(good)))
     return rows
 
 
@@ -169,6 +223,7 @@ def bench_draft(
     key: str,
     workers: int,
     documents: list[str],
+    guard: Guard,
 ) -> list[dict[str, Any]]:
     defaults = get_settings().models()
     main = ReplayClient(RECORDED / f"{pack.name}.jsonl")
@@ -178,7 +233,7 @@ def bench_draft(
         if found[i.key].passages
     }
     judged_items = [i for i in items if i.key in decisions and decisions[i.key].label != "unknown"]
-    judge_client = RecordingClient(OpenRouterClient(key), CANDIDATES / "judge.jsonl")
+    judge_client = RecordingClient(Guarded(OpenRouterClient(key), guard), CANDIDATES / "judge.jsonl")
     rows = []
     for model in models:
         judges = judges_for(model, defaults["judge"])
@@ -186,19 +241,34 @@ def bench_draft(
             print(f"skip {model}: no judge from another family")
             continue
         usage = Usage(
-            RecordingClient(OpenRouterClient(key), CANDIDATES / f"draft-{model.replace('/', '_')}.jsonl")
+            RecordingClient(
+                Guarded(OpenRouterClient(key), guard), CANDIDATES / f"draft-{model.replace('/', '_')}.jsonl"
+            )
         )
+        judge_usage = Usage(judge_client)  # the judge calls of this model's drafts count in its cost
 
         def one(
-            item: ItemInput, model: str = model, usage: Usage = usage, judges: list[str] = judges
-        ) -> tuple[str, bool, list[bool]]:
-            draft = write_draft(usage, item, decisions[item.key], model, always, documents)
-            verdicts = [
-                judge(judge_client, item, decisions[item.key], draft.text, j).faithful for j in judges
-            ]
+            item: ItemInput,
+            model: str = model,
+            usage: Usage = usage,
+            judges: list[str] = judges,
+            judge_usage: Usage = judge_usage,
+        ) -> tuple[str, bool, list[bool]] | None:
+            try:
+                draft = write_draft(usage, item, decisions[item.key], model, always, documents)
+                verdicts = [
+                    judge(judge_usage, item, decisions[item.key], draft.text, j).faithful for j in judges
+                ]
+            except LLMError:
+                return None  # counted as a failure, and as unfaithful
             return draft.source, not draft.problems and draft.source == "model", verdicts
 
-        out = _parallel(one, judged_items, workers)
+        try:
+            results = _parallel(one, judged_items, workers)
+        except BenchStop:
+            break  # this model's rows would be incomplete
+        out = {k: v for k, v in results.items() if v is not None}
+        failures = len(results) - len(out)
         n = len(judged_items) or 1
         for k, judge_model in enumerate(judges):  # the reference gets one row per judge
             scores = {
@@ -207,19 +277,21 @@ def bench_draft(
                 "fallbacks": sum(src == "template" for src, _, _ in out.values()),
                 "judge_faithfulness": round(sum(v[k] for _, _, v in out.values()) / n, 4),
             }
-            rows.append({**_row(model, scores, usage, 0), "judge": judge_model})
+            rows.append({**_row(model, scores, [usage, judge_usage], failures), "judge": judge_model})
     return rows
 
 
-def markdown(step: str, pack: str, rows: list[dict[str, Any]]) -> str:
+def markdown(step: str, pack: str, rows: list[dict[str, Any]], partial: str | None = None) -> str:
+    note = [f"PARTIAL: the run stopped early ({partial}); models after the last row were not benched.", ""]
     if not rows:
-        return f"# Model bench: {step}\n\nNo candidate could be run.\n"
+        return f"# Model bench: {step}\n\nNo candidate could be run.\n" + ("\n".join(note) if partial else "")
     columns = list(rows[0])
     lines = [
         f"# Model bench: {step} ({pack} pack, {date.today().isoformat()})",
         "",
         "Live calls from `python -m evals.bench`, not reproduced in CI; app/settings.py defaults follow it.",
         "",
+        *(note if partial else []),
         "| " + " | ".join(columns) + " |",
         "|" + "---|" * len(columns),
     ]
@@ -233,6 +305,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--models", required=True, help="comma-separated OpenRouter model ids")
     parser.add_argument("--pack", default="dev")
     parser.add_argument("--workers", type=int, default=6)
+    parser.add_argument(
+        "--max-usd", type=float, default=MAX_BENCH_USD, help="stop when live spend reaches this"
+    )
     args = parser.parse_args(argv)
     if "test" not in (make_url(database_url()).database or ""):  # the bench writes a workspace there
         print("refusing to run: DATABASE_URL must point at a test database", file=sys.stderr)
@@ -265,18 +340,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             session.execute(delete(Workspace).where(Workspace.id == ws.id))
             session.commit()
     documents = [d.filename for d in pack.facts.documents]
+    guard = Guard(args.max_usd)
     try:
         if args.step == "stance":
-            rows = bench_stance(pack, items, found, models, key, args.workers)
+            rows = bench_stance(pack, items, found, models, key, args.workers, guard)
         else:
-            rows = bench_draft(pack, items, found, models, key, args.workers, documents)
+            rows = bench_draft(pack, items, found, models, key, args.workers, documents, guard)
     except ReplayMiss as exc:
         print(
             f"the draft bench reads the main recording; record the main eval first ({exc})", file=sys.stderr
         )
         return 2
     out = RESULTS / f"bench-{args.step}.md"
-    out.write_text(markdown(args.step, args.pack, rows))
+    out.write_text(markdown(args.step, args.pack, rows, guard.reason))
     print(f"wrote {out}")
     return 0
 
