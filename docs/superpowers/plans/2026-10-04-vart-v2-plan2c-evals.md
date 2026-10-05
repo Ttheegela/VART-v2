@@ -24,6 +24,21 @@ Tarun settled Plan 2's open decisions on 2026-10-04 (one row each in `docs/PROGR
 - **Branches.** Tasks 4-6 run on branch `plan2` in `~/Desktop/portfolio/projects/VART-wt-plan2`, not on `main` in the main checkout (`main` stays production); the lead merges the lanes into `plan2` locally, with no approval needed (Task 4 Step 1); pushing and the release (a pull request `plan2` -> `main`, merged by fast-forward after green CI, then the deploy) need Tarun's OK (Task 6 Step 6).
 - **Checkpoint 1 (Plan 2A Rulings 14-15):** the patterns, contract wording and pins were fixed in Part 0; the following steps carry its lane findings: Task 6 Step 6 (M10: the runtime `presidio-analyzer`, `spacy` and `thinc` pinned equal to `requirements-dev.txt` in both `requirements.txt` and `pyproject.toml`; numpy and blis stay ranges at runtime).
 
+### Execution notes (rulings during execution, recorded 2026-10-05)
+
+Where the steps below differ from these lines, these lines describe what was built.
+
+- **Ruling 1.** The scorer fails closed: a table pins each gate's direction and a floor at the spec value; classification counts every fact-sheet document; a key with no result raises; `Pack.control` was removed (targets come from the key's own traps); citations need `line_end == line_start`; `template_or_draft_cited_as_verified` checks template and placeholder citations in every label (the draft ceiling stays verified-only).
+- **Ruling 2.** The draft bench catches `LLMError` per item, stops on a 402 or the `MAX_BENCH_USD` guard and writes a partial table, and counts judge calls in its cost.
+- **Rulings 3-5.** Adversary checkpoint 3 (evals): template drafts are not judged and count as unfaithful in both the bench and the release run; statements and recheck prompts are in the leak scan; the judge reads the answer as one JSON line; `--refresh STEP` replaces a bad recorded row; vacuous gates (nothing to measure) fail; `max_tokens` is in the recording key.
+- **Ruling 6.** "Reply with JSON only." ends every system message and `provider.require_parameters: true` goes on every request; the interim defaults were `deepseek/deepseek-v4-flash` until the bench.
+- **Ruling 7.** Reasoning is set per step and is part of the recording key (spec 6.14).
+- **Ruling 8.** The canary runs with reasoning off.
+- **Rulings 9, 10 and round 3.** Tuning: `stance@p3` and `draft@p2`, a one-way synonym list and joined de-hyphenation in retrieval, and the answer check ignores a trailing `, ; :` inside quotation marks. The judge prompt is `judge@p2`.
+- **Conflict and date gates (Tarun, 2026-10-05).** `conflict_recall` and `date_rule_correct` count planted traps (a trap is caught when one of its items is right); the per-item numbers are reported, ungated.
+- **Ruling 11.** Draft reasoning is off, so `z-ai/glm-5.3-flash` gets `{"effort": "low"}` through `reasoning_for` (its reasoning is mandatory).
+- **Task 6.** Gates tightened to max(spec, baseline - 0.02): label accuracy 0.90, recall@8 0.95, judge faithfulness 0.95. A record run that leaves a request unrecorded (a failed live call swallowed by the draft fallback) exits 2 and writes no results.
+
 ## Global Constraints
 
 The full list is in plan2a; it applies here unchanged. The lines that matter most for this file:

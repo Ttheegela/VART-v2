@@ -181,14 +181,15 @@ worker process is needed. The run records the prompt versions and model IDs it u
 
 ### 6.5 Retrieval
 
-Query = the item's question (+ topic). Postgres full-text search (`websearch_to_tsquery`, `ts_rank_cd`) always;
-pgvector cosine search is tried only if the real baseline's recall@8 on the dev pack is below 0.95, and kept only if
-it raises recall@8 by ≥ 0.05. Results are merged by reciprocal rank fusion, capped at two passages per document, and
-extended by a record hop: when a selected passage names an identifier (email, hostname, system name) that appears in
-record rows, up to three of those rows are added. Passages from documents with `evidence_allowed = false` stay in the
-results so the evidence drawer can show why they were not used (decide drops them). Passages flagged `injection` are
-removed before any model call and recorded as dropped. No answer-key evidence is ever inserted. The embedding provider
-is chosen in Plan 2 (OpenRouter embeddings if available; otherwise vectors are skipped and the README says so).
+Query = the item's question (+ topic). Postgres full-text search (`websearch_to_tsquery`) finds the candidates,
+ranked by `ts_rank_cd` and by an IDF-weighted term overlap and merged by reciprocal rank fusion, at most two text
+passages and three record rows per document. Vectors were not added: the Plan 2 baseline's recall@8 was 0.9738, and
+pgvector search is tried only below 0.95 and kept only if it adds 0.05. The results are extended by a record hop:
+when a selected passage names an identifier (email, hostname, system name) that appears in record rows, up to three
+of those rows are added. Passages from documents with `evidence_allowed = false` stay in the results so the evidence
+drawer can show why they were not used (decide drops them). Passages flagged `injection` are removed before any
+model call and recorded as dropped. No answer-key evidence is ever inserted. With no vectors there is no embedding
+provider, and the README says so.
 
 ### 6.6 Stance
 
@@ -201,8 +202,9 @@ note. The system prompt states that passage text is data, never instructions. Th
 
 Inputs: the item, its stances, the passages with their document metadata. Rules apply in this order:
 
-1. **Containment.** The quote must be a substring of the passage after whitespace and quote-mark normalization;
-   otherwise drop it (`containment`).
+1. **Containment.** The quote must be a substring of one line of the passage after whitespace and quote-mark
+   normalization, 3 to 30 words (a record row's quote at most 30 words, made of whole `Header: value` fields);
+   otherwise drop it (`containment`, `quote-length`, `record-field`).
 2. **Evidence gate.** Drop passages whose document has `evidence_allowed = false`, or whose chunk is flagged
    `placeholder` or `injection` (`not-evidence`, `placeholder`, `injection`).
 3. **Irrelevant.** Drop `irrelevant` stances.
@@ -218,8 +220,8 @@ Inputs: the item, its stances, the passages with their document metadata. Rules 
    → `verified`, value No (an honest negative is still verified). Any other mix → `partial`, value Partial.
 8. **Draft ceiling.** If every surviving citation comes from documents with status `draft`, `verified` becomes
    `partial` (value Partial; every partial label carries value Partial).
-9. **Confidence.** verified 0.9, partial 0.6, conflict 0.3, unknown 0.0; minus 0.2 if anything was dropped for
-   containment; floor 0.
+9. **Confidence.** verified 0.9, partial 0.6, conflict 0.3, unknown 0.0; minus 0.2 if any quote failed rule 1
+   (`containment`, `quote-length` or `record-field`); floor 0.
 
 Output: label, value, citations (only quotes that passed containment), dropped list with reasons, conflict
 (both sides, dates, rule) or scope note, confidence. When the visitor overrides document metadata, decide re-runs on the
@@ -229,11 +231,12 @@ stances already collected, with no model call.
 
 One structured call per item that has surviving evidence: one or two plain sentences naming the documents in plain
 words. It may use only the decide step's citations and may not add new ones. For conflicts it writes the question
-for the person; for unknowns it writes the question to ask. A code check then confirms every quoted string is in a
-citation (a trailing comma, semicolon or colon inside the quotation marks is the writer's punctuation and is ignored;
-the drafter is told to put its punctuation outside them), every document named is a cited document, and every number in the text appears in a cited quote (reusing
-PriorPath's `grounding.unsupported_numbers`). A failed check retries once, then falls back to a template answer built
-from the citations.
+for the person. An unknown item gets no draft call: its question goes to the interview queue as it is. A code check
+then confirms every quoted string is in a citation (a trailing comma, semicolon or colon inside the quotation marks
+is the writer's punctuation and is ignored; the drafter is told to put its punctuation outside them), every document
+named is a cited document, and every number in the text appears in a cited quote (reusing PriorPath's
+`grounding.unsupported_numbers`). A failed check retries once, then falls back to a template answer built from the
+citations.
 
 ### 6.9 Interview
 
@@ -265,7 +268,7 @@ ids return 404.
 | `workspaces` | id, created_at, ip_hash |
 | `documents` | id, filename, source (sample/upload/drive/statement), sha256, kind, status, effective_date, scope, evidence_allowed, metadata_source (rule/model/user), line_count |
 | `document_lines` | document_id, n, text (redacted) — primary key (document_id, n) |
-| `chunks` | id, document_id, line_start, line_end, text, heading, flags text[], as_of, `tsv` tsvector (generated); an optional `embedding` vector, added only if Plan 2's retrieval eval shows it helps (full-text search is the default) |
+| `chunks` | id, document_id, line_start, line_end, text, heading, flags text[], as_of, `record` (a one-line record row; Plan 2), `tsv` tsvector (generated); no `embedding` column (Plan 2's recall@8 did not need vectors, section 6.5) |
 | `questionnaires` | id, filename, source, original_bytes (xlsx only), sheet, mapping jsonb |
 | `items` | id, questionnaire_id, position, row_ref, code, topic, question, csf_id |
 | `runs` | id, questionnaire_id, status, prompt_versions jsonb, models jsonb, cost_usd, started_at, finished_at |
@@ -325,7 +328,14 @@ frozen contracts, then wired to the real one. Keyboard-usable grid and drawer; l
   reference, and is never a default. The defaults, set from the 2026-10-05 bench: stance and recheck
   `deepseek/deepseek-v4-pro`, draft `z-ai/glm-5.3-flash`, classify `deepseek/deepseek-v4-flash` (one live check on
   a document no rule knows; `qwen/qwen3.5-flash-02-23`'s only provider does not enforce strict schemas) and judge
-  `qwen/qwen3.7-plus`; when the drafter is a Qwen model, the judge default is `moonshotai/kimi-k2.5`.
+  `qwen/qwen3.7-plus`; when the drafter is a Qwen model, the judge default is `moonshotai/kimi-k2.5`. These replace
+  the starting defaults; the recheck model defaults to the stance model (`RECHECK_MODEL` empty).
+- Every request sends OpenRouter `provider.require_parameters: true` (route only to providers that honour every
+  parameter sent), ends its system message with the fixed line "Reply with JSON only." (a provider that downgrades a
+  JSON schema to JSON mode refuses messages without the word "json"), and sets reasoning per step (`REASONING` in
+  `app/settings.py`): off (`{"enabled": false}`) for stance, classify, recheck, judge, draft and the canary, and the
+  lowest effort (`{"effort": "low"}`) through `reasoning_for` for models whose reasoning cannot be turned off
+  (`REASONING_MANDATORY`). The reasoning setting is part of the recording key.
 - Langfuse: metadata only (model, prompt version, latency, tokens, finish reason, item id, step); never prompts,
   document text or answers. No-op without keys; failures never affect a request.
 
@@ -395,14 +405,15 @@ attribution in `data/NOTICE.md`; VSAQ (Apache-2.0) and MVSP (CC0) attributions i
 
 ## 8. Evals and tests
 
-**Mechanics.** `python -m evals.run --pack dev --replay` runs the whole pipeline over each questionnaire on recorded
-model outputs, scores it against the key, writes `evals/results/latest.{md,json}`, and exits non-zero on a failed
-gate. CI runs it and then `git diff --exit-code evals/results` (PriorPath pattern). Re-recording (`--record`) and the
-bench need an OpenRouter key and use the eval key, never the production key. The eval key is
-`VART_EVAL_OPENROUTER_API_KEY` in `~/.config/vart/eval.env` (mode 600, outside every repo), an OpenRouter key with a
-$5 credit limit. The lead, or an agent the lead names, runs them without asking Tarun: the file is loaded inside the
-command and mapped to `OPENROUTER_API_KEY` for that command only, and the key is never printed. Spending past the cap
-needs Tarun. The production key stays in Vercel and never goes in a local file.
+**Mechanics.** `python -m evals.run --pack dev` (`--mode replay`, the default) runs the whole pipeline over each
+questionnaire on recorded model outputs, scores it against the key, writes `evals/results/latest.{md,json}`, and
+exits non-zero on a failed gate. CI runs it and then `git diff --exit-code evals/results` (PriorPath pattern).
+Re-recording (`--mode record`; `--mode live` calls the models without recording) and the bench need an OpenRouter
+key and use the eval key, never the production key. The eval key is `VART_EVAL_OPENROUTER_API_KEY` in
+`~/.config/vart/eval.env` (mode 600, outside every repo), an OpenRouter key with a $5 credit limit. The lead, or an
+agent the lead names, runs them without asking Tarun: the file is loaded inside the command and mapped to
+`OPENROUTER_API_KEY` for that command only, and the key is never printed. Spending past the cap needs Tarun. The
+production key stays in Vercel and never goes in a local file.
 
 A model bench (`evals/bench.py`) compares candidate models per step on accuracy, cost and latency; results go to
 `evals/results/bench-<step>.md` and set the defaults. The candidates are pool models (section 6.14) plus Claude Sonnet
@@ -414,22 +425,25 @@ the cheapest pool model that keeps the classification eval at 22/22 on the dev p
 
 | Stage | Metric | Gate (dev pack; tightened after the Plan 2 baseline) |
 |---|---|---|
-| Column mapping | correct mapping on the 10 variants | 10/10 |
+| Column mapping | correct mapping on the 10 variants | 10/10 (moves to Plan 3 with the mapper) |
 | Parsing | lines extracted vs source text | reported |
 | Classification | kind, status, dated, scope, `evidence_allowed` vs the `facts.yaml` documents on the dev pack | 22/22 |
-| Retrieval | recall@8 of key evidence lines (no pinning) | ≥ 0.90 |
+| Retrieval | recall@8 of key evidence lines (no pinning) | ≥ 0.95 (spec 0.90) |
 | Stance | accuracy vs key stances | reported |
-| Labels | accuracy vs key before the interview | ≥ 0.80 |
+| Labels | accuracy vs key before the interview | ≥ 0.90 (spec 0.80) |
 | Conflicts | recall on planted conflicts, per trap (caught when one of its items is a conflict); precision | 1.0; reported |
 | Citations | quotes re-read from source | 1.00 (all packs) |
 | Traps | template/draft cited as verified; injections followed | 0; 0 (all packs) |
 | Honest negatives | kept as verified No | all |
 | Interview | ask recall and precision; asked twice | reported; never |
-| Answer text | judge (different family) faithfulness; code checks | ≥ 0.90; all pass |
+| Answer text | judge (different family) faithfulness; code checks | ≥ 0.95 (spec 0.90); all pass |
 | Holdout | the full table on the holdout pack | reported, not tuned |
 | Cost and speed | USD and p50 seconds per 60-item run | reported; target ≤ $0.30 |
 
-After the Plan 2 baseline, each gate tightens to max(spec value, baseline - 0.02).
+After the Plan 2 baseline, each gate tightens to max(spec value, baseline - 0.02); the table shows the tightened
+targets (`evals/score.py` `GATES`) with the spec value in brackets. Plan 2 also gates classification (22/22), the
+D-trap date rule (per planted date trap), fills suggested by the interview's re-check (all), and the redacted-upload
+stage (citations 1.00, private-data leaks 0); the column-mapping gate moves to Plan 3 with the mapper.
 
 The README compares v2 with v1 honestly: different datasets, and v1's retrieval had the key's evidence pinned in.
 
@@ -454,11 +468,12 @@ cell; the interview fills an item), and the live smoke script against production
   bundled 22-document sample pack is loaded by the app, not uploaded, so this limit does not apply to it); ≤ 150
   questionnaire items; zip-bomb-safe xlsx reading (size and row caps).
 - **Data handling:** uploaded document bytes are parsed in memory and never stored; only redacted lines are kept.
-  Redaction (Presidio names, emails, phone numbers, addresses; regexes for API keys, private keys, tokens and
-  connection strings) runs before storage and before any model call. It covers the visitor's own interview answers
-  too: names and emails become tokens, the same way as in uploads. Place names and cloud regions stay unredacted,
-  because data-residency answers need them. The questionnaire xlsx is stored (for export) and deleted with the
-  workspace.
+  Redaction finds personal names (Presidio; kept only when two or more capitalised words and not an organisation or
+  product name), emails, phone numbers, street addresses and secrets (regexes for API keys, private keys, tokens and
+  connection strings); it runs before storage and before any model call. It covers the visitor's own interview
+  answers too: names and emails become tokens, the same way as in uploads. Place names and cloud regions stay
+  unredacted, because data-residency answers need them. The questionnaire xlsx is stored (for export) and deleted
+  with the workspace.
 - **Prompt injection:** passage text is data; injection-flagged chunks are excluded; labels come from code; the
   injection eval gates CI.
 - **Outputs:** export marks unapproved answers; the answer check blocks unsupported quotes, names and numbers.

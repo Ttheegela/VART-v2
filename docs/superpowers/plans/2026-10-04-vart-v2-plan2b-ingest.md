@@ -21,6 +21,20 @@ Tarun settled Plan 2's open decisions on 2026-10-04 (one row each in `docs/PROGR
 - **Lane and branches.** This lane runs in parallel with 2A and 2C, in its own worktree (Sonnet 5.5), branches from `plan2` after Part 0, and is merged into `plan2` by the lead (plan2c Task 4); pushing and the release need Tarun's OK.
 - **Checkpoint 1 (Plan 2A Rulings 14-15):** the patterns, contract wording and pins were fixed in Part 0; the following steps carry its lane findings: Task 1 (Ruling 10/M3: a list item's checked box `[x] ` is dropped and an open `[ ] ` kept; M6: `sniff` refuses the `zip`, `binary` and `text` sentinels; M7: a line longer than `MAX_LINE_CHARS = 20_000` characters is refused; M12: a cell under a due, next, expiry, until, planned or target header never dates a row), Task 3 (I2: a line matching `INJECTION` never reaches the classify prompt), Task 4 (I2: a heading or title matching `INJECTION` flags every passage beneath it, and an upload whose file name matches it is refused; I3: `ingest_document` commits right after the limit check, so no transaction is open while classify's model runs; M8: `store_statement` reads the answer as plain lines, not Markdown), each with its test.
 
+### Execution notes (rulings during execution, recorded 2026-10-05)
+
+Where the steps below differ from these lines, these lines describe what was built.
+
+- **Ruling 1.** Task 1's hardening deviations (limits checked, a readable `IngestError`, no silent row loss) were accepted and reviewed.
+- **Ruling 2.** Per-shape parser guards: bad zips, a cell budget (`MAX_CELLS`), a bounded docx row walk, styles resolved once, docx parts capped at 10 MB unzipped, tracked changes refused, long lines split at sentence ends.
+- **Ruling 3.** PDF stream inflation is a documented demo risk (Plan 4's SECURITY.md); ingest logs `IngestError.__cause__`.
+- **Ruling 4.** Redaction: secret-label boundaries count underscores, named token shapes (Bearer, `sk_live_`, `github_pat_`, Slack hook URLs, SAS `sig=`), and names with Unicode letters, middle initials and capitals.
+- **Ruling 5.** The keyed-secret regex is linear in line length.
+- **Ruling 6.** A header row naming question and answer columns makes a document a questionnaire; drafts stay `evidence_allowed` (decide's draft ceiling handles them); only templates and placeholders are excluded.
+- **Ruling 7.** Upload limits count uploads only; the file-name injection check also tries the camelCase-split, separator-free form; the log holds the redacted file name; Presidio runs batched.
+- **Ruling 8.** Adversary checkpoint 3 (ingest) fixes: PEM body rows, a content-free parse log, answer caps, a classify prompt cap, fewer false positives, a redaction deadline.
+- **Ruling 9.** Keyed secrets: a secret-word key, then any 8+ value after `=` or a quote, or an 8+ digit, 12+ letter or 4+ hyphen-word value after `:`; the redacted file name is cut to 255; the classify text is cut at a line boundary.
+
 ## Global Constraints
 
 The full list is in plan2a; it applies here unchanged. The lines that matter most for this lane:

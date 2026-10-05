@@ -23,6 +23,28 @@ Tarun settled Plan 2's open decisions on 2026-10-04 (one row each in `docs/PROGR
 - **Branches.** Part 0 and the integration tasks run on branch `plan2` in `~/Desktop/portfolio/projects/VART-wt-plan2`, not on `main` in the main checkout (`main` stays production); lanes branch from `plan2` after Part 0 and the lead merges them into it locally; pushing and the release need Tarun's OK. Database names are unchanged: `vart_test_main` stays the Part 0 and integration database, now used from the `plan2` worktree.
 - **Checkpoint 1 (Plan 2A Rulings 14-15):** the patterns, contract wording and pins were fixed in Part 0; the following steps carry its lane findings: Task 4 (M13: a test that `SCOPE_WORDS` names exactly `app.contracts.SCOPES`; M14: `Dropped.quote` is the same stripped quote as `Citation.quote`), Task 5 (I1: the record hop never adds an injection-flagged row, with a test), Task 9 (M11: `recheck` records the chunks it filters out for injection as `Dropped` and passes them to `decide`, with a test).
 
+### Execution notes (rulings during execution, recorded 2026-10-05)
+
+Where the steps below differ from these lines, these lines describe what was built.
+
+- **Digest.** `test_normalize_is_pinned` now pins `51d166991e8eaf3eec8fb43f514e3c3e644784c7976bc24355cd2b349dccd89a`, not the `77d4af9b…` in Task 1: Ruling 12 folded U+02BC (commit `5679378`).
+- **Ruling 7.** `contains()`'s tail is `(?![^\W\d])`: a quote may end before a digit but not inside an identifier (`contains("MFA_enforced: false", "MFA")` is False).
+- **Ruling 8.** Task 1's pattern false positives were left to the reviewer and checkpoint 1, not changed in Task 1.
+- **Ruling 9.** INJECTION uses the reviewer's regex with its counterexamples as negative tests (a cue needs an attack shape).
+- **Ruling 10.** PLACEHOLDER matches an unchecked box `[ ]`; plan2b Task 1 strips a leading checked box.
+- **Ruling 11.** The PLACEHOLDER bracket alternative skips Markdown reference links.
+- **Ruling 12.** `normalize` folds U+02BC to an apostrophe (new digest); U+2032 stays.
+- **Ruling 13.** "SHA" contained in "SHA1" is accepted.
+- **Ruling 14.** The Part 0 fix batch: adversary checkpoint 1's INJECTION, NEGATION cues and carve-outs (`not only`, `cannot be disabled`, …), the PLACEHOLDER bracket guards, the `Stance.passage` and `spend()` contract notes, pydantic pins in `requirements-dev.txt`.
+- **Ruling 15.** The lane carries (I1, M3, M6-M8, M11-M14 above) were written into the plan text before the lanes branched.
+- **Ruling 16.** The negation guard `_NOT_NEGATED` (not, n't, cannot, never, nor, who, to before the verb) with its negative tests; fixed-width lookbehinds leave the listed residuals.
+- **Ruling 17.** Every pattern check runs on `normalize()`d text, file names included.
+- **Rulings 18, 20, 21.** Decide's date rule compares a record only with other documents: rows and the title passage of the newer side's own sheet snapshot are not "another document"; the older side is dated by what was compared; when both sides qualify, the rule is `documents-disagree`.
+- **Ruling 19.** No date to compare gives `documents-disagree` (spec-correct); `.coverage` went into `.gitignore` with the CI coverage step (plan2c Task 6).
+- **Rulings 22, 23.** Adversary checkpoint 3 (engine): the record hop is memoised and capped (`HOP_MAX_IDENTIFIERS`), the query is deduplicated and capped (`MAX_QUERY_CHARS`, `MAX_QUERY_WORDS`), and recheck sends at most 8 chunks.
+- **Prompts.** The prompt texts moved past this plan's text during tuning: `stance@p3` and `draft@p2` (plan2c Task 4 Step 7, Rulings 9, 10 and the round-3 decision); `docs/CONTRACTS.md` carries the change-log lines.
+- **Client.** Every request ends its system message with "Reply with JSON only.", sends `provider.require_parameters: true`, and sets reasoning per step (`REASONING`, `REASONING_MANDATORY`, `reasoning_for` in `app/settings.py`); `max_tokens` and the reasoning setting are part of the recording key (plan2c Rulings 4, 6, 7, 11).
+
 ## How Plan 2 is split, and why
 
 Like Plan 1 (one shared task on `main`, then parallel lanes), Plan 2 starts with a shared contract freeze and then runs three lanes, one implementer each, in their own worktrees:
