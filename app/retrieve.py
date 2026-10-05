@@ -21,6 +21,7 @@ HOP = 3  # record rows the hop may add
 HOP_MAX_CHUNKS = 5  # an identifier found in more chunks than this is too common to hop on (a company name)
 RRF_K = 60
 CANDIDATES = 200
+MAX_QUERY_WORDS = 64  # distinct words of question and topic; the dev pack's longest cell has 22
 # Security acronyms and their spelled-out forms; a query gets both. Generic domain words, not dev-pack tuning.
 SYNONYMS: dict[str, tuple[str, ...]] = {
     "mfa": ("multi-factor",),
@@ -55,8 +56,10 @@ _DOCUMENT = text(
 
 
 def build_query(question: str, topic: str | None) -> str:
-    """Every word of the question and topic, OR-ed (websearch_to_tsquery would AND them), plus synonyms."""
-    words = _WORD.findall(f"{question} {topic or ''}")
+    """The question's and topic's distinct words, at most MAX_QUERY_WORDS, OR-ed (websearch_to_tsquery would
+    AND them), plus synonyms. Repeats change no rank (ts_rank_cd counts an operand once) but cost the database
+    memory per operand, so one long cell could fail the item (adversary checkpoint 3, I2)."""
+    words = list(dict.fromkeys(_WORD.findall(f"{question} {topic or ''}")))[:MAX_QUERY_WORDS]
     words += [s for w in words for s in SYNONYMS.get(w.lower(), ())]
     return " or ".join(f'"{w}"' if " " in w else w for w in words)
 
@@ -109,12 +112,17 @@ def _fused(session: Session, workspace_id: uuid.UUID, query: str, rows: Sequence
     return sorted(rows, key=lambda r: (-round(score[r.id], 9), r.filename, r.line_start))
 
 
-def _chunks_naming(session: Session, workspace_id: uuid.UUID, identifier: str) -> int:
-    count = session.scalar(
-        text("SELECT count(*) FROM chunks WHERE workspace_id = :ws AND strpos(lower(text), lower(:i)) > 0"),
-        {"ws": workspace_id, "i": identifier},
-    )
-    return int(count or 0)
+_CHUNKS_NAMING = text(
+    """SELECT i, (SELECT count(*) FROM chunks c
+        WHERE c.workspace_id = :ws AND strpos(lower(c.text), lower(i)) > 0)
+    FROM unnest(CAST(:ids AS text[])) AS i"""
+)
+
+
+def _chunks_naming(session: Session, workspace_id: uuid.UUID, identifiers: set[str]) -> dict[str, int]:
+    """How many of the workspace's chunks name each identifier, in one query."""
+    rows = session.execute(_CHUNKS_NAMING, {"ws": workspace_id, "ids": sorted(identifiers)})
+    return {i: int(n) for i, n in rows}
 
 
 def _hop(session: Session, workspace_id: uuid.UUID, chosen: Sequence[Any]) -> list[Any]:
@@ -124,7 +132,7 @@ def _hop(session: Session, workspace_id: uuid.UUID, chosen: Sequence[Any]) -> li
     named = "\n".join(r.text for r in chosen)
     have = {r.id for r in chosen}
     docs = {r.document_id for r in chosen}
-    found = []
+    named_rows = []
     for row in session.execute(_RECORDS, {"ws": workspace_id}):
         # ponytail: reads the first "Header: value" back out of a record line (app/text.py says lines are for
         # reading, not parsing); a value holding "; " only costs a missed or extra hop, never a citation.
@@ -132,11 +140,12 @@ def _hop(session: Session, workspace_id: uuid.UUID, chosen: Sequence[Any]) -> li
         if row.id in have or first is None or "injection" in row.flags:
             continue
         identifier = first.group(1).strip()
-        if (
-            contains(named, identifier)
-            and _chunks_naming(session, workspace_id, identifier) <= HOP_MAX_CHUNKS
-        ):
-            found.append(row)
+        if contains(named, identifier):
+            named_rows.append((row, identifier))
+    # One count per distinct identifier, all in one query: a count per row made the hop rows x chunks
+    # (adversary checkpoint 3, I1). Identifiers are bounded by the words of the chosen passages.
+    counts = _chunks_naming(session, workspace_id, {i for _, i in named_rows}) if named_rows else {}
+    found = [row for row, i in named_rows if counts[i] <= HOP_MAX_CHUNKS]
     found.sort(key=lambda r: r.document_id not in docs)  # stable: filename and line order inside each group
     return found[:HOP]
 

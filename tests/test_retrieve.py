@@ -2,13 +2,14 @@ from collections.abc import Iterator
 from datetime import date
 
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, event
 from sqlalchemy.orm import Session
 
-from app.db.models import Document, Workspace
+from app.db.models import Chunk, Document, Workspace
 from app.retrieve import (
     HOP,
     HOP_MAX_CHUNKS,
+    MAX_QUERY_WORDS,
     RECORD_CAP,
     TEXT_CAP,
     K,
@@ -317,3 +318,53 @@ def test_document_passages_of_another_workspace_are_empty(s: Session) -> None:
     d = _doc(s, other, "answer.txt", "First line.")
     s.commit()
     assert document_passages(s, mine.id, d.id) == ()
+
+
+def test_the_hop_counts_each_identifier_once_in_one_query(s: Session) -> None:
+    # Adversary checkpoint 3, I1: a count per record row made the hop rows x chunks (158 s at 20,000 rows).
+    ws = f.workspace(s)
+    _doc(s, ws, "acp.docx", "MFA is enforced for every employee account on OKTA and the Ledger console.")
+    inv = _doc(s, ws, "inventory.csv", record=True, kind="record")
+    s.add_all(
+        Chunk(
+            workspace_id=ws.id,
+            document_id=inv.id,
+            line_start=i + 2,
+            line_end=i + 2,
+            text=f"System: OKTA; Owner: team{i}; MFA: yes",
+            record=True,
+        )
+        for i in range(3000)
+    )
+    _doc(s, ws, "assets.xlsx", "Asset: Ledger console; Owner: Eng", record=True, kind="record")
+    s.commit()
+    statements: list[str] = []
+
+    def count(*args: object) -> None:
+        statements.append(str(args[2]))
+
+    bind = s.get_bind()
+    event.listen(bind, "before_cursor_execute", count)
+    try:
+        r = retrieve(s, ws.id, "Is MFA enforced?", None)
+    finally:
+        event.remove(bind, "before_cursor_execute", count)
+    rows = [p.lines[0] for p in r.passages if p.record]
+    assert "Asset: Ledger console; Owner: Eng" in rows  # named once: hops
+    assert sum(x.startswith("System: OKTA") for x in rows) == RECORD_CAP  # by rank only: OKTA is too common
+    assert len(statements) <= 10  # candidates, ts_stat, totals, records, one count query
+
+
+def test_a_long_question_is_deduplicated_and_capped() -> None:
+    # Adversary checkpoint 3, I2: duplicates and an uncapped word list made ts_rank_cd ask for 1 GB a row.
+    assert build_query("mfa " * 5000, None) == build_query("mfa", None)
+    words = build_query(" ".join(f"w{i}" for i in range(MAX_QUERY_WORDS + 50)), "Access")
+    assert words.split(" or ") == [f"w{i}" for i in range(MAX_QUERY_WORDS)]
+
+
+def test_the_adversary_questions_complete(s: Session) -> None:
+    ws = f.workspace(s)
+    _doc(s, ws, "p.md", "MFA is enforced for every employee account.")
+    s.commit()
+    for question in ("mfa " * 4400, "mfa " + " ".join(f"w{i}" for i in range(19000))):
+        assert [p.doc.filename for p in retrieve(s, ws.id, question, None).passages] == ["p.md"]

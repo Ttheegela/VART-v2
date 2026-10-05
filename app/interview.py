@@ -13,7 +13,7 @@ from app.contracts import Dropped, OpenItem, OpenLabel, QueueEntry, Spend, Sugge
 from app.decide import decide
 from app.llm.client import LLMClient, LLMError
 from app.llm.recorder import ReplayMiss
-from app.retrieve import document_passages
+from app.retrieve import K, document_passages
 from app.stance import stance
 
 OPEN = ("conflict", "unknown", "partial")
@@ -91,7 +91,8 @@ def recheck(
     (step "recheck"), decided by the same rules. Suggests only verified or partial results. A chunk flagged
     `injection` never reaches the model and is recorded as dropped (spec 6.5 and 9)."""
     every = document_passages(session, workspace_id, statement_id)
-    passages = tuple(p for p in every if "injection" not in p.flags)
+    # Spec 6.6: up to K passages. A statement has no ranking, so the first K clean chunks in line order.
+    passages = tuple(p for p in every if "injection" not in p.flags)[:K]
     dropped = tuple(
         Dropped(p.chunk_id, p.doc.id, p.doc.filename, "injection") for p in every if "injection" in p.flags
     )
