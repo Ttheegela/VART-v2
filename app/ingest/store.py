@@ -44,6 +44,14 @@ def _name_reads_like_an_instruction(filename: str) -> bool:
     return bool(INJECTION.search(plain) or INJECTION.search(re.sub(r"[\W\d_]+", " ", split)))
 
 
+def _cut(filename: str) -> str:
+    """At most 255 characters, the column's width; keeps the extension, which parse reads the format from."""
+    if len(filename) <= 255:
+        return filename
+    root, ext = os.path.splitext(filename)
+    return root[: max(0, 255 - len(ext))] + ext[:255]
+
+
 def _check_limits(
     session: Session, workspace_id: uuid.UUID, new_lines: int, *, new_document: bool = True
 ) -> None:
@@ -129,10 +137,8 @@ def ingest_document(
 ) -> Document:
     """Raises IngestError (shown to the visitor as is) for a file the app will not take."""
     # a NUL is a psycopg DataError (a 500), and the name also goes into the classify prompt
-    filename = normalize(filename)
-    if len(filename) > 255:  # the column's width; keep the extension, parse reads the format from it
-        root, ext = os.path.splitext(filename)
-        filename = root[: max(0, 255 - len(ext))] + ext[:255]
+    # (a lone surrogate, possible in a JSON-supplied name, cannot be encoded: it becomes "?")
+    filename = _cut(normalize(filename.encode("utf-8", "replace").decode()))
     # The name is printed in every model prompt. Read separators as spaces and split camelCase,
     # so "ignore.all.previous.instructions" and "IgnoreAllPrevious..." are caught like the spaced name.
     if source != "sample" and _name_reads_like_an_instruction(filename):
@@ -156,7 +162,7 @@ def ingest_document(
     if source != "sample":
         _check_limits(session, workspace_id, len(parsed.lines))
         parsed = replace(parsed, lines=redact_lines(parsed.lines))
-        filename = redact_text(filename)
+        filename = _cut(redact_text(filename))  # a redaction token can lengthen the name
     session.commit()  # ends any open read: no transaction stays open across classify's model call
     meta = classify(filename, parsed, llm, model, spend)
     digest = hashlib.sha256(data).hexdigest()

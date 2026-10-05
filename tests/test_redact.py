@@ -97,6 +97,10 @@ def test_private_data_and_secrets_are_replaced(text: str, expected: str) -> None
         # I1: a hash is not a key body (one case: hex is single-case)
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "commit 9298371c0ffee0ddba11ad5eed0f00dfacade123 merged",
+        # re-review N1: the extra keyed rule leaves policy cells alone
+        "Password: required for all accounts",
+        "Password: hashed-and-salted",
+        "Password: Required; Secret: Vault; Token: OAuth2",
     ],
 )
 def test_business_text_is_left_alone(text: str) -> None:
@@ -191,3 +195,61 @@ def test_redaction_past_its_time_budget_is_refused(monkeypatch: pytest.MonkeyPat
 def test_lines_redacted_in_slices_match_one_by_one() -> None:
     texts = [f"Row {i}: owner Marcus Lee, phone 512 555 01{i:02d}." for i in range(20)]
     assert [x.text for x in redact_lines([Line(t) for t in texts])] == [redact_text(t) for t in texts]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [  # adversary-3 re-review N1: realistic keyed secrets 65ba93c let through (in pieces for gitleaks)
+        "DB_PASSWORD=" + "supersecretpassword",
+        "POSTGRES_PASSWORD: " + "correcthorsebattery",
+        "api_key=" + "1234567890123456,",
+        "API_KEY=" + "12345678901234567890",
+        "password: " + "12345678.",
+        "Password: " + "12345678",
+        "token: " + "9876543210987654",
+        "password: " + "correcthorsebatterystaple",
+        "password: " + "correct-horse-battery-staple",
+        "client_secret: " + "correct-horse-battery-staple",
+        "password: " + '"correct horse battery staple"',
+        "password = " + "'letmein-please-now'",
+        "spring.datasource.password=" + "changeme",
+        "clientSecret: " + "abcdefghijklmnop",
+        "secret=" + "abcdefghijklmnopqrstuvwx",
+        "password=" + "Summer-Breeze-2024",
+        "DB_PASSWORD=" + "hunter2hunter2",
+        "System: Prod DB; Username: admin; Password: " + "correcthorsebattery; Notes: rotate",
+        "Password: " + "Tr0ub4dor&3",
+        "  password: " + "changemeplease",
+        "x-api-key: " + "1234567890123456",
+        "export GITHUB_TOKEN=" + "abcdefghijklmnopqrstuvwxyz",
+    ],
+)
+def test_a_keyed_secret_of_any_shape_is_redacted(text: str) -> None:
+    out = redact_text(text)
+    assert "<SECRET>" in out
+    for value in (
+        "supersecret",
+        "correcthorse",
+        "12345678",
+        "9876543210",
+        "correct-horse",
+        "letmein",
+        "changeme",
+        "abcdefghijklmnop",
+        "Summer-Breeze",
+        "hunter2",
+        "Tr0ub4dor",
+    ):
+        assert value not in out
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "PRIVATE_KEY=" + "MIIEowIBAAKCAQEA" + "x" * 48,
+        "PRIVATE_KEY_B64=" + "LS0tLS1CRUdJTiBSU0Eg" + "UHJpdmF0ZQ" * 4,
+    ],
+)
+def test_a_key_body_right_after_an_equals_sign_is_redacted(text: str) -> None:
+    # adversary-3 re-review N2: the PEM-row lookbehind excluded '='
+    assert redact_text(text).endswith("=<SECRET>")

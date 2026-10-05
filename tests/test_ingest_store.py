@@ -327,3 +327,13 @@ def test_a_file_name_is_normalized_and_cut_before_it_is_used(s: Session) -> None
     )
     assert (len(doc.filename), doc.filename[-4:]) == (255, "n.md")
     assert "n" * 256 not in llm.requests[0].user
+
+
+def test_a_file_name_is_cut_again_after_redaction_and_a_lone_surrogate_is_replaced(s: Session) -> None:
+    # adversary-3 re-review M1: redaction lengthened a cut name (a@b.co -> <EMAIL>): a 500
+    ws = f.workspace(s)
+    name = ("a@b.co " * 40)[:251] + ".md"
+    doc = _ingest(s, ws.id, name, "upload", b"# T\n\nText here.\n")
+    assert len(doc.filename) <= 255 and "<EMAIL>" in doc.filename
+    doc = _ingest(s, ws.id, "notes" + chr(0xDCFF) + ".md", "upload", b"# T\n\nText here.\n")
+    assert doc.filename.startswith("notes") and doc.filename.endswith(".md")

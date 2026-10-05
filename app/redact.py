@@ -71,17 +71,21 @@ _NOT_A_NAME = {
     "management",
     "description",
 }
+_KW = r"(?:api[_-]?key|secret|token|passphrase|password|passwd|pwd)"
+_QUOTED = r"(?:\"[^\"\n]{8,200}\"|'[^'\n]{8,200}')"
 _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "SECRET",
         re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)"),
     ),
     (  # a PEM body row on its own line (docx, xlsx and csv give one line per row): a run of 40+ base64
-        # characters with both cases, not touching a word, dot, colon, hyphen or percent. A hex hash or
-        # base32 is single-case, an English word is never 40 letters, and a URL path touches a dot or colon.
+        # characters with both cases, not touching a word, dot, colon, hyphen or percent (an '=' before it is
+        # allowed: PRIVATE_KEY=MIIE...). A hex hash or base32 is single-case, an English word is never 40
+        # letters, and a URL path touches a dot or colon. Over-redacts a bare base64 digest or a 40+ character
+        # camelCase identifier, neither of which is evidence.
         "SECRET",
         re.compile(
-            r"(?<![\w+/=.:%-])(?=[A-Za-z0-9+/]*[a-z])(?=[A-Za-z0-9+/]*[A-Z])[A-Za-z0-9+/]{40,}={0,2}(?![\w+/=.:%-])"
+            r"(?<![\w+/.:%-])(?=[A-Za-z0-9+/]*[a-z])(?=[A-Za-z0-9+/]*[A-Z])[A-Za-z0-9+/]{40,}={0,2}(?![\w+/=.:%-])"
         ),
     ),
     (
@@ -107,6 +111,22 @@ _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
             r"(?<![\w-])[\w-]{0,64}(?:api[_-]?key|secret|token|password|passwd|pwd)"
             r"(?:[_-][\w-]{0,64}|(?-i:[A-Z])\w{0,64})?\s*[:=]\s*"
             r"(?=[^\s\d]{0,200}\d)(?=[^\sa-z]{0,200}[a-z])(?![^\s-]{0,200}-[a-z]{3,}\b)\S{8,}",
+            re.IGNORECASE,
+        ),
+    ),
+    (  # a key that ends in the secret word: bare (password), compound (DB_PASSWORD, client-secret,
+        # db.password) or camelCase (clientSecret). '=' (env, ini, properties) or a quoted value is config, so
+        # any 8+ characters count. After ':' only values a policy cell never holds: 8+ digits, or a passphrase
+        # (12+ lowercase letters, or 4+ hyphen-joined lowercase words) that ends the value (re-review N1).
+        "SECRET",
+        re.compile(
+            r"(?<![\w.-])(?:[\w.-]{0,64}[_.-]" + _KW + r"|[a-z][a-z0-9]{0,63}"
+            r"(?-i:ApiKey|Secret|Token|Passphrase|Password|Passwd|Pwd)|" + _KW + r")"
+            r"\s*(?:=\s*(?:"
+            + _QUOTED
+            + r"|\S{8,})|:\s*(?:"
+            + _QUOTED
+            + r"|\d{8,}(?![\w-])|(?-i:[a-z]{12,}|[a-z]+(?:-[a-z]+){3,})(?=\s*(?:[;,.]|$))))",
             re.IGNORECASE,
         ),
     ),

@@ -151,7 +151,9 @@ def classify(
     if sure or llm is None or not spend("classify"):
         return meta
     texts = [t for t in texts[:40] if not INJECTION.search(t)]  # an injection never reaches the model
-    user = (f"File name: {filename}\n\n" + "\n".join(texts))[:MAX_PROMPT_CHARS]
+    user = f"File name: {filename}\n\n" + "\n".join(texts)
+    if len(user) > MAX_PROMPT_CHARS:  # cut at a line end: a cut mid-line could complete an injection phrase
+        user = user[: user.rfind("\n", 0, MAX_PROMPT_CHARS + 1)]
     req = build_request("classify", model, PROMPT_VERSION, SYSTEM, user, ClassifyOut, 800)
     try:
         out = complete_model(llm, req, ClassifyOut)
