@@ -274,10 +274,15 @@ _FILE_CONTEXT = "Notes from "
 
 
 def _suffix_spans(root: str) -> list[tuple[int, int, str]]:
-    """Regex spans of the root and of every part that starts after a separator: "\\b" treats "_" as a word
-    character, so "notes_ghp_..." hides a key from the patterns (re-review I-B)."""
-    starts = [0] + [m.end() for m in re.finditer(r"[_\W]", root)]
-    return [(a + i, b + i, label) for i in starts for a, b, label in _spans(root[i:], [])]
+    """Regex spans of every part of the root bounded by separators (or its ends) on both sides: "\\b" treats
+    "_" as a word character, so "notes_ghp_..._v2" hides a key from the patterns at either end (re-review
+    I-B, I-1). Cheap: a file name is at most 255 characters (0.12 s worst case)."""
+    seps = [m.start() for m in re.finditer(r"[_\W]", root)]
+    starts = [0] + [i + 1 for i in seps]
+    ends = seps + [len(root)]
+    return [
+        (a + i, b + i, label) for i in starts for e in ends if e > i for a, b, label in _spans(root[i:e], [])
+    ]
 
 
 def redact_filename(filename: str) -> str:
@@ -307,7 +312,9 @@ def redact_filename(filename: str) -> str:
     ]
     kept: list[tuple[int, int, str]] = []
     for start, end, label in sorted(found, key=lambda s: (s[0], -s[1])):
-        if not kept or start >= kept[-1][1]:
+        if kept and start < kept[-1][1]:  # overlap: one span, so an email glued to a name loses both
+            kept[-1] = (kept[-1][0], max(end, kept[-1][1]), kept[-1][2])
+        else:
             kept.append((start, end, label))
     return _apply(root, kept) + ext
 

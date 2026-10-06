@@ -352,7 +352,20 @@ _SECRETS = {
 }
 
 
-@pytest.mark.parametrize("join", ["{s}", "notes_{s}", "Marcus_Lee_{s}", "notes-{s}", "notes.{s}"])
+@pytest.mark.parametrize(
+    "join",
+    [
+        "{s}",
+        "notes_{s}",
+        "Marcus_Lee_{s}",
+        "notes-{s}",
+        "notes.{s}",
+        "{s}_v2",
+        "notes_{s}_v2",
+        "{s}-notes",
+        "{s}.backup",
+    ],
+)
 @pytest.mark.parametrize("kind", sorted(_SECRETS))
 def test_a_secret_after_a_separator_in_a_file_name_is_redacted(kind: str, join: str) -> None:
     # Re-review I-B: "\\b" treats "_" as a word character, so "notes_ghp_..." slipped past the patterns.
@@ -402,3 +415,12 @@ def test_last_first_followed_by_a_title_or_more_is_still_a_name(text: str) -> No
 )
 def test_product_lists_stay(text: str) -> None:
     assert redact_text(text) == text
+
+
+def test_a_secret_followed_by_a_name_in_a_file_name_loses_both() -> None:
+    assert redact_filename("AKIAABCDEFGHIJKLMNOP_Dana_Ortiz.txt") == "<SECRET>_<PERSON>.txt"
+
+
+def test_an_email_glued_to_a_name_in_a_file_name_loses_both() -> None:
+    out = redact_filename("dana.ortiz@kestrelyn.example.Priya M. Patel.txt")
+    assert "Patel" not in out and "kestrelyn" not in out
