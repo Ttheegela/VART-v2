@@ -4,9 +4,8 @@ VART is a public demo on synthetic data. Do not upload confidential documents: u
 you would be happy to see on a public website.
 
 ## Reporting a problem
-Use GitHub private vulnerability reporting on Ttheegela/VART-v2 (Security tab, "Report a vulnerability"); it is
-enabled at release. Until it is on, open a public issue on the repository that only asks for a private contact, with
-no details of the problem, and the maintainer will reply with one.
+Use GitHub private vulnerability reporting on Ttheegela/VART-v2 (Security tab, "Report a vulnerability"); it has
+been enabled since the Plan 4 release (2026-10-06).
 
 ## What is stored, and for how long
 - A workspace: its id, when it was made, and a salted hash of the visitor's IP address (`app/db/models.py` Workspace,

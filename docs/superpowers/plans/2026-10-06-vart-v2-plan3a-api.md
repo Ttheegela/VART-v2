@@ -10,6 +10,24 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-03-vart-v2-design.md` - sections 5 (what a visitor does), 6.3 (one fill run), 6.7 (re-decide with no model call), 6.9 (interview), 6.10 (import and export), 6.11 (database: `interview_questions` and `suggestions`), 6.12 (API), 8 (column-mapping gate, tests), 9 (security, limits), 11 (delivery: the HTTP contract freezes at the start of Plan 3 with an adversary review). Companion plan: `docs/superpowers/plans/2026-10-06-vart-v2-plan3b-ui.md` (the UI lane, the E2E tests, integration and release). Unit contracts: `docs/CONTRACTS.md`. Must-fix sources: `.superpowers/sdd/2026-10-04-vart-v2-plan2c-evals/final-review.md` (triage table) and `.superpowers/sdd/later-plans-carryover.md` (Plan 3 lines), both in the main checkout `~/Desktop/portfolio/projects/VART`.
 
+## Execution notes (rulings during execution, recorded 2026-10-06)
+
+- The contract froze with 27 operations after adversary checkpoint 1 (workspace creation only on `GET /api/workspace`,
+  403 on cross-site writes, scoped budget 429s, per-call model limits, questionnaire caps and delete). Later changes
+  only added statuses or optional fields, each with a change-log line in `docs/CONTRACTS.md`: 503 with Retry-After on a
+  provider outage, the `export` limit, the mapping PUT counted under `upload`.
+- `tests/test_api_errors.py` ends with an equality check: every contract operation is covered by a named test that
+  calls it (no stubs remain).
+- Inputs-lane caps from adversary checkpoint 3: csv questionnaires 2,000 rows by 52 columns, xlsx 4 MB unzipped,
+  a question 2,000 characters and a topic 200, a document's text 1,000,000 characters; deleting a document is refused
+  while a run is running.
+- Runs-lane fixes from adversary checkpoint 3: NUL characters are scrubbed from model text; a provider outage releases
+  untouched items with their attempt refunded (the item that met the error keeps it, so a stuck item ends failed); the
+  interview's re-check carries its cost and a 90 s deadline; `create_run` locks the questionnaire `FOR SHARE`.
+- Redaction known gaps (single first names, lower-case names, "Last, First", accented all-caps names) are named in the
+  upload notice; questionnaires are stored and sent as written, which the notice also says.
+- Deferred to Plan 4: see "Plan 4 carry-over" in `docs/PROGRESS.md`.
+
 ## How Plan 3 is split, and why
 
 Plan 3 is too large for one document: it is a backend (fourteen endpoint groups, a concurrent step runner, an importer and an exporter) and a full frontend (seven views, a keyboard map, a drawer). It is split in two files the way Plan 2 was split in three:
