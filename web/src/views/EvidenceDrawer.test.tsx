@@ -70,6 +70,87 @@ describe("EvidenceDrawer", () => {
   });
 });
 
+describe("EvidenceDrawer fixes", () => {
+  const approved = { ...fixtures.rows[1].answer!, approved: true };
+  const err = (status: number, detail: string) => new Response(JSON.stringify({ detail }), { status });
+
+  it("a switch to another answer never shows the old one, and a slow old load cannot land", async () => {
+    narrow(false);
+    let release: () => void = () => {};
+    const slow = new Promise<void>((r) => { release = r; });
+    mockApi({
+      "GET /api/answers/a2": async () => { await slow; return fixtures.detail; },
+      "GET /api/answers/a1": { ...fixtures.detail, id: "a1", item: { ...fixtures.detail.item, question: "Second question?" } },
+    });
+    const { rerender } = render(<EvidenceDrawer {...base} onClose={() => {}} />);
+    rerender(<EvidenceDrawer {...base} answerId="a1" code="VSQ-01" onClose={() => {}} />);
+    expect(await screen.findByText("Second question?")).toBeInTheDocument();
+    release();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByText("Second question?")).toBeInTheDocument();
+    expect(screen.queryByText("Is MFA enforced for all workforce access?")).not.toBeInTheDocument();
+  });
+
+  it("approve succeeds, refreshes and notifies; in narrow mode Tab stays inside afterwards", async () => {
+    narrow(true);
+    const changed = vi.fn();
+    let done = false;
+    mockApi({
+      "GET /api/answers/a2": () => ({ ...fixtures.detail, approved: done }),
+      "POST /api/answers/a2/approve": () => { done = true; return approved; },
+    });
+    render(<EvidenceDrawer {...base} onChanged={changed} onClose={() => {}} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    expect(await screen.findByText("Approved")).toBeInTheDocument();
+    expect(changed).toHaveBeenCalled();
+    const dialog = screen.getByRole("dialog");
+    for (let i = 0; i < 6; i++) { await userEvent.tab(); expect(dialog.contains(document.activeElement)).toBe(true); }
+  });
+
+  it("a 409 on approve is shown, and cleared by the next success", async () => {
+    narrow(false);
+    let fail = true;
+    mockApi({
+      "GET /api/answers/a2": fixtures.detail,
+      "POST /api/answers/a2/approve": () => (fail ? err(409, "Answer the question first.") : approved),
+    });
+    render(<EvidenceDrawer {...base} onClose={() => {}} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Answer the question first.");
+    fail = false;
+    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+
+  it("a failed not-applicable keeps the form open and shows the error", async () => {
+    narrow(false);
+    mockApi({ "GET /api/answers/a2": fixtures.detail, "POST /api/answers/a2/not-applicable": err(500, "Could not save.") });
+    render(<EvidenceDrawer {...base} onClose={() => {}} />);
+    await screen.findByRole("figure", { name: /access-control/ });
+    await userEvent.keyboard("n");
+    await userEvent.type(screen.getByLabelText("reason"), "No cards.{Enter}");
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByLabelText("reason")).toBeInTheDocument();
+  });
+
+  it("a conflict shows each side under a heading with its stance and date", async () => {
+    narrow(false);
+    const c0 = fixtures.detail.citations[0];
+    mockApi({
+      "GET /api/answers/a2": {
+        ...fixtures.detail, label: "conflict",
+        citations: [c0, { ...c0, filename: "old-policy.docx", stance: "no" }],
+        conflict: { rule: "date", sides: [{ citations: [0], date: "2026-01-15", stance: "yes" }, { citations: [1], date: "2025-01-15", stance: "no" }] },
+      },
+    });
+    render(<EvidenceDrawer {...base} onClose={() => {}} />);
+    const yes = await screen.findByRole("heading", { name: "yes · 2026-01-15" });
+    const no = screen.getByRole("heading", { name: "no · 2025-01-15" });
+    expect(within(yes.parentElement!).getByRole("figure", { name: /access-control/ })).toBeInTheDocument();
+    expect(within(no.parentElement!).getByRole("figure", { name: /old-policy/ })).toBeInTheDocument();
+  });
+});
+
 describe("EvidenceDrawer in the run grid", () => {
   function Host() {
     const r = useRoute();

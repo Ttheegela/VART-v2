@@ -43,7 +43,12 @@ export function Citation({ c, n }: { c: CitationOut; n: number }) {
 
 type Props = { answerId: string; code: string; runId: string; onClose: () => void; onChanged: () => void };
 
-export default function EvidenceDrawer({ answerId, code, runId, onClose, onChanged }: Props) {
+/** Keyed by the answer, so a quick switch never shows the old answer's evidence or error. */
+export default function EvidenceDrawer(p: Props) {
+  return <Drawer key={p.answerId} {...p} />;
+}
+
+function Drawer({ answerId, code, runId, onClose, onChanged }: Props) {
   const narrow = useNarrow();
   const [a, setA] = useState<AnswerDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,11 +57,17 @@ export default function EvidenceDrawer({ answerId, code, runId, onClose, onChang
   const root = useRef<HTMLElement>(null);
   const titleId = `q-${answerId}`;
 
-  useEffect(() => { api.answer(answerId).then(setA, (e) => setError((e as Error).message)); }, [answerId]);
+  const live = useRef(true);
+  useEffect(() => {
+    live.current = true;
+    api.answer(answerId).then((d) => { if (live.current) { setA(d); setError(null); } }, (e) => { if (live.current) setError((e as Error).message); });
+    return () => { live.current = false; };
+  }, [answerId]);
+  const refetch = async () => { onChanged(); const d = await api.answer(answerId); if (live.current) setA(d); };
   useEffect(() => { if (narrow) root.current?.querySelector<HTMLElement>("button")?.focus(); }, [narrow]); // the close control exists before the answer loads
 
-  const approve = async () => { try { await api.approve(answerId); setA(await api.answer(answerId)); onChanged(); } catch (e) { setError((e as Error).message); } };
-  const markNa = async () => { try { await api.notApplicable(answerId, reason); setAsking(false); setA(await api.answer(answerId)); onChanged(); } catch (e) { setError((e as Error).message); } };
+  const approve = async () => { setError(null); try { await api.approve(answerId); await refetch(); root.current?.focus(); } catch (e) { setError((e as Error).message); } };
+  const markNa = async () => { setError(null); try { await api.notApplicable(answerId, reason.trim()); setAsking(false); await refetch(); root.current?.focus(); } catch (e) { setError((e as Error).message); } };
   const canApprove = a !== null && a.label !== "conflict" && a.label !== "unknown" && !a.approved;
   useKeys({
     Escape: onClose,
@@ -71,6 +82,7 @@ export default function EvidenceDrawer({ answerId, code, runId, onClose, onChang
     if (items.length === 0) return;
     const first = items[0];
     const last = items[items.length - 1];
+    if (!root.current.contains(document.activeElement)) { e.preventDefault(); first.focus(); return; } // the focused control went away
     if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   };
@@ -79,11 +91,12 @@ export default function EvidenceDrawer({ answerId, code, runId, onClose, onChang
   return (
     <aside
       ref={root}
+      tabIndex={-1}
       aria-labelledby={titleId}
       role={narrow ? "dialog" : undefined}
       aria-modal={narrow ? true : undefined}
       onKeyDown={trap}
-      className={`${narrow ? "fixed inset-0 z-10" : "border-l border-ink"} flex min-h-0 flex-col overflow-auto bg-paper transition duration-200 ease-out`}
+      className={`focus:outline-none ${narrow ? "fixed inset-0 z-10" : "border-l border-ink"} flex min-h-0 flex-col overflow-auto bg-paper transition duration-200 ease-out`}
     >
       <div data-chrome className="flex h-8 items-center justify-between bg-chrome px-3 text-xs">
         <span className="font-bold text-on-chrome">{code} · evidence</span>
@@ -111,9 +124,14 @@ export default function EvidenceDrawer({ answerId, code, runId, onClose, onChang
             )}
             <section className="space-y-2">
               <h3 className="border-b border-ink text-xs font-medium text-ink-2">sources ({a.citations.length})</h3>
-              {(a.conflict ? a.conflict.sides.flatMap((s) => s.citations) : a.citations.map((_, i) => i)).map((i) => (
-                <Citation key={i} c={a.citations[i]} n={i + 1} />
-              ))}
+              {a.conflict
+                ? a.conflict.sides.map((side, k) => (
+                    <div key={k} className="space-y-2">
+                      <h4 className="text-xs font-bold">{side.stance} · {side.date ?? "undated"}</h4>
+                      {side.citations.map((i) => <Citation key={i} c={a.citations[i]} n={i + 1} />)}
+                    </div>
+                  ))
+                : a.citations.map((c, i) => <Citation key={i} c={c} n={i + 1} />)}
             </section>
             <section>
               <h3 className="border-b border-ink text-xs font-medium text-ink-2">dropped evidence ({a.dropped.length})</h3>
