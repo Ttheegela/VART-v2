@@ -8,7 +8,7 @@ describe("api", () => {
   beforeEach(() => resetWorkspaceForTests());
 
   it("creates the workspace once", async () => {
-    const fetchMock = vi.fn(async () => json(200, { created_at: "2026-10-03T12:00:00Z" }));
+    const fetchMock = vi.fn(async () => json(200, { created_at: "2026-10-03T12:00:00Z", expires_at: "2026-10-04T12:00:00Z" }));
     vi.stubGlobal("fetch", fetchMock);
     await ensureWorkspace();
     await ensureWorkspace();
@@ -23,6 +23,11 @@ describe("api", () => {
   it("turns other failures into ApiError with the server's detail", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => json(429, { detail: "too many new sessions" })));
     await expect(ensureWorkspace()).rejects.toEqual(new ApiError(429, "too many new sessions"));
+  });
+
+  it("keeps Retry-After on a 429", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ detail: "budget" }), { status: 429, headers: { "Retry-After": "120" } })));
+    await expect(request("/api/runs/r/step", { method: "POST" })).rejects.toMatchObject({ status: 429, retryAfter: 120 });
   });
 
   it("reads no body from a 204", async () => {
