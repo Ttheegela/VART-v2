@@ -3133,14 +3133,13 @@ def evidence(session: Session, workspace_id: uuid.UUID, item: ItemInput) -> Retr
     return Retrieval(r.passages, r.dropped + tuple(Dropped(p.chunk_id, p.doc.id, p.doc.filename, "statement") for p in said))
 ```
 
-Add to `docs/CONTRACTS.md`'s unit table: the `retrieve` row reads `retrieve(session, workspace_id, question, topic, *, exclude_kinds=())`, and the `csf` row's `explain` and `aggregate` gain `filled=frozenset()`. Then add to the change log:
+`docs/CONTRACTS.md` already records the `retrieve` row with `exclude_kinds`, sets-of-passages, surviving per-part fills and the Confirmed-by-you rule (Part 0 fix round, `8542dc9`). Add only what it lacks: the `csf` row's `explain` and `aggregate` gain `filled=frozenset()`. Then add to the change log:
 
 ```markdown
-- 2026-10-06: Plan 6B Task 4 (lead's OK under rule 10; adversary-1 I3, I4, M5, Ruling 4): `app.retrieve.retrieve`
-  gains the keyword `exclude_kinds` (default `()`, every existing caller unchanged); `csf.evidence` keeps statements
-  out of a Checked part's top K. `csf.explain` and `csf.aggregate` gain `filled` (default empty: 6A's output).
-  `runs.reopen_changed` gains an optional `models`. A Checked outcome whose every non-Gap part was filled from the
-  visitor's answer is `user_confirmed`. No prompt or label of a questionnaire changes; nothing is re-recorded.
+- 2026-10-06: Plan 6B Task 4 (lead's OK under rule 10; adversary-1 I3, M5, Ruling 4): `csf.explain` and
+  `csf.aggregate` gain `filled` (default empty: 6A's output); `runs.reopen_changed` gains an optional `models`
+  (today's judges; a part judged by another stance prompt or model re-opens). No prompt or questionnaire label
+  changes; nothing is re-recorded.
 ```
 
 - [ ] **Step 8: Write the per-part re-decide**
