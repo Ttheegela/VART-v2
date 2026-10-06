@@ -191,7 +191,8 @@ export interface paths {
      * `running` (a step may answer nothing while another step holds the rest: wait a moment first). 429 with
      * Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the spender) or a model
      * budget (workspace hour, global hour, global day) is used up; the sentence names which. 503 when model
-     * calls are off.
+     * calls are off, or the provider is failing (a bad key, no credit, a rate limit, an outage): nothing is
+     * marked failed, the items stay pending and Retry-After says when to ask again.
      */
     post: operations["step_run_api_runs__run_id__step_post"];
   };
@@ -2303,7 +2304,8 @@ export interface operations {
    * `running` (a step may answer nothing while another step holds the rest: wait a moment first). 429 with
    * Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the spender) or a model
    * budget (workspace hour, global hour, global day) is used up; the sentence names which. 503 when model
-   * calls are off.
+   * calls are off, or the provider is failing (a bad key, no credit, a rate limit, an outage): nothing is
+   * marked failed, the items stay pending and Retry-After says when to ask again.
    */
   step_run_api_runs__run_id__step_post: {
     parameters: {

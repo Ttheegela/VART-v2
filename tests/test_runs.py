@@ -11,7 +11,7 @@ from sqlalchemy import Engine, func, select, text
 from sqlalchemy.orm import Session
 
 from app import runs
-from app.api.errors import NotFound
+from app.api.errors import ModelsUnavailable, NotFound
 from app.contracts import BudgetExhausted
 from app.db.models import Answer, LlmUsage, Run, RunItem
 from app.llm.client import LLMError, LLMRequest, LLMResult
@@ -413,13 +413,113 @@ def _api_error(status: int) -> LLMError:
     return err
 
 
-@pytest.mark.parametrize(("status", "calls"), [(401, 1), (408, 2), (429, 2), (503, 2)])
-def test_retry_follows_the_real_status_error(s: Session, status: int, calls: int) -> None:
+@pytest.mark.parametrize(("status", "calls"), [(401, 1), (402, 1), (408, 2), (429, 2), (503, 2)])
+def test_a_provider_outage_writes_no_failed_answers(s: Session, status: int, calls: int) -> None:
+    # Adversary-3 I3: the items go back untried, the cost is kept, the route answers 503.
+    ws, q = _questionnaire(s, n=3)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    llm = ByStepLLM({"stance": _api_error(status)})
+    with pytest.raises(ModelsUnavailable):
+        runs.step(s, ws.id, run.id, llm, MODELS)
+    assert len(llm.requests) == calls
+    assert s.scalars(select(Answer)).all() == []
+    assert sorted(s.execute(select(RunItem.state, RunItem.attempts)).all()) == [("pending", 0)] * 3
+
+
+@pytest.mark.parametrize("status", [400, 403])
+def test_another_client_error_is_a_failed_answer_after_one_call(s: Session, status: int) -> None:
     ws, q = _questionnaire(s, n=1)
     run = runs.create_run(s, ws.id, q.id, MODELS)
     llm = ByStepLLM({"stance": _api_error(status)})
     runs.step(s, ws.id, run.id, llm, MODELS)
-    assert len(llm.requests) == calls
+    assert len(llm.requests) == 1 and s.scalars(select(Answer.text)).one() == runs.FAILED_TEXT
+
+
+def test_a_connection_error_is_an_outage(s: Session) -> None:
+    ws, q = _questionnaire(s, n=1)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    err = LLMError("stance: APIConnectionError")
+    err.__cause__ = openai.APIConnectionError(request=httpx.Request("POST", "http://x"))
+    with pytest.raises(ModelsUnavailable):
+        runs.step(s, ws.id, run.id, ByStepLLM({"stance": err}), MODELS)
+    assert s.scalars(select(Answer)).all() == []
+
+
+def test_an_outage_keeps_the_cost_and_a_schema_error_is_still_failed(s: Session) -> None:
+    ws, q = _questionnaire(s, n=1)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    runs.step(s, ws.id, run.id, ByStepLLM({"stance": "not json"}, cost=0.01), MODELS)
+    assert s.scalars(select(Answer.text)).one() == runs.FAILED_TEXT
+    assert s.scalar(select(Run.cost_usd).where(Run.id == run.id)) == Decimal("0.02")
+
+
+def test_the_step_route_maps_an_outage_to_a_503_with_retry_after() -> None:
+    from tests.test_api_errors import _app
+
+    r = _app(ModelsUnavailable()).get("/boom")
+    assert (r.status_code, r.headers["retry-after"]) == (503, "60") and "failing" in r.json()["detail"]
+
+
+def test_a_nul_in_a_model_reply_is_scrubbed_not_a_500(s: Session) -> None:
+    # Adversary-3 I1: Postgres refuses U+0000 in text and jsonb.
+    ws, q = _questionnaire(s, n=1)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    stance = json.dumps(
+        {"passages": [{"passage": 1, "stance": "yes", "quote": QUOTE, "note": "states\u0000 it"}]}
+    )
+    draft = json.dumps(
+        {"text": 'Yes\u0000. The crypto policy says "Customer data at rest is encrypted with AES-256."'}
+    )
+    runs.step(s, ws.id, run.id, ByStepLLM({"stance": stance, "draft": draft}, cost=0.01), MODELS)
+    a = s.scalars(select(Answer)).one()
+    assert a.label == "verified" and "\x00" not in a.text and "\x00" not in json.dumps(a.stances)
+
+
+def test_a_value_the_database_refuses_is_written_as_failed_with_the_cost(
+    s: Session, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    ws, q = _questionnaire(s, n=1)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    real = runs._write
+    calls: list[dict] = []  # type: ignore[type-arg]
+
+    def write(session, workspace_id, run_id, item_id, values, cost):  # type: ignore[no-untyped-def]
+        calls.append(values)
+        if len(calls) == 1:
+            session.execute(text("select 1/0"))  # a DataError, as a refused value would be
+        return real(session, workspace_id, run_id, item_id, values, cost)
+
+    monkeypatch.setattr(runs, "_write", write)
+    runs.step(s, ws.id, run.id, _llm(cost=0.01), MODELS)
+    assert s.scalars(select(Answer.text)).one() == runs.FAILED_TEXT
+    assert s.scalar(select(Run.cost_usd).where(Run.id == run.id)) == Decimal("0.02")
+    assert "select" not in caplog.text and "DataError" in caplog.text
+
+
+def test_create_run_waits_for_a_questionnaire_being_changed_and_then_404s(db: Engine) -> None:
+    # Ruling 14 I-1: a concurrent delete (FOR UPDATE) makes the run wait, then see the row gone: no FK 500.
+    with Session(db) as s:
+        ws, q = _questionnaire(s, n=1)
+        ws_id, q_id = ws.id, q.id
+    outcome: list[object] = []
+
+    def start() -> None:
+        with Session(db) as t:
+            try:
+                outcome.append(runs.create_run(t, ws_id, q_id, MODELS))
+            except Exception as exc:
+                outcome.append(exc)
+
+    with Session(db) as holder:
+        holder.execute(text("select id from questionnaires where id = :i for update"), {"i": q_id}).one()
+        th = threading.Thread(target=start)
+        th.start()
+        th.join(0.7)
+        assert th.is_alive()  # waiting on the lock
+        holder.execute(text("delete from questionnaires where id = :i"), {"i": q_id})
+        holder.commit()
+    th.join(10)
+    assert len(outcome) == 1 and isinstance(outcome[0], NotFound)
 
 
 def test_a_rate_limit_is_not_retried_past_the_deadline(s: Session) -> None:
@@ -427,7 +527,8 @@ def test_a_rate_limit_is_not_retried_past_the_deadline(s: Session) -> None:
     run = runs.create_run(s, ws.id, q.id, MODELS)
     llm = ByStepLLM({"stance": _api_error(429)})
     ticks = iter([0.0, 0.0, runs.DEADLINE_S + 1, runs.DEADLINE_S + 1])
-    runs.step(s, ws.id, run.id, llm, MODELS, clock=lambda: next(ticks))
+    with pytest.raises(ModelsUnavailable):
+        runs.step(s, ws.id, run.id, llm, MODELS, clock=lambda: next(ticks))
     assert len(llm.requests) == 1
 
 
@@ -439,7 +540,8 @@ def test_a_retryable_error_past_the_deadline_gives_the_item_back_untried(s: Sess
     llm = ByStepLLM({"stance": _api_error(503)})
     late = runs.DEADLINE_S + 1
     ticks = iter([0.0, 0.0, late, late, late, late, late])
-    assert runs.step(s, ws.id, run.id, llm, MODELS, clock=lambda: next(ticks)) == []
+    with pytest.raises(ModelsUnavailable):
+        runs.step(s, ws.id, run.id, llm, MODELS, clock=lambda: next(ticks))
     assert s.scalars(select(Answer)).all() == []
     assert sorted(s.execute(select(RunItem.state, RunItem.attempts)).all()) == [
         ("pending", 0),
@@ -461,7 +563,7 @@ def test_the_deadline_release_keeps_the_cost_already_spent(s: Session) -> None:
 def test_a_client_error_past_the_deadline_is_still_a_failed_answer(s: Session) -> None:
     ws, q = _questionnaire(s, n=1)
     run = runs.create_run(s, ws.id, q.id, MODELS)
-    llm = ByStepLLM({"stance": _api_error(401)})
+    llm = ByStepLLM({"stance": _api_error(400)})
     late = runs.DEADLINE_S + 1
     ticks = iter([0.0, 0.0, late, late, late])
     runs.step(s, ws.id, run.id, llm, MODELS, clock=lambda: next(ticks))

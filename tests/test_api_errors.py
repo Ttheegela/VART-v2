@@ -72,6 +72,14 @@ def test_a_foreign_key_violation_is_a_404(db: Engine) -> None:
     assert r.status_code == 404 and "reload the page" in r.json()["detail"]
 
 
+def test_a_row_deleted_between_two_reads_is_a_gone_404() -> None:
+    # Adversary-3 M7: a reset between an unlocked read and its locked re-read.
+    from sqlalchemy.exc import NoResultFound
+
+    r = _app(NoResultFound()).get("/boom")
+    assert (r.status_code, r.json()["detail"]) == (404, errors.GONE)
+
+
 def test_another_integrity_error_is_not_dressed_up_as_a_404(db: Engine) -> None:
     with Session(db) as s:
         s.add(Questionnaire(workspace_id=uuid.uuid4(), filename="q.csv", source="nope"))

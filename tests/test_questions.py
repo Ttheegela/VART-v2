@@ -3,10 +3,11 @@ import threading
 import uuid
 from collections.abc import Callable, Iterator
 from datetime import date, timedelta
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from app import questions as qs
@@ -283,6 +284,47 @@ def test_two_answers_at_once_store_one_statement(db: Engine) -> None:
     assert sorted(outcomes) == ["conflict", "ok"]
     with Session(db) as s:
         assert len(s.scalars(select(Document).where(Document.kind == "statement")).all()) == 1
+
+
+def test_the_rechecks_cost_lands_on_the_run(s: Session) -> None:
+    # Adversary-3 I2: the recheck is the one model path that had no cost meter.
+    ws, r = _done_run(s, ["Data Security", "Data Security", "Data Security"])
+    q = qs.ensure_questions(s, ws.id, r.id)[0]
+    llm = ByStepLLM(_recheck_llm().replies, cost=0.01)
+    qs.answer_question(s, ws.id, q.id, TEXT, llm, MODELS, TODAY)
+    assert len(llm.requests) == 2
+    assert s.scalar(select(Run.cost_usd).where(Run.id == r.id)) == Decimal("0.02")
+
+
+def test_the_recheck_stops_at_its_deadline(s: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    ws, r = _done_run(s, ["Data Security"] * 4)
+    q = qs.ensure_questions(s, ws.id, r.id)[0]
+    now = [0.0]
+    monkeypatch.setattr(qs, "monotonic", lambda: now[0])
+
+    class Slow(ByStepLLM):
+        def complete(self, req: LLMRequest) -> LLMResult:
+            now[0] += qs.RECHECK_SECONDS + 1  # the first call alone uses up the allowance
+            return super().complete(req)
+
+    llm = Slow(_recheck_llm().replies, cost=0.01)
+    qs.answer_question(s, ws.id, q.id, TEXT, llm, MODELS, TODAY)
+    assert len(llm.requests) == 1
+    assert s.scalar(select(Run.cost_usd).where(Run.id == r.id)) == Decimal("0.01")
+
+
+def test_an_item_the_visitor_approved_or_edited_is_not_overwritten_by_its_question(s: Session) -> None:
+    # Adversary-3 M3 and M4: the question is moot, listed as skipped, and answering it is a 409.
+    ws, r = _done_run(s, ["Data", "Data"], ["partial", "partial"])
+    first, second = qs.ensure_questions(s, ws.id, r.id)
+    s.execute(Answer.__table__.update().where(Answer.item_id == first.item_ids[0]).values(edited=True))
+    s.execute(
+        Answer.__table__.update().where(Answer.item_id == second.item_ids[0]).values(approved_at=func.now())
+    )
+    s.commit()
+    with pytest.raises(qs.Conflict):
+        qs.answer_question(s, ws.id, first.id, TEXT, None, MODELS, TODAY)
+    assert [q.status for q in qs.ensure_questions(s, ws.id, r.id)] == ["skipped", "skipped"]
 
 
 def test_a_failure_after_the_statement_is_written_leaves_nothing_and_a_retry_works(

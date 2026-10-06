@@ -6,8 +6,9 @@ from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import ObjectDeletedError
 from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -26,6 +27,7 @@ BUDGET: dict[BudgetScope, str] = {
 }
 CROSS_SITE = "Cross-site requests are not accepted."
 WRITES = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+MODELS_DOWN = "Model calls are failing right now; the run resumes when they return."
 GONE = "Your workspace has expired or was reset; reload the page to start a new one."
 
 
@@ -35,6 +37,11 @@ class NotFound(Exception):
 
 class Conflict(Exception):
     """The action conflicts with the row's state; the message is the sentence shown."""
+
+
+class ModelsUnavailable(Exception):
+    """The model provider is refusing or not answering (bad key, no credit, rate limit, outage, timeout): the
+    run waits instead of writing failed answers. A 503 with Retry-After."""
 
 
 def not_built() -> HTTPException:
@@ -120,6 +127,16 @@ def install(app: FastAPI) -> None:
             status_code=429,
             headers={"Retry-After": str(retry_after_budget(scope=scope))},
         )
+
+    @app.exception_handler(ModelsUnavailable)
+    def _models(_: Request, exc: ModelsUnavailable) -> JSONResponse:
+        return JSONResponse({"detail": MODELS_DOWN}, status_code=503, headers={"Retry-After": "60"})
+
+    @app.exception_handler(NoResultFound)
+    @app.exception_handler(ObjectDeletedError)
+    def _deleted(_: Request, exc: Exception) -> JSONResponse:
+        # a reset between an unlocked read and its locked re-read (adversary-3 M7)
+        return JSONResponse({"detail": GONE}, status_code=404)
 
     @app.exception_handler(IntegrityError)
     def _integrity(_: Request, exc: IntegrityError) -> JSONResponse:

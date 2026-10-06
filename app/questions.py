@@ -3,6 +3,7 @@
 import uuid
 from collections.abc import Mapping
 from datetime import date
+from time import monotonic
 from typing import cast
 
 from sqlalchemy import select, update
@@ -17,12 +18,14 @@ from app.ingest.store import store_statement
 from app.interview import OPEN, follow_up, plan_queue, recheck
 from app.llm.client import LLMClient
 from app.redact import redact_text
+from app.runs import CostMeter, _add_cost
 from app.services import audit_log
 from app.services.llm_budget import spender
 
 MAX_RECHECKS = 8  # per accepted answer (triage row 18): a questionnaire without sections has one topic, None
 CONFIDENCE = {"verified": 0.9, "partial": 0.6}
 ASKABLE = ("open", "follow_up")
+RECHECK_SECONDS = 120.0  # the whole re-check stays well under the 300 s function limit (adversary-3 I2)
 
 __all__ = ["MAX_RECHECKS", "Conflict", "NotFound"]
 
@@ -48,6 +51,11 @@ def _question(
 def _answer_of(session: Session, run_id: uuid.UUID, item_id: uuid.UUID, *, lock: bool = False) -> Answer:
     query = select(Answer).where(Answer.run_id == run_id, Answer.item_id == item_id)
     return session.scalars(query.with_for_update() if lock else query).one()
+
+
+def _still_open(a: Answer) -> bool:
+    """Open for the interview: not edited or approved by the visitor (adversary-3 M3)."""
+    return a.label in OPEN and not a.edited and a.approved_at is None
 
 
 def _open_pairs(session: Session, run_id: uuid.UUID) -> list[tuple[Item, Answer]]:
@@ -92,6 +100,18 @@ def ensure_questions(session: Session, workspace_id: uuid.UUID, run_id: uuid.UUI
             session.execute(insert(InterviewQuestion).values(rows).on_conflict_do_nothing())
         session.commit()
         existing = list(session.scalars(select(InterviewQuestion).where(InterviewQuestion.run_id == run_id)))
+    live = [q for q in existing if q.status in ASKABLE]
+    if live:  # a question whose item was meanwhile approved, edited or marked N/A is moot (adversary-3 M4)
+        gone = {
+            a.item_id
+            for a in session.scalars(select(Answer).where(Answer.run_id == run_id))
+            if not _still_open(a)
+        }
+        moot = [q for q in live if q.item_ids[0] in gone]
+        for q in moot:
+            q.status = "skipped"
+        if moot:
+            session.commit()
     order = {"open": 0, "follow_up": 0, "answered": 1, "skipped": 1}
     return sorted(existing, key=lambda q: (order[q.status], q.rank))
 
@@ -113,8 +133,8 @@ def answer_question(
     session.refresh(q, with_for_update=True)
     if q.status not in ASKABLE:
         raise Conflict("This question is already closed.")
-    if answer.label not in OPEN:
-        raise Conflict("This item was answered since; the question no longer applies.")
+    if not _still_open(answer):
+        raise Conflict("This item was answered, edited or approved since; the question no longer applies.")
     if q.status == "open" and follow_up(item.question, text) is not None:
         q.status, q.asked_count, q.answer_text = "follow_up", 1, redact_text(text)
         audit_log.record(session, workspace_id, "question.follow_up", ref=str(q.id))
@@ -187,20 +207,23 @@ def _suggest(
     ]
     if not opens:
         return []
+    meter = CostMeter(llm)  # recheck's calls are billed like the runner's (adversary-3 I2)
+    spend = spender(session, workspace_id, network=network)
+    until = monotonic() + RECHECK_SECONDS
+
+    def spend_in_time(step: str) -> bool:
+        return monotonic() <= until and spend(step)  # False stops the loop; the rest stay open
+
     try:
         found = recheck(
-            session,
-            workspace_id,
-            statement_id,
-            topic,
-            opens,
-            llm,
-            models["recheck"],
-            spender(session, workspace_id, network=network),
+            session, workspace_id, statement_id, topic, opens, meter, models["recheck"], spend_in_time
         )
     except Exception:
         session.rollback()  # triage row 37: never leave a refused recheck's row lock to the request's end
+        _add_cost(session, run_id, meter.take())
+        session.commit()
         raise
+    _add_cost(session, run_id, meter.take())
     if found:
         session.execute(
             insert(SuggestedFill)
@@ -265,9 +288,9 @@ def accept_suggestion(session: Session, workspace_id: uuid.UUID, suggestion_id: 
     if sg.status != "open":
         session.rollback()
         raise Conflict("This suggestion was already used or dismissed.")
-    if a.label not in OPEN:
+    if not _still_open(a):
         session.rollback()
-        raise Conflict("This item was answered since; the suggestion no longer applies.")
+        raise Conflict("This item was answered, edited or approved since; the suggestion no longer applies.")
     a.label, a.value, a.text, a.citations = sg.label, sg.value, sg.text, sg.citations
     a.dropped, a.conflict, a.scope_note, a.confidence = sg.dropped, None, None, sg.confidence
     a.stances, a.chunk_ids, a.retrieval_dropped = [], [], []  # the run's stances describe the old answer (P7)

@@ -135,3 +135,7 @@ change-log line; changing or removing a path, a field or a status needs the lead
   keeps the answer and returns no suggestions when the re-check's model budget is refused (200); only the `interview`
   cap is a 429; 409 also when the item was answered since. `store_statement(..., commit=False)` lets the interview
   write statement, answer and question in one transaction (Ruling 9).
+- 2026-10-06: Plan 3A adversary-3 fix round (wording and behaviour inside existing statuses; no path or field changed):
+  `POST /api/runs/{id}/step` answers 503 with `Retry-After: 60` when the model provider is failing (401, 402, 408, 429,
+  5xx, connection errors); the items stay pending, nothing is written as failed, the cost is kept. Schema mismatches
+  and other 4xx are still the failed answer. A reset between two reads of one row is the `GONE` 404.

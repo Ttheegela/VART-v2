@@ -11,12 +11,13 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+import openai
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import DataError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.api.errors import NotFound
+from app.api.errors import ModelsUnavailable, NotFound
 from app.classify import PROMPT_VERSION as CLASSIFY_PROMPT
 from app.contracts import BudgetExhausted, ItemInput, ItemResult, Spend, jsonable
 from app.db.models import Answer, Item, Questionnaire, Run, RunItem
@@ -69,9 +70,9 @@ def create_run(
     session: Session, workspace_id: uuid.UUID, questionnaire_id: uuid.UUID, models: Mapping[str, str]
 ) -> Run:
     q = session.scalar(
-        select(Questionnaire).where(
-            Questionnaire.id == questionnaire_id, Questionnaire.workspace_id == workspace_id
-        )
+        select(Questionnaire)
+        .where(Questionnaire.id == questionnaire_id, Questionnaire.workspace_id == workspace_id)
+        .with_for_update(read=True)  # a concurrent mapping change or delete waits, then we see the result
     )
     if q is None:
         raise NotFound()
@@ -161,7 +162,33 @@ def _answer(
         return answer_item(session, workspace_id, item, llm, models, spend)
 
 
+def _no_nul(v: Any) -> Any:
+    """Postgres refuses U+0000 in text and jsonb; a model reply (or a document it quotes) can carry one."""
+    if isinstance(v, str):
+        return v.replace("\x00", "")
+    if isinstance(v, list):
+        return [_no_nul(x) for x in v]
+    if isinstance(v, dict):
+        return {k: _no_nul(x) for k, x in v.items()}
+    return v
+
+
+def _provider_down(exc: LLMError) -> bool:
+    """The provider, not the model's answer, failed: bad key (401), no credit (402), timeout (408), rate limit
+    (429), 5xx, a dropped connection. A reply that fails the schema, or another 4xx, is a bad answer."""
+    cause = exc.__cause__
+    if not isinstance(cause, openai.APIError):
+        return False
+    status = getattr(cause, "status_code", None)
+    return not isinstance(status, int) or status in (401, 402, 408, 429) or status >= 500
+
+
 def _values(r: ItemResult) -> dict[str, Any]:
+    clean: dict[str, Any] = _no_nul(_raw(r))
+    return clean
+
+
+def _raw(r: ItemResult) -> dict[str, Any]:
     d = r.decision
     return {
         "label": d.label,
@@ -289,6 +316,14 @@ def step(
             raise (refused or exc) from None
         except LLMError as exc:
             session.rollback()
+            if _provider_down(exc):
+                # an outage is not a bad answer: give the items back untried (adversary-3 I3)
+                _release(session, run_id, rest)
+                _add_cost(session, run_id, meter.take())
+                session.commit()
+                if answered:
+                    break  # the next step meets the outage itself
+                raise ModelsUnavailable() from None
             if _retryable(exc) and clock() > deadline:
                 # the deadline cut the retry: not tried twice, so not failed (Task 8 review)
                 _release(session, run_id, rest)
@@ -296,16 +331,24 @@ def step(
                 session.commit()
                 break
             values = FAILED
-        except SQLAlchemyError:
+        except SQLAlchemyError as exc:
             session.rollback()  # triage row 24: a failed transaction must not swallow the next write
-            log.exception("run %s item %s: database error; answered as failed", run_id, item_id)
+            # the type only: the statement's parameters carry the question's words (adversary-3 M1)
+            log.error("run %s item %s: %s; answered as failed", run_id, item_id, type(exc).__name__)
             values = FAILED
         except Exception:
             _keep_cost(session, run_id, meter.take(), claimed[n + 1 :])
             raise
         cost = meter.take()
         try:
-            _write(session, workspace_id, run_id, item_id, values, cost)
+            try:
+                _write(session, workspace_id, run_id, item_id, values, cost)
+            except DataError as exc:  # the database refused a value: write the failure, not a reclaim loop
+                session.rollback()
+                log.error(
+                    "run %s item %s: %s on write; answered as failed", run_id, item_id, type(exc).__name__
+                )
+                _write(session, workspace_id, run_id, item_id, FAILED, cost)
         except Exception:
             _keep_cost(session, run_id, cost, claimed[n + 1 :])
             raise

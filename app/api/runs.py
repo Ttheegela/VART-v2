@@ -104,7 +104,8 @@ def step_run(
     `running` (a step may answer nothing while another step holds the rest: wait a moment first). 429 with
     Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the spender) or a model
     budget (workspace hour, global hour, global day) is used up; the sentence names which. 503 when model
-    calls are off."""
+    calls are off, or the provider is failing (a bad key, no credit, a rate limit, an outage): nothing is
+    marked failed, the items stay pending and Retry-After says when to ask again."""
     ws_id = ws.id
     run = _own(session, ws, run_id)
     if llm is None:
