@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { fixtures, mockApi } from "../test/mockApi";
 import ExportView from "./Export";
@@ -16,5 +17,15 @@ describe("Export", () => {
     mockApi({ "GET /api/runs/r1/answers": new Response(JSON.stringify({ detail: "boom" }), { status: 500 }) });
     render(<ExportView workspace={fixtures.workspace} onGone={() => {}} runId="r1" />);
     expect(await screen.findByText(/boom/)).toBeInTheDocument();
+  });
+
+  it("e clicks the download link", async () => {
+    mockApi({ "GET /api/runs/r1/answers": { run: fixtures.run, rows: fixtures.rows } });
+    render(<ExportView workspace={fixtures.workspace} onGone={() => {}} runId="r1" />);
+    const link = await screen.findByRole("link", { name: "Export" });
+    let clicked = 0;
+    link.addEventListener("click", (ev) => { ev.preventDefault(); clicked++; });
+    await userEvent.keyboard("e");
+    expect(clicked).toBe(1);
   });
 });

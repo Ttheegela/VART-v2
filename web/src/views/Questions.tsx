@@ -16,7 +16,7 @@ function QuestionCard({ q, focus, onUpdated, onStale }: { q: QuestionOut; focus:
   const code = q.codes[0] ?? "item";
   useEffect(() => { if (focus) box.current?.focus(); }, [focus]);
   const fail = (e: unknown, reload = false) => {
-    if (e instanceof ApiError && e.status === 429) setError(`Too many answers at once. Try again in ${e.retryAfter ?? 10} s.`);
+    if (e instanceof ApiError && e.status === 429) setError(`Too many answers at once.${e.retryAfter ? ` Try again in ${e.retryAfter} s.` : ""}`);
     else setError(messageOf(e));
     if (reload && e instanceof ApiError && e.status === 409) onStale(); // answered or skipped elsewhere: show the queue as it is now
   };
@@ -108,10 +108,11 @@ function QuestionsFor({ workspace, onGone, runId }: ViewProps & { runId: string 
   const [list, setList] = useState<QuestionOut[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const local = useRef(new Map<string, QuestionOut>()); // cards updated here: a later reload must not overwrite them
   useEffect(() => {
     let alive = true;
     api.questions(runId).then(
-      (l) => { if (alive) setList(l); },
+      (l) => { if (alive) { setError(null); setList(l.map((q) => local.current.get(q.id) ?? q)); } },
       (e) => { if (alive) setError(goneOn404(e, onGone)); },
     );
     return () => { alive = false; };
@@ -127,7 +128,7 @@ function QuestionsFor({ workspace, onGone, runId }: ViewProps & { runId: string 
         {list && list.length === 0 && <p className="py-3 text-sm text-ink-2">Nothing to ask: every item has an answer from the documents, or the run is still filling.</p>}
         <ul>
           {list?.map((q) => (
-            <QuestionCard key={q.id} q={q} focus={q.id === focusId} onStale={() => setTick((t) => t + 1)} onUpdated={(nq) => setList((all) => all?.map((x) => (x.id === nq.id ? nq : x)) ?? null)} />
+            <QuestionCard key={q.id} q={q} focus={q.id === focusId} onStale={() => setTick((t) => t + 1)} onUpdated={(nq) => { local.current.set(nq.id, nq); setList((all) => all?.map((x) => (x.id === nq.id ? nq : x)) ?? null); }} />
           ))}
         </ul>
       </div>

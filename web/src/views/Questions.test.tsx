@@ -127,4 +127,26 @@ describe("Questions", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.queryByLabelText("your answer to VSQ-03")).not.toBeInTheDocument();
   });
+
+  it("a reload after a 409 does not overwrite a later answer on another card", async () => {
+    const two = [fixtures.questions[0], { ...fixtures.questions[0], id: "qq2", item_ids: ["i4"], codes: ["VSQ-04"] }];
+    let release: (v: unknown) => void = () => {};
+    let loads = 0;
+    mockApi({
+      "GET /api/runs/r1/questions": () => (++loads === 1 ? two : new Promise((r) => { release = r; })),
+      "POST /api/questions/qq1/answer": err(409, "This question was already answered."),
+      "POST /api/questions/qq2/answer": { question: { ...two[1], status: "answered" }, answer: null, suggestions: [] },
+    });
+    render(<Questions {...props} />);
+    await userEvent.type(await screen.findByLabelText("your answer to VSQ-03"), "a");
+    await userEvent.click(screen.getAllByRole("button", { name: "Send" })[0]);
+    await screen.findByText(/already answered/);
+    await userEvent.type(screen.getByLabelText("your answer to VSQ-04"), "b");
+    await userEvent.click(screen.getAllByRole("button", { name: "Send" })[1]);
+    await screen.findByText("confirmed by you");
+    release(two); // the older reload lands last
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByText("confirmed by you")).toBeInTheDocument();
+    expect(screen.queryByLabelText("your answer to VSQ-04")).not.toBeInTheDocument();
+  });
 });

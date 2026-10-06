@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Shell, goneOn404, type ViewProps } from "../components/Shell";
 import { ErrorLine, Kbd } from "../components/ui";
 import { api, type RunRowsOut } from "../lib/api";
@@ -16,7 +16,8 @@ export default function ExportView({ workspace, onGone, runId }: ViewProps & { r
     return () => { alive = false; setData(null); };
   }, [runId, onGone]);
   const url = api.exportUrl(runId);
-  useKeys({ e: () => window.location.assign(url) });
+  const link = useRef<HTMLAnchorElement>(null);
+  useKeys({ e: () => link.current?.click() }); // the same download link, so one path decides what a click does
   const rows = data?.rows ?? [];
   const approved = rows.filter((r) => r.answer?.approved).length;
   const draft = rows.filter((r) => r.answer && !r.answer.approved).length;
@@ -32,7 +33,7 @@ export default function ExportView({ workspace, onGone, runId }: ViewProps & { r
           Notes. Unapproved answers are exported marked "Draft, not approved". A csv comes back as csv.
         </p>
         <p className="text-xs text-ink-3">Embedded images and charts are not kept in an exported workbook (an openpyxl limit).</p>
-        <a href={url} download aria-keyshortcuts="e" className="inline-flex h-7 items-center gap-2 bg-chrome px-2 text-sm font-medium text-on-chrome hover:bg-neutral-800">
+        <a ref={link} href={url} download aria-keyshortcuts="e" className="inline-flex h-7 items-center gap-2 bg-chrome px-2 text-sm font-medium text-on-chrome hover:bg-neutral-800">
           <Kbd>e</Kbd><span>Export</span>
         </a>
       </div>
