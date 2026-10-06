@@ -7,12 +7,32 @@ _Last updated: 2026-10-05 · Branch: `main` (origin: https://github.com/Ttheegel
 |---|---|---|
 | 1A Foundation | done, live 2026-10-04 | schema, workspaces, LLM client, health + canary, React shell, CI, gates |
 | 1B Dev data | done | fact sheet, questionnaires, documents, keys |
-| 2 Engine and evals | done (branch `plan2`; release waits for Tarun's OK) | engine, ingest, evals; baseline label accuracy 0.9213, recall@8 0.9738, cost $0.0361 per 60 items |
+| 2 Engine and evals | done, live 2026-10-05 | engine, ingest, evals; baseline label accuracy 0.9213, recall@8 0.9738, cost $0.0361 per 60 items |
 | 3 API and UI | not started | |
 | 4 Hardening and launch | not started | |
 | 5 Google Drive | not started | |
 
 ## Releases
+### Plan 2 — 2026-10-05
+- `main` = `c8836cc`, merged by PR #3 (fast-forward of `plan2`) after green CI: gates (gitleaks over the full history,
+  sponsor check, monochrome), backend (1144 tests, decide at 100% branch coverage, the dev-pack eval replayed on Linux
+  with no drift), frontend, e2e. Two CI jobs needed re-runs because GitHub assigned them no runner; no step had failed.
+- Preview bundle check before the release: the Python function is 70.91 MB (READY on a CLI preview, region iad1).
+- `ops/setup.sh migrate` (Tarun): Neon migrated `186f3400ded0` -> `ffbf91b464dc` (additive `chunks.record`) before
+  `main` moved.
+- Production deploy READY; smoke test ok (version `2.0.0.dev0`); `/api/health` `"status":"ok"`, `"db":"ok"`.
+- Models now in production (set from the 2026-10-05 bench, approved by Tarun): stance and recheck
+  `deepseek/deepseek-v4-pro`, draft `z-ai/glm-5.3-flash`, classify `deepseek/deepseek-v4-flash`, judge (evals only)
+  `qwen/qwen3.7-plus`. The first canary on these ids is the 17:00 UTC run on 2026-10-06.
+- Visitors cannot reach the engine or ingest yet: the questionnaire workspace arrives with Plan 3.
+
+| Release check | Result |
+|---|---|
+| Dev pack (15 gates) | 15/15; label accuracy 0.9213, recall@8 0.9738, judge faithfulness 0.971 |
+| Cost and speed | $0.0361 per 60 items; p50 10.35 s per item |
+| Function size | 70.91 MB |
+| Canary on the new models | pending: the 17:00 UTC run on 2026-10-06 |
+
 ### Plan 1 — 2026-10-04
 - `main` = `f26ae27`, merged by PR #1 after green CI: backend 522 tests, frontend 18 tests, 1 e2e test, gates (gitleaks over
   the full history, sponsor check, monochrome).
