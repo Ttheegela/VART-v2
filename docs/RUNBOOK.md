@@ -39,8 +39,8 @@ additive migration (the old code ignores the column); roll a risky one back toge
 | 429 on every step after a long provider outage | each step's retries spent the workspace's stance calls: a long outage exhausts the 150-an-hour stance cap in about 20 to 25 minutes | nothing to fix: steps answer 429 until the hour turns, then the run goes on |
 
 ## Known limits
-- `create_run`, `copy_questionnaire_run` (`app/runs.py`, `app/sample_run.py`), and approve, not-applicable and Check again (Task 5 M1) lock the questionnaire row and then
-  want the workspace row, while a workspace reset locks the workspace and its cascade wants the questionnaire: a
+- `create_run` and `copy_questionnaire_run` (`app/runs.py`, `app/sample_run.py`) lock the questionnaire row, and
+  approve, not-applicable and Check again (Task 5 M1) lock an answer or run row, and then want the workspace row, while a workspace reset locks the workspace and its cascade wants the questionnaire: a
   start and a reset at the same instant can deadlock. Postgres aborts one of them, the visitor sees an error and
   repeats the action. Accepted for a demo (adversary-1 M12, adversary-2 M1).
 - A database error (`SQLAlchemyError`, such as a dropped Neon connection) inside a step's worker marks that answer
