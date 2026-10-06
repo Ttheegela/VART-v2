@@ -145,6 +145,18 @@ describe("GapCheck", () => {
     expect(click).not.toHaveBeenCalled();
   });
 
+  it("e waits after the step loop stopped on a run that is still running (adversary-2 N1)", async () => {
+    const running = { ...fixtures.gap, run: { ...fixtures.gap.run!, status: "running" as const, done: 0 } };
+    mockApi({ "GET /api/gap/core": running, "POST /api/runs/r9/step": new Response("{}", { status: 500 }) });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    render(<GapCheck {...props} />);
+    await screen.findByRole("alert");
+    expect(screen.getByRole("button", { name: "Export xlsx" })).toBeDisabled();
+    expect(screen.getByText("export when the check is done")).toBeInTheDocument();
+    await userEvent.keyboard("e");
+    expect(click).not.toHaveBeenCalled();
+  });
+
   it("a scope switch puts the cursor back on the first row", async () => {
     mockApi({ "GET /api/gap/core": fixtures.gap, "GET /api/gap/protect": { ...fixtures.gap, scope: "protect" } });
     const { rerender } = render(<GapCheck {...props} />);

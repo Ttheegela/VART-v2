@@ -140,7 +140,8 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
     } catch (e) { setError(messageOf(e)); }
     setBusy(false);
   };
-  const exportFile = () => { if (run && !running) download.current?.click(); }; // a running check's sheet is partial
+  const exportable = run?.status === "done"; // a running check's sheet is partial, and a stopped loop leaves it running (409)
+  const exportFile = () => { if (exportable) download.current?.click(); };
   const down = () => setCursor(Math.min(cur + 1, visible.length - 1));
   const up = () => setCursor(Math.max(cur - 1, 0));
 
@@ -181,8 +182,8 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
             </div>
             <div className="flex flex-wrap gap-2">
               <Button k="r" label={run ? "Check again" : "Run gap check"} primary onClick={() => void start()} busy={busy} busyLabel="Starting…" disabled={!data || running} />
-              <Button k="e" label="Export xlsx" onClick={exportFile} disabled={!run || running} />
-              {running && <span className="self-center text-xs text-ink-3">export when the check is done</span>}
+              <Button k="e" label="Export xlsx" onClick={exportFile} disabled={!exportable} />
+              {run && !exportable && <span className="self-center text-xs text-ink-3">export when the check is done</span>}
               {run && <a ref={download} href={api.exportUrl(run.id)} download hidden tabIndex={-1} aria-hidden="true" />}
             </div>
           </div>

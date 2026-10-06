@@ -206,6 +206,9 @@ Replace step 3 with:
 Sync (Plan 6A, Task 7), 5.3: `na` shows no label. A Checked outcome the visitor confirms shows **Confirmed by you**.
 Sync, 5.4: *Questions for you* holds Ask-me outcomes only.
 
+Sync (Plan 6B, Tarun 2026-10-06), 5.4: nothing re-checks an Ask-me outcome; the visitor's answer is stored as a statement and confirms it, and a later upload does not re-run it.
+Sync (Plan 6B, Tarun 2026-10-06), 5.6: in a gap-check run an Ask-me answer is re-checked against the open parts of Checked outcomes in the same CSF function (a questionnaire keeps the same-topic rule), at most 8 re-checks per answer; a fill stays a suggestion until accepted. Accepted fills make an outcome Confirmed by you only when its label would otherwise be Covered (one filled part with the rest Gap stays Partly covered), and accepting one fill never locks the others. Check again (r) re-runs every machine-judged part of each affected outcome; a part the visitor filled stays. Gap-check outcomes are reviewed through Check again, not approved: bulk approve skips them, and approving or editing a gap answer answers 409.
+
 ## 6. Data model
 
 The schema already fits: runs belong to a questionnaire, and `items.csf_id` exists.
@@ -217,6 +220,8 @@ The schema already fits: runs belong to a questionnaire, and `items.csf_id` exis
   constraint (no Covered or Partly result without a citation).
 - Items keep the outcome's `question`. The parts live only in the CSF data file and are covered by the
   questionnaire's digest: a changed part gives the next run a new questionnaire. There is no parts table.
+
+Sync (Plan 6B), section 6: run items gained `parts` (each part's result, stored as it lands so a step resumed after a refusal re-runs only the unpaid parts) and suggestions gained a `part` column; there is still no parts table.
 - The CSF data file is read-only reference data, not stored in the database beyond the items a run creates.
 
 ## 7. View (design direction C, `design.md`)
@@ -235,6 +240,8 @@ The schema already fits: runs belong to a questionnaire, and `items.csf_id` exis
 - Export: the existing xlsx export gains a gap-report sheet: id, function, category, label, explanation, quotes with
   file and line, NIST text, links, related controls, run date, CSF version.
 - Copy: "Possible gap — review it" and a footer line "Not legal advice. CSF 2.0 text © NIST, public domain."
+
+Sync (Plan 6B): the path's first segment is "workspace" (the API has no company name); the filter toggles have no single keys; the coverage line sits in the status line; 800-53 controls link to NIST's SP 800-53 Rev 5 page; the gap sheet also rides in an xlsx questionnaire export (the latest done gap check, with its scope and date).
 
 ## 8. Evals
 
@@ -285,6 +292,8 @@ run are reported.
 the 0.80 above. It is accepted and reported, not gating, until a later plan improves stance: `gap-dev.md` keeps the
 0.80 target in the table and marks it "reported: below target, accepted 2026-10-06". Every other gate gates.
 
+Sync (Plan 6B, Tarun 2026-10-06): the planted improvement plan moved from the gap extension into the dev pack, which is the sample pack, so the live demo shows Not met (stated). The questionnaire keys were re-derived and the dev eval re-recorded; its gates held.
+
 Every gate fails closed when it has nothing to measure. CI replays recorded model outputs; recording uses the capped
 eval key.
 
@@ -329,3 +338,4 @@ first baseline.
 - 2026-10-06: Plan 6A Task 7 sync, no new behaviour. Section 4 (file header, Rev 5.2.0, `source_url`, change log), the
   tiers (31 / 5 / 70), 5.3 (`na`, Confirmed by you), 5.4 and section 8 (gap extension, gate names, cost and seconds).
   Section 8: label accuracy is reported below target (0.7097 against 0.80, accepted by Tarun), not gating.
+- 2026-10-06: Plan 6B sync (sections 5.4, 5.6, 6, 7 and 8): fills within a CSF function, the gap sheet in questionnaire exports, the planted plan in the sample pack.
