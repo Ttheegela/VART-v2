@@ -86,15 +86,17 @@ export interface paths {
   "/api/questionnaires": {
     /**
      * List Questionnaires
-     * @description Every questionnaire in the workspace, newest first (a built-in `csf` one included, Plan 6B).
+     * @description The workspace's uploaded and sample questionnaires, newest first. The built-in `csf` one (Plan 6B) is
+     * left out: it is not the visitor's file and does not count toward the 5-per-workspace cap.
      */
     get: operations["list_questionnaires_api_questionnaires_get"];
     /**
      * Upload Questionnaire
      * @description Multipart xlsx or csv. Answers the detected mapping and a preview; no items exist until the visitor
      * confirms with PUT .../mapping. 422 for a refused file, a file over 1 MB (`MAX_QUESTIONNAIRE_BYTES`), or a
-     * workspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`); 429 per network (`upload`); 503 when
-     * the demo is full. The sheet names are stored at upload, so listing never re-parses the file.
+     * workspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`, built-in `csf` ones not counted);
+     * 429 per network (`upload`); 503 when the demo is full. The sheet names are stored at upload, so listing
+     * never re-parses the file.
      */
     post: operations["upload_questionnaire_api_questionnaires_post"];
   };
@@ -104,6 +106,7 @@ export interface paths {
      * @description `vsq-a` (xlsx) or `mvsp-b` (csv), mapped and itemised at once. 404 for another name. Idempotent:
      * when the workspace already has that sample, it is answered again and nothing is stored. A new one counts
      * under the per-network `upload` limit (429), the storage breaker (503) and `MAX_QUESTIONNAIRES` (422).
+     * No model call.
      */
     post: operations["load_sample_questionnaire_api_questionnaires_sample__name__post"];
   };
@@ -112,8 +115,9 @@ export interface paths {
     get: operations["get_questionnaire_api_questionnaires__questionnaire_id__get"];
     /**
      * Delete Questionnaire
-     * @description Remove a questionnaire and its items, so the 5-per-workspace cap does not force a reset. 409 when a run
-     * used it (reset the workspace to start over).
+     * @description Remove a questionnaire and its items, so the 5-per-workspace cap does not force a reset. 409 when a
+     * run used it (reset the workspace to start over). A built-in `csf` questionnaire is 404 here. The row is
+     * locked before the run check, so a run being created at the same moment either wins (409) or fails.
      */
     delete: operations["delete_questionnaire_api_questionnaires__questionnaire_id__delete"];
   };
@@ -121,7 +125,7 @@ export interface paths {
     /**
      * Confirm Mapping
      * @description Replace the items with the ones this mapping reads. 422 when it finds none or more than 150; 409 once a
-     * run exists for the questionnaire.
+     * run exists for the questionnaire, or for a built-in `csf` one (it has no file to map).
      */
     put: operations["confirm_mapping_api_questionnaires__questionnaire_id__mapping_put"];
   };
@@ -1516,7 +1520,8 @@ export interface operations {
   };
   /**
    * List Questionnaires
-   * @description Every questionnaire in the workspace, newest first (a built-in `csf` one included, Plan 6B).
+   * @description The workspace's uploaded and sample questionnaires, newest first. The built-in `csf` one (Plan 6B) is
+   * left out: it is not the visitor's file and does not count toward the 5-per-workspace cap.
    */
   list_questionnaires_api_questionnaires_get: {
     responses: {
@@ -1562,8 +1567,9 @@ export interface operations {
    * Upload Questionnaire
    * @description Multipart xlsx or csv. Answers the detected mapping and a preview; no items exist until the visitor
    * confirms with PUT .../mapping. 422 for a refused file, a file over 1 MB (`MAX_QUESTIONNAIRE_BYTES`), or a
-   * workspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`); 429 per network (`upload`); 503 when
-   * the demo is full. The sheet names are stored at upload, so listing never re-parses the file.
+   * workspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`, built-in `csf` ones not counted);
+   * 429 per network (`upload`); 503 when the demo is full. The sheet names are stored at upload, so listing
+   * never re-parses the file.
    */
   upload_questionnaire_api_questionnaires_post: {
     requestBody: {
@@ -1621,6 +1627,7 @@ export interface operations {
    * @description `vsq-a` (xlsx) or `mvsp-b` (csv), mapped and itemised at once. 404 for another name. Idempotent:
    * when the workspace already has that sample, it is answered again and nothing is stored. A new one counts
    * under the per-network `upload` limit (429), the storage breaker (503) and `MAX_QUESTIONNAIRES` (422).
+   * No model call.
    */
   load_sample_questionnaire_api_questionnaires_sample__name__post: {
     parameters: {
@@ -1727,8 +1734,9 @@ export interface operations {
   };
   /**
    * Delete Questionnaire
-   * @description Remove a questionnaire and its items, so the 5-per-workspace cap does not force a reset. 409 when a run
-   * used it (reset the workspace to start over).
+   * @description Remove a questionnaire and its items, so the 5-per-workspace cap does not force a reset. 409 when a
+   * run used it (reset the workspace to start over). A built-in `csf` questionnaire is 404 here. The row is
+   * locked before the run check, so a run being created at the same moment either wins (409) or fails.
    */
   delete_questionnaire_api_questionnaires__questionnaire_id__delete: {
     parameters: {
@@ -1782,7 +1790,7 @@ export interface operations {
   /**
    * Confirm Mapping
    * @description Replace the items with the ones this mapping reads. 422 when it finds none or more than 150; 409 once a
-   * run exists for the questionnaire.
+   * run exists for the questionnaire, or for a built-in `csf` one (it has no file to map).
    */
   confirm_mapping_api_questionnaires__questionnaire_id__mapping_put: {
     parameters: {

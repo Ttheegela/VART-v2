@@ -144,7 +144,7 @@ def test_workspace_says_when_it_expires(db: Engine) -> None:
 
 def test_a_stub_is_a_501_with_the_error_shape(db: Engine) -> None:
     client, _ = visitor(db)
-    r = client.get("/api/questionnaires")
+    r = client.get(f"/api/runs/{U}/export")
     assert (r.status_code, r.json()) == (501, {"detail": "Not built yet."})
 
 
@@ -158,14 +158,7 @@ MAPPING = {
     "answer_col": "B",
     "comments_col": None,
 }
-FILE = {"file": ("a.txt", b"hello", "text/plain")}
 CALLS: dict[tuple[str, str], dict[str, object]] = {
-    ("/api/questionnaires", "get"): {},
-    ("/api/questionnaires", "post"): {"files": FILE},
-    ("/api/questionnaires/sample/{name}", "post"): {},
-    ("/api/questionnaires/{questionnaire_id}", "get"): {},
-    ("/api/questionnaires/{questionnaire_id}", "delete"): {},
-    ("/api/questionnaires/{questionnaire_id}/mapping", "put"): {"json": MAPPING},
     ("/api/questionnaires/{questionnaire_id}/runs", "post"): {},
     ("/api/runs/{run_id}", "get"): {},
     ("/api/runs/{run_id}/step", "post"): {},
@@ -246,7 +239,7 @@ def test_a_cross_site_write_is_a_403(db: Engine, headers: dict[str, str]) -> Non
 )
 def test_a_same_origin_write_passes_the_guard(db: Engine, headers: dict[str, str]) -> None:
     client, _ = visitor(db)
-    assert client.post("/api/questionnaires/sample/vsq-a", headers=headers).status_code == 501
+    assert client.post(f"/api/runs/{U}/step", headers=headers).status_code == 501
 
 
 def test_a_cross_site_read_is_not_refused(db: Engine) -> None:
