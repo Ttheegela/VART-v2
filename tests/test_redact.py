@@ -261,7 +261,7 @@ def test_a_key_body_right_after_an_equals_sign_is_redacted(text: str) -> None:
         ("Dana Ortiz.docx", "<PERSON>.docx"),
         (
             "notes_from_Marcus_Lee_2026.md",
-            "notes from <PERSON> 2026.md",
+            "notes_from_<PERSON>_2026.md",
         ),  # preflight P2: digits not in the span
         ("access-control-policy.docx", "access-control-policy.docx"),
         ("Access Control Policy.docx", "Access Control Policy.docx"),
@@ -286,10 +286,37 @@ def test_a_comma_pair_that_is_not_a_name_keeps_the_side_that_is_one() -> None:
     assert redact._spans(text, people) == [(0, 10, "PERSON")]
 
 
-def test_an_all_caps_accented_name_is_redacted() -> None:
-    assert redact_text("Signed by JOSÉ NÚÑEZ on 2026-09-01.") == "Signed by <PERSON> on 2026-09-01."
+def test_an_all_caps_accented_name_is_a_known_gap() -> None:
+    # Known gap (review C1): the small model tags no ALL CAPS accented name, and every rule that catches
+    # "JOSÉ NÚÑEZ" also takes place names and headings, which spec 9 keeps as evidence. Open question 3.
+    assert redact_text("Signed by JOSÉ NÚÑEZ on 2026-09-01.") == "Signed by JOSÉ NÚÑEZ on 2026-09-01."
 
 
-def test_an_all_caps_accented_word_alone_or_with_a_product_word_is_kept() -> None:
-    assert redact_text("The CAFÉ policy is reviewed.") == "The CAFÉ policy is reviewed."
-    assert redact_text("The SÉCURITÉ SYSTEM is reviewed.") == "The SÉCURITÉ SYSTEM is reviewed."
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Primary region: SÃO PAULO (sa-east-1).",
+        "Data center: MÉXICO CITY",
+        "SOCIÉTÉ GÉNÉRALE",
+        "MFA IS ENFORCED FOR ALL USERS IN SÃO PAULO",
+        "## PROTECTION DES DONNÉES PERSONNELLES",
+    ],
+)
+def test_all_caps_accented_places_and_headings_are_kept(text: str) -> None:
+    assert redact_text(text) == text
+
+
+def test_a_secret_in_a_file_name_with_a_name_is_redacted_too() -> None:
+    out = redact_filename("Marcus Lee sk_live_abcdef1234567890XYZ.txt")
+    assert out == "<PERSON> <SECRET>.txt"
+
+
+def test_a_pair_inside_a_comma_list_is_not_merged() -> None:
+    text = "SSO providers: Okta, Duo, Ping"
+    assert redact_text(text) == text
+    assert redact_text("Reviewed by Ortiz, Dana on Monday.") == "Reviewed by <PERSON> on Monday."
+
+
+@pytest.mark.parametrize("name", ["Key Rotation.pdf", "Jamf Pro.pdf", "Data Retention.docx"])
+def test_ordinary_title_case_file_names_are_kept(name: str) -> None:
+    assert redact_filename(name) == name

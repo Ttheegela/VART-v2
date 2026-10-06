@@ -395,3 +395,11 @@ def test_a_statement_file_name_gets_the_upload_guards(s: Session, name: str) -> 
             store.store_statement(
                 s, ws.id, "We review access quarterly.", filename=name, today=date(2026, 10, 6)
             )
+
+
+def test_the_refusal_log_holds_a_redacted_file_name(s: Session, caplog: pytest.LogCaptureFixture) -> None:
+    # Review I1: redact_text leaves "Dana Ortiz.docx"; the log uses redact_filename.
+    ws = f.workspace(s)
+    with caplog.at_level("WARNING", logger="app.ingest.store"), pytest.raises(IngestError):
+        _ingest(s, ws.id, "Dana Ortiz.xlsx", "upload", _xlsx_with_text_in_a_number_cell())
+    assert caplog.records and "Dana" not in caplog.text and "Ortiz" not in caplog.text

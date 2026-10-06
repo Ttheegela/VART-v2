@@ -25,7 +25,7 @@ from app.db.models import Chunk, Document, DocumentLine, Workspace
 from app.ingest.parse import MAX_LINE_CHARS, IngestError, parse
 from app.llm.client import LLMClient
 from app.patterns import INJECTION
-from app.redact import redact_filename, redact_lines, redact_text
+from app.redact import redact_filename, redact_lines
 from app.text import normalize
 
 log = logging.getLogger(__name__)
@@ -152,7 +152,7 @@ def ingest_document(
             where = traceback.extract_tb(cause.__traceback__)[-1]
             log.warning(
                 "ingest of %r refused: %s (cause %s at %s:%d)",
-                redact_text(filename),
+                redact_filename(filename),
                 exc,
                 type(cause).__name__,
                 where.filename,
