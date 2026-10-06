@@ -14,7 +14,7 @@ dependencies = [
     "itsdangerous>=2.2,<3",
     "python-multipart>=0.0.20,<1",
     "langfuse>=4,<5",
-    "openpyxl>=3.1.5,<4",
+    "openpyxl==3.1.5",
     "python-docx>=1.2,<2",
     "pypdfium2>=5.13,<6",
     "presidio-analyzer==2.2.364",

@@ -19,6 +19,7 @@ from docx.enum.style import WD_STYLE_TYPE
 from docx.styles import BabelFish
 from docx.table import Table, _Cell
 from docx.text.paragraph import Paragraph
+from openpyxl.xml.functions import iterparse
 
 from app.contracts import Line, LineKind, ParsedDocument
 from app.text import cell_text, normalize, record_line
@@ -44,6 +45,37 @@ _TO_COME = re.compile(
 )  # "Next review due", "Expires"
 _TEXT_FORMATS = ("csv", "md", "txt")
 _OLE2 = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"  # legacy .doc/.xls, and every password-protected Office file
+# Runs a reader cannot see are never evidence (Plan 3 adversary-3 M4): hidden (w:vanish, unless switched off
+# with val 0/false/off) or under 1 pt (w:sz is in half-points). ponytail: run properties only; text hidden
+# or shrunk by a style or document default, and white or background-coloured text, are known gaps
+# (docs/SECURITY.md).
+_HIDDEN_RUNS = (
+    './/w:r[w:rPr/w:vanish[not(@w:val) or not(@w:val="0" or @w:val="false" or @w:val="off")]'
+    " or w:rPr/w:sz[number(@w:val) < 2] or w:rPr/w:szCs[number(@w:val) < 2]"
+    ' or w:rPr/w:sz[@w:val and string(number(@w:val))="NaN"]]'
+)
+_SHEET_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+
+
+def hidden_rows(ws: Any) -> set[int]:
+    """Row numbers a read-only worksheet marks hidden. openpyxl's read-only reader drops row attributes, so
+    the sheet's XML is streamed once more for them, keeping memory flat (each finished row is cleared from its
+    parent). ponytail: `_get_source` is openpyxl's private reader (pinned 3.1.5 in requirements.txt);
+    hidden columns are not handled (docs/SECURITY.md)."""
+    hidden: set[int] = set()
+    n = 0
+    data = None
+    with ws._get_source() as src:
+        for event, el in iterparse(src, events=("start", "end")):
+            if event == "start" and el.tag == _SHEET_NS + "sheetData":
+                data = el
+            elif event == "end" and el.tag == _SHEET_NS + "row":
+                n = int(float(el.get("r") or n + 1))
+                if el.get("hidden") in ("1", "true") or float(el.get("ht") or 1) == 0:  # ht 0: zero height
+                    hidden.add(n)
+                if data is not None:
+                    data.clear()
+    return hidden
 
 
 class IngestError(ValueError):
@@ -120,6 +152,8 @@ def _docx_lines(data: bytes) -> list[Line]:
     if document.element.xpath("count(.//w:ins | .//w:del | .//w:moveFrom | .//w:moveTo)"):
         # python-docx reads neither the inserted nor the deleted runs: the text left says what nobody wrote
         raise IngestError("This document has tracked changes. Accept or reject them, then upload it again.")
+    for run in document.element.xpath(_HIDDEN_RUNS):
+        run.getparent().remove(run)
     # Styles resolve once: python-docx's Paragraph.style searches every style for every paragraph.
     names: dict[str, str] = {}
     for s in document.styles.element.style_lst:
@@ -205,10 +239,15 @@ def _xlsx_lines(data: bytes, notes: set[str]) -> list[Line]:
         out: list[Line] = []
         budget = [MAX_ROWS, MAX_CELLS]
         for ws_v, ws_f in zip(values.worksheets, formulas.worksheets, strict=True):
+            if ws_v.sheet_state != "visible":
+                continue  # a hidden sheet is not evidence a reader sees (Plan 3 adversary-3 M3)
             # The declared size is only a claim: too small hides rows, huge pads empty rows to 16,384 cells.
             ws_v.reset_dimensions()
             ws_f.reset_dimensions()
-            rows = zip(ws_v.iter_rows(values_only=True), ws_f.iter_rows(values_only=True), strict=False)
+            hidden = hidden_rows(ws_v)
+            pairs = zip(ws_v.iter_rows(values_only=True), ws_f.iter_rows(values_only=True), strict=False)
+            # a hidden row reads as an empty one: it still counts against the row budget, and is never a line
+            rows = ((((), ()) if n in hidden else r) for n, r in enumerate(pairs, 1))
             out += _rows(rows, notes, f"sheet {ws_v.title}", budget)
             if len(out) > MAX_LINES:
                 raise IngestError(f"This file has more than {MAX_LINES:,} lines.")

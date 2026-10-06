@@ -19,5 +19,5 @@ def test_runtime_redaction_stack_is_pinned_to_what_the_eval_measured() -> None:
         return {x.split("==")[0]: x for x in (line.strip() for line in lines) if "==" in x}
 
     runtime, dev = pins("requirements.txt"), pins("requirements-dev.txt")
-    names = ("presidio-analyzer", "spacy", "thinc")
+    names = ("presidio-analyzer", "spacy", "thinc", "openpyxl")
     assert {n: runtime.get(n) for n in names} == {n: dev[n] for n in names}
