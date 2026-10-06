@@ -120,13 +120,15 @@ def _claim(session: Session, run_id: uuid.UUID, now: datetime) -> list[tuple[uui
     return [(r.item_id, r.attempts) for r in rows]
 
 
-def _release(session: Session, run_id: uuid.UUID, item_ids: list[uuid.UUID]) -> None:
+def _release(session: Session, run_id: uuid.UUID, item_ids: list[uuid.UUID], *, refund: bool = True) -> None:
     if item_ids:
+        # the claim counted an attempt, but a released item was never tried: give it back (review C1).
+        # refund=False keeps it for the item that met a provider error, so MAX_ATTEMPTS still binds.
+        attempts = func.greatest(RunItem.attempts - 1, 0) if refund else RunItem.attempts
         session.execute(
             update(RunItem)
             .where(RunItem.run_id == run_id, RunItem.item_id.in_(item_ids), RunItem.state == "claimed")
-            # the claim counted an attempt, but a released item was never tried: give it back (review C1)
-            .values(state="pending", claimed_at=None, attempts=func.greatest(RunItem.attempts - 1, 0))
+            .values(state="pending", claimed_at=None, attempts=attempts)
         )
     session.commit()
 
@@ -317,8 +319,10 @@ def step(
         except LLMError as exc:
             session.rollback()
             if _provider_down(exc):
-                # an outage is not a bad answer: give the items back untried (adversary-3 I3)
-                _release(session, run_id, rest)
+                # an outage is not a bad answer: the items go back, but the one that met it keeps its
+                # attempt, so an item the provider always fails still ends FAILED (adversary-3 N1)
+                _release(session, run_id, rest[:1], refund=False)
+                _release(session, run_id, rest[1:])
                 _add_cost(session, run_id, meter.take())
                 session.commit()
                 if answered:

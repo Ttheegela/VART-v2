@@ -25,7 +25,7 @@ from app.services.llm_budget import spender
 MAX_RECHECKS = 8  # per accepted answer (triage row 18): a questionnaire without sections has one topic, None
 CONFIDENCE = {"verified": 0.9, "partial": 0.6}
 ASKABLE = ("open", "follow_up")
-RECHECK_SECONDS = 120.0  # the whole re-check stays well under the 300 s function limit (adversary-3 I2)
+RECHECK_SECONDS = 90.0  # the whole re-check stays well under the 300 s function limit (adversary-3 I2)
 
 __all__ = ["MAX_RECHECKS", "Conflict", "NotFound"]
 
@@ -53,9 +53,15 @@ def _answer_of(session: Session, run_id: uuid.UUID, item_id: uuid.UUID, *, lock:
     return session.scalars(query.with_for_update() if lock else query).one()
 
 
+def _askable(a: Answer) -> bool:
+    """The question still applies: the item is open and not approved. An edited conflict or unknown answer
+    is still unresolved, so the visitor can still answer it (adversary-3 N3)."""
+    return a.label in OPEN and a.approved_at is None
+
+
 def _still_open(a: Answer) -> bool:
-    """Open for the interview: not edited or approved by the visitor (adversary-3 M3)."""
-    return a.label in OPEN and not a.edited and a.approved_at is None
+    """A fill may replace the answer only if the visitor has not edited or approved it (adversary-3 M3)."""
+    return _askable(a) and not a.edited
 
 
 def _open_pairs(session: Session, run_id: uuid.UUID) -> list[tuple[Item, Answer]]:
@@ -105,7 +111,7 @@ def ensure_questions(session: Session, workspace_id: uuid.UUID, run_id: uuid.UUI
         gone = {
             a.item_id
             for a in session.scalars(select(Answer).where(Answer.run_id == run_id))
-            if not _still_open(a)
+            if not _askable(a)
         }
         moot = [q for q in live if q.item_ids[0] in gone]
         for q in moot:
@@ -133,8 +139,8 @@ def answer_question(
     session.refresh(q, with_for_update=True)
     if q.status not in ASKABLE:
         raise Conflict("This question is already closed.")
-    if not _still_open(answer):
-        raise Conflict("This item was answered, edited or approved since; the question no longer applies.")
+    if not _askable(answer):
+        raise Conflict("This item was answered or approved since; the question no longer applies.")
     if q.status == "open" and follow_up(item.question, text) is not None:
         q.status, q.asked_count, q.answer_text = "follow_up", 1, redact_text(text)
         audit_log.record(session, workspace_id, "question.follow_up", ref=str(q.id))

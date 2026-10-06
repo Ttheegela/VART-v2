@@ -313,18 +313,29 @@ def test_the_recheck_stops_at_its_deadline(s: Session, monkeypatch: pytest.Monke
     assert s.scalar(select(Run.cost_usd).where(Run.id == r.id)) == Decimal("0.01")
 
 
-def test_an_item_the_visitor_approved_or_edited_is_not_overwritten_by_its_question(s: Session) -> None:
-    # Adversary-3 M3 and M4: the question is moot, listed as skipped, and answering it is a 409.
+def test_an_approved_item_is_not_overwritten_and_its_question_is_moot(s: Session) -> None:
+    # Adversary-3 M3 and M4.
     ws, r = _done_run(s, ["Data", "Data"], ["partial", "partial"])
     first, second = qs.ensure_questions(s, ws.id, r.id)
-    s.execute(Answer.__table__.update().where(Answer.item_id == first.item_ids[0]).values(edited=True))
     s.execute(
-        Answer.__table__.update().where(Answer.item_id == second.item_ids[0]).values(approved_at=func.now())
+        Answer.__table__.update().where(Answer.item_id == first.item_ids[0]).values(approved_at=func.now())
     )
     s.commit()
     with pytest.raises(qs.Conflict):
         qs.answer_question(s, ws.id, first.id, TEXT, None, MODELS, TODAY)
-    assert [q.status for q in qs.ensure_questions(s, ws.id, r.id)] == ["skipped", "skipped"]
+    assert sorted(q.status for q in qs.ensure_questions(s, ws.id, r.id)) == ["open", "skipped"]
+
+
+def test_an_edited_conflict_can_still_be_answered_but_a_fill_will_not_replace_the_edit(s: Session) -> None:
+    # Adversary-3 N3: an edited conflict is still a conflict; only a fill must respect the edit.
+    ws, r = _done_run(s, ["Data", "Data"], ["conflict", "partial"])
+    first, second = qs.ensure_questions(s, ws.id, r.id)
+    s.execute(Answer.__table__.update().values(edited=True))
+    s.commit()
+    _, answer, found = qs.answer_question(s, ws.id, first.id, TEXT, _recheck_llm(), MODELS, TODAY)
+    assert answer is not None and answer.label == "user_confirmed" and len(found) == 1
+    with pytest.raises(qs.Conflict):
+        qs.accept_suggestion(s, ws.id, found[0].id)
 
 
 def test_a_failure_after_the_statement_is_written_leaves_nothing_and_a_retry_works(

@@ -1,3 +1,4 @@
+import contextlib
 import json
 import threading
 from collections.abc import Iterator
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 from app import runs
 from app.api.errors import ModelsUnavailable, NotFound
 from app.contracts import BudgetExhausted
-from app.db.models import Answer, LlmUsage, Run, RunItem
+from app.db.models import Answer, Item, LlmUsage, Run, RunItem
 from app.llm.client import LLMError, LLMRequest, LLMResult
 from app.llm.recorder import ReplayMiss
 from app.services import llm_budget
@@ -423,7 +424,11 @@ def test_a_provider_outage_writes_no_failed_answers(s: Session, status: int, cal
         runs.step(s, ws.id, run.id, llm, MODELS)
     assert len(llm.requests) == calls
     assert s.scalars(select(Answer)).all() == []
-    assert sorted(s.execute(select(RunItem.state, RunItem.attempts)).all()) == [("pending", 0)] * 3
+    assert sorted(s.execute(select(RunItem.state, RunItem.attempts)).all()) == [
+        ("pending", 0),
+        ("pending", 0),
+        ("pending", 1),
+    ]  # the item that met it keeps its attempt
 
 
 @pytest.mark.parametrize("status", [400, 403])
@@ -433,6 +438,29 @@ def test_another_client_error_is_a_failed_answer_after_one_call(s: Session, stat
     llm = ByStepLLM({"stance": _api_error(status)})
     runs.step(s, ws.id, run.id, llm, MODELS)
     assert len(llm.requests) == 1 and s.scalars(select(Answer.text)).one() == runs.FAILED_TEXT
+
+
+def test_an_item_the_provider_always_fails_ends_failed_and_the_others_are_answered(s: Session) -> None:
+    # Adversary-3 N1: the refund must not make MAX_ATTEMPTS unreachable.
+    ws, q = _questionnaire(s, n=3)
+    s.execute(text("update items set question = question || ' ZZZ' where position = 1"))
+    s.commit()
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+
+    class Flaky(ByStepLLM):
+        def complete(self, req: LLMRequest) -> LLMResult:
+            if "ZZZ" in req.user:
+                raise _api_error(408)
+            return super().complete(req)
+
+    llm = Flaky({"stance": STANCE, "draft": DRAFT})
+    for _ in range(runs.MAX_ATTEMPTS + 2):
+        with contextlib.suppress(ModelsUnavailable):
+            runs.step(s, ws.id, run.id, llm, MODELS)
+    s.refresh(run)
+    assert run.status == "done"
+    by_pos = dict(s.execute(select(Item.position, Answer.text).join(Answer, Answer.item_id == Item.id)).all())
+    assert by_pos[1] == runs.FAILED_TEXT and by_pos[2] != runs.FAILED_TEXT and by_pos[3] != runs.FAILED_TEXT
 
 
 def test_a_connection_error_is_an_outage(s: Session) -> None:
@@ -545,7 +573,7 @@ def test_a_retryable_error_past_the_deadline_gives_the_item_back_untried(s: Sess
     assert s.scalars(select(Answer)).all() == []
     assert sorted(s.execute(select(RunItem.state, RunItem.attempts)).all()) == [
         ("pending", 0),
-        ("pending", 0),
+        ("pending", 1),
     ]
 
 
