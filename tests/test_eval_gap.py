@@ -375,8 +375,8 @@ def test_main_writes_the_gap_pack_to_its_own_results_files(
 def test_label_accuracy_is_reported_with_its_target_and_cannot_fail_the_run(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Tarun, 2026-10-06: below target, accepted. The target stays 0.80, the verdict says so, every other gate gates."""
-    assert gap.GATES["label_accuracy"] == (">=", 0.80) and gap.REPORTED == {"label_accuracy"}
+    """Tarun, 2026-10-06: below target, accepted. The target stays 0.80; every other gate gates."""
+    assert gap.GATES["label_accuracy"] == (">=", 0.80) and {"label_accuracy"} == gap.REPORTED
     metrics: dict[str, float | None] = {n: 1.0 if op == ">=" else 0.0 for n, (op, _) in gap.GATES.items()}
     metrics["label_accuracy"] = 0.7097
     table = score.gates(metrics, gap.GATES, gap.REPORTED)

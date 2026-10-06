@@ -167,6 +167,21 @@ def test_every_checked_outcome_has_parts_and_no_other_outcome_does() -> None:
     assert all(len(m) <= csf.MAX_PARAPHRASE for m in tiers["paraphrase_words"].values())
 
 
+# A re-cut fails here, next to its tiers.yaml change-log line (Task 8 review M3).
+PART_COUNTS = {
+    "GV.PO-01": 3, "GV.PO-02": 4, "ID.AM-01": 1, "ID.AM-02": 3, "ID.AM-03": 1, "ID.AM-05": 4, "ID.AM-08": 5,
+    "ID.RA-01": 3, "ID.RA-02": 1, "ID.RA-08": 3, "PR.AA-01": 3, "PR.AA-03": 3, "PR.AA-05": 5, "PR.AA-06": 3,
+    "PR.DS-01": 3, "PR.DS-02": 3, "PR.DS-11": 4, "PR.PS-01": 2, "PR.PS-02": 3, "PR.PS-04": 2, "PR.PS-06": 2,
+    "PR.IR-03": 1, "PR.IR-04": 1, "DE.CM-09": 3, "DE.AE-06": 1, "DE.AE-07": 1, "RS.MA-01": 1, "RS.AN-03": 1,
+    "RS.CO-02": 1, "RS.MI-01": 1, "RC.RP-01": 1,
+}  # fmt: skip
+
+
+def test_each_outcomes_part_count_is_pinned() -> None:
+    _, _, built = _committed()
+    assert {o["id"]: len(o["parts"]) for o in built["outcomes"] if o["parts"]} == PART_COUNTS
+
+
 @pytest.mark.parametrize(
     ("edit", "problem"),
     [
@@ -201,6 +216,10 @@ def test_every_checked_outcome_has_parts_and_no_other_outcome_does() -> None:
         (  # I3: a paraphrase word names an instance of a NIST word of its own outcome
             lambda t: t["paraphrase_words"]["RC.RP-01"].update({"failover": "bcp"}),
             "RC.RP-01: paraphrase word 'failover' must map to a word of NIST's text, not 'bcp'",
+        ),
+        (  # review M1: a function word is not a NIST word to map to
+            lambda t: t["paraphrase_words"]["RC.RP-01"].update({"failover": "the"}),
+            "RC.RP-01: paraphrase word 'failover' must map to a word of NIST's text, not 'the'",
         ),
         (
             lambda t: t["paraphrase_words"]["PR.PS-06"].update({"sast": "practices"}),

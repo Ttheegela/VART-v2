@@ -36,9 +36,7 @@ _CODE = re.compile(r"\(([A-Z]{2}(?:\.[A-Z]{2})?)\)")
 _OUTCOME = re.compile(r"([A-Z]{2}\.[A-Z]{2}-\d{2}): (.+)", re.DOTALL)
 NIST_FIELDS = ("id", "function", "category", "outcome", "related_controls", "source_url")
 # Question words a part may use besides NIST's own (CSF spec 4, amended): none names a thing or a requirement.
-_FRAME_WORDS = (
-    "a an the is are do does its their of and or to for in on at by with from once as such example through"
-)
+_FRAME_WORDS = "a an the is are do does its their of and to for in by from as such example through"
 FRAME = frozenset(_FRAME_WORDS.split())
 MAX_PARAPHRASE = 3  # words per outcome (adversary checkpoint 2, I3)
 _WORD = re.compile(r"[a-z]+")
@@ -75,7 +73,7 @@ def _part_problems(i: str, listed: list[Any], mapping: dict[str, Any], outcome: 
     p = [
         f"{i}: paraphrase word {w!r} must map to a word of NIST's text, not {t!r}"
         for w, t in mapping.items()
-        if not (isinstance(t, str) and _stem(t.lower()) in have)
+        if not (isinstance(t, str) and t.lower() not in FRAME and _stem(t.lower()) in have)
     ]
     if len(mapping) > MAX_PARAPHRASE:
         p.append(f"{i}: {len(mapping)} paraphrase words, at most {MAX_PARAPHRASE}")
