@@ -31,6 +31,7 @@ describe("Shell", () => {
     expect(current).toHaveTextContent("run");
     expect(current).toHaveAttribute("aria-keyshortcuts", "2");
     expect(screen.getByText("AC-04 · 4/60")).toBeInTheDocument();
+    expect(screen.getByText("j/k").closest("[aria-hidden]")).toBeNull(); // the status line's keys reach screen readers
   });
 
   it("opens the key sheet on ? and closes it on Esc", async () => {
