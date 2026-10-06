@@ -257,3 +257,12 @@ change-log line; changing or removing a path, a field or a status needs the lead
   `RunOut.precomputed` is true for it. `live=true` (Re-run live) always runs the engine; a function-scope gap check
   always runs live. `GET /api/version` gains `sample_precomputed`. Counted under `run` as before. No prompt or label
   rule changes.
+- 2026-10-07: Plan 4 Task 4 (a 409 on an existing path, Ruling 8; migration `e7d1f3a5b9c2`, additive):
+  `POST /api/questionnaires/{id}/runs` answers 409 ("A run of this questionnaire is still going; wait for it to
+  finish first.") while a live run of that questionnaire is running and a step touched it in the last 10 minutes.
+  A running run idle for 10 minutes is closed as `failed` when a new run of its questionnaire starts or a document
+  delete is asked, so it blocks neither; a step records `runs.stepped_at`. `POST /api/gap/{scope}/run` starts a new
+  run when the latest is `failed`. A copied sample run is never refused (it spends nothing). A step refused by a
+  model budget (429) sets `stepped_at` to the end of its Retry-After, so a run waiting on it is not closed
+  (preflight I5); a step never writes into a run closed since it read it; `reopen_changed` (Check again) sets
+  `stepped_at`. The UI says why a closed run stopped. No prompt or label rule changes.

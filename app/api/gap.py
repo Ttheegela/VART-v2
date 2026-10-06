@@ -176,7 +176,8 @@ def start_gap(scope: GapScope, ws: WorkspaceDep, session: SessionDep, request: R
     # workspaces grow past that.
     session.execute(select(Questionnaire.id).where(Questionnaire.id == q.id).with_for_update())
     run = latest_run(session, q.id)
-    if run is None:  # under the lock above, so a copy is made once too (adversary-1 M6)
+    # under the lock above, so a copy is made once too (adversary-1 M6); a closed run is not resumed (Task 4)
+    if run is None or run.status == "failed":
         models = get_settings().models()
         run = copy_gap_run(session, ws_id, q, models) or create_run(session, ws_id, q.id, models)
     elif run.status == "done":

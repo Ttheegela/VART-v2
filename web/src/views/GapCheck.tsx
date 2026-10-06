@@ -3,7 +3,7 @@ import { Shell, goneOn404, type ViewProps } from "../components/Shell";
 import { Button, ErrorLine, GapChip, Kbd, LabelChip } from "../components/ui";
 import { api, messageOf, type GapLabel, type GapOut, type GapRow, type GapScope, type RunRowsOut } from "../lib/api";
 import { useKeys } from "../lib/keys";
-import { GAP_FOOTER, GAP_LABELS, GAP_REVIEW, SCOPES, SCOPE_KEY } from "../lib/labels";
+import { GAP_FOOTER, GAP_LABELS, GAP_REVIEW, RUN_CLOSED, SCOPES, SCOPE_KEY } from "../lib/labels";
 import { go } from "../lib/route";
 import GapDrawer from "./GapDrawer";
 import { useStepLoop } from "./RunGrid";
@@ -156,7 +156,7 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
     e: exportFile,
   }, !open);
 
-  const said = notice?.scope === current ? notice.text : null;
+  const said = notice?.scope === current ? notice.text : run?.status === "failed" ? RUN_CLOSED : null;
   const checked = data ? checkedOf(data.rows) : "";
   const status = running ? "Checking." : run?.status === "done" ? `Gap check done: ${checked} checked.` : "";
   // no scope hint in the status line: the keys sit on the scope line, and the coverage line keeps the room

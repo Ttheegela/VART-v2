@@ -36,6 +36,7 @@ from app.db.models import (
 from app.ingest.parse import MAX_BYTES, MAX_LINES, IngestError, parse
 from app.ingest.store import _store, ingest_document
 from app.redecide import redecide
+from app.runs import close_abandoned
 from app.services import audit_log
 from app.services.capacity import ensure_capacity
 from app.services.llm_budget import spender
@@ -192,6 +193,11 @@ def delete_document(document_id: uuid.UUID, ws: WorkspaceDep, session: SessionDe
     """409 while a run is going (a step may be citing the document) and when a run used the document (reset
     the workspace to start over)."""
     doc = _own(session, ws, document_id)
+    # a run no step touched for 10 minutes was left: it no longer blocks (Plan 4 Task 4). Closed and committed
+    # before the workspace lock below, so this transaction holds no run row while it waits for the workspace
+    # (a create holds its run rows, then wants the workspace: adversary-1 I1)
+    close_abandoned(session, ws.id)
+    session.commit()
     # a run's insert takes a key-share lock on the workspace row (its foreign key), so this row lock waits for
     # a run being created and keeps a new one from starting between the check and the delete (final review M8)
     if session.scalar(select(Workspace.id).where(Workspace.id == ws.id).with_for_update()) is None:

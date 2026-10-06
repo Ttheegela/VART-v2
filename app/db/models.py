@@ -163,6 +163,8 @@ class Run(Base):
     cost_usd: Mapped[Decimal] = mapped_column(Numeric(10, 4), default=Decimal("0"), server_default="0")
     started_at: Mapped[datetime] = _created_at()
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # Plan 4 Task 4: the last step's time; a running run idle for runs.ABANDONED blocks nothing
+    stepped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     __table_args__ = (CheckConstraint(_in("status", ("running", "done", "failed")), name="ck_runs_status"),)
 
 

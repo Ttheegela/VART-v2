@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GapRow } from "../lib/api";
-import { GAP_FOOTER, GAP_REVIEW } from "../lib/labels";
+import { GAP_FOOTER, GAP_REVIEW, RUN_CLOSED } from "../lib/labels";
 import { fixtures, mockApi } from "../test/mockApi";
 import GapCheck, { coverage } from "./GapCheck";
 
@@ -93,6 +93,12 @@ describe("GapCheck", () => {
     const toggle = screen.getByRole("button", { name: /^no result 1$/ });
     await userEvent.click(toggle);
     expect(screen.getByRole("row", { name: /^PR\.DS-01 / })).toBeInTheDocument();
+  });
+
+  it("a check closed as abandoned says why and how to start again (Plan 4 Task 4)", async () => {
+    mockApi({ "GET /api/gap/core": { ...fixtures.gap, run: { ...fixtures.gap.run!, status: "failed" } } });
+    render(<GapCheck {...props} />);
+    expect(await screen.findByText(RUN_CLOSED)).not.toHaveClass("sr-only");
   });
 
   it("scope keys switch the scope", async () => {

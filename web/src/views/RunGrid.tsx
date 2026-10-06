@@ -3,7 +3,7 @@ import { Shell, goneOn404, type ViewProps } from "../components/Shell";
 import { Button, ErrorLine, Kbd, LabelChip } from "../components/ui";
 import { ApiError, api, messageOf, type Label, type RunRow, type RunRowsOut, type StepOut } from "../lib/api";
 import { useKeys } from "../lib/keys";
-import { FILTER_KEY, LABELS, approvalText, confidenceText } from "../lib/labels";
+import { FILTER_KEY, LABELS, RUN_CLOSED, approvalText, confidenceText } from "../lib/labels";
 import { go } from "../lib/route";
 import EvidenceDrawer from "./EvidenceDrawer";
 
@@ -216,7 +216,7 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
   }, !open);
 
   const current = visible[cur];
-  const status = !data ? "" : running ? "Answering questions." : data.run.status === "done" ? `Run done: ${data.run.done} of ${data.run.total} answered.` : `Run ${data.run.status}.`;
+  const status = !data ? "" : running ? "Answering questions." : data.run.status === "done" ? `Run done: ${data.run.done} of ${data.run.total} answered.` : data.run.status === "failed" ? RUN_CLOSED : `Run ${data.run.status}.`;
   return (
     <Shell
       mode="RUN"
@@ -235,7 +235,7 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
               <p className="text-xs text-ink-3">
                 {data ? `${data.run.done} of ${data.run.total} answered · ${running ? "answering" : data.run.status}${data.run.precomputed ? " · precomputed sample answers" : ""} · $${data.run.cost_usd.toFixed(4)}` : "loading…"}
               </p>
-              <p role="status" className="sr-only">{status}</p>
+              <p role="status" className={status === RUN_CLOSED ? "text-xs text-ink-2" : "sr-only"}>{status}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button k="r" label="Re-run live" onClick={() => void rerun()} busy={busy === "rerun"} busyLabel="Starting…" disabled={!data || running} />

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { RunRowsOut } from "../lib/api";
+import { RUN_CLOSED } from "../lib/labels";
 import { fixtures, mockApi } from "../test/mockApi";
 import RunGrid, { mergeRows, useStepLoop } from "./RunGrid";
 
@@ -18,6 +19,12 @@ describe("RunGrid", () => {
     expect(within(row).getByText("Draft, not approved")).toBeInTheDocument();
     expect(within(screen.getByRole("row", { name: /VSQ-03/ })).getByText("answering…")).toBeInTheDocument();
     expect(screen.getByText("# access control")).toBeInTheDocument();
+  });
+
+  it("a run closed as abandoned says why and how to start again (Plan 4 Task 4)", async () => {
+    mockApi({ "GET /api/runs/r1/answers": { run: { ...fixtures.run, status: "failed" }, rows: fixtures.rows } });
+    render(<RunGrid {...props} />);
+    expect(await screen.findByText(RUN_CLOSED)).not.toHaveClass("sr-only");
   });
 
   it("approve all says how many edited answers it left for a look", async () => {

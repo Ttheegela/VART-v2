@@ -24,6 +24,9 @@ export const FILTER_KEY: Record<Label, string> = {
   verified: "v", partial: "p", conflict: "c", unknown: "u", user_confirmed: "y", na: "x",
 };
 
+/** Plan 4 Task 4: the only way a run ends `failed` is being closed after 10 minutes with no step. */
+export const RUN_CLOSED = "This run was closed after 10 minutes without a step (a closed tab). Press r to run again.";
+
 export const LABELS: readonly Label[] = ["verified", "partial", "conflict", "unknown", "user_confirmed", "na"];
 
 /** Tarun 2026-10-05: an em dash for answers no model scored. */

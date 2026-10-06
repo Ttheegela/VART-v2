@@ -18,16 +18,16 @@ from functools import partial
 from typing import Any
 
 import openai
-from sqlalchemy import Engine, and_, delete, func, literal, or_, select, update
+from sqlalchemy import Engine, and_, delete, exists, func, literal, or_, select, update
 from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.exc import DataError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app import csf
-from app.api.errors import ModelsUnavailable, NotFound
+from app.api.errors import Conflict, ModelsUnavailable, NotFound, retry_after_budget
 from app.classify import PROMPT_VERSION as CLASSIFY_PROMPT
 from app.contracts import BudgetExhausted, ItemInput, ItemResult, Spend, jsonable
-from app.db.models import Answer, Item, Questionnaire, Run, RunItem, SuggestedFill
+from app.db.models import Answer, Item, Questionnaire, Run, RunItem, SuggestedFill, Workspace
 from app.draft import PROMPT_VERSION as DRAFT_PROMPT
 from app.ingest.parse import IngestError
 from app.llm.client import LLMClient, LLMError, LLMRequest, LLMResult
@@ -47,6 +47,8 @@ DEADLINE_S = 240.0  # under Vercel's 300 s function limit, as in PriorPath
 # a step answers by then whatever its jobs do: under Vercel's 300 s, so STALE never meets a live step
 HARD_S = 270.0
 MAX_ATTEMPTS = 3  # claims before an item that keeps crashing its step is answered as failed
+ABANDONED = timedelta(minutes=10)  # a running run no step touched this long was left (a closed tab): Ruling 8
+RUN_IN_PROGRESS = "A run of this questionnaire is still going; wait for it to finish first."
 FAILED_TEXT = "No answer: the model call failed twice. Re-run live to try again."
 STEP_PARTS = 8  # CSF spec 5.7: a gap-check step claims outcomes until their parts add up to 8 (8 x 15 s p90)
 # An Ask-me outcome waits for the visitor (CSF spec 5.4): no retrieval, no call; gap_label shows Not answered.
@@ -81,16 +83,50 @@ def _run(session: Session, workspace_id: uuid.UUID, run_id: uuid.UUID) -> Run:
     return run
 
 
+def close_abandoned(
+    session: Session, workspace_id: uuid.UUID, questionnaire_id: uuid.UUID | None = None
+) -> int:
+    """Close the workspace's running runs that no step touched for ABANDONED as `failed`, so they block
+    neither a new run nor a document delete (Plan 3 Ruling 8; PROGRESS carry-over). One UPDATE: a step that
+    touches a run at the same moment wins, because the row lock re-checks the condition. Does not commit.
+    Lock order: the workspace row FOR KEY SHARE, then the run rows, then the audit rows (which point at the
+    workspace). So a reset (workspace FOR UPDATE, then a cascade to the runs) waits or goes first, and Task
+    5's writers (workspace FOR NO KEY UPDATE, which KEY SHARE does not wait for, and no run row lock) never
+    wait for a run row this holds: no cycle with either."""
+    session.execute(
+        select(Workspace.id).where(Workspace.id == workspace_id).with_for_update(read=True, key_share=True)
+    )
+    stmt = (
+        update(Run)
+        .where(
+            Run.workspace_id == workspace_id,
+            Run.status == "running",
+            func.coalesce(Run.stepped_at, Run.started_at) < func.now() - ABANDONED,
+        )
+        .values(status="failed", finished_at=func.now())
+        .returning(Run.id)
+    )
+    if questionnaire_id is not None:
+        stmt = stmt.where(Run.questionnaire_id == questionnaire_id)
+    closed = list(session.scalars(stmt))
+    for run_id in closed:
+        audit_log.record(session, workspace_id, "run.abandoned", ref=str(run_id))
+    return len(closed)
+
+
 def create_run(
     session: Session, workspace_id: uuid.UUID, questionnaire_id: uuid.UUID, models: Mapping[str, str]
 ) -> Run:
     q = session.scalar(
         select(Questionnaire)
         .where(Questionnaire.id == questionnaire_id, Questionnaire.workspace_id == workspace_id)
-        .with_for_update(read=True)  # a concurrent mapping change or delete waits, then we see the result
+        .with_for_update()  # two creates, a mapping change or a delete take turns (Plan 4 Task 4)
     )
     if q is None:
         raise NotFound()
+    close_abandoned(session, workspace_id, q.id)
+    if session.scalar(select(exists().where(Run.questionnaire_id == q.id, Run.status == "running"))):
+        raise Conflict(RUN_IN_PROGRESS)  # one live run per questionnaire: two would pay twice (Ruling 8)
     item_ids = list(
         session.scalars(select(Item.id).where(Item.questionnaire_id == q.id).order_by(Item.position))
     )
@@ -557,6 +593,15 @@ def step(
     run = _run(session, workspace_id, run_id)
     if run.status != "running":
         return []
+    touched = session.scalar(  # committed by _claim
+        update(Run)
+        .where(Run.id == run_id, Run.status == "running")
+        .values(stepped_at=func.now())
+        .returning(Run.id)
+    )
+    if touched is None:  # closed as abandoned since the read (adversary-1 I2): a failed run is never stepped
+        session.commit()
+        return []
     by_parts = (
         session.scalar(select(Questionnaire.source).where(Questionnaire.id == run.questionnaire_id)) == "csf"
     )
@@ -692,6 +737,12 @@ def step(
             if isinstance(refused, Refused)
             else refusal_scope(session, workspace_id, kind, network)
         )
+        # the step loop waits Retry-After with no step: the run reads as touched until then (preflight I5)
+        wait = timedelta(seconds=retry_after_budget(scope=scope))
+        session.execute(
+            update(Run).where(Run.id == run_id, Run.status == "running").values(stepped_at=func.now() + wait)
+        )
+        session.commit()
         raise Refused(kind, scope) from None
     if crashed is not None:
         raise crashed
@@ -814,7 +865,8 @@ def reopen_changed(
             .values(status="dismissed")
         )
     if reopened:
-        run.status, run.finished_at = "running", None
+        # touched now, so it does not read as abandoned before its next step (adversary-1 M5)
+        run.status, run.finished_at, run.stepped_at = "running", None, datetime.now(UTC)
         audit_log.record(
             session, workspace_id, "run.recheck", ref=str(run_id), detail={"outcomes": len(reopened)}
         )
