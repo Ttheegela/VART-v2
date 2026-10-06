@@ -11,7 +11,7 @@ _Last updated: 2026-10-07 · Branch: `main` (origin: https://github.com/Ttheegel
 | 3 API and UI | done 2026-10-06 on `plan3`; release pending | 26 operations, step runner, column mapper, export, console UI, Playwright flows on recorded model replies |
 | 6A CSF gap check, backend and evals | done; merged with Plan 3 on branch `plan6a`, release pending | gap-dev baseline: label accuracy 0.7097 (22 of 31; reported, below the 0.80 target, accepted 2026-10-06), 9 other gates pass; 6B (view, export, README, E2E) after Plan 3 |
 | 6B CSF gap check, the visitor half | done on plan6b; release pending | Gap check view (tab 6), per-part runner and resume, check again per affected outcome, Ask-me answers filling Govern parts, gap sheet in both exports, the planted plan in the sample pack. Dev 15/15 with label_accuracy 0.9326; gap-dev 9/9 gating with label_accuracy 0.7097 reported; E2E 7/7, 210 model calls per pass; 1771 pytest and 131 vitest before this commit |
-| 4 Hardening and launch | done on `plan4`; release pending | dev 15/15 (label accuracy 0.9326); gap-dev 9/9 gating (label accuracy 0.7097 reported); holdout 7/7 gating (label accuracy 0.8539, conflict recall 0.7143, citations valid 1.0, injections followed 0.0, reported, not tuned); a live 64-item run 231 s in 16 steps ($0.0622) against about 660 s before; E2E 19 model calls per pass (about 210 before) |
+| 4 Hardening and launch | done on `plan4`; release pending | dev 15/15 (label accuracy 0.9326); gap-dev 9/9 gating (label accuracy 0.7097 reported); holdout 7/7 gating (label accuracy 0.8539, conflict recall 0.7143, citations valid 1.0, injections followed 0.0, reported, not tuned); a live 64-item run 231 s in 16 steps ($0.0622), measured locally (TestClient, live models), not on Vercel, against an estimated 660 s before (64 x 10.35 s p50, sequential); E2E 19 model calls per pass (about 210 before) |
 | 5 Google Drive | not started | |
 
 ## Releases
@@ -108,7 +108,7 @@ plan's "Execution notes").
 | 2026-10-07 | Plan 4 Decision 1: speed-up A, a thread pool per step, bound 8; a step still claims 4 items (or outcomes up to 8 parts), so the frozen contract text does not move |
 | 2026-10-07 | Plan 4 Decision 2: every worker has its own session and `llm_budget.spender`; counters are single atomic statements, so the caps hold exactly under concurrency (hard rule 11) |
 | 2026-10-07 | Plan 4 Decision 3: `HARD_S` (270 s) bounds a whole step under Vercel's 300 s; a job still running then goes back with its attempt counted (closes N1) |
-| 2026-10-07 | Plan 4 Decision 4: the retry and provider-failure policy is unchanged; a step that answered nothing is a 503 with `Retry-After: 60` |
+| 2026-10-07 | Plan 4 Decision 4: the retry and provider-failure policy is unchanged except Ruling 5 (when no model call returned in a step, only the first job that met the outage keeps its attempt and the rest are refunded; a pause precedes the single 429 retry); a step that answered nothing is a 503 with `Retry-After: 60` |
 | 2026-10-07 | Plan 4 Decision 5: evals call `answer_item` and `check_parts`, never `step`, so dev and gap-dev results stay byte-identical |
 | 2026-10-07 | Plan 4 Decision 6: the E2E is re-recorded once (eval key) because the copied sample run changes the interview flow's questions; model calls per pass fall from about 210 to 19 |
 | 2026-10-07 | Plan 4 Decision 7: the network-call caps do not change; a run makes the same calls, faster, and the sample path spends nothing |
@@ -117,7 +117,7 @@ plan's "Execution notes").
 | 2026-10-07 | Plan 4 Decision 10: editing a Confirmed answer stores a new dated, redacted statement and points the answer at it (M6) |
 | 2026-10-07 | Plan 4 Decision 11: every write that stores or links a statement takes the workspace row `FOR NO KEY UPDATE` first, so the interview cannot deadlock against a reset |
 | 2026-10-07 | Plan 4 Decision 12: hidden content (hidden or under-1-pt Word text, tiny PDF lines, hidden sheets and rows) is never evidence; the known gaps are in SECURITY.md |
-| 2026-10-07 | Plan 4 Decision 13: the holdout pack is authored in parallel and first run after the tag `engine-freeze-plan4`; no engine file changes after it |
+| 2026-10-07 | Plan 4 Decision 13: the holdout pack is authored in parallel and first run after the tag `engine-freeze-plan4`; one engine change landed after the tag: cf9d696 (adversary-2 M6), which makes the PDF inexact-page path fail closed and is likely unreachable; the dev, gap-dev and holdout replays are byte-identical after it, so nothing was re-recorded |
 | 2026-10-07 | Plan 4 Decision 14: preview deployments with a Neon branch are deferred (Tarun chose 2B); on-demand CLI previews cover the size check |
 | 2026-10-07 | Plan 4 Decision 15: a custom gitleaks rule for bare OpenRouter keys; PDF stream inflation, IPv6 /64 rotation, a connection per `/api/health` hit and Vercel deploys not waiting for CI are accepted demo risks in SECURITY.md |
 | 2026-10-07 | Plan 4 Decision 16: Safari/WebKit replaces Firefox: a WebKit Playwright project for the smoke test and the sample flow, plus Tarun's manual Safari check; Firefox untested |
@@ -134,7 +134,7 @@ plan's "Execution notes").
 - Answering an interview question can deadlock against a workspace reset: Task 5.
 - Workspace N2 (Enter on a select): replaced by WebKit tests and Tarun's Safari check (Decision 16); Firefox untested.
 - The sample run is not precomputed: Task 3 (a snapshot replayed from the eval recordings).
-- A step answers its claimed items concurrently: Task 2 (a live 64-item run took 231 s in 16 steps against about 660 s).
+- A step answers its claimed items concurrently: Task 2 (a live 64-item run took 231 s in 16 steps, measured locally with live models, not on Vercel; the estimated 660 s before is 64 x 10.35 s p50, sequential).
 - SECURITY.md with the four known redaction gaps: Task 8.
 - A run stuck in `running` blocks document deletes: Task 4.
 

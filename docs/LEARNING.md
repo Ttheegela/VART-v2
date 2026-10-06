@@ -30,7 +30,7 @@ question and combining the answers in code makes each label explainable, and sho
 misses (the first gap-check baseline lists every miss with its cause).
 
 **Keep a step's concurrency within the budget's atomic counters.** Answering items at the same time made a run
-about 3 times faster: 231 s in 16 steps ($0.06) against about 11 minutes, and it is safe because each budget spend is one atomic statement and no transaction is open
+about 3 times faster against an estimate: 231 s in 16 steps ($0.06), measured locally (TestClient, live models), not on Vercel, against an estimated 11 minutes (64 items x 10.35 s p50, sequential), and it is safe because each budget spend is one atomic statement and no transaction is open
 while a model runs.
 
 **Replay the sample run from the recordings the evals score.** The instant demo shows exactly what the evals measured,

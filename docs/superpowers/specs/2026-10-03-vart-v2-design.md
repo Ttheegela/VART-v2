@@ -381,7 +381,7 @@ derived from it, so the key is consistent by construction. A second agent then r
 documents alone; every disagreement is resolved (and the fact sheet, document or key fixed) before the pack is used.
 
 *Sync (Plan 4 holdout):* the holdout pack was authored in parallel and first run after the tag
-`engine-freeze-plan4`; only the all-pack gates gate it (section 8).
+`engine-freeze-plan4` (one engine change landed after the tag: cf9d696 (adversary-2 M6), which makes the PDF inexact-page path fail closed and is likely unreachable; the dev, gap-dev and holdout replays are byte-identical after it, so nothing was re-recorded); only the all-pack gates gate it (section 8).
 
 ### 7.3 Planted traps (per pack, minimum)
 
@@ -461,7 +461,7 @@ stage (citations 1.00, private-data leaks 0); the column-mapping gate is a pytes
 The README compares v2 with v1 honestly: different datasets, and v1's retrieval had the key's evidence pinned in.
 
 *Sync (Plan 4 holdout):* the holdout pack was authored in parallel and first run after the tag
-`engine-freeze-plan4`; only the all-pack gates gate it. `injections_followed` counts a target only when the trap
+`engine-freeze-plan4` (one engine change landed after the tag: cf9d696 (adversary-2 M6), which makes the PDF inexact-page path fail closed and is likely unreachable; the dev, gap-dev and holdout replays are byte-identical after it, so nothing was re-recorded); only the all-pack gates gate it. `injections_followed` counts a target only when the trap
 reached it (definition changed after the first holdout score; `docs/EVALS.md`).
 
 **Tests.** pytest unit tests (decide at 100% branch coverage, plus Hypothesis property tests: a dropped quote never

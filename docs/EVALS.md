@@ -70,7 +70,8 @@ The dev pack passes 15 of 15 gates. The holdout passes its 7 gating gates and re
 (classification, label accuracy, conflict recall, date rule, honest negatives) and 3 that met it (retrieval, fills,
 judge faithfulness). The misses are listed in
 `evals/results/holdout.md` ("Label misses"); the answer keys' own disagreements and how each was decided are in
-`data/holdout/key/RESOLUTIONS.md`.
+`data/holdout/key/RESOLUTIONS.md`. MVSP-2.4's key is Yes by derivation where a correct engine might say Partial
+(RESOLUTIONS.md); it did not cost a miss in this run.
 
 Reported, not gated:
 
@@ -110,7 +111,7 @@ seconds_per_core_run 790.42.
 
 ## The holdout, and a definition that changed
 The holdout company was authored in parallel and first run after the tag `engine-freeze-plan4`; its metrics are
-reported, not tuned. One definition changed after its first score, and it is disclosed here:
+reported, not tuned. Exactly one engine change landed after the tag: cf9d696 (adversary-2 M6), which makes the PDF inexact-page path fail closed and is likely unreachable; the dev, gap-dev and holdout replays are byte-identical after it, so nothing was re-recorded. One definition changed after its first score, and it is disclosed here:
 
 - **First score.** `injections_followed` read 1.0 on the holdout (1 of 2 planted traps), so the gate failed.
 - **Why it was wrong.** The old scorer counted any target item whose label differed from its key as an injection
@@ -134,7 +135,7 @@ reported, not tuned. One definition changed after its first score, and it is dis
 `python -m evals.bench` makes live calls on the dev pack and writes `bench-stance.md` and `bench-draft.md` (not
 reproduced in CI). For each step the pick is the cheapest pool model (cheap Chinese or open-weight OpenRouter models
 with structured outputs) that passes every gate and scores within 0.02 of Claude Sonnet 5.5, the quality reference;
-Tarun approved the picks on 2026-10-05; stance's pick is 0.0225 below Sonnet 5.5's accuracy, outside the 0.02 rule,
+the draft pick is not the cheapest passing model (`openai/gpt-oss-120b` is cheaper) but has the highest judge faithfulness; Tarun approved the picks on 2026-10-05; stance's pick is 0.0225 below Sonnet 5.5's accuracy, outside the 0.02 rule,
 and Tarun approved it. Stance: `deepseek/deepseek-v4-pro`. Draft: `z-ai/glm-5.3-flash`. Classify
 stays `deepseek/deepseek-v4-flash` (not benched: the cheapest model that keeps classification at 22 of 22).
 
@@ -167,8 +168,9 @@ are left out of the tables above (the full rows are in the bench files).
 ## Cost and speed
 - Per 60 items, replayed from the recordings: $0.0335 on the dev pack and $0.0594 on the holdout; p50 11.12 s and
   12.1 s per item.
-- A live 64-item run after Plan 4's concurrent steps took 231 s in 16 steps and cost $0.0622, against about 660 s
-  (about 11 minutes) before: about 3 times faster.
+- A live 64-item run after Plan 4's concurrent steps took 231 s in 16 steps and cost $0.0622, measured locally
+  (FastAPI TestClient, live models), not on Vercel. The about 11 minutes (660 s) before is an estimate, 64 items x the
+  10.35 s p50 run sequentially, not a measured run: about 3 times faster against that estimate.
 - The end-to-end test makes 19 recorded model calls per pass, down from about 210.
 - The sample run ("Try with a sample company") is copied from a precomputed snapshot and spends nothing.
 

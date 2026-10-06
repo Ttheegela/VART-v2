@@ -39,7 +39,7 @@ Opening the precomputed sample run starts a ten-step tour in the browser: what V
 questionnaire, the run grid, the evidence drawer, Questions for you, export, the audit log, the gap check and a note
 that this is not legal advice. It starts every time the sample run opens (there is no "seen" flag), never starts on a
 run the engine made for the visitor's own files (a sample copy the visitor has answered questions in keeps it, because
-it still carries the sample snapshot's mark), closes when another run opens or a live gap check runs, and `t`, the Tour button or `?` starts it
+it still carries the sample snapshot's mark), closes when another run opens or a live gap check runs, and `t` or the Tour button (listed under `?`) starts it
 again. It is browser code over the sample run's stored answers, so it makes no request of its own and spends nothing.
 
 ## One fill run
@@ -72,7 +72,8 @@ again. It is browser code over the sample run's stored answers, so it makes no r
    a pool of at most 8 workers. Each worker has its own database session and budget counter. A worker spends the
    budget before every model call and never holds a transaction open while a model runs. The budget counters are
    single atomic statements, so concurrent workers cannot spend past a cap. The speed-up is about 3 times: a live 64-item run
-   took 231 s in 16 steps ($0.06) against about 11 minutes.
+   took 231 s in 16 steps ($0.06), measured locally (TestClient, live models), not on Vercel, against an estimated 11 minutes
+   (64 items x 10.35 s p50, sequential).
 4. **Time limits.** `DEADLINE_S` (240 s) decides whether a job or a retry may start; `HARD_S` (270 s) bounds the whole
    step. A job still running at `HARD_S` is abandoned and its item goes back with its attempt counted, so a step always
    answers before Vercel's 300 s limit. An item that fails `MAX_ATTEMPTS` times is answered as failed.

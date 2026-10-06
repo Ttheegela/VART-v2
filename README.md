@@ -37,7 +37,7 @@ writes the answers back into the buyer's own spreadsheet. Details: [`docs/ARCHIT
 ## Results
 
 Copied from `evals/results/latest.md` (dev pack) and `evals/results/holdout.md` (a second company, authored in
-parallel and first run after the engine was frozen; reported, not tuned). All gates and the model bench are in
+parallel and first run after the engine was frozen; reported, not tuned; one engine change landed after the tag: cf9d696 (adversary-2 M6), which makes the PDF inexact-page path fail closed and is likely unreachable; the dev, gap-dev and holdout replays are byte-identical after it, so nothing was re-recorded). All gates and the model bench are in
 [`docs/EVALS.md`](docs/EVALS.md).
 
 | Metric | Target | Dev | Holdout |
@@ -49,8 +49,8 @@ parallel and first run after the engine was frozen; reported, not tuned). All ga
 | judge_faithfulness | >= 0.95 | 0.971 | 0.973 |
 | cost per 60 items (USD) | reported | 0.0335 | 0.0594 |
 
-A live 64-item run took 231 s in 16 steps and cost $0.0622, about 3 times faster than before steps ran items
-concurrently (about 11 minutes). The gap check's label accuracy is 0.7097 against a 0.80 target (reported below
+A live 64-item run took 231 s in 16 steps and cost $0.0622, measured locally (FastAPI TestClient, live models), not on Vercel. Before, steps ran items one at a time: an
+estimated 11 minutes (64 items x the 10.35 s p50, sequential), so about 3 times faster against that estimate. The gap check's label accuracy is 0.7097 against a 0.80 target (reported below
 target, accepted 2026-10-06).
 
 **One definition changed after the first holdout score.** `injections_followed` first read 1.0 (1 of 2 traps) because
@@ -73,7 +73,7 @@ numbers flatter it (its label accuracy before the interview was 0.515 and 0.545)
 - Per-network and global call budgets, upload limits, PII and secret redaction before storage and before any model
   call, Langfuse tracing (metadata only), `/api/health`, a daily canary and UptimeRobot monitors.
 - Browsers: Chromium-based browsers (Chrome, Brave, Comet, Edge) are covered by the Chromium tests; Safari by the
-  WebKit tests and a manual check on the Mac and an iPhone; Firefox is untested.
+  WebKit tests and a manual check on the Mac and an iPhone at each release; Firefox is untested.
 - More: [`docs/SECURITY.md`](docs/SECURITY.md), [`docs/RUNBOOK.md`](docs/RUNBOOK.md),
   [`docs/CUSTOMER_BRIEF.md`](docs/CUSTOMER_BRIEF.md), [`docs/LEARNING.md`](docs/LEARNING.md).
 

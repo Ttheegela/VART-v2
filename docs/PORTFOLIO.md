@@ -8,7 +8,7 @@ Solo rebuild (2026) of a 4-person hackathon project (Money Talks AI x Finance Ha
   what the documents do not cover. Exports back into the buyer's own spreadsheet. Also checks documents against
   NIST CSF 2.0.
 - Labels are decided by code, not by the model; quotes are re-read from the source before they show.
-- Evals in CI on a dev company and a holdout company built after the engine was frozen: label accuracy 0.9326 dev
+- Evals in CI on a dev company and a holdout company authored in parallel and first run after the engine was frozen: label accuracy 0.9326 dev
   and 0.8539 holdout, conflict recall 1.0 dev and 0.7143 holdout, citations valid 1.0 and 1.0, injections followed
   0.0 and 0.0 (the holdout is reported, not tuned; one metric's definition changed after its first score and is
   disclosed in `docs/EVALS.md`).
