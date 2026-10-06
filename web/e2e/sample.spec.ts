@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { RUN_WAIT, sampleRun, xlsxCells } from "./helpers.ts";
 
-// One sample run feeds all four tests: each run spends ~120 model calls, and the network cap is 400 an hour
-// (Ruling 20). Serial, in this order: the export approves the verified answers, and the interview changes an item.
+// One sample run feeds all four tests. It is copied from data/dev/sample-run.json (Plan 4 Task 3): no model call.
+// Serial, in this order: the export approves the verified answers, and the interview changes an item.
 test.describe.configure({ mode: "serial" });
 
 let page: Page;
@@ -38,6 +38,7 @@ test("the guided tour opens on the sample run, can be skipped, and opens again o
 });
 
 test("the sample flow fills the questionnaire and opens the evidence", async () => {
+  await expect(page.getByText(/precomputed sample answers/)).toBeVisible();
   const rows = page.getByRole("row", { name: /^VSQ-\d\d / });
   await expect(rows).toHaveCount(64);
   await page.keyboard.press("v"); // the verified filter (the command line also has "Approve all verified")

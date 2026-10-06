@@ -156,7 +156,7 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
         working-directory: web
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
         working-directory: web
       # retries are 0 in playwright.config.ts on purpose: a retry re-runs the shared sample run and can pass the 400/h per-network cap
       - run: npm run e2e

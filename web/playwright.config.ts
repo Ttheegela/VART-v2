@@ -9,7 +9,12 @@ export default defineConfig({
   // No retries even in CI: a retry re-runs the shared sample run, and its model calls can pass the 400/h per-network cap.
   retries: 0,
   use: { baseURL: remote ?? "http://127.0.0.1:8000", trace: "retain-on-failure" },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // Chromium covers Chrome, Brave, Comet and Edge; WebKit is Safari's engine, for the smoke test and the sample flow
+  // only (Plan 4 Decision 16). Firefox is untested.
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "webkit", use: { ...devices["Desktop Safari"] }, testMatch: /(smoke|sample)\.spec\.ts$/ },
+  ],
   // One server: FastAPI serves the built UI (public/) and the API. Build first so it mounts.
   webServer: remote
     ? undefined

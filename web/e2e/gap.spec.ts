@@ -1,9 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { RUN_WAIT, xlsxCells } from "./helpers.ts";
 
-// One core gap check (at most 73 stance calls, no draft call) in its own workspace, plus at most 7 re-checks of
-// Govern parts after the Ask-me answer. With the other specs (about 150 calls) it stays under the 400-an-hour
-// per-network model-call cap.
+// The core gap check over the untouched sample pack is copied from data/dev/sample-run.json (Plan 4 Task 3): no
+// model call. What still calls a model: at most 7 re-checks of Govern parts after the Ask-me answer.
 test("the gap check runs over the sample documents, takes an Ask-me answer and exports the report", async ({ page }) => {
   await page.goto("/?view=workspace");
   await expect(page.getByRole("button", { name: "Load sample documents" })).toBeEnabled();
