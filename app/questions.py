@@ -6,12 +6,13 @@ from datetime import date
 from time import monotonic
 from typing import cast
 
+from fastapi import HTTPException
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app import csf
-from app.api.errors import Conflict, NotFound
+from app.api.errors import GONE, Conflict, NotFound
 from app.contracts import (
     Citation,
     Decision,
@@ -26,7 +27,16 @@ from app.contracts import (
     Value,
     jsonable,
 )
-from app.db.models import Answer, DocumentLine, InterviewQuestion, Item, Run, RunItem, SuggestedFill
+from app.db.models import (
+    Answer,
+    DocumentLine,
+    InterviewQuestion,
+    Item,
+    Run,
+    RunItem,
+    SuggestedFill,
+    Workspace,
+)
 from app.draft import template_answer
 from app.ingest.store import store_statement
 from app.interview import OPEN, follow_up, plan_queue, recheck
@@ -47,6 +57,18 @@ __all__ = ["MAX_RECHECKS", "Conflict", "NotFound"]
 def statement_filename(position: int) -> str:
     """A server value, never the visitor's item code (triage row 38: the name is printed in every prompt)."""
     return f"answer-{position:03d}.txt"
+
+
+def lock_workspace(session: Session, workspace_id: uuid.UUID) -> None:
+    """Take the workspace row FOR KEY SHARE before any other lock. A reset deletes that row and cascades to
+    everything in the workspace; a write that locked an answer and then inserted a statement (a row pointing
+    at the workspace) waited for the reset while the reset waited for that answer: a deadlock (Plan 3
+    carry-over). Locking the workspace first puts both in one order. A reset that won: the GONE 404."""
+    found = session.scalar(
+        select(Workspace.id).where(Workspace.id == workspace_id).with_for_update(key_share=True)
+    )
+    if found is None:
+        raise HTTPException(404, GONE)
 
 
 def _question(
@@ -197,8 +219,10 @@ def answer_question(
     today: date,
     network: str | None = None,
 ) -> tuple[InterviewQuestion, Answer | None, list[SuggestedFill]]:
-    # Lock order everywhere: the run (Check again only), answer, question, suggestion, run item (preflight
-    # I1), so accept, answer and Check again cannot deadlock.
+    # Lock order everywhere: the workspace (FOR KEY SHARE), the run (Check again only), answer, question,
+    # suggestion, run item (preflight I1; Plan 4 Task 5), so accept, answer, Check again and a reset cannot
+    # deadlock.
+    lock_workspace(session, workspace_id)
     q = _question(session, workspace_id, question_id)
     item = session.get_one(Item, q.item_ids[0])
     answer = _answer_of(session, q.run_id, item.id, lock=True)
@@ -355,6 +379,7 @@ def skip(session: Session, workspace_id: uuid.UUID, question_id: uuid.UUID) -> I
 
 
 def accept_suggestion(session: Session, workspace_id: uuid.UUID, suggestion_id: uuid.UUID) -> Answer:
+    lock_workspace(session, workspace_id)
     sg = session.scalar(
         select(SuggestedFill).where(
             SuggestedFill.id == suggestion_id, SuggestedFill.workspace_id == workspace_id
@@ -362,7 +387,7 @@ def accept_suggestion(session: Session, workspace_id: uuid.UUID, suggestion_id: 
     )
     if sg is None:
         raise NotFound()
-    # lock order as answer_question: answer, question, suggestion, run item
+    # lock order as answer_question: workspace, answer, question, suggestion, run item
     a = _answer_of(session, sg.run_id, sg.item_id, lock=True)
     session.execute(
         update(InterviewQuestion)

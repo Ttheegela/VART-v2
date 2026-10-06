@@ -1,5 +1,6 @@
 import json
 import threading
+import time
 import uuid
 from collections.abc import Callable, Iterator
 from datetime import date, timedelta
@@ -7,12 +8,21 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, func, select
+from sqlalchemy import Engine, delete, func, select, text
 from sqlalchemy.orm import Session
 
 from app import questions as qs
 from app.api.deps import get_llm
-from app.db.models import Answer, Document, InterviewQuestion, Item, Run, SuggestedFill, Workspace
+from app.db.models import (
+    Answer,
+    Document,
+    DocumentLine,
+    InterviewQuestion,
+    Item,
+    Run,
+    SuggestedFill,
+    Workspace,
+)
 from app.llm.client import LLMRequest, LLMResult
 from app.main import app
 from app.services import ip_limits, llm_budget
@@ -519,3 +529,107 @@ def test_an_item_redecide_opens_after_the_queue_exists_gets_a_question(db: Engin
         assert done["answer"]["label"] == "user_confirmed"
     finally:
         app.dependency_overrides.clear()
+
+
+def _lock_waiters(db: Engine) -> int:
+    with db.connect() as conn:
+        return int(
+            conn.execute(
+                text(
+                    "select count(*) from pg_stat_activity "
+                    "where wait_event_type = 'Lock' and datname = current_database()"
+                )
+            ).scalar_one()
+        )
+
+
+def test_an_answer_and_a_workspace_reset_at_once_never_deadlock(
+    db: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Plan 3 carry-over: the answer locked its row, then its statement insert waited for the workspace row the
+    # reset held, while the reset's cascade waited for that answer.
+    with Session(db) as s:
+        ws, r = _done_run(s, ["Data Security"])
+        (q,) = qs.ensure_questions(s, ws.id, r.id)
+        ws_id, q_id = ws.id, q.id
+    inside, go_on = threading.Event(), threading.Event()
+    real = qs.store_statement
+
+    def slow(*a, **k):  # type: ignore[no-untyped-def]
+        inside.set()
+        go_on.wait(10)
+        return real(*a, **k)
+
+    monkeypatch.setattr(qs, "store_statement", slow)
+    errors: list[BaseException] = []
+
+    def answer() -> None:
+        with Session(db) as t:
+            try:
+                qs.answer_question(t, ws_id, q_id, TEXT, None, MODELS, TODAY)
+            except BaseException as exc:
+                errors.append(exc)
+
+    def reset() -> None:
+        with Session(db) as t:
+            try:
+                t.execute(delete(Workspace).where(Workspace.id == ws_id))
+                t.commit()
+            except BaseException as exc:
+                errors.append(exc)
+
+    a = threading.Thread(target=answer)
+    a.start()
+    assert inside.wait(10)
+    b = threading.Thread(target=reset)
+    b.start()
+    for _ in range(100):  # until the reset waits on a lock
+        if _lock_waiters(db):
+            break
+        time.sleep(0.05)
+    go_on.set()
+    a.join(20)
+    b.join(20)
+    assert not [e for e in errors if "deadlock" in str(e).lower()], errors
+    with Session(db) as s:
+        assert s.get(Workspace, ws_id) is None  # the reset still happened
+
+
+def test_editing_a_confirmed_answer_stores_the_edit_as_a_new_statement(db: Engine) -> None:
+    client, ws_id = visitor(db)
+    with Session(db) as s:
+        r = _fill(s, s.get_one(Workspace, ws_id), ["Data Security"])
+        (q,) = qs.ensure_questions(s, ws_id, r.id)
+        _, a, _ = qs.answer_question(s, ws_id, q.id, TEXT, None, MODELS, TODAY)
+        assert a is not None
+        a_id, old = a.id, a.statement_id
+    res = client.patch(
+        f"/api/answers/{a_id}",
+        json={"text": "Backups are encrypted; ask jane.doe@northwind.example about key rotation."},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert (body["label"], body["edited"], body["approved"]) == ("user_confirmed", True, False)
+    assert body["statement_id"] != str(old)
+    assert "jane.doe@northwind.example" not in body["text"]  # redacted like every statement
+    with Session(db) as s:
+        new = s.get_one(Document, uuid.UUID(body["statement_id"]))
+        lines = s.scalars(select(DocumentLine.text).where(DocumentLine.document_id == new.id)).all()
+        assert new.source == "statement" and body["text"] == " ".join(lines)
+        assert s.get(Document, old) is not None  # the first answer stays: a fill may cite it
+
+
+def test_editing_a_confirmed_answer_counts_under_the_interview_cap(
+    db: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, ws_id = visitor(db)
+    with Session(db) as s:
+        r = _fill(s, s.get_one(Workspace, ws_id), ["Data Security", "Data Security"], ["unknown", "verified"])
+        (q,) = qs.ensure_questions(s, ws_id, r.id)
+        _, a, _ = qs.answer_question(s, ws_id, q.id, TEXT, None, MODELS, TODAY)
+        assert a is not None
+        confirmed = a.id
+        verified = s.scalars(select(Answer.id).where(Answer.run_id == r.id, Answer.label == "verified")).one()
+    monkeypatch.setitem(ip_limits.LIMITS, "interview", (0, ip_limits.LIMITS["interview"][1]))
+    assert client.patch(f"/api/answers/{confirmed}", json={"text": "Quarterly."}).status_code == 429
+    assert client.patch(f"/api/answers/{verified}", json={"text": "Yes, daily."}).status_code == 200

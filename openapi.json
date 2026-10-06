@@ -2241,7 +2241,7 @@
         ]
       },
       "patch": {
-        "description": "Edit the text; the answer becomes unapproved and `edited`. 409 for a gap check's outcome.",
+        "description": "Edit the text; the answer becomes unapproved and `edited`. On a Confirmed-by-you answer the edit is the\nvisitor's new answer: it is stored as a new dated, redacted statement and the answer points to it\n(Plan 3 M6), counted under the network's `interview` cap (each pays for redaction, adversary-1 N2).\n409 for a gap check's outcome; 422 when the redacted answer is empty or too long.",
         "operationId": "edit_answer_api_answers__answer_id__patch",
         "parameters": [
           {
@@ -2310,11 +2310,18 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused input: a sentence, or FastAPI's validation list"
           },
           "429": {
             "content": {

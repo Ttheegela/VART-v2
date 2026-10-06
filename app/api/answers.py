@@ -3,15 +3,16 @@
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from sqlalchemy import select
 
 from app import csf
 from app.api.deps import SessionDep, WorkspaceDep
-from app.api.errors import Conflict, NotFound
+from app.api.errors import Conflict, NotFound, limit
 from app.api.runs import summary
 from app.api.schemas import (
     ERRORS,
+    SENTENCE_422,
     AnswerDetail,
     AnswerEdit,
     AnswerSummary,
@@ -26,6 +27,8 @@ from app.api.schemas import (
     PartOut,
 )
 from app.db.models import Answer, Chunk, Document, DocumentLine, Item, RunItem
+from app.ingest.store import store_statement
+from app.questions import lock_workspace, statement_filename
 from app.redact import redact_text
 from app.runs import FAILED_TEXT
 from app.services import audit_log
@@ -174,15 +177,38 @@ def get_answer(answer_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -> A
     return detail(session, _own(session, ws, answer_id))
 
 
-@router.patch("/api/answers/{answer_id}")
+@router.patch("/api/answers/{answer_id}", responses=SENTENCE_422)
 def edit_answer(
-    answer_id: uuid.UUID, edit: AnswerEdit, ws: WorkspaceDep, session: SessionDep
+    answer_id: uuid.UUID, edit: AnswerEdit, ws: WorkspaceDep, session: SessionDep, request: Request
 ) -> AnswerSummary:
-    """Edit the text; the answer becomes unapproved and `edited`. 409 for a gap check's outcome."""
+    """Edit the text; the answer becomes unapproved and `edited`. On a Confirmed-by-you answer the edit is the
+    visitor's new answer: it is stored as a new dated, redacted statement and the answer points to it
+    (Plan 3 M6), counted under the network's `interview` cap (each pays for redaction, adversary-1 N2).
+    409 for a gap check's outcome; 422 when the redacted answer is empty or too long."""
+    ws_id = ws.id
+    label = session.scalar(select(Answer.label).where(Answer.id == answer_id, Answer.workspace_id == ws_id))
+    if label == "user_confirmed":
+        limit(request, session, "interview")  # commits: before any lock
+    lock_workspace(session, ws_id)  # first, as every write that stores a statement (Plan 4 Task 5)
     a = _own(session, ws, answer_id, lock=True)
     _not_gap(session, a)
-    a.text, a.edited, a.approved_at = edit.text, True, None
-    audit_log.record(session, ws.id, "answer.edit", ref=str(a.id))
+    text = edit.text
+    if a.label == "user_confirmed":
+        position = session.scalar(select(Item.position).where(Item.id == a.item_id)) or 0
+        said = store_statement(
+            session,
+            ws_id,
+            text,
+            filename=statement_filename(position),
+            today=datetime.now(UTC).date(),
+            commit=False,
+        )
+        lines = session.scalars(
+            select(DocumentLine.text).where(DocumentLine.document_id == said.id).order_by(DocumentLine.n)
+        )
+        a.statement_id, text = said.id, " ".join(lines)
+    a.text, a.edited, a.approved_at = text, True, None
+    audit_log.record(session, ws_id, "answer.edit", ref=str(a.id))
     session.commit()
     return summary(a)
 
