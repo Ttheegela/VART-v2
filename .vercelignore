@@ -1,4 +1,4 @@
-# Keep the deployed function small: the runtime needs only app/. Plan 4 un-ignores data/ for the sample pack.
+# Keep the deployed function small: the runtime needs app/ and the sample data (data/dev/docs, data/questionnaires).
 .venv
 .env*
 docs
@@ -6,7 +6,15 @@ tests
 evals
 scripts
 datakit
-data
+# The sample path (Plan 3) reads the dev documents and the two bundled questionnaires at runtime.
+# (Plan 6A also negates data/csf: the second merger writes the union of both lanes' negations.)
+/data/*
+!/data/dev
+/data/dev/*
+!/data/dev/docs
+!/data/questionnaires
+!/data/NOTICE.md
+!/data/LICENSE
 .github
 .mypy_cache
 .ruff_cache

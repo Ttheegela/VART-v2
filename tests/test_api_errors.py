@@ -144,7 +144,7 @@ def test_workspace_says_when_it_expires(db: Engine) -> None:
 
 def test_a_stub_is_a_501_with_the_error_shape(db: Engine) -> None:
     client, _ = visitor(db)
-    r = client.get("/api/documents")
+    r = client.get("/api/questionnaires")
     assert (r.status_code, r.json()) == (501, {"detail": "Not built yet."})
 
 
@@ -160,12 +160,6 @@ MAPPING = {
 }
 FILE = {"file": ("a.txt", b"hello", "text/plain")}
 CALLS: dict[tuple[str, str], dict[str, object]] = {
-    ("/api/documents", "get"): {},
-    ("/api/documents", "post"): {"files": FILE},
-    ("/api/documents/sample", "post"): {},
-    ("/api/documents/{document_id}", "patch"): {"json": {}},
-    ("/api/documents/{document_id}", "delete"): {},
-    ("/api/documents/{document_id}/lines", "get"): {},
     ("/api/questionnaires", "get"): {},
     ("/api/questionnaires", "post"): {"files": FILE},
     ("/api/questionnaires/sample/{name}", "post"): {},
@@ -199,7 +193,9 @@ def _url(path: str) -> str:
 
 
 def test_the_stub_table_covers_the_contract() -> None:
-    assert set(CALLS) == CONTRACT
+    assert (
+        set(CALLS) <= CONTRACT
+    )  # a lane drops its rows as it implements them (Ruling 7: lead restores equality)
 
 
 @pytest.mark.parametrize(("path", "method"), sorted(CALLS))
@@ -250,7 +246,7 @@ def test_a_cross_site_write_is_a_403(db: Engine, headers: dict[str, str]) -> Non
 )
 def test_a_same_origin_write_passes_the_guard(db: Engine, headers: dict[str, str]) -> None:
     client, _ = visitor(db)
-    assert client.post("/api/documents/sample", headers=headers).status_code == 501
+    assert client.post("/api/questionnaires/sample/vsq-a", headers=headers).status_code == 501
 
 
 def test_a_cross_site_read_is_not_refused(db: Engine) -> None:
