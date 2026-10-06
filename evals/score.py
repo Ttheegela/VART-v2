@@ -267,9 +267,11 @@ def score(pack: Pack, obs: Observed) -> dict[str, float | None]:
     return m
 
 
-def gates(metrics: dict[str, float | None]) -> dict[str, dict[str, Any]]:
+def gates(
+    metrics: dict[str, float | None], table: dict[str, tuple[str, float]] | None = None
+) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
-    for name, (op, target) in GATES.items():
+    for name, (op, target) in (table or GATES).items():
         value = metrics.get(name)
         ok = value is not None and (value >= target if op == ">=" else value <= target)
         out[name] = {"op": op, "target": target, "value": value, "pass": ok}

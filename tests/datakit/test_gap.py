@@ -91,3 +91,14 @@ def test_the_improvement_plan_is_classified_by_rules_alone() -> None:
     spec = g.documents[0]
     meta, sure = rules("md", lines_of(gap.doc_path("dev", g, spec)))
     assert sure and meta == DocMeta("plan", "final", date(2026, 7, 1), None, True, "rule")
+
+
+def test_a_template_gap_does_not_count_as_an_honest_gap(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 5 review carry: PR.IR-04 is a Gap only because its one source is a template; with ID.AM-03
+    mapped to a covered control, one honest Gap is left, and the spec asks for two."""
+    facts, g = gap.load("dev")
+    outcomes = tuple(
+        o.model_copy(update={"control": "sso"}) if o.csf_id == "ID.AM-03" else o for o in g.outcomes
+    )
+    monkeypatch.setattr(gap, "load", lambda pack: (facts, g.model_copy(update={"outcomes": outcomes})))
+    assert "only 1 honest gap outcome(s) planted, need 2" in gap.check("dev")

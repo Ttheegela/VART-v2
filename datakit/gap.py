@@ -5,6 +5,7 @@ it agrees with the documents by construction: nobody writes an answer to match t
 python -m datakit.gap dev"""
 
 import sys
+from collections import Counter
 from pathlib import Path
 
 from app.csf import Outcome, framework, gap_label
@@ -15,7 +16,8 @@ from datakit.schemas import DocSpec, Facts, GapFacts, Key, Selection, SelectionI
 
 ROOT = Path(__file__).resolve().parent.parent
 NAME = "csf-core"
-MIN_PLANTED = {"documents_disagree": 2, "not_met": 2, "gap": 2}  # CSF spec 8
+# CSF spec 8. An honest gap: no statement at all speaks to its control (a template-only Gap is a trap).
+MIN_PLANTED = {"documents_disagree": 2, "not_met": 2, "honest gap": 2}
 TRAP_SOURCES = ("template", "draft", "planned")
 
 
@@ -133,15 +135,17 @@ def check(pack: str) -> list[str]:
         for k in key.items
         if k.expected_label == "conflict" and k.conflict_trap is None
     ]
-    labels: list[str | None] = [
-        gap_label(framework().get(k.code), k.expected_label, k.expected_value) for k in key.items
-    ]
-    p += [
-        f"only {labels.count(x)} {x} outcome(s) planted, need {n}"
-        for x, n in MIN_PLANTED.items()
-        if labels.count(x) < n
-    ]
     control = {m.csf_id: m.control for m in gap.outcomes}
+    labels = {
+        k.code: gap_label(framework().get(k.code), k.expected_label, k.expected_value) for k in key.items
+    }
+    planted: Counter[str | None] = Counter(labels.values())
+    planted["honest gap"] = sum(x == "gap" and not f.statements_for(control[c]) for c, x in labels.items())
+    p += [
+        f"only {planted[x]} {x} outcome(s) planted, need {n}"
+        for x, n in MIN_PLANTED.items()
+        if planted[x] < n
+    ]
     found = set().union(*(trap_sources(f, control[k.code]) for k in key.items))
     p += [f"no trap outcome where only a {s} source speaks" for s in TRAP_SOURCES if s not in found]
     return p
