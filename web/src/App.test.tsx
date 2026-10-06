@@ -14,6 +14,20 @@ describe("App", () => {
     await waitFor(() => expect(calls[0]).toBe("GET /api/workspace"));
   });
 
+  it("a deep link shows a loading line, not Home, while the workspace loads", async () => {
+    window.history.replaceState(null, "", "?view=audit");
+    let open: (r: Response) => void = () => {};
+    mockApi({
+      "GET /api/workspace": () => new Promise<Response>((resolve) => { open = resolve; }),
+      "GET /api/audit": [],
+    });
+    render(<App />);
+    expect(await screen.findByRole("status")).toHaveTextContent("Opening your workspace…");
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    open(new Response(JSON.stringify(fixtures.workspace), { status: 200 }));
+    await waitFor(() => expect(screen.queryByText("Opening your workspace…")).toBeNull());
+  });
+
   it("opens on Home with both ways in and the system status", async () => {
     window.history.replaceState(null, "", "/");
     mockApi({ "GET /api/workspace": fixtures.workspace, "GET /api/health": fixtures.health });

@@ -200,6 +200,7 @@ export default function WorkspaceView({ workspace, onGone }: ViewProps) {
   const show = (q: QuestionnaireOut) => {
     setQs((all) => [q, ...all.filter((x) => x.id !== q.id)]);
     setCurrent(q);
+    setListError(null); // an earlier refused delete no longer describes the list
   };
   const uploadDocs = async (input: HTMLInputElement) => {
     setDocError(null);
@@ -248,9 +249,10 @@ export default function WorkspaceView({ workspace, onGone }: ViewProps) {
       setListError(messageOf(e)); // 409: a run used it
       return;
     }
-    const rest = qs.filter((x) => x.id !== q.id);
-    setQs(rest);
-    if (current?.id === q.id) setCurrent(rest[0] ?? null);
+    // the list as it is now, not as it was when the delete started (an upload may have landed meanwhile)
+    let rest: QuestionnaireOut[] = [];
+    setQs((all) => (rest = all.filter((x) => x.id !== q.id)));
+    setCurrent((c) => (c?.id === q.id ? rest[0] ?? null : c));
     // the pressed button is gone; focus the list's first remaining control, or the upload input
     requestAnimationFrame(() => (list.current?.querySelector("button") ?? qInput.current)?.focus());
   };
@@ -347,7 +349,7 @@ export default function WorkspaceView({ workspace, onGone }: ViewProps) {
                           <td className="px-2 text-right tabular-nums">{q.item_count}</td>
                           <td className="space-x-3 whitespace-nowrap px-2 text-xs">
                             {/* one button that stays mounted, so focus survives opening its row */}
-                            <button type="button" aria-label={`Open ${q.filename}`} aria-disabled={shown ? "true" : undefined} className={shown ? "text-ink-3" : "underline"} onClick={() => { if (shown) return; setListError(null); setRunError(null); setCurrent(q); }}>{shown ? "shown" : "open"}</button>
+                            <button type="button" aria-label={shown ? `${q.filename} is shown` : `Open ${q.filename}`} aria-disabled={shown ? "true" : undefined} className={shown ? "text-ink-3" : "underline"} onClick={() => { if (shown) return; setListError(null); setRunError(null); setCurrent(q); }}>{shown ? "shown" : "open"}</button>
                             <button type="button" aria-label={`Delete ${q.filename}`} className="underline" onClick={() => void remove(q)}>delete</button>
                           </td>
                         </tr>

@@ -23,6 +23,10 @@ export default function App() {
 
   const onGone = () => setGone(true);
   if (gone) return <ExpiredNotice />;
+  if (route.view !== "home" && !workspace && !error) {
+    // a deep link waits for its workspace here instead of flashing Home
+    return <p role="status" className="m-4 text-xs text-ink-3">Opening your workspace…</p>;
+  }
   if (route.view === "home" || !workspace) {
     return (
       <ErrorBoundary>

@@ -169,11 +169,11 @@ export function Shell({ mode, cursor, hints, runId, expiresAt, children }: Shell
       </header>
       <main className="min-h-0 overflow-auto">{children}</main>
       <footer data-chrome className="flex h-7 items-center gap-3 overflow-hidden bg-chrome px-4 text-xs text-on-chrome-2">
-        <span className="bg-on-chrome px-1 font-bold text-ink">{mode}</span>
-        {cursor && <span>{cursor}</span>}
+        <span className="shrink-0 whitespace-nowrap bg-on-chrome px-1 font-bold text-ink">{mode}</span>
+        {cursor && <span className="min-w-0 truncate">{cursor}</span>}
         {/* not <Kbd>: these hints are not on a control with aria-keyshortcuts, so the key must stay readable */}
         {hints.map(([k, what], i) => (
-          <span key={k} className={i > 1 ? "hidden min-[480px]:inline" : ""}><kbd>{k}</kbd> {what}</span>
+          <span key={k} className={`whitespace-nowrap ${i > 1 ? "hidden min-[480px]:inline" : ""}`}><kbd>{k}</kbd> {what}</span>
         ))}
         <span className="ml-auto hidden min-[900px]:inline">VART · labels decided by code · synthetic demo data · MIT</span>
       </footer>

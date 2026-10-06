@@ -32,6 +32,9 @@ describe("Shell", () => {
     expect(current).toHaveAttribute("aria-keyshortcuts", "2");
     expect(screen.getByText("AC-04 · 4/60")).toBeInTheDocument();
     expect(screen.getByText("j/k").closest("[aria-hidden]")).toBeNull(); // the status line's keys reach screen readers
+    // 320px: the status line never wraps; a long cursor note is cut, hints stay whole
+    expect(screen.getByText("AC-04 · 4/60")).toHaveClass("truncate");
+    expect(screen.getByText("j/k").parentElement).toHaveClass("whitespace-nowrap");
   });
 
   it("opens the key sheet on ? and closes it on Esc", async () => {

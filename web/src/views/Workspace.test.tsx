@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { fixtures, mockApi } from "../test/mockApi";
@@ -179,7 +179,7 @@ describe("Workspace", () => {
     await userEvent.keyboard("{Enter}");
     expect(screen.getByText("12 questions")).toBeInTheDocument();
     expect(within(list).getByRole("row", { name: /older\.csv/ })).toHaveAttribute("aria-current", "true");
-    expect(within(list).getByRole("button", { name: "Open older.csv" })).toHaveFocus();
+    expect(within(list).getByRole("button", { name: "older.csv is shown" })).toHaveFocus(); // the name holds "shown"
     await userEvent.click(within(list).getByRole("button", { name: "Delete used.xlsx" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Error: A run used this questionnaire; reset the workspace to start over.");
     expect(within(list).getByRole("row", { name: /used\.xlsx/ })).toBeInTheDocument();
@@ -188,6 +188,34 @@ describe("Workspace", () => {
     expect(screen.queryByRole("row", { name: /v05\.xlsx/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(calls.filter((c) => c.startsWith("DELETE"))).toEqual(["DELETE /api/questionnaires/q3", "DELETE /api/questionnaires/q1"]);
+  });
+
+  it("an upload that lands while a delete is pending stays listed, and the refused delete's error clears", async () => {
+    const older = { ...fixtures.questionnaire, id: "q2", filename: "older.csv", item_count: 12 };
+    const fresh = { ...fixtures.questionnaire, id: "q4", filename: "fresh.csv", item_count: 7 };
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    let finish: (r: Response) => void = () => {};
+    let n = 0;
+    mockApi({
+      "GET /api/documents": [],
+      "GET /api/questionnaires": [fixtures.questionnaire, older],
+      "POST /api/questionnaires": fresh,
+      "DELETE /api/questionnaires/q2": () =>
+        ++n === 1
+          ? new Response(JSON.stringify({ detail: "A run used this questionnaire." }), { status: 409 })
+          : new Promise<Response>((resolve) => { finish = resolve; }),
+    });
+    render(<WorkspaceView {...props} />);
+    const list = await screen.findByRole("table", { name: "questionnaires (2 of 5)" });
+    await userEvent.click(within(list).getByRole("button", { name: "Delete older.csv" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("A run used this questionnaire.");
+    await userEvent.click(within(list).getByRole("button", { name: "Delete older.csv" })); // pending
+    await userEvent.upload(screen.getByLabelText("upload a questionnaire"), new File(["x"], "fresh.csv"));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await act(async () => finish(new Response(null, { status: 204 })));
+    expect(await screen.findByRole("table", { name: "questionnaires (2 of 5)" })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /fresh\.csv/ })).toHaveAttribute("aria-current", "true");
+    expect(screen.queryByRole("row", { name: /older\.csv/ })).not.toBeInTheDocument();
   });
 
   it("deleting the shown questionnaire shows the next one", async () => {

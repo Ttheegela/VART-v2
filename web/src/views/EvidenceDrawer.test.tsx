@@ -104,6 +104,7 @@ describe("EvidenceDrawer fixes", () => {
     expect(await screen.findByText("Approved")).toBeInTheDocument();
     expect(changed).toHaveBeenCalled();
     const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveFocus(); // the pressed Approve is gone; focus moves to the dialog, not to the body
     for (let i = 0; i < 6; i++) { await userEvent.tab(); expect(dialog.contains(document.activeElement)).toBe(true); }
   });
 

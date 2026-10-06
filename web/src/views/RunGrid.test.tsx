@@ -236,6 +236,19 @@ describe("useStepLoop", () => {
     expect(result.current.running).toBe(false);
   });
 
+  it("a 503 from step stops the loop and shows the sentence, even with Retry-After (no auto-retry)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const down = "The model provider is not answering right now; try the run again in a minute.";
+    const calls = mockApi({
+      "POST /api/runs/r1/step": new Response(JSON.stringify({ detail: down }), { status: 503, headers: { "Retry-After": "60" } }),
+    });
+    const { result } = renderHook(() => useStepLoop("r1", start, () => {}));
+    await act(() => vi.advanceTimersByTimeAsync(180_000));
+    expect(calls).toHaveLength(1);
+    expect(result.current.error).toBe(down);
+    expect(result.current.running).toBe(false);
+  });
+
   it("any other error stops the loop", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     const calls = mockApi({ "POST /api/runs/r1/step": new Response("{}", { status: 500 }) });
