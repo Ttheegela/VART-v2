@@ -80,6 +80,27 @@ export interface paths {
      */
     get: operations["document_lines_api_documents__document_id__lines_get"];
   };
+  "/api/gap/{scope}": {
+    /**
+     * Gap View
+     * @description Every outcome of the scope's functions in NIST's order (the core: all 106), each with its tier and,
+     * once the latest run of the scope's current questionnaire has answered it, its gap label and explanation.
+     * Labels are decided by code; a not-checked outcome never carries one. Writes nothing; no model call.
+     */
+    get: operations["gap_view_api_gap__scope__get"];
+  };
+  "/api/gap/{scope}/run": {
+    /**
+     * Start Gap
+     * @description Start or continue the gap check for this scope, then call POST /api/runs/{id}/step while `running`.
+     * Creates (or reuses) the workspace's built-in questionnaire for the scope; it is never counted, listed or
+     * deleted with the visitor's questionnaires. Answers a new run when none exists on it, the running one, or
+     * the done one with every outcome whose evidence changed since (a new upload) re-opened, all of its parts;
+     * with nothing changed it stays done and no model is called. 429 per network (`run`, 20 an hour); 503 when
+     * the demo is full.
+     */
+    post: operations["start_gap_api_gap__scope__run_post"];
+  };
   "/api/health": {
     /** Health */
     get: operations["health_api_health_get"];
@@ -258,6 +279,11 @@ export interface components {
        * @enum {string}
        */
       label: "verified" | "partial" | "conflict" | "unknown" | "user_confirmed" | "na";
+      /**
+       * Parts
+       * @default []
+       */
+      parts?: components["schemas"]["PartOut"][];
       /** Scope Note */
       scope_note: string | null;
       /** Sources */
@@ -578,6 +604,56 @@ export interface components {
       /** Detail */
       detail: string;
     };
+    /** GapOut */
+    GapOut: {
+      /** Controls Url */
+      controls_url: string;
+      /** Csf Version */
+      csf_version: string;
+      /** Retrieved */
+      retrieved: string;
+      /** Rows */
+      rows: components["schemas"]["GapRow"][];
+      run: components["schemas"]["RunOut"] | null;
+      /**
+       * Scope
+       * @enum {string}
+       */
+      scope: "core" | "govern" | "identify" | "protect" | "detect" | "respond" | "recover";
+    };
+    /**
+     * GapRow
+     * @description One CSF 2.0 outcome in the Gap check view (CSF spec 7).
+     */
+    GapRow: {
+      /** Answer Id */
+      answer_id: string | null;
+      /** Category */
+      category: string;
+      /** Csf Id */
+      csf_id: string;
+      /** Explanation */
+      explanation: string | null;
+      /** Function */
+      function: string;
+      /** Item Id */
+      item_id: string | null;
+      /** Label */
+      label: ("covered" | "partly_covered" | "not_met" | "documents_disagree" | "gap" | "confirmed_by_you" | "not_answered") | null;
+      /** Outcome */
+      outcome: string;
+      /** Related Controls */
+      related_controls: string[];
+      /** Source Url */
+      source_url: string;
+      /** Sources */
+      sources: number;
+      /**
+       * Tier
+       * @enum {string}
+       */
+      tier: "checked" | "ask" | "not_checked";
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -663,6 +739,28 @@ export interface components {
     NotApplicableIn: {
       /** Reason */
       reason: string;
+    };
+    /**
+     * PartOut
+     * @description One part of a Checked CSF outcome (CSF spec 5.2, carry d): its own label and its own cited lines, each
+     * with the document's status (a draft-only quote shows `draft`).
+     */
+    PartOut: {
+      /** Citations */
+      citations: components["schemas"]["CitationOut"][];
+      /** Dropped */
+      dropped: components["schemas"]["DroppedOut"][];
+      /** From Statement */
+      from_statement: boolean;
+      /**
+       * Label
+       * @enum {string}
+       */
+      label: "covered" | "partly_covered" | "not_met" | "documents_disagree" | "gap";
+      /** N */
+      n: number;
+      /** Question */
+      question: string;
     };
     /** PreviewRow */
     PreviewRow: {
@@ -861,6 +959,11 @@ export interface components {
        * @enum {string}
        */
       label: "verified" | "partial";
+      /**
+       * Part
+       * @default 0
+       */
+      part?: number;
       /** Question */
       question: string;
       /**
@@ -1499,6 +1602,123 @@ export interface operations {
       422: {
         content: {
           "application/json": components["schemas"]["ErrorOut"] | components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description A per-network limit or the model budget; see Retry-After */
+      429: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description The demo is full, or model calls are off */
+      503: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  /**
+   * Gap View
+   * @description Every outcome of the scope's functions in NIST's order (the core: all 106), each with its tier and,
+   * once the latest run of the scope's current questionnaire has answered it, its gap label and explanation.
+   * Labels are decided by code; a not-checked outcome never carries one. Writes nothing; no model call.
+   */
+  gap_view_api_gap__scope__get: {
+    parameters: {
+      path: {
+        scope: "core" | "govern" | "identify" | "protect" | "detect" | "respond" | "recover";
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["GapOut"];
+        };
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unknown id, another workspace's id, or the workspace is gone */
+      404: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description The action conflicts with the item's state */
+      409: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description A per-network limit or the model budget; see Retry-After */
+      429: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description The demo is full, or model calls are off */
+      503: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  /**
+   * Start Gap
+   * @description Start or continue the gap check for this scope, then call POST /api/runs/{id}/step while `running`.
+   * Creates (or reuses) the workspace's built-in questionnaire for the scope; it is never counted, listed or
+   * deleted with the visitor's questionnaires. Answers a new run when none exists on it, the running one, or
+   * the done one with every outcome whose evidence changed since (a new upload) re-opened, all of its parts;
+   * with nothing changed it stays done and no model is called. 429 per network (`run`, 20 an hour); 503 when
+   * the demo is full.
+   */
+  start_gap_api_gap__scope__run_post: {
+    parameters: {
+      path: {
+        scope: "core" | "govern" | "identify" | "protect" | "detect" | "respond" | "recover";
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["RunOut"];
+        };
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unknown id, another workspace's id, or the workspace is gone */
+      404: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description The action conflicts with the item's state */
+      409: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
       /** @description A per-network limit or the model budget; see Retry-After */

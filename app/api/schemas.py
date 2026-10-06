@@ -19,6 +19,8 @@ from pydantic import (
 from pydantic.json_schema import SkipJsonSchema
 
 from app.contracts import DropReason
+from app.csf import GapLabel, PartLabel, Tier
+from app.csf import Scope as CsfScope
 
 MAX_ANSWER_CHARS = 4000  # an interview answer (engine adversary-3 I3: statements bypass the line limit)
 MAX_EDIT_CHARS = 4000  # an edited answer text
@@ -286,6 +288,18 @@ class ConflictOut(BaseModel):
     sides: list[ConflictSideOut]  # newer record first for the date rule
 
 
+class PartOut(BaseModel):
+    """One part of a Checked CSF outcome (CSF spec 5.2, carry d): its own label and its own cited lines, each
+    with the document's status (a draft-only quote shows `draft`)."""
+
+    n: int  # 1-based, in NIST's order
+    question: str
+    label: PartLabel
+    citations: list[CitationOut]
+    dropped: list[DroppedOut]
+    from_statement: bool  # an accepted fill from the visitor's answer replaced this part (CSF spec 5.6)
+
+
 class AnswerDetail(AnswerSummary):
     item: ItemOut
     citations: list[CitationOut]
@@ -293,6 +307,7 @@ class AnswerDetail(AnswerSummary):
     conflict: ConflictOut | None
     scope_note: str | None
     statement_lines: list[LineOut]  # confirmed by you: the visitor's stored (redacted) answer
+    parts: list[PartOut] = []  # Plan 6B: a Checked CSF outcome's parts, in NIST's order; [] otherwise
 
 
 class AnswerEdit(BaseModel):
@@ -320,6 +335,9 @@ class SuggestionOut(_Out):
     value: Value | None
     text: str
     status: Literal["open", "accepted", "dismissed"]
+    # Plan 6B: the part of a CSF outcome this fill is for (CSF spec 5.6); 0: the whole item. When it is above
+    # 0, `question` is that part's wording, not the outcome's (preflight I3).
+    part: int = 0
 
 
 class QuestionOut(BaseModel):
@@ -354,3 +372,33 @@ class AuditEventOut(_Out):
     action: str
     ref: str | None
     detail: dict[str, object]
+
+
+# ------------------------------------------------------------------ gap check (Plan 6B)
+GapScope = CsfScope  # "core" or one CSF function, lowercase
+
+
+class GapRow(BaseModel):
+    """One CSF 2.0 outcome in the Gap check view (CSF spec 7)."""
+
+    csf_id: str
+    function: str
+    category: str
+    outcome: str  # NIST's text, verbatim (CSF spec 4)
+    related_controls: list[str]  # SP 800-53 Rev 5.2.0 identifiers
+    source_url: str
+    tier: Tier
+    item_id: uuid.UUID | None  # None for a not-checked outcome, and before the scope's first run
+    answer_id: uuid.UUID | None  # None until the outcome is answered
+    label: GapLabel | None  # code's (app.csf.gap_label); None: not checked, not answered yet, not applicable
+    explanation: str | None  # code's one paragraph; for Confirmed by you, the visitor's stored answer
+    sources: int  # cited documents
+
+
+class GapOut(BaseModel):
+    scope: GapScope
+    csf_version: str
+    retrieved: str  # when NIST's text was downloaded
+    controls_url: str  # NIST's SP 800-53 Rev 5 page; every related control links to it
+    run: RunOut | None  # the latest run of the scope's current built-in questionnaire; None before the first
+    rows: list[GapRow]  # every outcome of the scope's functions (the core: all of them), in NIST's order

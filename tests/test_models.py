@@ -291,3 +291,33 @@ def test_a_questionnaire_may_be_the_built_in_csf_one(s: Session) -> None:
     q = f.questionnaire(s, f.workspace(s), source="csf", filename="csf-2.0", mapping={"scope": "core"})
     s.commit()
     assert (q.source, q.mapping) == ("csf", {"scope": "core"})
+
+
+def test_a_fill_is_unique_per_part_of_an_item(db: Engine) -> None:
+    with Session(db) as s:
+        ws = f.workspace(s)
+        q = f.questionnaire(s, ws, source="csf", filename="csf-2.0")
+        it = f.item(s, q, csf_id="GV.PO-01", code="GV.PO-01", row_ref="GV.PO-01")
+        r = f.run(s, q)
+        st = f.document(s, ws, source="statement", kind="statement", filename="answer-001.txt")
+        f.suggestion(s, r, it, st, part=1)
+        f.suggestion(s, r, it, st, part=2)  # another part of the same outcome, from the same answer
+        s.commit()
+        with pytest.raises(IntegrityError, match="uq_suggestions_fill"):
+            f.suggestion(s, r, it, st, part=2)
+
+
+def test_run_item_parts_start_empty_and_must_be_an_object(db: Engine) -> None:
+    with Session(db) as s:
+        ws = f.workspace(s)
+        q = f.questionnaire(s, ws, source="csf", filename="csf-2.0")
+        it = f.item(s, q, csf_id="PR.DS-11", code="PR.DS-11", row_ref="PR.DS-11")
+        r = f.run(s, q)
+        ri = RunItem(run_id=r.id, item_id=it.id)
+        s.add(ri)
+        s.commit()
+        s.refresh(ri)
+        assert ri.parts == {}
+        ri.parts = []  # type: ignore[assignment]
+        with pytest.raises(IntegrityError, match="ck_run_items_parts"):
+            s.commit()

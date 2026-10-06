@@ -190,6 +190,8 @@ CALLS: dict[tuple[str, str], dict[str, object]] = {
     ("/api/questions/{question_id}/skip", "post"): {},
     ("/api/suggestions/{suggestion_id}/accept", "post"): {},
     ("/api/audit", "get"): {},
+    ("/api/gap/{scope}", "get"): {},
+    ("/api/gap/{scope}/run", "post"): {},
 }
 # Ruling 7: no operation is a stub after the Plan 3 merge; each is named by the test that exercises it.
 # ponytail: the check proves each named test exists, not that it still calls its route (checked by hand at
@@ -201,7 +203,8 @@ D, Q, R, E, IV = (
     "tests.test_export",
     "tests.test_questions",
 )
-STUBS: set[tuple[str, str]] = set()
+# Plan 6B Task 1: the gap stubs answer 501 until Task 3 builds them and moves them to COVERED.
+STUBS: set[tuple[str, str]] = {("/api/gap/{scope}", "get"), ("/api/gap/{scope}/run", "post")}
 COVERED: dict[tuple[str, str], str] = {
     ("/api/documents", "get"): f"{D}::test_an_upload_is_parsed_classified_and_listed",
     ("/api/documents", "post"): f"{D}::test_an_upload_is_parsed_classified_and_listed",
@@ -254,6 +257,7 @@ COVERED: dict[tuple[str, str], str] = {
 def _url(path: str) -> str:
     return (
         path.replace("{name}", "vsq-a")
+        .replace("{scope}", "core")
         .replace("_id}", "}")
         .format_map({k: U for k in ("document", "questionnaire", "run", "answer", "question", "suggestion")})
     )
@@ -273,7 +277,8 @@ def test_every_operation_is_reachable_and_built(db: Engine, path: str, method: s
     # Review I-3: every operation is reachable and none is shadowed; after the merge none is a 501 stub.
     client, _ = visitor(db)
     r = client.request(method.upper(), _url(path), **CALLS[(path, method)])  # type: ignore[arg-type]
-    assert r.status_code not in (405, 501), (path, method, r.status_code)
+    assert r.status_code != 405, (path, method, r.status_code)
+    assert (r.status_code == 501) == ((path, method) in STUBS), (path, method, r.status_code)
     assert r.content != b'{"detail":"Not Found"}', (path, method)  # the router's miss, not the app's 404
 
 

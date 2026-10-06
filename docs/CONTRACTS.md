@@ -19,7 +19,8 @@ the change log at the end, and a re-recording of the evals when a prompt or a la
 | draft | `app/draft.py` (2A) | `PROMPT_VERSION = "draft@p2"`; `plain_name(filename: str) -> str`; `user_prompt(item: ItemInput, decision: Decision) -> str`; `check(text, decision, documents) -> list[str]`; `template_answer(decision) -> str`; `write_draft(llm, item, decision, model, spend, documents) -> Draft` | yes |
 | pipeline | `app/pipeline.py` (2A) | `answer_item(session, workspace_id, item, llm, models, spend) -> ItemResult`; `answer_retrieved(session, workspace_id, item, retrieval, llm, models, spend) -> ItemResult` (answer_item after its retrieval); raises `BudgetExhausted` when `spend("stance")` is refused | via stance, draft |
 | interview | `app/interview.py` (2A) | `high_weight(topic) -> bool`; `plan_queue(items) -> list[QueueEntry]`; `follow_up(question, answer) -> str or None`; `recheck(session, workspace_id, statement_id, topic, items, llm, model, spend) -> list[Suggestion]` | recheck only |
-| csf | `app/csf.py` (6A) | `framework() -> Framework`; `in_scope(scope) -> tuple[Outcome, ...]`; `item_input(o) -> ItemInput`; `gap_label(o, label, value=None, statement_id=None) -> GapLabel or None`; `questionnaire_for(session, workspace_id, scope) -> Questionnaire`; `part_inputs(o) -> tuple[ItemInput, ...]`; `evidence(session, workspace_id, item) -> Retrieval`; `check_parts(session, workspace_id, o, llm, models, spend) -> list[ItemResult]`; `part_label(r) -> PartLabel`; `combine(labels) -> PartLabel`; `explain(o, parts) -> str`; `aggregate(o, parts) -> ItemResult`; `check_outcome(session, workspace_id, o, llm, models, spend) -> ItemResult or None`; `ask_queue(outcomes, asked) -> list[QueueEntry]` | via answer_retrieved (stance only; a part's draft is never written) |
+| csf | `app/csf.py` (6A) | `framework() -> Framework`; `in_scope(scope) -> tuple[Outcome, ...]`; `item_input(o) -> ItemInput`; `gap_label(o, label, value=None, statement_id=None) -> GapLabel or None`; `questionnaire_for(session, workspace_id, scope) -> Questionnaire`; `part_inputs(o) -> tuple[ItemInput, ...]`; `evidence(session, workspace_id, item) -> Retrieval`; `check_parts(session, workspace_id, o, llm, models, spend) -> list[ItemResult]`; `part_label(r) -> PartLabel`; `combine(labels) -> PartLabel`; `explain(o, parts) -> str`; `aggregate(o, parts) -> ItemResult`; `check_outcome(session, workspace_id, o, llm, models, spend) -> ItemResult or None`; `ask_queue(outcomes, asked) -> list[QueueEntry]`; `current_mapping(scope) -> dict[str, str]`; `check_part(session, workspace_id, o, n, llm, models, spend) -> ItemResult`; `part_result(o, n, raw) -> ItemResult`; `CONTROLS_URL` | via answer_retrieved (stance only; a part's draft is never written) |
+| runs | `app/runs.py` (6B; only these names) | `STEP_PARTS = 8`; `outcome_values(o, parts) -> dict[str, Any]`; `reopen_changed(session, workspace_id, run_id) -> int` | no |
 | budget | `app/services/llm_budget.py` | `spender(session, workspace_id) -> Spend` | no |
 
 ## Rules every unit keeps
@@ -96,12 +97,19 @@ change-log line; changing or removing a path, a field or a status needs the lead
   per call by `llm_budget.spender(session, workspace_id, network=errors.network(request))` (steps and interview
   rechecks; never through `limit`), `interview` 60 answers (through `limit`, before any write); per workspace an hour per step (`llm_budget.CAPS`); globally 1,500 model calls
   an hour and 4,000 a day.
-- Plan 6B room: `QuestionnaireOut.source` includes `csf` (with `format` `builtin`, `detected` null, and the
-  scope in `Mapping.scope`); `ItemOut.csf_id`; runs scoped by questionnaire; `GET /api/questionnaires` lists
-  built-in questionnaires. The seam is per-item dispatch in `app/runs.py` on `Questionnaire.source` /
-  `Item.csf_id`; 6B may change the internals of `_answer`, `_values` and `step` (they are not frozen), and may
-  add paths and optional fields (extending `CONTRACT` with a change-log line), but not change or remove ones
-  defined here.
+- Gap check (Plan 6B): `GET /api/gap/{scope}` (`core` or one CSF function, lowercase) answers `GapOut`: every
+  outcome of the scope's functions in NIST's order with its tier, and the label (`app.csf.gap_label`) and
+  explanation from the latest run of the scope's current built-in questionnaire; it writes nothing.
+  `POST /api/gap/{scope}/run` creates or reuses that questionnaire (Plan 3 Ruling 5: built-in ones are never
+  counted, listed or deleted) and answers the run to step: a new one, the running one, or the done one with
+  every outcome whose evidence changed re-opened in full (`app.runs.reopen_changed`, CSF spec 5.6; none
+  changed: it stays done). It is counted under `run`, and 503 when the demo is full. A step claims csf items until their parts add up to
+  `STEP_PARTS` (8) and stores each part's result in `run_items.parts` as it lands. `AnswerDetail.parts` lists a
+  Checked outcome's parts; `SuggestionOut.part` names the part a fill is for (0: the whole item); on a gap-check
+  run an answer is re-checked against the open parts in its CSF function. On a gap-check run,
+  `GET /api/runs/{id}/export` answers the gap-report workbook (it was a 409), and Questions for you holds the
+  Ask-me outcomes only. An xlsx questionnaire export carries the latest done gap check as a `Gap report` sheet.
+  `Mapping.scope` stays unused.
 
 ## Change log
 
@@ -163,3 +171,11 @@ change-log line; changing or removing a path, a field or a status needs the lead
 - 2026-10-06: Plan 6A merged onto Plan 3 (final review I2; an added enum value, allowed after the HTTP freeze):
   `DroppedOut.reason` is typed as `contracts.DropReason`, so it gains `"statement"`, and the evidence drawer's
   sentence table covers every `DropReason` (a test pins it). No path, field or status changed; no prompt changed.
+- 2026-10-06: Plan 6B Task 1 (added paths, optional fields and one status, allowed after the freeze; lead's OK
+  under rule 10 for the `csf` row): `GET /api/gap/{scope}`, `POST /api/gap/{scope}/run`, `GapOut`, `GapRow`,
+  `PartOut`, `AnswerDetail.parts`, `SuggestionOut.part`; a gap-check run's export is 200 (was 409); migration
+  `c4e8a2d6f1b3` (`run_items.parts`, `suggestions.part`). The `csf` row gains `current_mapping`, `check_part`,
+  `part_result` and `CONTROLS_URL`. No prompt or label changes, so nothing is re-recorded.
+- 2026-10-06: Plan 6B Task 1, preflight M5 and I3: a `runs` row records `STEP_PARTS`, `outcome_values` and
+  `reopen_changed` for Tasks 3-4 (only these names of `app/runs.py` are contract); when `SuggestionOut.part` is
+  above 0, its `question` is that part's wording (Task 4), not the outcome's.
