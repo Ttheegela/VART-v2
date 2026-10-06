@@ -162,7 +162,7 @@ export interface paths {
     /**
      * Approve Verified
      * @description Approve every verified answer not yet approved (design key A). An edited answer is left for a look
-     * (adversary-1 M5): approve it by itself.
+     * (adversary-1 M5): approve it by itself; `skipped_edited` counts them.
      */
     post: operations["approve_verified_api_runs__run_id__approve_verified_post"];
   };
@@ -317,6 +317,11 @@ export interface components {
     ApprovedCount: {
       /** Approved */
       approved: number;
+      /**
+       * Skipped Edited
+       * @default 0
+       */
+      skipped_edited?: number;
     };
     /** AuditEventOut */
     AuditEventOut: {
@@ -2123,7 +2128,7 @@ export interface operations {
   /**
    * Approve Verified
    * @description Approve every verified answer not yet approved (design key A). An edited answer is left for a look
-   * (adversary-1 M5): approve it by itself.
+   * (adversary-1 M5): approve it by itself; `skipped_edited` counts them.
    */
   approve_verified_api_runs__run_id__approve_verified_post: {
     parameters: {

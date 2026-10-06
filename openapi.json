@@ -297,6 +297,11 @@
           "approved": {
             "title": "Approved",
             "type": "integer"
+          },
+          "skipped_edited": {
+            "default": 0,
+            "title": "Skipped Edited",
+            "type": "integer"
           }
         },
         "required": [
@@ -4020,7 +4025,7 @@
     },
     "/api/runs/{run_id}/approve-verified": {
       "post": {
-        "description": "Approve every verified answer not yet approved (design key A). An edited answer is left for a look\n(adversary-1 M5): approve it by itself.",
+        "description": "Approve every verified answer not yet approved (design key A). An edited answer is left for a look\n(adversary-1 M5): approve it by itself; `skipped_edited` counts them.",
         "operationId": "approve_verified_api_runs__run_id__approve_verified_post",
         "parameters": [
           {

@@ -173,10 +173,6 @@ CALLS: dict[tuple[str, str], dict[str, object]] = {
     ("/api/questionnaires/{questionnaire_id}", "delete"): {},
     ("/api/questionnaires/{questionnaire_id}/mapping", "put"): {"json": MAPPING},
     ("/api/runs/{run_id}/export", "get"): {},
-    ("/api/runs/{run_id}/questions", "get"): {},
-    ("/api/questions/{question_id}/answer", "post"): {"json": {"text": "x"}},
-    ("/api/questions/{question_id}/skip", "post"): {},
-    ("/api/suggestions/{suggestion_id}/accept", "post"): {},
 }
 
 

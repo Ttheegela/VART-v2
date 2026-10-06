@@ -287,8 +287,12 @@ def step(
             _add_cost(session, run_id, meter.take())
             session.commit()
             raise (refused or exc) from None
-        except LLMError:
+        except LLMError as exc:
             session.rollback()
+            if _retryable(exc) and clock() > deadline:
+                # the deadline cut the retry: not tried twice, so not failed (Task 8 review)
+                _release(session, run_id, rest)
+                break
             values = FAILED
         except SQLAlchemyError:
             session.rollback()  # triage row 24: a failed transaction must not swallow the next write

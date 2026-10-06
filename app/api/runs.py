@@ -129,7 +129,7 @@ def run_answers(run_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -> Run
 @router.post("/api/runs/{run_id}/approve-verified")
 def approve_verified(run_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -> ApprovedCount:
     """Approve every verified answer not yet approved (design key A). An edited answer is left for a look
-    (adversary-1 M5): approve it by itself."""
+    (adversary-1 M5): approve it by itself; `skipped_edited` counts them."""
     run = _own(session, ws, run_id)
     result = session.execute(
         update(Answer)
@@ -142,6 +142,14 @@ def approve_verified(run_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -
         .values(approved_at=func.now())
     )
     n = int(result.rowcount or 0)  # type: ignore[attr-defined]
+    skipped = session.scalar(
+        select(func.count()).where(
+            Answer.run_id == run.id,
+            Answer.label == "verified",
+            Answer.edited.is_(True),
+            Answer.approved_at.is_(None),
+        )
+    )
     audit_log.record(session, ws.id, "answer.approve_verified", ref=str(run.id), detail={"approved": n})
     session.commit()
-    return ApprovedCount(approved=n)
+    return ApprovedCount(approved=n, skipped_edited=skipped or 0)

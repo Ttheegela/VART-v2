@@ -1,8 +1,9 @@
 import json
+import threading
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_llm
@@ -80,7 +81,10 @@ def test_the_drawer_rereads_each_citation_with_context(ready) -> None:  # type: 
 def test_approve_rules_and_bulk_approve(ready) -> None:  # type: ignore[no-untyped-def]
     client, qid = ready
     run = _run_to_end(client, qid)
-    assert client.post(f"/api/runs/{run['id']}/approve-verified").json() == {"approved": 1}
+    assert client.post(f"/api/runs/{run['id']}/approve-verified").json() == {
+        "approved": 1,
+        "skipped_edited": 0,
+    }
     answer_id = _answer_id(client, run)
     edited = client.patch(f"/api/answers/{answer_id}", json={"text": "Yes, AES-256."}).json()
     assert (edited["edited"], edited["approved"]) == (True, False)
@@ -94,8 +98,35 @@ def test_bulk_approve_leaves_an_edited_answer_for_a_look(ready) -> None:  # type
     client, qid = ready
     run = _run_to_end(client, qid)
     client.patch(f"/api/answers/{_answer_id(client, run)}", json={"text": "Yes, but changed."})
-    assert client.post(f"/api/runs/{run['id']}/approve-verified").json() == {"approved": 0}
+    assert client.post(f"/api/runs/{run['id']}/approve-verified").json() == {
+        "approved": 0,
+        "skipped_edited": 1,
+    }
     assert client.post(f"/api/answers/{_answer_id(client, run)}/approve").json()["approved"] is True
+
+
+def test_an_approval_waits_for_a_writer_and_then_sees_its_result(db: Engine, ready) -> None:  # type: ignore[no-untyped-def]
+    # Task 8 review: edit, approve and not-applicable take turns on the answer row (FOR UPDATE). Without
+    # the lock the approval reads the old label and approves what became a conflict.
+    client, qid = ready
+    answer_id = _answer_id(client, _run_to_end(client, qid))
+    result: list[int] = []
+
+    def approve() -> None:
+        result.append(client.post(f"/api/answers/{answer_id}/approve").status_code)
+
+    with Session(db) as holder:
+        holder.execute(select(Answer).where(Answer.id == answer_id).with_for_update()).one()
+        t = threading.Thread(target=approve)
+        t.start()
+        t.join(0.7)
+        assert t.is_alive()  # waiting for the lock
+        holder.execute(update(Answer).where(Answer.id == answer_id).values(label="conflict"))
+        holder.commit()
+    t.join(10)
+    assert result == [409]
+    with Session(db) as s:
+        assert s.get_one(Answer, answer_id).approved_at is None
 
 
 def test_not_applicable_clears_what_the_engine_stored(db: Engine, ready) -> None:  # type: ignore[no-untyped-def]

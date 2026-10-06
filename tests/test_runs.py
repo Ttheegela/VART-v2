@@ -431,6 +431,32 @@ def test_a_rate_limit_is_not_retried_past_the_deadline(s: Session) -> None:
     assert len(llm.requests) == 1
 
 
+def test_a_retryable_error_past_the_deadline_gives_the_item_back_untried(s: Session) -> None:
+    # Task 8 review: the deadline cut the retry, so the item was not answered twice; it must not become a
+    # permanent failed answer, and the attempt it claimed is refunded.
+    ws, q = _questionnaire(s, n=2)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    llm = ByStepLLM({"stance": _api_error(503)})
+    late = runs.DEADLINE_S + 1
+    ticks = iter([0.0, 0.0, late, late, late, late, late])
+    assert runs.step(s, ws.id, run.id, llm, MODELS, clock=lambda: next(ticks)) == []
+    assert s.scalars(select(Answer)).all() == []
+    assert sorted(s.execute(select(RunItem.state, RunItem.attempts)).all()) == [
+        ("pending", 0),
+        ("pending", 0),
+    ]
+
+
+def test_a_client_error_past_the_deadline_is_still_a_failed_answer(s: Session) -> None:
+    ws, q = _questionnaire(s, n=1)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    llm = ByStepLLM({"stance": _api_error(401)})
+    late = runs.DEADLINE_S + 1
+    ticks = iter([0.0, 0.0, late, late, late])
+    runs.step(s, ws.id, run.id, llm, MODELS, clock=lambda: next(ticks))
+    assert s.scalars(select(Answer.text)).one() == runs.FAILED_TEXT
+
+
 def test_an_early_error_releases_the_unstarted_items(s: Session, monkeypatch: pytest.MonkeyPatch) -> None:
     ws, q = _questionnaire(s, n=3)
     run = runs.create_run(s, ws.id, q.id, MODELS)
