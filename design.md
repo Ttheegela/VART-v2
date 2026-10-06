@@ -119,8 +119,9 @@ leaves). Letters are case sensitive. Every key below is shown as a hint on the c
 | Key | Action | Where |
 |---|---|---|
 | `s` / `o` | try with a sample company / use your own files | Home |
-| `1`–`5` | workspace · run · questions for you · export · audit log | everywhere in a workspace |
+| `1`–`6` | workspace · run · questions for you · export · audit log · gap check | everywhere in a workspace |
 | `v` `p` `c` `u` `y` `x` | toggle the filter: verified · partial · conflict · unknown · confirmed by you · not applicable | Run |
+| `g` `i` `p` `d` `s` `o` `a` | scope: govern · identify · protect · detect · respond · recover · all core | Gap check |
 | `/` | focus search | Run, Audit log |
 | `j` / `k` (and ↓ / ↑) | move the cursor down / up a row | lists |
 | `enter` | open the Evidence drawer on the cursor row | lists |
@@ -133,6 +134,8 @@ leaves). Letters are case sensitive. Every key below is shown as a hint on the c
 | `n` | mark not applicable (asks for a reason) | the cursor item or open drawer |
 | `r` | start a run on the confirmed questionnaire | Workspace |
 | `l` / `q` / `w` | load the sample documents / sample questionnaire A / sample questionnaire B | Workspace |
+| `r` | run the gap check, or check again (counts under the run limit, even when nothing changed) | Gap check |
+| `e` | export the gap report (xlsx) | Gap check |
 | `R` (shift+r) | reset the workspace: delete everything now, after a confirm | Workspace |
 | `ctrl+enter` | send an answer (in its text field) | Questions for you |
 | `?` | show all keys (a sheet listing this table; esc closes) | everywhere |
@@ -186,3 +189,9 @@ a single key cannot say which row. Enter in a form submits it from any field, a 
 - 2026-10-06 · Workspace row actions (edit, open, delete) are Tab-reached text buttons with row-named labels, no
   single key; Enter submits a form from a select too. The upload notices split: one for documents (redaction and
   its known gaps), one for questionnaires (stored and sent as written).
+- 2026-10-06 · Gap check (Plan 6B): view 6 in the Workbench layout; scope keys g i p d s o a; gap label chips
+  (covered fill, partly 1px, not met 1px bold, DISAGREE 2px uppercase, gap dashed, confirmed by you neutral-700
+  fill, not answered quiet); the filter toggles are Tab-reached with no single keys (g i p d s o a r e are taken);
+  the coverage line sits in the status line's cursor slot. An outcome marked N/A reads `not applicable` (the
+  questionnaire chip) with its own filter count; a failed outcome has no chip and shows its failure sentence; `r`
+  with nothing changed says "Nothing changed since the last check." under the review line.

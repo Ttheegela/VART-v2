@@ -19,6 +19,7 @@ from app.api import (
     documents,
     errors,
     export,
+    gap,
     internal,
     questionnaires,
     questions,
@@ -56,7 +57,7 @@ app.add_middleware(FlushTraces)
 app.include_router(workspace.router)
 app.include_router(internal.router)
 errors.install(app)
-for module in (documents, questionnaires, runs, answers, questions, export, audit):
+for module in (documents, questionnaires, runs, answers, questions, export, audit, gap):
     app.include_router(module.router)
 
 

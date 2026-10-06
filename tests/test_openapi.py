@@ -44,6 +44,8 @@ CONTRACT = {
     ("/api/questions/{question_id}/skip", "post"),
     ("/api/suggestions/{suggestion_id}/accept", "post"),
     ("/api/audit", "get"),
+    ("/api/gap/{scope}", "get"),
+    ("/api/gap/{scope}/run", "post"),
 }
 
 

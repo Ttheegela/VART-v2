@@ -39,18 +39,18 @@ Progress and the decisions table: `docs/PROGRESS.md`. The detailed per-task ledg
 - `ops/` `setup.sh` runs the infrastructure phases (accounts, release, migrate, uptime, status). Tarun runs it in his
   terminal; secrets go only through its hidden prompts.
 - API (Plan 3): `app/api/` routers by lane (`documents.py`, `questionnaires.py`, `workspace.py` inputs; `runs.py`,
-  `answers.py`, `audit.py`, `export.py` runs; `questions.py` interview; `errors.py`, `deps.py`, `schemas.py` shared),
+  `answers.py`, `audit.py`, `export.py` runs; `gap.py` gap-check endpoints; `questions.py` interview; `errors.py`, `deps.py`, `schemas.py` shared),
   `app/runs.py` (step runner), `app/questions.py` (interview service), `app/questionnaires.py` (import and mapper),
   `app/export.py`, `app/redecide.py`.
-- UI (Plan 3): `web/src/views/` (one file per view), `web/src/lib/{api,route,keys,labels}.ts`, `design.md` (binding for
+- UI (Plan 3): `web/src/views/` (one file per view; `GapCheck.tsx` and `GapDrawer.tsx` are the Gap check view and its inspector), `web/src/lib/{api,route,keys,labels}.ts`, `design.md` (binding for
   UI work); `web/e2e/` Playwright flows and `recorded.jsonl`.
 - Engine (Plan 2): `app/contracts.py` (frozen unit types; signatures in `docs/CONTRACTS.md`), `app/patterns.py`,
   `app/ingest/` (parse, pdf, store), `app/redact.py`, `app/classify.py`, `app/chunk.py`, `app/retrieve.py`,
   `app/stance.py`, `app/decide.py`, `app/draft.py`, `app/grounding.py`, `app/pipeline.py` (`answer_item`),
   `app/interview.py`, `app/csf.py` (CSF 2.0 gap check: framework, built-in questionnaire, per-part checks,
-  gap labels).
+  gap labels); `app/runs.py` answers a gap-check run part by part (`run_items.parts`).
 - `data/csf/` NIST CSF 2.0 extract, `tiers.yaml`, built `csf-2.0.json` (`python -m datakit.csf build`);
-  `data/dev/gap/` the gap check's fact-sheet extension (`python -m datakit.gap dev`).
+  `data/dev/gap/` the gap check's outcome map and judged overrides (`python -m datakit.gap dev`); the planted improvement plan is in the dev pack.
 - `evals/`: `run.py` (harness), `gap.py` (the `gap-dev` pack), `score.py` (metrics, gates), `bench.py` (model bench), `recorded/` (replayed model
   outputs), `results/` (committed results; CI fails on drift).
 

@@ -1,7 +1,8 @@
 """Fill runs (spec 6.3): a run lists its items as run_items; each POST /api/runs/{id}/step claims up to
 STEP_ITEMS of them in a short transaction (FOR UPDATE SKIP LOCKED), answers them outside any transaction, and
 writes one answer row per item (UNIQUE (run_id, item_id): a duplicate write does nothing). No queue, no
-worker: the browser drives the loop."""
+worker: the browser drives the loop; a gap-check step claims outcomes by their parts (CSF spec 5.7) and stores
+each part as it lands."""
 
 import logging
 import time
@@ -9,18 +10,20 @@ import uuid
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from functools import partial
 from typing import Any
 
 import openai
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import DataError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app import csf
 from app.api.errors import ModelsUnavailable, NotFound
 from app.classify import PROMPT_VERSION as CLASSIFY_PROMPT
 from app.contracts import BudgetExhausted, ItemInput, ItemResult, Spend, jsonable
-from app.db.models import Answer, Item, Questionnaire, Run, RunItem
+from app.db.models import Answer, Item, Questionnaire, Run, RunItem, SuggestedFill
 from app.draft import PROMPT_VERSION as DRAFT_PROMPT
 from app.ingest.parse import IngestError
 from app.llm.client import LLMClient, LLMError, LLMRequest, LLMResult
@@ -39,6 +42,14 @@ STALE = timedelta(
 DEADLINE_S = 240.0  # under Vercel's 300 s function limit, as in PriorPath
 MAX_ATTEMPTS = 3  # claims before an item that keeps crashing its step is answered as failed
 FAILED_TEXT = "No answer: the model call failed twice. Re-run live to try again."
+STEP_PARTS = 8  # CSF spec 5.7: a gap-check step claims outcomes until their parts add up to 8 (8 x 15 s p90)
+# An Ask-me outcome waits for the visitor (CSF spec 5.4): no retrieval, no call; gap_label shows Not answered.
+ASK: dict[str, Any] = {"label": "unknown", "value": None, "text": "", "confidence": 0.0}
+
+
+class _OutOfTime(Exception):
+    """The step's deadline passed before a part not yet stored (adversary-1 M3): the outcome goes back with
+    the parts it stored, and the next step resumes it."""
 
 
 class CostMeter:
@@ -95,29 +106,52 @@ def create_run(
     return run
 
 
-def _claim(session: Session, run_id: uuid.UUID, now: datetime) -> list[tuple[uuid.UUID, int]]:
-    """(item id, attempts before this claim), in questionnaire order; committed before any model call."""
-    rows = session.execute(
-        select(RunItem.item_id, RunItem.attempts)
-        .join(Item, Item.id == RunItem.item_id)
-        .where(
-            RunItem.run_id == run_id,
-            or_(
-                RunItem.state == "pending", and_(RunItem.state == "claimed", RunItem.claimed_at < now - STALE)
-            ),
-        )
-        .order_by(Item.position)
-        .limit(STEP_ITEMS)
-        .with_for_update(skip_locked=True, of=RunItem)
-    ).all()
+def _claim(
+    session: Session, run_id: uuid.UUID, now: datetime, *, by_parts: bool = False
+) -> list[tuple[uuid.UUID, int]]:
+    """(item id, attempts before this claim), in questionnaire order; committed before any model call. A
+    questionnaire step takes STEP_ITEMS items. A gap-check step takes outcomes until their parts add up to
+    STEP_PARTS (CSF spec 5.7): an outcome with more is taken alone, and an Ask-me outcome counts one."""
+    rows = list(
+        session.execute(
+            select(RunItem.item_id, RunItem.attempts, Item.csf_id)
+            .join(Item, Item.id == RunItem.item_id)
+            .where(
+                RunItem.run_id == run_id,
+                or_(
+                    RunItem.state == "pending",
+                    and_(RunItem.state == "claimed", RunItem.claimed_at < now - STALE),
+                ),
+            )
+            .order_by(Item.position)
+            .limit(STEP_PARTS if by_parts else STEP_ITEMS)
+            .with_for_update(skip_locked=True, of=RunItem)
+        ).all()
+    )
+    if by_parts:
+        rows = _by_parts(rows)
     if rows:
         session.execute(
             update(RunItem)
             .where(RunItem.run_id == run_id, RunItem.item_id.in_([r.item_id for r in rows]))
             .values(state="claimed", claimed_at=now, attempts=RunItem.attempts + 1)
         )
-    session.commit()
+    session.commit()  # rows locked but not taken are free again
     return [(r.item_id, r.attempts) for r in rows]
+
+
+def _by_parts(rows: list[Any]) -> list[Any]:
+    """The leading rows whose parts fit STEP_PARTS (at least one). An id the data no longer has weighs one."""
+    taken: list[Any] = []
+    total = 0
+    for r in rows:
+        o = csf.outcome_or_none(r.csf_id or "")
+        weight = max(1, len(o.parts)) if o else 1
+        if taken and total + weight > STEP_PARTS:
+            break
+        taken.append(r)
+        total += weight
+    return taken
 
 
 def _release(session: Session, run_id: uuid.UUID, item_ids: list[uuid.UUID], *, refund: bool = True) -> None:
@@ -141,6 +175,20 @@ def _retryable(exc: LLMError) -> bool:
     return not (isinstance(status, int) and 400 <= status < 500 and status not in (408, 429))
 
 
+def _once[T](session: Session, call: Callable[[], T], can_retry: Callable[[], bool]) -> T:
+    """`call`, and once more after a failed model call (a malformed reply rarely repeats). Never again on a
+    missing recording or a refused budget, nor once `can_retry` says the step's deadline has passed."""
+    try:
+        return call()
+    except (ReplayMiss, BudgetExhausted):
+        raise
+    except LLMError as exc:
+        if not _retryable(exc) or not can_retry():
+            raise
+        session.rollback()
+        return call()
+
+
 def _answer(
     session: Session,
     workspace_id: uuid.UUID,
@@ -150,18 +198,84 @@ def _answer(
     spend: Spend,
     can_retry: Callable[[], bool] = lambda: True,
 ) -> ItemResult:
-    """One item, retried once on a failed model call (a malformed reply rarely repeats). Never retries a
-    missing recording or a refused budget, nor once `can_retry` says the step's deadline has passed.
-    Plan 6B branches here on the questionnaire's source."""
-    try:
-        return answer_item(session, workspace_id, item, llm, models, spend)
-    except (ReplayMiss, BudgetExhausted):
-        raise
-    except LLMError as exc:
-        if not _retryable(exc) or not can_retry():
-            raise
-        session.rollback()
-        return answer_item(session, workspace_id, item, llm, models, spend)
+    """One questionnaire item, retried once on a failed model call (`_once`)."""
+    return _once(session, partial(answer_item, session, workspace_id, item, llm, models, spend), can_retry)
+
+
+def _is_current(o: csf.Outcome, n: int, raw: Mapping[str, Any], models: Mapping[str, str]) -> bool:
+    """A stored part still stands for part n as deployed: the same wording, judged by the same stance prompt
+    and model (adversary-1 M5). A part filled from the visitor's answer has no judge of its own; only its
+    wording counts."""
+    if not 1 <= n <= len(o.parts) or raw.get("question") != o.parts[n - 1]:
+        return False
+    judged = (raw.get("stance_prompt"), raw.get("model")) == (STANCE_PROMPT, models["stance"])
+    return judged or bool(raw.get("statement_id"))
+
+
+def _answer_outcome(
+    session: Session,
+    workspace_id: uuid.UUID,
+    run_id: uuid.UUID,
+    item_id: uuid.UUID,
+    o: csf.Outcome,
+    llm: LLMClient,
+    models: Mapping[str, str],
+    spend: Spend,
+    can_retry: Callable[[], bool],
+) -> dict[str, Any]:
+    """One gap-check outcome (CSF spec 5.2-5.5, 5.7). Ask me: no retrieval and no call. Checked: every part
+    not stored yet runs through the pipeline (each retried once, `_once`) and is stored the moment it lands,
+    so a step refused by the budget mid-outcome resumes without paying again. A stored part whose wording,
+    stance prompt or model differs from the deployed one runs again (`_is_current`). The deadline is checked
+    before each part not yet stored (`_OutOfTime`). Then code combines the parts (`outcome_values`)."""
+    if o.tier != "checked":
+        return dict(ASK)
+    have = (
+        session.scalar(select(RunItem.parts).where(RunItem.run_id == run_id, RunItem.item_id == item_id))
+        or {}
+    )
+    parts = {
+        k: have[k]
+        for n in range(1, len(o.parts) + 1)
+        if (k := str(n)) in have and _is_current(o, n, have[k], models)
+    }
+    session.commit()  # no transaction stays open into the first model call
+    for n, text in enumerate(o.parts, 1):
+        if str(n) in parts:
+            continue
+        if not can_retry():
+            raise _OutOfTime()
+        call = partial(csf.check_part, session, workspace_id, o, n, llm, models, spend)
+        judged = {"question": text, "stance_prompt": STANCE_PROMPT, "model": models["stance"]}
+        parts[str(n)] = _no_nul({**judged, **_raw(_once(session, call, can_retry))})
+        session.execute(
+            update(RunItem)
+            .where(RunItem.run_id == run_id, RunItem.item_id == item_id)
+            .values(parts=dict(parts))
+        )
+        session.commit()
+    return outcome_values(o, parts)
+
+
+def outcome_values(o: csf.Outcome, parts: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    """A Checked outcome's answer row from its stored parts, all present (CSF spec 5.3): the label by
+    `combine`, code's explanation, the parts' citations and drops. Its chunk ids are the parts' union, so a
+    metadata override finds it (app.redecide decides it again part by part); no stances of its own. Parts
+    filled from the visitor's answer are named first in the explanation (`csf.explain`), and an outcome that
+    would read Covered with any of them is Confirmed by you, citing the first one's statement (Ruling 6:
+    with a Gap or Partly part left it stays Partly covered)."""
+    raws = [parts[str(n)] for n in range(1, len(o.parts) + 1)]
+    results = [csf.part_result(o, n, r) for n, r in enumerate(raws, 1)]
+    values = _values(csf.aggregate(o, results))
+    values["chunk_ids"] = list(dict.fromkeys(c for r in raws for c in r["chunk_ids"]))
+    filled = [n for n, r in enumerate(raws, 1) if r.get("statement_id")]
+    values["statement_id"] = None
+    if filled:
+        values["text"] = _no_nul(csf.explain(o, results, filled))
+        if (values["label"], values["value"]) == ("verified", "Yes"):
+            values |= {"label": "user_confirmed", "value": None}
+            values["statement_id"] = uuid.UUID(raws[filled[0] - 1]["statement_id"])
+    return values
 
 
 def _no_nul(v: Any) -> Any:
@@ -281,8 +395,11 @@ def step(
     run = _run(session, workspace_id, run_id)
     if run.status != "running":
         return []
+    by_parts = (
+        session.scalar(select(Questionnaire.source).where(Questionnaire.id == run.questionnaire_id)) == "csf"
+    )
     deadline = clock() + DEADLINE_S
-    claimed = _claim(session, run_id, now or datetime.now(UTC))
+    claimed = _claim(session, run_id, now or datetime.now(UTC), by_parts=by_parts)
     meter = CostMeter(llm)
     spend = spender(session, workspace_id, network=network)
     answered: list[uuid.UUID] = []
@@ -297,10 +414,30 @@ def step(
             continue
         try:
             row = session.get_one(Item, item_id)
-            item = ItemInput(str(row.id), row.question, row.topic)
-            values = _values(
-                _answer(session, workspace_id, item, meter, models, spend, lambda: clock() <= deadline)
-            )
+            # an id a data refresh withdrew is answered as the question it was (adversary-1 N1)
+            o = csf.outcome_or_none(row.csf_id) if row.csf_id is not None else None
+            if o is not None:
+                values = _answer_outcome(
+                    session,
+                    workspace_id,
+                    run_id,
+                    item_id,
+                    o,
+                    meter,
+                    models,
+                    spend,
+                    lambda: clock() <= deadline,
+                )
+            else:
+                item = ItemInput(str(row.id), row.question, row.topic)
+                values = _values(
+                    _answer(session, workspace_id, item, meter, models, spend, lambda: clock() <= deadline)
+                )
+        except _OutOfTime:
+            _release(session, run_id, rest)  # refunds: the stored parts stay, the outcome was not tried out
+            _add_cost(session, run_id, meter.take())
+            session.commit()
+            break
         except (BudgetExhausted, ReplayMiss) as exc:
             session.rollback()
             refused: BudgetExhausted | None = None
@@ -359,3 +496,124 @@ def step(
         answered.append(item_id)
     _finish_if_done(session, run)
     return answered
+
+
+REOPEN = ("verified", "partial", "conflict", "unknown")  # machine labels; the visitor's own labels stay
+
+
+def machine_judged(labels: tuple[str, ...]) -> Any:
+    """Answers with a machine label, or a Checked CSF outcome that reads Confirmed by you through a part fill:
+    its other parts are still judged on the documents (review I2). An Ask-me confirmation has no parts.
+    Used by Check again and by re-decide."""
+    with_parts = (
+        select(RunItem.item_id)
+        .where(RunItem.run_id == Answer.run_id, RunItem.item_id == Answer.item_id, RunItem.parts != {})
+        .exists()
+    )
+    return or_(Answer.label.in_(labels), and_(Answer.label == "user_confirmed", with_parts))
+
+
+def _same_evidence(
+    session: Session,
+    workspace_id: uuid.UUID,
+    o: csf.Outcome,
+    n: int,
+    raw: Mapping[str, Any],
+    models: Mapping[str, str],
+) -> bool:
+    """A stored part still describes the documents: the deployed wording and judge (`_is_current`), and the
+    same passages retrieved now, as a set: decide reads them by content, not rank (adversary-1 I4).
+    Retrieval only, no model call."""
+    if not _is_current(o, n, raw, models):
+        return False
+    found = csf.evidence(session, workspace_id, csf.part_inputs(o)[n - 1])
+    return {p.chunk_id for p in found.passages} == set(raw["chunk_ids"])
+
+
+def reopen_changed(
+    session: Session,
+    workspace_id: uuid.UUID,
+    run_id: uuid.UUID,
+    models: Mapping[str, str] | None = None,
+) -> int:
+    """Check again after an upload (CSF spec 5.6; plan 6B decision 3), with no model call. A Checked outcome
+    is affected when a stored part is missing, its wording, judge or evidence changed, or its answer failed.
+    Every machine-judged part of an affected outcome is dropped, and the outcome goes back to pending with its
+    answer removed and its whole-item fills dismissed, so the step loop runs all of its parts again. A part
+    filled by a fill the visitor accepted stays, and so do the open per-part fills (a fill is the visitor's
+    answer judged against the part's wording, not the documents), and an outcome the visitor edited,
+    approved, confirmed (Ask me) or marked not applicable. A part's judge is compared with `models`, the
+    deployed ones the next step uses (review I1; default: the run's own). Lock order: the run (two presses
+    re-open once), the answers by id, then their run items, read under those locks so an accept in flight is
+    waited out and its part kept (preflight I1), then the fills. ponytail: the evidence scan (one retrieval
+    per stored part) runs under those locks, so a press blocks accepts and edits for it; fine at demo scale,
+    scan first and re-verify under the locks if it is not. Returns the outcomes re-opened; with any, the run
+    is running."""
+    run = session.scalar(
+        select(Run).where(Run.id == run_id, Run.workspace_id == workspace_id).with_for_update()
+    )
+    if run is None or run.status != "done":
+        session.commit()
+        return 0
+    answers = session.scalars(
+        select(Answer)
+        .join(Item, Item.id == Answer.item_id)
+        .where(
+            Answer.run_id == run_id,
+            Item.csf_id.is_not(None),
+            machine_judged(REOPEN),
+            Answer.edited.is_(False),
+            Answer.approved_at.is_(None),
+        )
+        .order_by(Answer.id)
+        .with_for_update(of=Answer)
+    ).all()
+    judge = models or run.models
+    failed = {a.item_id for a in answers if a.text == FAILED_TEXT}
+    rows = session.execute(
+        select(RunItem.item_id, RunItem.parts, Item.csf_id)
+        .join(Item, Item.id == RunItem.item_id)
+        .where(RunItem.run_id == run_id, RunItem.item_id.in_([a.item_id for a in answers]))
+        .order_by(Item.position)
+        .with_for_update(of=RunItem)
+    ).all()  # fetched first: _same_evidence runs queries of its own
+    reopened: dict[uuid.UUID, dict[str, Any]] = {}
+    for item_id, stored, csf_id in rows:
+        o = csf.outcome_or_none(csf_id or "")
+        if o is None or o.tier != "checked":
+            continue
+        affected = (
+            item_id in failed
+            or any(str(n) not in stored for n in range(1, len(o.parts) + 1))
+            or any(
+                not raw.get("statement_id")
+                and not _same_evidence(session, workspace_id, o, int(k), raw, judge)
+                for k, raw in stored.items()
+            )
+        )
+        if affected:  # every machine-judged part runs again; the visitor's accepted parts stay
+            reopened[item_id] = {k: raw for k, raw in stored.items() if raw.get("statement_id")}
+    for item_id, keep in reopened.items():
+        session.execute(delete(Answer).where(Answer.run_id == run_id, Answer.item_id == item_id))
+        session.execute(
+            update(RunItem)
+            .where(RunItem.run_id == run_id, RunItem.item_id == item_id)
+            .values(parts=keep, state="pending", claimed_at=None, attempts=0)
+        )
+        session.execute(
+            update(SuggestedFill)
+            .where(
+                SuggestedFill.run_id == run_id,
+                SuggestedFill.item_id == item_id,
+                SuggestedFill.part == 0,
+                SuggestedFill.status == "open",
+            )
+            .values(status="dismissed")
+        )
+    if reopened:
+        run.status, run.finished_at = "running", None
+        audit_log.record(
+            session, workspace_id, "run.recheck", ref=str(run_id), detail={"outcomes": len(reopened)}
+        )
+    session.commit()
+    return len(reopened)

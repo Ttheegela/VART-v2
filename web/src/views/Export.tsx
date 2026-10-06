@@ -30,7 +30,8 @@ export default function ExportView({ workspace, onGone, runId }: ViewProps & { r
         {data && <p className="tabular-nums">{approved} approved · {draft} draft · {unanswered} unanswered</p>}
         <p className="text-ink-2">
           The file you uploaded comes back with the answer column filled and three columns added: Status, Sources and
-          Notes. Unapproved answers are exported marked "Draft, not approved". A csv comes back as csv.
+          Notes. Unapproved answers are exported marked "Draft, not approved". A csv comes back as csv. If you ran a
+          gap check, an xlsx also gets a Gap report sheet with the latest gap check that is done, its scope and its date.
         </p>
         <p className="text-xs text-ink-3">Embedded images and charts are not kept in an exported workbook (an openpyxl limit).</p>
         <a ref={link} href={url} download aria-keyshortcuts="e" className="inline-flex h-7 items-center gap-2 bg-chrome px-2 text-sm font-medium text-on-chrome hover:bg-neutral-800">

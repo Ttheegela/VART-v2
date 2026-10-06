@@ -24,6 +24,14 @@ function ViewWithDrawer({ onA }: { onA: () => void }) {
 }
 
 describe("Shell", () => {
+  it("the gap check is view 6 and opens without a run", () => {
+    window.history.replaceState(null, "", "?view=workspace");
+    render(<Shell mode="WORKSPACE" cursor="" hints={[]} expiresAt={null}>x</Shell>);
+    const tab = screen.getByRole("link", { name: /gap check/ });
+    expect(tab).toHaveAttribute("aria-keyshortcuts", "6");
+    expect(tab).toHaveAttribute("href", "?view=gap");
+  });
+
   it("numbers the views, marks the current one and names its key", () => {
     window.history.replaceState(null, "", "?view=run&run=r1");
     render(<Shell mode="RUN" cursor="AC-04 · 4/60" hints={[["j/k", "move"]]} runId="r1" expiresAt={null}>x</Shell>);

@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Shell, goneOn404, type ViewProps } from "../components/Shell";
-import { Button, ErrorLine, LabelChip } from "../components/ui";
-import { ApiError, api, messageOf, type QuestionOut, type SuggestionOut } from "../lib/api";
+import { Button, ErrorLine, GapChip, LabelChip } from "../components/ui";
+import { ApiError, api, messageOf, type GapLabel, type QuestionOut, type SuggestionOut } from "../lib/api";
 import { useRoute } from "../lib/route";
 
 const MAX = 4000;
+/** A part's fill in the gap check's words (CSF spec 5.3; adversary-2 M4). */
+const PART_LABEL: Record<string, GapLabel> = { Yes: "covered", Partial: "partly_covered", No: "not_met" };
 
-function QuestionCard({ q, focus, onUpdated, onStale }: { q: QuestionOut; focus: boolean; onUpdated: (q: QuestionOut) => void; onStale: () => void }) {
+export function QuestionCard({ q, focus, gap = false, onUpdated, onStale }: { q: QuestionOut; focus: boolean; gap?: boolean; onUpdated: (q: QuestionOut) => void; onStale: () => void }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +55,7 @@ function QuestionCard({ q, focus, onUpdated, onStale }: { q: QuestionOut; focus:
       <div className="flex flex-wrap items-baseline gap-2 text-sm">
         <span className="font-bold">{code}</span>
         <span className="text-xs uppercase text-ink-3">{q.reason}{q.high_weight ? " · high weight" : ""}</span>
-        {q.status === "answered" && <LabelChip label="user_confirmed" />}
+        {q.status === "answered" && (gap ? <GapChip label="confirmed_by_you" tier="ask" /> : <LabelChip label="user_confirmed" />)} {/* Ruling 14 */}
         {q.status === "skipped" && <span className="text-xs text-ink-3">skipped</span>}
       </div>
       <p className="text-base [overflow-wrap:anywhere]">{q.follow_up ?? q.text}</p>
@@ -85,10 +87,12 @@ function QuestionCard({ q, focus, onUpdated, onStale }: { q: QuestionOut; focus:
         <ul className="space-y-1 border-l border-ink pl-3 text-sm">
           {fills.map((s) => (
             <li key={s.id} className="flex flex-wrap items-center gap-2">
-              <span className="font-bold">{s.code}</span><LabelChip label={s.label} />
+              <span className="font-bold">{s.code}</span>
+              {s.part ? <span className="text-xs text-ink-3">part {s.part}</span> : null /* preflight I3: question is that part's wording */}
+              {s.part ? <GapChip label={PART_LABEL[s.value ?? ""] ?? "partly_covered"} /> : <LabelChip label={s.label} />}
               <span className="min-w-0 flex-1 truncate text-ink-2">{s.question}</span>
               {s.status === "open" ? (
-                <button type="button" aria-label={`Accept fill for ${s.code}`} onClick={() => void accept(s)} className="h-7 border border-ink px-2 text-sm hover:bg-sunken">accept</button>
+                <button type="button" aria-label={`Accept fill for ${s.code}${s.part ? ` part ${s.part}` : ""}`} onClick={() => void accept(s)} className="h-7 border border-ink px-2 text-sm hover:bg-sunken">accept</button>
               ) : (
                 <span className="text-xs text-ink-3">{s.status}</span>
               )}

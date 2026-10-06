@@ -16,6 +16,7 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     Numeric,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -176,8 +177,13 @@ class RunItem(Base):
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     # Claims so far; an item whose step crashed three times is answered as failed instead of claimed again.
     attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # A CSF outcome's part results as they land (CSF spec 5.7):
+    # {"1": {"question": ..., **runs._raw(...)}, ...}; a step refused mid-outcome resumes from here without
+    # paying again. Empty for a questionnaire item.
+    parts: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
     __table_args__ = (
         CheckConstraint(_in("state", ("pending", "claimed", "done")), name="ck_run_items_state"),
+        CheckConstraint("jsonb_typeof(parts) = 'object'", name="ck_run_items_parts"),
         Index("ix_run_items_state", "run_id", "state"),
     )
 
@@ -282,9 +288,11 @@ class SuggestedFill(Base):
     dropped: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, server_default="[]")
     confidence: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     status: Mapped[str] = mapped_column(String(10), default="open", server_default="open")
+    part: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")  # CSF spec 5.6; 0: item
     created_at: Mapped[datetime] = _created_at()
     __table_args__ = (
-        UniqueConstraint("run_id", "item_id", "statement_id", name="uq_suggestions_fill"),
+        UniqueConstraint("run_id", "item_id", "statement_id", "part", name="uq_suggestions_fill"),
+        CheckConstraint("part >= 0", name="ck_suggestions_part"),
         CheckConstraint(_in("label", ("verified", "partial")), name="ck_suggestions_label"),
         CheckConstraint("value IS NULL OR value IN ('Yes', 'No', 'Partial')", name="ck_suggestions_value"),
         CheckConstraint(

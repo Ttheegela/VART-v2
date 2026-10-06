@@ -40,6 +40,7 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
 }
 _WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9.'-]*[A-Za-z0-9]|[A-Za-z0-9]")
 _FIRST_VALUE = re.compile(r"[^:;]+: ([^;]+)")
+_SOURCE = re.compile(r"[a-z]+")  # a document source (models.py: sample, upload, drive, statement)
 _COLUMNS = """c.id, c.document_id, c.line_start, c.text, c.heading, c.flags, c.as_of, c.record,
     d.filename, d.kind, d.status, d.effective_date, d.scope, d.evidence_allowed"""
 _CANDIDATES = text(
@@ -47,13 +48,14 @@ _CANDIDATES = text(
         round(ts_rank_cd(c.tsv, q.query, 1)::numeric, 6) AS cd
     FROM chunks c JOIN documents d ON d.id = c.document_id
     CROSS JOIN websearch_to_tsquery('english', :q) AS q(query)
-    WHERE c.workspace_id = :ws AND c.tsv @@ q.query
+    WHERE c.workspace_id = :ws AND c.tsv @@ q.query AND NOT d.source = ANY(CAST(:exclude AS text[]))
     ORDER BY cd DESC, d.filename, c.line_start
     LIMIT :limit"""
 )
 _RECORDS = text(
     f"""SELECT {_COLUMNS} FROM chunks c JOIN documents d ON d.id = c.document_id
-    WHERE c.workspace_id = :ws AND c.record ORDER BY d.filename, c.line_start"""
+    WHERE c.workspace_id = :ws AND c.record AND NOT d.source = ANY(CAST(:exclude AS text[]))
+    ORDER BY d.filename, c.line_start"""
 )
 _DOCUMENT = text(
     f"""SELECT {_COLUMNS} FROM chunks c JOIN documents d ON d.id = c.document_id
@@ -92,15 +94,34 @@ def _passage(row: Any) -> Passage:
     )
 
 
-def _fused(session: Session, workspace_id: uuid.UUID, query: str, rows: Sequence[Any]) -> list[Any]:
+def _fused(
+    session: Session,
+    workspace_id: uuid.UUID,
+    query: str,
+    rows: Sequence[Any],
+    exclude_sources: Sequence[str] = (),
+) -> list[Any]:
     """Reciprocal rank fusion of the cover-density order and an IDF-weighted order of the same candidates.
-    IDF comes from ts_stat over this workspace, so a term found in few chunks counts for more."""
+    IDF comes from ts_stat over this workspace, so a term found in few chunks counts for more. Chunks of
+    documents from `exclude_sources` count in neither the IDF nor the total (adversary-2 I2): storing one
+    moves no ranking."""
     inner = f"SELECT tsv FROM chunks WHERE workspace_id = '{uuid.UUID(str(workspace_id))}'"
+    if exclude_sources:  # ts_stat takes its query as text, so the sources are checked before they go in
+        if not all(_SOURCE.fullmatch(x) for x in exclude_sources):
+            raise ValueError(f"not a document source: {exclude_sources!r}")
+        listed = ", ".join(f"'{x}'" for x in exclude_sources)
+        inner += f" AND document_id NOT IN (SELECT id FROM documents WHERE source IN ({listed}))"
     ndoc: dict[str, int] = {
         w: n for w, n in session.execute(text("SELECT word, ndoc FROM ts_stat(:inner)"), {"inner": inner})
     }
     total = (
-        session.scalar(text("SELECT count(*) FROM chunks WHERE workspace_id = :ws"), {"ws": workspace_id})
+        session.scalar(
+            text(
+                """SELECT count(*) FROM chunks c JOIN documents d ON d.id = c.document_id
+                WHERE c.workspace_id = :ws AND NOT d.source = ANY(CAST(:exclude AS text[]))"""
+            ),
+            {"ws": workspace_id, "exclude": list(exclude_sources)},
+        )
         or 1
     )
     terms = set(
@@ -124,15 +145,23 @@ def _fused(session: Session, workspace_id: uuid.UUID, query: str, rows: Sequence
     return sorted(rows, key=lambda r: (-round(score[r.id], 9), r.filename, r.line_start))
 
 
-def _chunks_naming(session: Session, workspace_id: uuid.UUID, identifier: str) -> int:
+def _chunks_naming(
+    session: Session, workspace_id: uuid.UUID, identifier: str, exclude_sources: Sequence[str]
+) -> int:
     count = session.scalar(
-        text("SELECT count(*) FROM chunks WHERE workspace_id = :ws AND strpos(lower(text), lower(:i)) > 0"),
-        {"ws": workspace_id, "i": identifier},
+        text(
+            """SELECT count(*) FROM chunks c JOIN documents d ON d.id = c.document_id
+            WHERE c.workspace_id = :ws AND strpos(lower(c.text), lower(:i)) > 0
+            AND NOT d.source = ANY(CAST(:exclude AS text[]))"""
+        ),
+        {"ws": workspace_id, "i": identifier, "exclude": list(exclude_sources)},
     )
     return int(count or 0)
 
 
-def _hop(session: Session, workspace_id: uuid.UUID, chosen: Sequence[Any]) -> list[Any]:
+def _hop(
+    session: Session, workspace_id: uuid.UUID, chosen: Sequence[Any], exclude_sources: Sequence[str] = ()
+) -> list[Any]:
     """Record hop: record rows whose identifier (the row's first value: a system, asset or host name) is named
     in a selected passage and in at most HOP_MAX_CHUNKS chunks; rows of already-selected documents first.
     A row flagged injection is never added: it would reach the model (spec 6.5)."""
@@ -140,7 +169,7 @@ def _hop(session: Session, workspace_id: uuid.UUID, chosen: Sequence[Any]) -> li
     have = {r.id for r in chosen}
     docs = {r.document_id for r in chosen}
     rows = []
-    for row in session.execute(_RECORDS, {"ws": workspace_id}):
+    for row in session.execute(_RECORDS, {"ws": workspace_id, "exclude": list(exclude_sources)}):
         # ponytail: reads the first "Header: value" back out of a record line (app/text.py says lines are for
         # reading, not parsing); a value holding "; " only costs a missed or extra hop, never a citation.
         first = _FIRST_VALUE.match(row.text)
@@ -165,20 +194,28 @@ def _hop(session: Session, workspace_id: uuid.UUID, chosen: Sequence[Any]) -> li
                 break  # ponytail: a later row might have hopped; raise the cap if real inventories need it
             hops[identifier] = (
                 contains(named, identifier)
-                and _chunks_naming(session, workspace_id, identifier) <= HOP_MAX_CHUNKS
+                and _chunks_naming(session, workspace_id, identifier, exclude_sources) <= HOP_MAX_CHUNKS
             )
         if hops[identifier]:
             found.append(row)
     return found
 
 
-def retrieve(session: Session, workspace_id: uuid.UUID, question: str, topic: str | None) -> Retrieval:
-    """At most K passages for one questionnaire item, best first."""
+def retrieve(
+    session: Session,
+    workspace_id: uuid.UUID,
+    question: str,
+    topic: str | None,
+    exclude_sources: Sequence[str] = (),
+) -> Retrieval:
+    """At most K passages for one questionnaire item, best first. Documents from `exclude_sources` are never
+    candidates, so they take no slot (Plan 6B: a Checked CSF part is judged without statements)."""
     query = build_query(question, topic)
-    rows = session.execute(_CANDIDATES, {"q": query, "ws": workspace_id, "limit": CANDIDATES}).all()
+    params = {"q": query, "ws": workspace_id, "limit": CANDIDATES, "exclude": list(exclude_sources)}
+    rows = session.execute(_CANDIDATES, params).all()
     if not rows:
         return Retrieval((), ())
-    ranked = _fused(session, workspace_id, query, rows)
+    ranked = _fused(session, workspace_id, query, rows, exclude_sources)
     dropped = tuple(
         Dropped(str(r.id), str(r.document_id), r.filename, "injection")
         for r in ranked[:K]
@@ -200,7 +237,7 @@ def retrieve(session: Session, workspace_id: uuid.UUID, question: str, topic: st
                 per_doc[key] = per_doc.get(key, 0) + 1
 
     take(K - HOP)
-    chosen.extend(_hop(session, workspace_id, chosen))
+    chosen.extend(_hop(session, workspace_id, chosen, exclude_sources))
     take(K)
     return Retrieval(tuple(_passage(r) for r in chosen), dropped)
 

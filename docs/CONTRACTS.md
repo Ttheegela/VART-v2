@@ -13,13 +13,14 @@ the change log at the end, and a re-recording of the evals when a prompt or a la
 | classify | `app/classify.py` (plan2b) | `PROMPT_VERSION = "classify@p1"`; `rules(fmt, texts) -> tuple[DocMeta, bool]`; `classify(filename, parsed, llm, model, spend) -> DocMeta` | fallback only |
 | chunk | `app/chunk.py` (plan2b) | `chunk_lines(lines) -> list[ChunkSpec]`; `flags_of(text) -> tuple[Flag, ...]` | no |
 | store | `app/ingest/store.py` (plan2b) | `ingest_document(session, workspace_id, filename, data, *, source, llm, model, spend) -> Document`; `store_statement(session, workspace_id, text, *, filename, today) -> Document` | via classify |
-| retrieve | `app/retrieve.py` (2A) | `build_query(question, topic) -> str`; `retrieve(session, workspace_id, question, topic) -> Retrieval`; `document_passages(session, workspace_id, document_id) -> tuple[Passage, ...]` | no |
+| retrieve | `app/retrieve.py` (2A) | `build_query(question, topic) -> str`; `retrieve(session, workspace_id, question, topic, exclude_sources=()) -> Retrieval` (6B: documents from `exclude_sources` are neither candidates nor hopped to, and count in neither the IDF nor the chunk total; the default is unchanged); `document_passages(session, workspace_id, document_id) -> tuple[Passage, ...]` | no |
 | stance | `app/stance.py` (2A) | `PROMPT_VERSION = "stance@p3"`; `user_prompt(item, passages) -> str`; `stance(llm, item, passages, model, step="stance") -> tuple[Stance, ...]` | yes |
 | decide | `app/decide.py` (2A) | `decide(passages, stances, dropped=()) -> Decision` | no |
 | draft | `app/draft.py` (2A) | `PROMPT_VERSION = "draft@p2"`; `plain_name(filename: str) -> str`; `user_prompt(item: ItemInput, decision: Decision) -> str`; `check(text, decision, documents) -> list[str]`; `template_answer(decision) -> str`; `write_draft(llm, item, decision, model, spend, documents) -> Draft` | yes |
 | pipeline | `app/pipeline.py` (2A) | `answer_item(session, workspace_id, item, llm, models, spend) -> ItemResult`; `answer_retrieved(session, workspace_id, item, retrieval, llm, models, spend) -> ItemResult` (answer_item after its retrieval); raises `BudgetExhausted` when `spend("stance")` is refused | via stance, draft |
 | interview | `app/interview.py` (2A) | `high_weight(topic) -> bool`; `plan_queue(items) -> list[QueueEntry]`; `follow_up(question, answer) -> str or None`; `recheck(session, workspace_id, statement_id, topic, items, llm, model, spend) -> list[Suggestion]` | recheck only |
-| csf | `app/csf.py` (6A) | `framework() -> Framework`; `in_scope(scope) -> tuple[Outcome, ...]`; `item_input(o) -> ItemInput`; `gap_label(o, label, value=None, statement_id=None) -> GapLabel or None`; `questionnaire_for(session, workspace_id, scope) -> Questionnaire`; `part_inputs(o) -> tuple[ItemInput, ...]`; `evidence(session, workspace_id, item) -> Retrieval`; `check_parts(session, workspace_id, o, llm, models, spend) -> list[ItemResult]`; `part_label(r) -> PartLabel`; `combine(labels) -> PartLabel`; `explain(o, parts) -> str`; `aggregate(o, parts) -> ItemResult`; `check_outcome(session, workspace_id, o, llm, models, spend) -> ItemResult or None`; `ask_queue(outcomes, asked) -> list[QueueEntry]` | via answer_retrieved (stance only; a part's draft is never written) |
+| csf | `app/csf.py` (6A) | `framework() -> Framework`; `in_scope(scope) -> tuple[Outcome, ...]`; `item_input(o) -> ItemInput`; `gap_label(o, label, value=None, statement_id=None) -> GapLabel or None`; `questionnaire_for(session, workspace_id, scope) -> Questionnaire`; `part_inputs(o) -> tuple[ItemInput, ...]`; `evidence(session, workspace_id, item) -> Retrieval`; `check_parts(session, workspace_id, o, llm, models, spend) -> list[ItemResult]`; `part_label(r) -> PartLabel`; `combine(labels) -> PartLabel`; `explain(o, parts, filled=()) -> str`; `aggregate(o, parts) -> ItemResult`; `check_outcome(session, workspace_id, o, llm, models, spend) -> ItemResult or None`; `ask_queue(outcomes, asked) -> list[QueueEntry]`; `current_mapping(scope) -> dict[str, str]`; `check_part(session, workspace_id, o, n, llm, models, spend) -> ItemResult`; `part_result(o, n, raw) -> ItemResult`; `CONTROLS_URL` | via answer_retrieved (stance only; a part's draft is never written) |
+| runs | `app/runs.py` (6B; only these names) | `STEP_PARTS = 8`; `outcome_values(o, parts) -> dict[str, Any]`; `reopen_changed(session, workspace_id, run_id, models=None) -> int` | no |
 | budget | `app/services/llm_budget.py` | `spender(session, workspace_id) -> Spend` | no |
 
 ## Rules every unit keeps
@@ -96,12 +97,37 @@ change-log line; changing or removing a path, a field or a status needs the lead
   per call by `llm_budget.spender(session, workspace_id, network=errors.network(request))` (steps and interview
   rechecks; never through `limit`), `interview` 60 answers (through `limit`, before any write); per workspace an hour per step (`llm_budget.CAPS`); globally 1,500 model calls
   an hour and 4,000 a day.
-- Plan 6B room: `QuestionnaireOut.source` includes `csf` (with `format` `builtin`, `detected` null, and the
-  scope in `Mapping.scope`); `ItemOut.csf_id`; runs scoped by questionnaire; `GET /api/questionnaires` lists
-  built-in questionnaires. The seam is per-item dispatch in `app/runs.py` on `Questionnaire.source` /
-  `Item.csf_id`; 6B may change the internals of `_answer`, `_values` and `step` (they are not frozen), and may
-  add paths and optional fields (extending `CONTRACT` with a change-log line), but not change or remove ones
-  defined here.
+- Plan 6A (shipped): `QuestionnaireOut.source` includes `csf` (with `format` `builtin` and `detected` null);
+  `ItemOut.csf_id`; runs are scoped by questionnaire. The seam is per-item dispatch in `app/runs.py` on
+  `Questionnaire.source` / `Item.csf_id`; 6B may change the internals of `_answer`, `_values` and `step` (they
+  are not frozen), and may add paths and optional fields (extending `CONTRACT` with a change-log line), but not
+  change or remove ones defined here.
+- Gap check (Plan 6B): `GET /api/gap/{scope}` (`core` or one CSF function, lowercase) answers `GapOut`: every
+  outcome of the scope's functions in NIST's order with its tier, and the label (`app.csf.gap_label`) and
+  explanation from the latest run of the scope's current built-in questionnaire; it writes nothing. An outcome
+  the visitor marked not applicable has `GapRow.not_applicable`, no label and its reason as the explanation, on
+  either tier, and the gap sheet writes "Not applicable". An outcome whose model call failed twice has no label
+  and the failure sentence as its explanation (never Gap); the sheet writes "Failed".
+  `POST /api/gap/{scope}/run` creates or reuses that questionnaire (Plan 3 Ruling 5: built-in ones are never
+  counted, listed or deleted), locks it, and answers the run to step: a new one, the running one, or the done
+  one with every outcome whose evidence changed (compared as sets of passages) or whose answer failed re-opened
+  in full (`app.runs.reopen_changed`, CSF spec 5.6; none changed: it stays done). Two presses at once answer the
+  same run. It is counted under `run`, and 503 when the demo is full.
+  A step claims csf items until their parts add up to `STEP_PARTS` (8), stores each part's result in
+  `run_items.parts` as it lands, and checks its deadline before each part not yet stored: an outcome cut off
+  there is released with its stored parts kept and no attempt counted, and the next step resumes it.
+  A Checked part's evidence never includes statements (`retrieve(..., exclude_sources=("statement",))`, keyed on
+  `Document.source`, so no kind the visitor sets lets one in); a statement's metadata cannot be patched (409).
+  `AnswerDetail.parts` lists a Checked outcome's parts; `SuggestionOut.part` names the part a fill is for (0:
+  the whole item); on a gap-check run an answer is re-checked against the open parts in its CSF function, and
+  a re-open keeps the open per-part fills. An accepted per-part fill reads "Confirmed by you: part n" in the
+  explanation when its part is Covered (otherwise its label's words "in your answer", e.g. "Partly evidenced in
+  your answer: part n") and "(your answer)" in the sheet's quotes (keyed on `Document.source`), and the outcome is Confirmed by you only when it would
+  otherwise read Covered (an Ask-me outcome the visitor answered reads "Answered by you", Ruling 14) (one filled part with Gaps left stays Partly covered); accepting one fill never
+  closes the others.
+  On a gap-check run, `GET /api/runs/{id}/export` answers the gap-report workbook (it was a 409), and Questions
+  for you holds the Ask-me outcomes only. An xlsx questionnaire export carries the latest done gap check as a
+  `Gap report` sheet. `Mapping.scope` stays unused.
 
 ## Change log
 
@@ -163,3 +189,48 @@ change-log line; changing or removing a path, a field or a status needs the lead
 - 2026-10-06: Plan 6A merged onto Plan 3 (final review I2; an added enum value, allowed after the HTTP freeze):
   `DroppedOut.reason` is typed as `contracts.DropReason`, so it gains `"statement"`, and the evidence drawer's
   sentence table covers every `DropReason` (a test pins it). No path, field or status changed; no prompt changed.
+- 2026-10-06: Plan 6B Task 1 (added paths, optional fields and one status, allowed after the freeze; lead's OK
+  under rule 10 for the `csf` row): `GET /api/gap/{scope}`, `POST /api/gap/{scope}/run`, `GapOut`, `GapRow`,
+  `PartOut`, `AnswerDetail.parts`, `SuggestionOut.part`; a gap-check run's export is 200 (was 409); migration
+  `c4e8a2d6f1b3` (`run_items.parts`, `suggestions.part`). The `csf` row gains `current_mapping`, `check_part`,
+  `part_result` and `CONTROLS_URL`. No prompt or label changes, so nothing is re-recorded.
+- 2026-10-06: Plan 6B Task 1, preflight M5 and I3: a `runs` row records `STEP_PARTS`, `outcome_values` and
+  `reopen_changed` for Tasks 3-4 (only these names of `app/runs.py` are contract); when `SuggestionOut.part` is
+  above 0, its `question` is that part's wording (Task 4), not the outcome's.
+- 2026-10-06: Plan 6B Task 1 fix round 1 (an added optional field and wording; lead's OK, Ruling 4, under rule 10
+  for `retrieve`): `GapRow.not_applicable` (bool, default false; adversary-1 I1). `app.retrieve.retrieve` gains
+  an optional `exclude_kinds=()` (Task 4; the default keeps today's candidates, so no prompt, label or replay
+  changes and nothing is re-recorded). Recorded for the lane tasks (adversary-1 as ruled): a step checks its
+  deadline before each unstored part and releases a cut-off outcome with its parts kept (Task 2); a failed
+  outcome carries no gap label (Task 3) and is re-opened by Check again (Task 4); two first presses answer one run
+  (Task 3); accepted per-part fills read Confirmed by you, evidence is compared as sets and per-part fills survive
+  a re-open (Task 4). The 6A statements dropped by Task 1 (`source` `csf`, `ItemOut.csf_id`, the seam) are
+  restored; "`GET /api/questionnaires` lists built-in questionnaires" stays out (it never did).
+- 2026-10-06: Plan 6B Task 3 (an added sheet, no path, field or status changed): an xlsx questionnaire export
+  carries the workspace's latest done gap check as a `Gap report` sheet (a free name when the file has one,
+  compared case-insensitively), every cell inert; with no done gap check, or for a csv, the export is unchanged
+  (Tarun, 2026-10-06).
+  Bulk approve (`approve-verified`) skips a gap check's Not met outcomes (adversary-1 N3, Ruling 4; the lead).
+- 2026-10-06: Plan 6B Task 4 (an added optional argument and wording; lead's OK, Rulings 4 and 6, under rule 10
+  for `csf` and `retrieve`): `csf.explain` gains an optional `filled=()` (the part numbers filled from the
+  visitor's answer, named first as "Confirmed by you: part n"); `retrieve(..., exclude_kinds=())` is in place and
+  `csf.evidence` passes `("statement",)`, so a statement is no longer a `statement` drop but never a candidate
+  (the questionnaire path is unchanged). The gap bullet's Confirmed-by-you sentence follows Ruling 6 (Task 1
+  re-review R1). No prompt or label rule changes, so nothing is re-recorded.
+- 2026-10-06: Plan 6B Task 4 fix round 1 (an added optional argument; lead's OK, Ruling 11, under rule 10 for
+  `runs`): `reopen_changed` gains `models=None` (the deployed models a part's judge is compared with;
+  `POST /api/gap/{scope}/run` passes the settings' models, the default is the run's own), so a model change
+  re-opens an outcome once, not on every press. Check again and re-decide also take a Checked outcome that reads
+  Confirmed by you through a part fill: its document-judged parts are checked and decided again, its filled parts
+  kept. `retrieve`'s `exclude_kinds` also applies to the record hop. No prompt or label rule changes.
+- 2026-10-06: Plan 6B adversary checkpoint 2 fix (lead's OK, Ruling 12, under rule 10 for `retrieve` and `csf`):
+  `retrieve`'s `exclude_kinds` becomes `exclude_sources` and keys on `Document.source` (I1); its documents also
+  count in neither the IDF (`ts_stat`) nor the chunk total, nor the hop's chunk count (I2). The default `()` is
+  unchanged, so no questionnaire prompt, label or replay moves. `PATCH /api/documents/{id}` on a statement is a
+  409 (I1, M7). `csf.explain` names a filled part "Confirmed by you" only when the part is Covered; any other
+  filled part reads "<label words> in your answer" (M2). `PATCH /api/answers/{id}` and `POST
+  /api/answers/{id}/approve` on a gap check's outcome are a 409, and `approve-verified` skips every gap check
+  outcome (M5, M6). `GET /api/runs/{id}/export` on a gap run that is not done is a 409 (M3).
+  `AnswerSummary.sources` for Confirmed by you counts the cited documents, at least 1 (M2). No prompt or label
+  rule changes, so nothing is re-recorded.
+- 2026-10-06: Plan 6B final review fix (Ruling 14; copy and mapping only, the label id `confirmed_by_you` and the OpenAPI schema are unchanged): an Ask-me outcome the visitor answered reads "Answered by you" (view chip, drawer, sheet via `csf.gap_word`) and stays in the review set; "Confirmed by you" is only for a Checked outcome made Covered by accepted fills (Ruling 6). The failed sheet word is "Failed" (stale "Not run yet" fixed). No prompt or label rule changes, so nothing is re-recorded.

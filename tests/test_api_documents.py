@@ -88,7 +88,7 @@ def test_the_sample_pack_loads_once_in_fact_sheet_order(db: Engine) -> None:
     assert list(api.SAMPLE_ORDER) == [d.filename for d in facts.documents]
     client, _ = visitor(db)
     first = client.post("/api/documents/sample")
-    assert first.status_code == 201 and len(first.json()) == 22
+    assert first.status_code == 201 and len(first.json()) == 23
     assert [d["filename"] for d in first.json()] == list(api.SAMPLE_ORDER)
     again = client.post("/api/documents/sample")
     assert [d["id"] for d in again.json()] == [d["id"] for d in first.json()]
@@ -114,7 +114,7 @@ def test_two_tabs_loading_the_sample_at_once_store_it_once(db: Engine) -> None:
     with Session(db) as s:
         n = s.scalar(select(func.count()).select_from(Document).where(Document.workspace_id == ws_id))
         names = s.scalars(select(Document.filename).where(Document.workspace_id == ws_id)).all()
-    assert n == 22 and len(set(names)) == 22
+    assert n == 23 and len(set(names)) == 23
 
 
 def test_a_metadata_override_is_stored_as_the_users(db: Engine) -> None:
@@ -153,6 +153,28 @@ def test_an_empty_patch_changes_nothing(db: Engine) -> None:
     with Session(db) as s:
         actions = s.scalars(select(AuditEvent.action).where(AuditEvent.workspace_id == ws_id)).all()
     assert actions == ["document.upload"]
+
+
+@pytest.mark.parametrize(
+    "patch", [{"kind": "policy"}, {"status": "draft"}, {"evidence_allowed": False}, {"scope": "production"}]
+)
+def test_a_statement_is_the_visitors_answer_and_its_metadata_cannot_change(
+    db: Engine, patch: dict[str, object]
+) -> None:
+    """adversary-2 I1 and M7: a kind patch would pass the visitor's own answer off as document evidence, and
+    the engine keeps a statement's other details (nothing re-decides on them)."""
+    client, ws_id = visitor(db)
+    with Session(db) as s:
+        stmt = f.document(
+            s, s.get_one(Workspace, ws_id), source="statement", filename="answer-001.txt", kind="statement"
+        )
+        s.commit()
+        stmt_id = stmt.id
+    r = client.patch(f"/api/documents/{stmt_id}", json=patch)
+    assert r.status_code == 409 and r.json()["detail"] == api.STATEMENT_FIXED
+    with Session(db) as s:
+        d = s.get_one(Document, stmt_id)
+        assert (d.kind, d.status, d.evidence_allowed, d.scope) == ("statement", "final", True, None)
 
 
 def test_another_workspaces_document_is_a_404(db: Engine) -> None:

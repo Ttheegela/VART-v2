@@ -2,6 +2,8 @@ from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import Engine, delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -15,6 +17,7 @@ from app.db.models import (
     DocumentLine,
     LlmUsage,
     RunItem,
+    SuggestedFill,
     Workspace,
 )
 from tests import factories as f
@@ -291,3 +294,89 @@ def test_a_questionnaire_may_be_the_built_in_csf_one(s: Session) -> None:
     q = f.questionnaire(s, f.workspace(s), source="csf", filename="csf-2.0", mapping={"scope": "core"})
     s.commit()
     assert (q.source, q.mapping) == ("csf", {"scope": "core"})
+
+
+def test_a_fill_is_unique_per_part_of_an_item(db: Engine) -> None:
+    with Session(db) as s:
+        ws = f.workspace(s)
+        q = f.questionnaire(s, ws, source="csf", filename="csf-2.0")
+        it = f.item(s, q, csf_id="GV.PO-01", code="GV.PO-01", row_ref="GV.PO-01")
+        r = f.run(s, q)
+        st = f.document(s, ws, source="statement", kind="statement", filename="answer-001.txt")
+        f.suggestion(s, r, it, st, part=1)
+        f.suggestion(s, r, it, st, part=2)  # another part of the same outcome, from the same answer
+        s.commit()
+        with pytest.raises(IntegrityError, match="uq_suggestions_fill"):
+            f.suggestion(s, r, it, st, part=2)
+        s.rollback()
+        with pytest.raises(IntegrityError, match="ck_suggestions_part"):
+            f.suggestion(s, r, it, st, part=-1)
+
+
+def test_run_item_parts_start_empty_and_must_be_an_object(db: Engine) -> None:
+    with Session(db) as s:
+        ws = f.workspace(s)
+        q = f.questionnaire(s, ws, source="csf", filename="csf-2.0")
+        it = f.item(s, q, csf_id="PR.DS-11", code="PR.DS-11", row_ref="PR.DS-11")
+        r = f.run(s, q)
+        ri = RunItem(run_id=r.id, item_id=it.id)
+        s.add(ri)
+        s.commit()
+        s.refresh(ri)
+        assert ri.parts == {}
+        ri.parts = []  # type: ignore[assignment]
+        with pytest.raises(IntegrityError, match="ck_run_items_parts"):
+            s.commit()
+
+
+BEFORE_PARTS = "a7c3e9d1b2f4"  # the revision before c4e8a2d6f1b3_csf_parts
+
+
+def _csf_rows(s: Session, part: int) -> tuple[RunItem, SuggestedFill]:
+    ws = f.workspace(s)
+    q = f.questionnaire(s, ws, source="csf", filename="csf-2.0")
+    it = f.item(s, q, csf_id="GV.PO-01", code="GV.PO-01", row_ref="GV.PO-01")
+    r = f.run(s, q)
+    st = f.document(s, ws, source="statement", kind="statement", filename="answer-001.txt")
+    ri = RunItem(run_id=r.id, item_id=it.id, parts={"1": {"question": "q"}})
+    s.add(ri)
+    sg = f.suggestion(s, r, it, st, part=part)
+    s.commit()
+    return ri, sg
+
+
+def test_the_parts_downgrade_refuses_while_a_fill_is_for_one_part(db: Engine) -> None:
+    # Review I1: the narrower key could not hold two parts of one item, so the downgrade stops, schema intact.
+    cfg = Config("alembic.ini")
+    with Session(db) as s:
+        _csf_rows(s, part=1)
+    try:
+        with pytest.raises(RuntimeError, match="1 suggestion"):
+            command.downgrade(cfg, BEFORE_PARTS)
+        with db.connect() as conn:
+            assert conn.execute(text("select part from suggestions")).scalars().all() == [1]
+    finally:
+        command.upgrade(cfg, "head")
+
+
+def test_the_parts_downgrade_runs_and_existing_rows_read_the_defaults_after_upgrade(db: Engine) -> None:
+    cfg = Config("alembic.ini")
+    with Session(db) as s:
+        ri, sg = _csf_rows(s, part=0)
+        ids = (ri.run_id, ri.item_id, sg.id)
+    try:
+        command.downgrade(cfg, BEFORE_PARTS)
+        with db.connect() as conn:
+            cols = conn.execute(
+                text(
+                    "select column_name from information_schema.columns "
+                    "where (table_name, column_name) in (('run_items', 'parts'), ('suggestions', 'part'))"
+                )
+            ).all()
+            assert cols == []
+    finally:
+        command.upgrade(cfg, "head")
+    with Session(db) as s:
+        ri2 = s.get_one(RunItem, (ids[0], ids[1]))
+        assert ri2.parts == {}  # the row existed before the upgrade; it reads the server default
+        assert s.get_one(SuggestedFill, ids[2]).part == 0

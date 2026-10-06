@@ -1,10 +1,10 @@
 import { useSyncExternalStore } from "react";
 
-export type View = "home" | "workspace" | "run" | "questions" | "export" | "audit";
-export type Route = { view: View; run?: string; item?: string; questionnaire?: string };
+export type View = "home" | "workspace" | "run" | "questions" | "export" | "audit" | "gap";
+export type Route = { view: View; run?: string; item?: string; questionnaire?: string; scope?: string };
 
-const VIEWS: readonly View[] = ["home", "workspace", "run", "questions", "export", "audit"];
-const KEYS = ["run", "item", "questionnaire"] as const;
+const VIEWS: readonly View[] = ["home", "workspace", "run", "questions", "export", "audit", "gap"];
+const KEYS = ["run", "item", "questionnaire", "scope"] as const;
 
 /** Only `/` and `/api/*` exist in production, so every view lives in the query string. */
 export function readRoute(search: string = window.location.search): Route {

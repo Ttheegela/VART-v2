@@ -16,6 +16,16 @@ describe("Workspace", () => {
     expect(screen.getByText(UPLOAD_NOTICE)).toBeInTheDocument();
   });
 
+  it("offers no metadata edit for the visitor's own answer (adversary-2 I1)", async () => {
+    const answer = { ...fixtures.documents[0], id: "d2", filename: "answer-001.txt", source: "statement" as const, kind: "statement" as const };
+    mockApi({ "GET /api/documents": [...fixtures.documents, answer], "GET /api/questionnaires": [] });
+    render(<WorkspaceView {...props} />);
+    const row = await screen.findByRole("row", { name: /answer-001\.txt/ });
+    expect(within(row).queryByRole("button", { name: /^Edit / })).not.toBeInTheDocument();
+    expect(within(row).getByText("your answer")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit access-control-policy.docx" })).toBeInTheDocument();
+  });
+
   it("shows a refused upload's sentence under the control", async () => {
     mockApi({
       "GET /api/documents": [],

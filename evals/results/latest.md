@@ -9,7 +9,7 @@ Prompts: classify@p1, draft@p2, judge@p2, stance@p3.
 |---|---|---|---|
 | classification_correct | >= 1.0 | 1.0 | yes |
 | retrieval_recall_at_8 | >= 0.95 | 0.9738 | yes |
-| label_accuracy | >= 0.9 | 0.9213 | yes |
+| label_accuracy | >= 0.9 | 0.9326 | yes |
 | conflict_recall | >= 1.0 | 1.0 | yes |
 | date_rule_correct | >= 1.0 | 1.0 | yes |
 | citations_valid | >= 1.0 | 1.0 | yes |
@@ -25,20 +25,20 @@ Prompts: classify@p1, draft@p2, judge@p2, stance@p3.
 
 | Reported | Value |
 |---|---|
-| ask_precision | 0.6757 |
-| ask_recall | 0.9615 |
-| conflict_items_recall | 0.8571 |
-| conflict_precision | 0.8571 |
-| cost_usd_per_60_items | 0.0361 |
+| ask_precision | 0.7027 |
+| ask_recall | 0.963 |
+| conflict_items_recall | 0.875 |
+| conflict_precision | 0.875 |
+| cost_usd_per_60_items | 0.0335 |
 | date_rule_items_correct | 0.75 |
 | fills_false | 0.0 |
 | first_drafts_pass | 0.9565 |
-| p50_seconds_per_item | 10.35 |
+| p50_seconds_per_item | 11.12 |
 | parsing_documents_match | 1.0 |
 | parsing_key_quotes_in_one_line | 1.0 |
 | redaction_label_accuracy | 0.92 |
 | scope_notes_on_scope_traps | 0.3333 |
-| stance_accuracy | 0.9149 |
+| stance_accuracy | 0.9158 |
 
 ## Label misses
 
@@ -48,4 +48,3 @@ Prompts: classify@p1, draft@p2, judge@p2, stance@p3.
 - VSQ-35: expected partial Partial, got verified No
 - MVSP-1.4: expected verified Yes, got partial Partial
 - MVSP-2.4: expected verified Yes, got unknown
-- MVSP-2.7: expected verified Yes, got partial Partial

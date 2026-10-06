@@ -10,6 +10,7 @@ _Last updated: 2026-10-06 · Branch: `main` (origin: https://github.com/Ttheegel
 | 2 Engine and evals | done, live 2026-10-05 | engine, ingest, evals; baseline label accuracy 0.9213, recall@8 0.9738, cost $0.0361 per 60 items |
 | 3 API and UI | done, live 2026-10-06 | 27 operations, step runner, column mapper, export, console UI, Playwright flows on recorded model replies |
 | 6A CSF gap check, backend and evals | done, merged 2026-10-06 (backend only; view in 6B) | gap-dev baseline: label accuracy 0.7097 (22 of 31; reported, below the 0.80 target, accepted 2026-10-06), 9 other gates pass; 6B (view, export, README, E2E) after Plan 3 |
+| 6B CSF gap check, the visitor half | done, live 2026-10-06 | Gap check view (tab 6), per-part runner and resume, check again per affected outcome, Ask-me answers filling Govern parts, gap sheet in both exports, the planted plan in the sample pack. Dev 15/15 with label_accuracy 0.9326; gap-dev 9/9 gating with label_accuracy 0.7097 reported; E2E 7/7, 210 model calls per pass; 1771 pytest and 131 vitest before this commit |
 | 4 Hardening and launch | not started | |
 | 5 Google Drive | not started | |
 
@@ -50,6 +51,21 @@ _Last updated: 2026-10-06 · Branch: `main` (origin: https://github.com/Ttheegel
 | Live canary | ok for all three models within the release script's 180 s limit; no `length` finish |
 | Daily crons (cleanup 05:00 UTC, canary 17:00 UTC) | ok: `/api/health` at 19:58 UTC on 2026-10-05 showed `"status":"ok"` and the canary ok at 17:59 UTC that day (the canary cron ran; Hobby crons fire within their hour). The cleanup cron leaves no mark in `/api/health` |
 | Vercel builds only `main` | ok: the push of this record's PR branch made no deployment (2026-10-04) |
+
+### Plan 6B (CSF gap check, visitor half) — 2026-10-06
+- `main` = `2ff1013`, merged by PR #8 (fast-forward of `plan6b`) after green CI: gates (gitleaks over the full
+  history), backend (1773 tests; dev eval 15/15 with label accuracy 0.9326 on the 23-document sample pack; gap-dev
+  9/9 gating with label_accuracy reported), frontend (133 Vitest tests), e2e (7/7 on recorded replies, 210 model calls
+  per pass from one address).
+- Preview bundle check before the release: function 71.66 MB; all 23 sample documents and `data/csf/csf-2.0.json`
+  present.
+- `ops/setup.sh migrate` (Tarun): Neon migrated `a7c3e9d1b2f4` -> `c4e8a2d6f1b3` (additive: `run_items.parts`,
+  `suggestions.part`) before `main` moved; Plan 6A code kept serving (`/api/health` ok).
+- Production deploy READY (Git integration); `scripts/smoke.py` ok; `/api/health` `"status":"ok"`, `"db":"ok"`;
+  `/api/gap/core` without a workspace answers the expected 404.
+- Tarun on production: a core gap check started from the Gap check tab; it ran part by part as designed
+  (15 of 31 outcomes checked, $0.0359 at the time of this record). Rollback rule: roll back code only, never
+  `alembic downgrade`.
 
 ### Plan 6A (CSF gap check, backend) — 2026-10-06
 - `main` = `d071aa2`, merged by PR #7 (fast-forward of `plan6a`, which merged released Plan 3 into Plan 6A) after
@@ -126,6 +142,12 @@ plan's "Execution notes").
 | 2026-10-06 | The gap-dev key is judged blind: a judge sees NIST's text, the dev documents and the fact sheet, never engine output, and the key is derived in code from that, never hand-edited or run through the engine's combination (CSF spec 8) |
 | 2026-10-06 | Tarun accepted and reported the per-part baseline: label accuracy 0.7097 (22 of 31) against the spec's 0.80, after two judged key rounds and one per-part tuning round |
 | 2026-10-06 | The 6A `app/redact.py` change (a word of a found name also names that person) ships to every upload and Ask-me answer when 6A merges, before 6B: it is a privacy gain, at the cost of over-redacting a capitalised name word used as an ordinary word in the same line |
+| 2026-10-06 | Tarun (6B): the gap sheet goes in both exports, the gap-report workbook and the filled questionnaire's xlsx |
+| 2026-10-06 | Tarun (6B): the planted improvement plan joins the sample pack, which reverses the 6A decision that kept it gap-only; the dev keys were re-derived and the dev gates held (15/15, label accuracy 0.9326) |
+| 2026-10-06 | Tarun (6B): an Ask-me answer's fills widen to the open parts of Checked outcomes in the same CSF function, not only the same topic; a fill stays a suggestion until accepted |
+| 2026-10-06 | Tarun (6B): check again re-runs every part of each affected outcome, started by `r`, never by an upload; a part the visitor filled stays |
+| 2026-10-06 | 6B Ruling 6: accepted per-part fills make an outcome Confirmed by you only when its label would otherwise be Covered; one filled part with Gaps stays Partly covered, and accepting one fill never locks the others |
+| 2026-10-06 | 6B Ruling 13: gap-check outcomes are reviewed through Check again, not approved: bulk approve skips them, and approving or editing a gap answer answers 409 |
 | 2026-10-06 | `label_accuracy` in gap-dev is reported, not gating, with its 0.80 target kept in the table and marked "reported: below target, accepted 2026-10-06", until a later plan improves stance; every other gate gates |
 
 
@@ -137,7 +159,8 @@ plan's "Execution notes").
 - Hidden spreadsheet rows are imported like any other row.
 - Answering an interview question can deadlock against a workspace reset happening at the same moment.
 - Workspace N2 (Enter on a select) needs one check in Firefox.
-- The sample run is not precomputed yet; the cheapest way is to replay the dev recordings for `source = sample` runs.
+- The sample run is not precomputed yet; the cheapest way is to replay the dev recordings for `source = sample` runs. Tarun asked for it on 2026-10-06 ("Try with a sample company" instant, spending nothing); the draft design is in commit `1db3f3e` (Tasks 2b and 7b, reverted).
+- Tarun, 2026-10-06: a step answers its claimed items concurrently, about 3-4x faster. Draft design in commit `1db3f3e` (Task 2b).
 - SECURITY.md is still to write; it must carry the four known redaction gaps ("Last, First" order, accented all-caps names, single first names, lower-case names).
 - A run stuck in `running` blocks document deletes until the visitor resets the workspace.
 
@@ -171,14 +194,18 @@ The 9 label misses of 31 Checked outcomes, each with its cause (from `gap-parts-
 Four misses are retrieval and five are stance; combine and the key caused none.
 
 ## 6B carry-over
-From Ruling 18 (per-part design):
-- (a) Persist per-part results, so an outcome refused by the budget resumes without paying twice.
-- (b) The runner claims csf items until their parts sum to at most 8 per step.
-- (c) A per-part re-check: an accepted suggestion replaces that part before `combine`.
-- (d) The inspector shows each part's status (and a draft-only quote's document status).
+From Ruling 18 (per-part design); (a) to (d) were delivered in 6B:
+- (a) Per-part results persisted: done, 6B Task 2.
+- (b) The runner claims csf items until their parts sum to at most 8 per step: done, 6B Task 2.
+- (c) A per-part re-check, an accepted suggestion replaces that part before `combine`: done, 6B Task 4.
+- (d) The inspector shows each part's status: done, 6B Tasks 3 and 6.
+
+Carried to a later plan:
 - Stance improvement: raise `label_accuracy` to its 0.80 target (qualifier and stated-limit reads; part retrieval
   vocabulary), then make it gating again.
-- Also: `app.csf.evidence` drops statements after the top-8 cut, so filter before the cut when 6B touches retrieval.
+- `app.csf.evidence` drops statements after the top-8 cut, so filter before the cut when retrieval is next touched.
+  It still holds, and `reopen_changed` inherits it: a new Ask-me statement that reaches a part's top 8 changes that
+  part's passages and re-opens its outcome once.
 
 ## How to run
 See `CLAUDE.md` (commands) and `README.md`.

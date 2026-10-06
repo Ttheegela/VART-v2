@@ -307,7 +307,7 @@ def test_run_scores_the_whole_pack_and_deletes_only_its_own_workspaces(
     llm = FakeLLM([FAITHFUL])
     report = run.run("dev", llm, MODELS)
 
-    assert loaded == [("sample", 22), ("upload", 17)]
+    assert loaded == [("sample", 23), ("upload", 17)]
     assert stored_on == [date(2000, 1, 1)] * 2  # the two scripted answers
     assert [(r.step, r.model) for r in llm.requests] == [("judge", "m/j")]  # only the one written answer
     assert checked == [[d.filename for d in pack.facts.documents]]

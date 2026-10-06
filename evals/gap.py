@@ -25,6 +25,7 @@ from app.db.session import get_engine
 from app.draft import PROMPT_VERSION as DRAFT_PROMPT
 from app.ingest.store import ingest_document, store_statement
 from app.llm.client import LLMClient
+from app.retrieve import retrieve
 from app.stance import PROMPT_VERSION as STANCE_PROMPT
 from app.text import contains, normalize
 from datakit import csf as csf_data
@@ -191,15 +192,15 @@ def run(llm: LLMClient, models: dict[str, str]) -> dict[str, Any]:
                         session, ws.id, answers[o.id], filename=f"answer-{o.id}.txt", today=STATEMENT_DATE
                     )
                     statements[o.id] = str(doc.id)
-            # Ruling 9 probe, no model call: what each Checked outcome would now be judged on
+            # Ruling 9 probe, no model call: the statement passages plain retrieval finds for each Checked
+            # part, and how many of them its evidence keeps (6B: statements are never candidates)
             said = set(statements.values())
             probe_kept = probe_seen = 0
             for o in outcomes:
                 for item in csf.part_inputs(o):
-                    found = csf.evidence(session, ws.id, item)
-                    kept = sum(p.doc.id in said for p in found.passages)
-                    probe_kept += kept
-                    probe_seen += kept + sum(d.document_id in said for d in found.dropped)
+                    seen = retrieve(session, ws.id, item.question, item.topic)
+                    probe_seen += sum(p.doc.id in said for p in seen.passages)
+                    probe_kept += sum(p.doc.id in said for p in csf.evidence(session, ws.id, item).passages)
             stored = _stored(session, ws.id)
             kinds = {sid: session.get_one(Document, uuid.UUID(sid)).kind for sid in statements.values()}
         finally:

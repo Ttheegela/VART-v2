@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter
 from sqlalchemy import select
 
+from app import csf
 from app.api.deps import SessionDep, WorkspaceDep
 from app.api.errors import Conflict, NotFound
 from app.api.runs import summary
@@ -22,9 +23,11 @@ from app.api.schemas import (
     ItemOut,
     LineOut,
     NotApplicableIn,
+    PartOut,
 )
-from app.db.models import Answer, Chunk, Document, DocumentLine, Item
+from app.db.models import Answer, Chunk, Document, DocumentLine, Item, RunItem
 from app.redact import redact_text
+from app.runs import FAILED_TEXT
 from app.services import audit_log
 from app.text import contains
 
@@ -48,6 +51,16 @@ def _own(session: SessionDep, ws: WorkspaceDep, answer_id: uuid.UUID, *, lock: b
     if a is None:
         raise NotFound()
     return a
+
+
+def _not_gap(session: SessionDep, a: Answer) -> None:
+    """A gap check's outcome is code's finding: an edit would reach the sheet as code's words, and an edit or
+    an approval would keep Check again off it (adversary-2 M5). Its labels change only through the gap view
+    (Check again, Ask me, a fill, not applicable)."""
+    if session.scalar(select(Item.csf_id).where(Item.id == a.item_id)) is not None:
+        raise Conflict(
+            "A gap check's outcome is not edited or approved; press r in the gap check to check it again."
+        )
 
 
 def _lines(session: SessionDep, document_id: uuid.UUID, start: int, end: int) -> list[tuple[int, str]]:
@@ -80,6 +93,43 @@ def _citation(session: SessionDep, c: dict) -> CitationOut:  # type: ignore[type
     )
 
 
+def _dropped(session: SessionDep, d: dict) -> DroppedOut:  # type: ignore[type-arg]
+    line = session.scalar(select(Chunk.line_start).where(Chunk.id == uuid.UUID(d["chunk_id"])))
+    return DroppedOut(
+        reason=d["reason"],
+        document_id=uuid.UUID(d["document_id"]),
+        filename=d["filename"],
+        line=line,
+        sentence=WHY[d["reason"]],
+    )
+
+
+def _parts(session: SessionDep, a: Answer, item: Item) -> list[PartOut]:
+    """A Checked CSF outcome's parts as the runner stored them (CSF spec 5.2, carry d); [] for anything else,
+    and for an outcome whose parts are not all stored, or that failed or was marked not applicable: a cited
+    document may be gone by then (adversary-1 M2, preflight M2)."""
+    o = csf.outcome_or_none(item.csf_id) if item.csf_id else None
+    if o is None or o.tier != "checked" or a.label == "na" or a.text == FAILED_TEXT:
+        return []
+    stored = (
+        session.scalar(select(RunItem.parts).where(RunItem.run_id == a.run_id, RunItem.item_id == a.item_id))
+        or {}
+    )
+    if len(stored) != len(o.parts):
+        return []
+    return [
+        PartOut(
+            n=int(k),
+            question=raw["question"],
+            label=csf.part_label(csf.part_result(o, int(k), raw)),
+            citations=[_citation(session, c) for c in raw["citations"]],
+            dropped=[_dropped(session, d) for d in raw["dropped"]],
+            from_statement=raw.get("statement_id") is not None,
+        )
+        for k, raw in sorted(stored.items(), key=lambda kv: int(kv[0]))
+    ]
+
+
 def detail(session: SessionDep, a: Answer) -> AnswerDetail:
     citations = [_citation(session, c) for c in a.citations]
     index = {(c["chunk_id"], c["quote"]): i for i, c in enumerate(a.citations)}
@@ -100,22 +150,11 @@ def detail(session: SessionDep, a: Answer) -> AnswerDetail:
                 for side in a.conflict["sides"]
             ],
         )
-    dropped = []
-    for d in a.dropped:
-        line = session.scalar(select(Chunk.line_start).where(Chunk.id == uuid.UUID(d["chunk_id"])))
-        dropped.append(
-            DroppedOut(
-                reason=d["reason"],
-                document_id=uuid.UUID(d["document_id"]),
-                filename=d["filename"],
-                line=line,
-                sentence=WHY[d["reason"]],
-            )
-        )
+    dropped = [_dropped(session, d) for d in a.dropped]
+    item = session.get_one(Item, a.item_id)
     statement = (
         [LineOut(n=n, text=t) for n, t in _lines(session, a.statement_id, 1, 200)] if a.statement_id else []
     )
-    item = session.get_one(Item, a.item_id)
     return AnswerDetail(
         **summary(a).model_dump(),
         item=ItemOut.model_validate(item),
@@ -124,6 +163,7 @@ def detail(session: SessionDep, a: Answer) -> AnswerDetail:
         conflict=conflict,
         scope_note=a.scope_note,
         statement_lines=statement,
+        parts=_parts(session, a, item),
     )
 
 
@@ -138,8 +178,9 @@ def get_answer(answer_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -> A
 def edit_answer(
     answer_id: uuid.UUID, edit: AnswerEdit, ws: WorkspaceDep, session: SessionDep
 ) -> AnswerSummary:
-    """Edit the text; the answer becomes unapproved and `edited`."""
+    """Edit the text; the answer becomes unapproved and `edited`. 409 for a gap check's outcome."""
     a = _own(session, ws, answer_id, lock=True)
+    _not_gap(session, a)
     a.text, a.edited, a.approved_at = edit.text, True, None
     audit_log.record(session, ws.id, "answer.edit", ref=str(a.id))
     session.commit()
@@ -148,8 +189,9 @@ def edit_answer(
 
 @router.post("/api/answers/{answer_id}/approve")
 def approve_answer(answer_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -> AnswerSummary:
-    """409 for a conflict or an unknown answer (answer the question first)."""
+    """409 for a conflict or an unknown answer (answer the question first), and for a gap check's outcome."""
     a = _own(session, ws, answer_id, lock=True)
+    _not_gap(session, a)
     if a.label == "conflict":
         raise Conflict("Resolve the conflict first: answer the question for this item.")
     if a.label == "unknown":

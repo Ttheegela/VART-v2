@@ -14,14 +14,14 @@ export interface paths {
     get: operations["get_answer_api_answers__answer_id__get"];
     /**
      * Edit Answer
-     * @description Edit the text; the answer becomes unapproved and `edited`.
+     * @description Edit the text; the answer becomes unapproved and `edited`. 409 for a gap check's outcome.
      */
     patch: operations["edit_answer_api_answers__answer_id__patch"];
   };
   "/api/answers/{answer_id}/approve": {
     /**
      * Approve Answer
-     * @description 409 for a conflict or an unknown answer (answer the question first).
+     * @description 409 for a conflict or an unknown answer (answer the question first), and for a gap check's outcome.
      */
     post: operations["approve_answer_api_answers__answer_id__approve_post"];
   };
@@ -69,7 +69,9 @@ export interface paths {
     delete: operations["delete_document_api_documents__document_id__delete"];
     /**
      * Update Document
-     * @description Override metadata; every answer that used this document is decided again with no model call.
+     * @description Override metadata; every answer that used this document is decided again with no model call. 409 for
+     * the visitor's own answer (a statement): its kind would pass it off as document evidence, and nothing is
+     * decided on its other details (adversary-2 I1, M7).
      */
     patch: operations["update_document_api_documents__document_id__patch"];
   };
@@ -79,6 +81,28 @@ export interface paths {
      * @description Stored (redacted) lines `from`..`to`, at most 200.
      */
     get: operations["document_lines_api_documents__document_id__lines_get"];
+  };
+  "/api/gap/{scope}": {
+    /**
+     * Gap View
+     * @description Every outcome of the scope's functions in NIST's order (the core: all 106), each with its tier and,
+     * once the latest run of the scope's current questionnaire has answered it, its gap label and explanation.
+     * Labels are decided by code; a not-checked outcome never carries one, nor does one the visitor marked not
+     * applicable (`not_applicable`) or one whose model call failed twice. Writes nothing; no model call.
+     */
+    get: operations["gap_view_api_gap__scope__get"];
+  };
+  "/api/gap/{scope}/run": {
+    /**
+     * Start Gap
+     * @description Start or continue the gap check for this scope, then call POST /api/runs/{id}/step while `running`.
+     * Creates (or reuses) the workspace's built-in questionnaire for the scope; it is never counted, listed or
+     * deleted with the visitor's questionnaires. Answers a new run when none exists on it, the running one, or
+     * the done one with every outcome whose evidence changed since (a new upload) re-opened, all of its parts;
+     * with nothing changed it stays done and no model is called. 429 per network (`run`, 20 an hour); 503 when
+     * the demo is full. Two presses at once answer the same run (the questionnaire is locked first).
+     */
+    post: operations["start_gap_api_gap__scope__run_post"];
   };
   "/api/health": {
     /** Health */
@@ -170,7 +194,8 @@ export interface paths {
     /**
      * Approve Verified
      * @description Approve every verified answer not yet approved (design key A). An edited answer is left for a look
-     * (adversary-1 M5): approve it by itself; `skipped_edited` counts them.
+     * (adversary-1 M5): approve it by itself; `skipped_edited` counts them. A gap check's outcomes are never
+     * approved (adversary-2 M5).
      */
     post: operations["approve_verified_api_runs__run_id__approve_verified_post"];
   };
@@ -180,7 +205,10 @@ export interface paths {
      * @description The original file with the answer column filled and Status, Sources and Notes columns added; csv in,
      * csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
      * with =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The
-     * response is an attachment with an ASCII-safe file name. 429 per network (`export`, 60 an hour).
+     * response is an attachment with an ASCII-safe file name. A gap-check run answers the gap-report workbook
+     * instead (CSF spec 7), 409 while it is running. An xlsx questionnaire's export also carries the
+     * workspace's latest done gap check as a `Gap report` sheet (renamed `Gap report (2)` and so on if the file
+     * has one), stating its scope and run date; a csv is unchanged. 429 per network (`export`, 60 an hour).
      */
     get: operations["export_run_api_runs__run_id__export_get"];
   };
@@ -258,6 +286,11 @@ export interface components {
        * @enum {string}
        */
       label: "verified" | "partial" | "conflict" | "unknown" | "user_confirmed" | "na";
+      /**
+       * Parts
+       * @default []
+       */
+      parts?: components["schemas"]["PartOut"][];
       /** Scope Note */
       scope_note: string | null;
       /** Sources */
@@ -578,6 +611,64 @@ export interface components {
       /** Detail */
       detail: string;
     };
+    /** GapOut */
+    GapOut: {
+      /** Controls Url */
+      controls_url: string;
+      /** Csf Version */
+      csf_version: string;
+      /** Retrieved */
+      retrieved: string;
+      /** Rows */
+      rows: components["schemas"]["GapRow"][];
+      run: components["schemas"]["RunOut"] | null;
+      /**
+       * Scope
+       * @enum {string}
+       */
+      scope: "core" | "govern" | "identify" | "protect" | "detect" | "respond" | "recover";
+    };
+    /**
+     * GapRow
+     * @description One CSF 2.0 outcome in the Gap check view (CSF spec 7). An outcome the visitor marked not applicable
+     * has `not_applicable` set, `label` None and the visitor's reason as `explanation`, on either tier
+     * (adversary-1 I1). An outcome whose model call failed twice has `label` None and the failure sentence as
+     * `explanation`, never a gap label (adversary-1 M4).
+     */
+    GapRow: {
+      /** Answer Id */
+      answer_id: string | null;
+      /** Category */
+      category: string;
+      /** Csf Id */
+      csf_id: string;
+      /** Explanation */
+      explanation: string | null;
+      /** Function */
+      function: string;
+      /** Item Id */
+      item_id: string | null;
+      /** Label */
+      label: ("covered" | "partly_covered" | "not_met" | "documents_disagree" | "gap" | "confirmed_by_you" | "not_answered") | null;
+      /**
+       * Not Applicable
+       * @default false
+       */
+      not_applicable?: boolean;
+      /** Outcome */
+      outcome: string;
+      /** Related Controls */
+      related_controls: string[];
+      /** Source Url */
+      source_url: string;
+      /** Sources */
+      sources: number;
+      /**
+       * Tier
+       * @enum {string}
+       */
+      tier: "checked" | "ask" | "not_checked";
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -663,6 +754,28 @@ export interface components {
     NotApplicableIn: {
       /** Reason */
       reason: string;
+    };
+    /**
+     * PartOut
+     * @description One part of a Checked CSF outcome (CSF spec 5.2, carry d): its own label and its own cited lines, each
+     * with the document's status (a draft-only quote shows `draft`).
+     */
+    PartOut: {
+      /** Citations */
+      citations: components["schemas"]["CitationOut"][];
+      /** Dropped */
+      dropped: components["schemas"]["DroppedOut"][];
+      /** From Statement */
+      from_statement: boolean;
+      /**
+       * Label
+       * @enum {string}
+       */
+      label: "covered" | "partly_covered" | "not_met" | "documents_disagree" | "gap";
+      /** N */
+      n: number;
+      /** Question */
+      question: string;
     };
     /** PreviewRow */
     PreviewRow: {
@@ -861,6 +974,11 @@ export interface components {
        * @enum {string}
        */
       label: "verified" | "partial";
+      /**
+       * Part
+       * @default 0
+       */
+      part?: number;
       /** Question */
       question: string;
       /**
@@ -980,7 +1098,7 @@ export interface operations {
   };
   /**
    * Edit Answer
-   * @description Edit the text; the answer becomes unapproved and `edited`.
+   * @description Edit the text; the answer becomes unapproved and `edited`. 409 for a gap check's outcome.
    */
   edit_answer_api_answers__answer_id__patch: {
     parameters: {
@@ -1040,7 +1158,7 @@ export interface operations {
   };
   /**
    * Approve Answer
-   * @description 409 for a conflict or an unknown answer (answer the question first).
+   * @description 409 for a conflict or an unknown answer (answer the question first), and for a gap check's outcome.
    */
   approve_answer_api_answers__answer_id__approve_post: {
     parameters: {
@@ -1398,7 +1516,9 @@ export interface operations {
   };
   /**
    * Update Document
-   * @description Override metadata; every answer that used this document is decided again with no model call.
+   * @description Override metadata; every answer that used this document is decided again with no model call. 409 for
+   * the visitor's own answer (a statement): its kind would pass it off as document evidence, and nothing is
+   * decided on its other details (adversary-2 I1, M7).
    */
   update_document_api_documents__document_id__patch: {
     parameters: {
@@ -1499,6 +1619,124 @@ export interface operations {
       422: {
         content: {
           "application/json": components["schemas"]["ErrorOut"] | components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description A per-network limit or the model budget; see Retry-After */
+      429: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description The demo is full, or model calls are off */
+      503: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  /**
+   * Gap View
+   * @description Every outcome of the scope's functions in NIST's order (the core: all 106), each with its tier and,
+   * once the latest run of the scope's current questionnaire has answered it, its gap label and explanation.
+   * Labels are decided by code; a not-checked outcome never carries one, nor does one the visitor marked not
+   * applicable (`not_applicable`) or one whose model call failed twice. Writes nothing; no model call.
+   */
+  gap_view_api_gap__scope__get: {
+    parameters: {
+      path: {
+        scope: "core" | "govern" | "identify" | "protect" | "detect" | "respond" | "recover";
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["GapOut"];
+        };
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unknown id, another workspace's id, or the workspace is gone */
+      404: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description The action conflicts with the item's state */
+      409: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description A per-network limit or the model budget; see Retry-After */
+      429: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description The demo is full, or model calls are off */
+      503: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  /**
+   * Start Gap
+   * @description Start or continue the gap check for this scope, then call POST /api/runs/{id}/step while `running`.
+   * Creates (or reuses) the workspace's built-in questionnaire for the scope; it is never counted, listed or
+   * deleted with the visitor's questionnaires. Answers a new run when none exists on it, the running one, or
+   * the done one with every outcome whose evidence changed since (a new upload) re-opened, all of its parts;
+   * with nothing changed it stays done and no model is called. 429 per network (`run`, 20 an hour); 503 when
+   * the demo is full. Two presses at once answer the same run (the questionnaire is locked first).
+   */
+  start_gap_api_gap__scope__run_post: {
+    parameters: {
+      path: {
+        scope: "core" | "govern" | "identify" | "protect" | "detect" | "respond" | "recover";
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["RunOut"];
+        };
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unknown id, another workspace's id, or the workspace is gone */
+      404: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description The action conflicts with the item's state */
+      409: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
       /** @description A per-network limit or the model budget; see Retry-After */
@@ -2146,7 +2384,8 @@ export interface operations {
   /**
    * Approve Verified
    * @description Approve every verified answer not yet approved (design key A). An edited answer is left for a look
-   * (adversary-1 M5): approve it by itself; `skipped_edited` counts them.
+   * (adversary-1 M5): approve it by itself; `skipped_edited` counts them. A gap check's outcomes are never
+   * approved (adversary-2 M5).
    */
   approve_verified_api_runs__run_id__approve_verified_post: {
     parameters: {
@@ -2204,7 +2443,10 @@ export interface operations {
    * @description The original file with the answer column filled and Status, Sources and Notes columns added; csv in,
    * csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
    * with =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The
-   * response is an attachment with an ASCII-safe file name. 429 per network (`export`, 60 an hour).
+   * response is an attachment with an ASCII-safe file name. A gap-check run answers the gap-report workbook
+   * instead (CSF spec 7), 409 while it is running. An xlsx questionnaire's export also carries the
+   * workspace's latest done gap check as a `Gap report` sheet (renamed `Gap report (2)` and so on if the file
+   * has one), stating its scope and run date; a csv is unchanged. 429 per network (`export`, 60 an hour).
    */
   export_run_api_runs__run_id__export_get: {
     parameters: {

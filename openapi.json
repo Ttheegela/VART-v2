@@ -64,6 +64,14 @@
             "title": "Label",
             "type": "string"
           },
+          "parts": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PartOut"
+            },
+            "title": "Parts",
+            "type": "array"
+          },
           "scope_note": {
             "anyOf": [
               {
@@ -962,6 +970,183 @@
         "title": "ErrorOut",
         "type": "object"
       },
+      "GapOut": {
+        "properties": {
+          "controls_url": {
+            "title": "Controls Url",
+            "type": "string"
+          },
+          "csf_version": {
+            "title": "Csf Version",
+            "type": "string"
+          },
+          "retrieved": {
+            "title": "Retrieved",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/GapRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scope": {
+            "enum": [
+              "core",
+              "govern",
+              "identify",
+              "protect",
+              "detect",
+              "respond",
+              "recover"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "csf_version",
+          "retrieved",
+          "controls_url",
+          "run",
+          "rows"
+        ],
+        "title": "GapOut",
+        "type": "object"
+      },
+      "GapRow": {
+        "description": "One CSF 2.0 outcome in the Gap check view (CSF spec 7). An outcome the visitor marked not applicable\nhas `not_applicable` set, `label` None and the visitor's reason as `explanation`, on either tier\n(adversary-1 I1). An outcome whose model call failed twice has `label` None and the failure sentence as\n`explanation`, never a gap label (adversary-1 M4).",
+        "properties": {
+          "answer_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Id"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "csf_id": {
+            "title": "Csf Id",
+            "type": "string"
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation"
+          },
+          "function": {
+            "title": "Function",
+            "type": "string"
+          },
+          "item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "enum": [
+                  "covered",
+                  "partly_covered",
+                  "not_met",
+                  "documents_disagree",
+                  "gap",
+                  "confirmed_by_you",
+                  "not_answered"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "not_applicable": {
+            "default": false,
+            "title": "Not Applicable",
+            "type": "boolean"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "related_controls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Related Controls",
+            "type": "array"
+          },
+          "source_url": {
+            "title": "Source Url",
+            "type": "string"
+          },
+          "sources": {
+            "title": "Sources",
+            "type": "integer"
+          },
+          "tier": {
+            "enum": [
+              "checked",
+              "ask",
+              "not_checked"
+            ],
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csf_id",
+          "function",
+          "category",
+          "outcome",
+          "related_controls",
+          "source_url",
+          "tier",
+          "item_id",
+          "answer_id",
+          "label",
+          "explanation",
+          "sources"
+        ],
+        "title": "GapRow",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1227,6 +1412,58 @@
           "reason"
         ],
         "title": "NotApplicableIn",
+        "type": "object"
+      },
+      "PartOut": {
+        "description": "One part of a Checked CSF outcome (CSF spec 5.2, carry d): its own label and its own cited lines, each\nwith the document's status (a draft-only quote shows `draft`).",
+        "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/CitationOut"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "dropped": {
+            "items": {
+              "$ref": "#/components/schemas/DroppedOut"
+            },
+            "title": "Dropped",
+            "type": "array"
+          },
+          "from_statement": {
+            "title": "From Statement",
+            "type": "boolean"
+          },
+          "label": {
+            "enum": [
+              "covered",
+              "partly_covered",
+              "not_met",
+              "documents_disagree",
+              "gap"
+            ],
+            "title": "Label",
+            "type": "string"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "n",
+          "question",
+          "label",
+          "citations",
+          "dropped",
+          "from_statement"
+        ],
+        "title": "PartOut",
         "type": "object"
       },
       "PreviewRow": {
@@ -1769,6 +2006,11 @@
             "title": "Label",
             "type": "string"
           },
+          "part": {
+            "default": 0,
+            "title": "Part",
+            "type": "integer"
+          },
           "question": {
             "title": "Question",
             "type": "string"
@@ -1999,7 +2241,7 @@
         ]
       },
       "patch": {
-        "description": "Edit the text; the answer becomes unapproved and `edited`.",
+        "description": "Edit the text; the answer becomes unapproved and `edited`. 409 for a gap check's outcome.",
         "operationId": "edit_answer_api_answers__answer_id__patch",
         "parameters": [
           {
@@ -2103,7 +2345,7 @@
     },
     "/api/answers/{answer_id}/approve": {
       "post": {
-        "description": "409 for a conflict or an unknown answer (answer the question first).",
+        "description": "409 for a conflict or an unknown answer (answer the question first), and for a gap check's outcome.",
         "operationId": "approve_answer_api_answers__answer_id__approve_post",
         "parameters": [
           {
@@ -2711,7 +2953,7 @@
         ]
       },
       "patch": {
-        "description": "Override metadata; every answer that used this document is decided again with no model call.",
+        "description": "Override metadata; every answer that used this document is decided again with no model call. 409 for\nthe visitor's own answer (a statement): its kind would pass it off as document evidence, and nothing is\ndecided on its other details (adversary-2 I1, M7).",
         "operationId": "update_document_api_documents__document_id__patch",
         "parameters": [
           {
@@ -2941,6 +3183,210 @@
         "summary": "Document Lines",
         "tags": [
           "documents"
+        ]
+      }
+    },
+    "/api/gap/{scope}": {
+      "get": {
+        "description": "Every outcome of the scope's functions in NIST's order (the core: all 106), each with its tier and,\nonce the latest run of the scope's current questionnaire has answered it, its gap label and explanation.\nLabels are decided by code; a not-checked outcome never carries one, nor does one the visitor marked not\napplicable (`not_applicable`) or one whose model call failed twice. Writes nothing; no model call.",
+        "operationId": "gap_view_api_gap__scope__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "enum": [
+                "core",
+                "govern",
+                "identify",
+                "protect",
+                "detect",
+                "respond",
+                "recover"
+              ],
+              "title": "Scope",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Gap View",
+        "tags": [
+          "gap"
+        ]
+      }
+    },
+    "/api/gap/{scope}/run": {
+      "post": {
+        "description": "Start or continue the gap check for this scope, then call POST /api/runs/{id}/step while `running`.\nCreates (or reuses) the workspace's built-in questionnaire for the scope; it is never counted, listed or\ndeleted with the visitor's questionnaires. Answers a new run when none exists on it, the running one, or\nthe done one with every outcome whose evidence changed since (a new upload) re-opened, all of its parts;\nwith nothing changed it stays done and no model is called. 429 per network (`run`, 20 an hour); 503 when\nthe demo is full. Two presses at once answer the same run (the questionnaire is locked first).",
+        "operationId": "start_gap_api_gap__scope__run_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "enum": [
+                "core",
+                "govern",
+                "identify",
+                "protect",
+                "detect",
+                "respond",
+                "recover"
+              ],
+              "title": "Scope",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Start Gap",
+        "tags": [
+          "gap"
         ]
       }
     },
@@ -4028,7 +4474,7 @@
     },
     "/api/runs/{run_id}/approve-verified": {
       "post": {
-        "description": "Approve every verified answer not yet approved (design key A). An edited answer is left for a look\n(adversary-1 M5): approve it by itself; `skipped_edited` counts them.",
+        "description": "Approve every verified answer not yet approved (design key A). An edited answer is left for a look\n(adversary-1 M5): approve it by itself; `skipped_edited` counts them. A gap check's outcomes are never\napproved (adversary-2 M5).",
         "operationId": "approve_verified_api_runs__run_id__approve_verified_post",
         "parameters": [
           {
@@ -4122,7 +4568,7 @@
     },
     "/api/runs/{run_id}/export": {
       "get": {
-        "description": "The original file with the answer column filled and Status, Sources and Notes columns added; csv in,\ncsv out. Unapproved answers read \"Draft, not approved\". Every cell written is inert text: a value starting\nwith =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The\nresponse is an attachment with an ASCII-safe file name. 429 per network (`export`, 60 an hour).",
+        "description": "The original file with the answer column filled and Status, Sources and Notes columns added; csv in,\ncsv out. Unapproved answers read \"Draft, not approved\". Every cell written is inert text: a value starting\nwith =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The\nresponse is an attachment with an ASCII-safe file name. A gap-check run answers the gap-report workbook\ninstead (CSF spec 7), 409 while it is running. An xlsx questionnaire's export also carries the\nworkspace's latest done gap check as a `Gap report` sheet (renamed `Gap report (2)` and so on if the file\nhas one), stating its scope and run date; a csv is unchanged. 429 per network (`export`, 60 an hour).",
         "operationId": "export_run_api_runs__run_id__export_get",
         "parameters": [
           {
