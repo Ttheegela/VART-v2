@@ -26,11 +26,11 @@ quotes the company's own line and NIST's own text, with a link to the official s
 |---|---|
 | Which framework first | NIST CSF 2.0, with each outcome's related NIST SP 800-53 rev5 controls shown as links. Both are US government works (public domain). |
 | Where results appear | A separate **Gap check** view next to the questionnaire run. |
-| How it works | Approach A: each CSF outcome becomes a fixed built-in question, run through the existing `answer_item` pipeline unchanged. |
+| How it works | Approach A, per part (amended 2026-10-06). Each Checked outcome is cut into its NIST **parts** by a fixed rule (section 4), and the parts are stored as data in `data/csf/tiers.yaml`. Each part runs as a fixed built-in question through the existing pipeline, unchanged: retrieve, stance, decide. Code then combines the parts' labels into the outcome's label (5.3). Why: with one question per outcome, stance could not tell a line that answers one part from a line that answers all of them, and a union of part-lines could never reach Covered (gap-tune-2 diagnosis). |
 | Which outcomes | All ~106 CSF 2.0 outcomes are stored. v1 checks a curated core of about 30 against documents (**Checked**), asks the visitor about about 5 (**Ask me**), and lists the rest as **Not checked yet**. The visitor can run the whole core or one CSF function. |
 | Source format | One bundled JSON file, downloaded from NIST once and committed. No runtime API, no RAG over CSF (the run walks every outcome in scope; there is nothing to search). Retrieval (RAG) runs over the company's documents, as today. Google's Open Knowledge Format was considered; an OKF export can come later if the data needs to be shared with other agents. |
 | Legal framing | Never legal advice. Every finding reads "possible gap, review it"; the view and the export say so. |
-| Not chosen | regulations.gov (proposed rules and comment dockets, not codified rules: a later "rules coming soon" feed at most); paid frameworks (SOC 2 criteria, ISO 27001 text); per-passage classification (approach B) and a single model review (approach C, which breaks "code decides labels"). |
+| Not chosen | regulations.gov (proposed rules and comment dockets, not codified rules: at most a later "rules coming soon" feed); paid frameworks (SOC 2 criteria, ISO 27001 text); per-passage classification (approach B); a single model review (approach C, which breaks "code decides labels"). For parts-aware labels (2026-10-06), also not chosen: a cap that lowers Covered over one question (it only lowers labels and cannot build Covered from separate lines); a shared stance-prompt change (it risks the dev pack's 0.90 gate and cannot build Covered from separate lines either). |
 
 ## 3. Scope
 
@@ -60,11 +60,35 @@ One entry per CSF 2.0 outcome (subcategory):
 | `source_url` | NIST's page for the outcome | NIST |
 | `tier` | `checked`, `ask`, or `not_checked` | VART |
 | `question` | a fixed retrieval-friendly phrasing (checked and ask tiers only) | VART |
+| `parts` | `["Are backups of data created?", "Are backups of data protected?", ...]`: the outcome cut by the rule below, as yes/no questions in NIST's order (Checked tier only, at least one) | VART |
 | `csf_version`, `retrieved` | `2.0`, the download date | VART |
 
 Rules:
-- What the visitor sees as "the framework" is always NIST's verbatim `outcome` text. Only `question` and `tier` are
-  VART's.
+- What the visitor sees as "the framework" is always NIST's verbatim `outcome` text. Only `tier`, `question` and
+  `parts` are VART's.
+- **The cut**, which uses NIST's text only and is the same for every outcome:
+  1. Every verb in a list of verbs is a part ("reviewed, updated, communicated, and enforced" gives four parts). So
+     is every gerund in such a list ("receiving, analyzing, and responding").
+  2. In a sentence with one verb, a comma list of three or more nouns is cut wherever it stands, one part per item
+     ("software, services, and systems"). That includes a list inside a qualifier ("based on classification,
+     criticality, resources, and impact on the mission" gives four parts); the qualifier's other words stay on every
+     part. In a sentence with a list of verbs, the nouns are not cut.
+  3. A pair of nouns joined by "and" is never cut ("identities and credentials", "hardware and software", "internal
+     and external stakeholders").
+  4. A qualifier is never a part of its own, and apart from rule 2's lists it is never cut. A qualifier is a phrase that says how, when, from where
+     or why ("based on ...", "commensurate with risk", "to reflect changes in ...", "in normal and adverse
+     situations", "once ...", "in coordination with ..."). It stays on the verb it follows in NIST's text.
+  5. A second predicate ("and incorporate the principles of ...") is cut by the same rules.
+  6. There are no exceptions.
+- **Wording.** A part uses NIST's words for its outcome (the outcome and category text) plus question words. Any
+  other word may appear only inside an example clause ("such as ...", "for example ...") and must be listed for that
+  outcome in `paraphrase_words`, mapped to the word of NIST's text it is an instance of (`encryption: protected`).
+  An outcome has at most three such words. A part never adds a requirement, a document name or a quote. Every word
+  of NIST's outcome appears in at least one part. `python -m datakit.validate csf` fails otherwise.
+- **The parts are frozen once recorded.** After the first gap-dev recording under parts, any change to a part counts
+  as a tuning round under the plan's rules: adding, removing, merging, splitting or rewording one. Each change needs
+  a `tiers.yaml` change-log line that cites the NIST clause, and the baseline report lists it. A re-cut also shows in
+  the per-part report of `evals/results/gap-dev.json`.
 - A unit test re-reads the committed NIST source extract and fails if any `id`, `outcome`, `related_controls` or URL
   differs, or if a control ID is not a valid SP 800-53 rev5 identifier.
 - Refreshing the file is a deliberate change with a new `retrieved` date, a re-run of the eval and a change-log line.
@@ -85,11 +109,17 @@ Rules:
 1. In the Gap check view the visitor picks the scope — the whole core, or one CSF function — and starts a run (key `r`).
    It creates (or reuses) the workspace's built-in CSF questionnaire for that scope and starts an ordinary run with the same run machinery, per-run and per-IP budget caps, and expiry
    as questionnaire runs.
-2. **Checked outcomes** run through `answer_item` unchanged, with the outcome's `question` as the item text:
-   retrieve the top passages from the uploaded and sample documents → stance per passage (yes / no / partial, with the
-   whole quoted sentence) → decide (code, spec 6.7 unchanged) → draft a one-to-two sentence explanation, checked
-   against its quotes.
-3. **Gap labels** are a display mapping over decide's output (decide itself does not change):
+2. **Checked outcomes run part by part.** For each part, in order, the part's text is the item text and the CSF
+   category is the topic. The pipeline retrieves the top passages from the uploaded and sample documents, drops any
+   stored statement (Ruling 9), takes a stance per passage (yes / no / partial, quoting the whole sentence) and runs
+   decide (code, spec 6.7 unchanged). This is `answer_retrieved`, unchanged. A part's own draft is refused before it
+   is spent, so it makes no model call and costs nothing; the outcome's explanation is written by code (step 3). The
+   budget is spent before every stance call, and no database transaction is open while a model runs. The parts'
+   own results stay available to the caller (`check_parts`) for diagnosis, the inspector and re-check.
+
+Replace step 3 with:
+
+3. **Gap labels.** Each part's decide output maps through this table (decide itself does not change):
 
    | Decide output | Gap check label | Meaning |
    |---|---|---|
@@ -99,13 +129,73 @@ Rules:
    | `conflict` | **Documents disagree** | e.g. the policy says quarterly reviews, the log shows them overdue |
    | `unknown` | **Gap** | no usable evidence in the documents |
 
+   The outcome's label combines its parts' labels in code. The first rule that applies wins:
+
+   1. **Documents disagree**: any part is Documents disagree. Until a person says which document is current, no other
+      label is safe to show, and Ruling 15 ranks a real final-vs-final conflict above missing parts. The explanation
+      still names any part stated as not done.
+   2. **Not met (stated)**: any part is Not met (a verified No). If a document says one part is not done, the outcome
+      is not met, however well its other parts are evidenced. Partly covered would hide the non-compliance alert.
+      Only a stated No counts: a part that is partial with a no line in it stays Partly covered.
+   3. **Covered**: every part is Covered. Every clause of the outcome has a final, verified yes.
+   4. **Gap**: every part is Gap. Nothing in the documents speaks to any clause.
+   5. **Partly covered**: any other mix, for example yes with unknown, or any partial part.
+
+   For an outcome with one part, the result is that part's label, so the table above is the single-part case.
+
+   **The outcome's Decision is a display record.** Its label and value come from the combination above. Its
+   citations are the union of the parts' citations in part order, with duplicates removed (same document, lines,
+   quote and stance). Each citation keeps the stance its own part judged it with (`Citation.stance`), so 6B shows
+   the stance next to the quote. Because of this, the record does not satisfy decide's per-label rule: a Not met
+   outcome can carry the yes citations of its evidenced parts.
+
+   The citations rule (`ck_answers_cited`) still holds. Every outcome that is Covered, Partly covered, Not met or
+   Documents disagree has at least one part that decide did not label unknown, and decide gives such a part at
+   least one citation. So no Covered or Partly result is ever stored without a citation. A Gap outcome cites nothing.
+
+   **The explanation is written by code, with no model call.** It has two pieces:
+   - Groups of part numbers by label: "Evidenced: parts 1, 2. Stated as not done: part 3."
+   - For each part that decided the outcome's label, that part's question followed by its own template answer
+     (`app.draft.template_answer` over the part's own Decision). For Documents disagree, these are the disagreeing
+     parts. For Not met, the stated-No parts. For Covered, every part. For Partly covered, the Covered and Partly
+     covered parts. For Gap, there are none.
+
+   This way a quote always stands next to the stance it was judged with, a "No." is never printed over yes lines,
+   and every disagreeing part's sides are shown. The quotes are cited lines. The explanation is code's text and is
+   not passed through the draft answer check.
+
+   One draft call per outcome was not chosen, for three reasons:
+   - The draft prompt cannot name parts without changing, and that change is frozen and would mean re-recording the
+     dev pack.
+   - The part labels are already known exactly in code.
+   - The call is cheap but not free: about $0.003 and 70 s per core run.
+
 4. **Ask-me outcomes** skip retrieval and go to *Questions for you*. An answer is redacted, stored as a statement
    (`store_statement`) and shown as **Confirmed by you**, citing the statement; unanswered ones show **Not answered**.
    A later upload re-checks them through the existing `recheck`.
 5. **Not-checked outcomes** make no model call and carry no label: they show NIST's text, links and "not checked in this
    version".
-6. **Re-check:** a new upload or an answered question re-runs only the affected outcomes, as for questionnaires.
-7. **Cost:** about 35 outcomes per full-core run, below a 60-item questionnaire run; it uses the existing caps.
+6. **Re-check:** a new upload or an answered question re-runs only the affected outcomes, as for questionnaires, and
+   for a Checked outcome it runs per part (Plan 6B builds it):
+   - The interview re-check takes one open item per part (key `<id>#<n>`) with that part's label. A part is open
+     when it is Gap, Partly covered or Documents disagree.
+   - A suggestion is for one part. Accepting it replaces that part's result, then re-runs the combination and the
+     explanation; it never replaces the outcome's Decision directly.
+   - A new upload re-runs every part of the affected outcomes.
+7. **Cost and the runner:**
+   - **Size.** The core's 31 Checked outcomes have 73 parts. A full core run therefore makes at most 73 stance calls,
+     one per part with passages, and no draft calls. Parts with identical text share a recorded reply, so the eval's
+     record run makes 72 live calls.
+   - **Price and time.** At the eval models' recorded prices ($0.0010 and 10.4 s per stance call, p90 15 s), that
+     is about $0.07 and about 13 minutes, run one after another.
+   - **The hourly cap.** The per-workspace hourly stance cap is 150, and a core run uses about half of it. One core
+     run plus a 60-item questionnaire run is 133 calls. A second core run, or a re-check, in the same hour can be
+     refused partway: `answer_retrieved` raises `BudgetExhausted` inside an outcome, and the parts already paid for
+     are lost unless they are kept. The caps do not change. Plan 6B stores each part's result as it lands, so a
+     step resumed in the next hour re-runs only the unpaid parts.
+   - **Claiming items.** A step claims csf items until their parts add up to 8 or fewer. That is 8 x 15 s = 120 s at
+     p90, inside the step's 240 s deadline (spec 6.3). An outcome with more than 8 parts would be claimed alone; no
+     v1 outcome has more than 5.
 
 ## 6. Data model
 
@@ -116,6 +206,8 @@ The schema already fits: runs belong to a questionnaire, and `items.csf_id` exis
 - Its items are ordinary `items` rows: `question` = the outcome's `question`, `code` = the CSF `id`, `csf_id` = the CSF
   `id`, `topic` = the CSF category. Runs, run items and answers are unchanged, including the `ck_answers_cited`
   constraint (no Covered or Partly result without a citation).
+- Items keep the outcome's `question`. The parts live only in the CSF data file and are covered by the
+  questionnaire's digest: a changed part gives the next run a new questionnaire. There is no parts table.
 - The CSF data file is read-only reference data, not stored in the database beyond the items a run creates.
 
 ## 7. View (design direction C, `design.md`)
@@ -139,10 +231,26 @@ The schema already fits: runs belong to a questionnaire, and `items.csf_id` exis
 
 A new eval pack, `gap-dev`, over the existing dev company documents (no new documents unless an outcome needs one).
 
-**Answer key.** One expected label per Checked outcome with the quote that proves it, derived by code from the dev
-pack's fact sheet (`datakit` key derivation, as for questionnaires): nobody hand-writes answers to match the engine.
-Planted on purpose: at least two **Documents disagree** outcomes, at least two **Not met (stated)** outcomes, at least
-two honest **Gaps**, and trap outcomes where only a template, a draft or a planned-only sentence mentions the control.
+**Answer key.** The key holds one expected label per Checked outcome, at the outcome level, with the quotes that
+prove it. Code derives it from the dev pack's fact sheet and its gap extension (`datakit.gap`, using `derive_key`'s
+rules), so nobody writes answers to match the engine.
+
+A blind judge may correct the extension's map of an outcome. The judge sees NIST's text, the documents and the fact
+sheet, and never the engine's output. If the judge finds the documents cover only some of a broad outcome's parts,
+the outcome gets `label: partly_covered`, with `missing:` naming the parts that lack evidence and `missing_parts:`
+giving their numbers.
+
+A planted Documents disagree must be visible to the part that asks the question. `datakit.gap` refuses a CSF
+conflict whose no side is neither negated nor a record status (for example "performed annually" against "quarterly",
+which is a no only against a stated threshold).
+
+The key is never derived through the engine's combination of parts, so a mistake in the precedence rules cannot sit
+in both the engine and the key, where the label-accuracy gate could not see it. Nobody edits
+`data/dev/key/csf-core.yaml` by hand.
+
+The planted cases stay as they are: at least two **Documents disagree** outcomes, at least two **Not met (stated)**
+outcomes, at least two honest **Gaps**, and trap outcomes where only a template, a draft or a planned-only sentence
+mentions the control.
 
 **Gates** (tightened after the first baseline to max(spec value, baseline - 0.02), as in the main spec):
 
@@ -150,13 +258,15 @@ two honest **Gaps**, and trap outcomes where only a template, a draft or a plann
 |---|---|
 | Cited coverage | every Covered and Partly result cites a line that contains its quote: 1.00 |
 | Trap coverage | a template, draft-only or planned-only source never yields Covered: 0 |
-| Label accuracy | on Checked outcomes: ≥ 0.80 |
+| Label accuracy | the outcome's combined label on Checked outcomes: ≥ 0.80 |
 | Disagreements caught | recall on planted Documents-disagree outcomes: 1.0 |
 | Stated non-compliance | recall on planted Not-met outcomes: 1.0 |
 | NIST text intact | unit test, section 4: all pass |
 | Honest tiers | Not-checked outcomes carry no label; Ask-me labels come only from a stored statement: all pass |
 | Redaction | names and secrets in Ask-me answers never reach a model (existing leak scan): 0 |
-| Cost and speed | USD and p50 seconds per full-core run: reported |
+| Cost and speed | USD and seconds (the sum of call latencies, one run) per full-core run, every part included: reported |
+| Retrieval | `retrieval_recall_at_8` keeps its name and now measures the key quotes found in the union of the parts' passages: reported |
+| Part agreement | over the outcomes whose key names `missing_parts`, the share where the engine left every missing part Gap or Partly covered and did not leave all the other parts Gap: reported, not a gate. It is degenerate for a one-part override, where any Gap or Partly covered on that part counts as agreement. |
 
 Every gate fails closed when it has nothing to measure. CI replays recorded model outputs; recording uses the capped
 eval key.
@@ -174,10 +284,28 @@ data, committed and tested; nothing from it is executed. NIST text is quoted, no
 | Visitors read a gap report as a compliance verdict | "Possible gap — review it" wording, coverage line, not-legal-advice footer, no overall score |
 | A fixed question phrasing misses evidence worded differently | retrieval recall is measured on the gap pack; phrasings are tuned within the plan's tuning rules, never per document |
 | NIST revises CSF | the file carries its version and date; refresh is deliberate and re-runs the evals |
-| Outcomes are broad, documents are specific | Partly covered is the honest default for partial evidence; the explanation names what is missing |
+| Outcomes are broad, documents are specific | parts make the breadth explicit: Partly covered when only some parts have evidence, and the explanation names which parts |
+| A part adds a requirement NIST does not state, or the parts drop a clause | the csf validate stage fails on any word outside NIST's outcome and category text and the question words, unless it stands in an example clause and is mapped to a NIST word (at most three per outcome). It also fails on any word of NIST's outcome that no part carries. |
+| The cut decides labels (a no line in its own part gives Not met; inside a larger part it gives Partly covered) | the cut follows NIST's text by a fixed rule with no exceptions (section 4), and the parts are frozen once recorded: each change is a tuning round with a change-log line that cites NIST |
+| A qualifier stays on one verb ("enforced commensurate with risk"), so that part needs a line that states the qualifier | an accepted ceiling: that part's Covered needs the qualifier evidenced. The other verbs' parts do not repeat it, so a missing qualifier lowers one part, not every part. |
+| NIST's literal text has parts few companies document. "Availability of data in transit" is almost never a written line, so PR.DS-02 is Partly covered for a company that has only TLS | an accepted ceiling. It is NIST's own text, and the explanation names the part. Nobody tunes a part or the key toward it. |
+| A disagreement that is only one interval against another (quarterly vs annually) cannot be seen by a part that states no threshold, and a part may not add one | it is reported in the key's `missing`, not planted as Documents disagree; `datakit.gap` refuses such a planted conflict |
+| More parts mean more ways to fall short of Covered, or to pick up a generic line on an expected Gap | Covered needs every part verified Yes, which is the honest bar. The per-part report shows which part cited which line. |
+| Cost and time grow with the parts (73 stance calls instead of 31 stance and 25 draft calls) | the parts follow NIST's clauses and nothing more; there is no draft call; the runner claims by parts (5.7) |
+| A line read too broadly still answers a part (RS.CO-02: a disaster-recovery role read as incident notification) | a known limit of per-passage stance. It is reported as a miss and not tuned. |
 
 ## 11. Definition of done
 
 The data file and its drift test; the built-in CSF questionnaire; the view and export; the `gap-dev` pack, key and gates all
 green on replay; the README explains what the gap check is and is not; Tarun approves the tiers' exact IDs and the
 first baseline.
+
+## 12. Change log
+
+- 2026-10-06: per-part questions (option A, approved by Tarun; lead Rulings 15 and 17). Sections 2, 4, 5.2, 5.3,
+  5.6, 5.7, 6, 8 and 10. Each Checked outcome is cut into NIST parts by a fixed rule. Each part runs through the
+  pipeline unchanged, and code combines the parts' labels (disagree, not met, covered, gap, partly) and writes the
+  explanation from the deciding parts. decide, stance, the draft prompt, `answer_item` and the dev pack are
+  unchanged. gap-dev is re-recorded. The key adopts blind judge 2's changes and its per-part re-judge: PR.DS-11 and
+  PR.DS-02 are Partly covered, and the key holds 12 Covered, 12 Partly covered, 2 Not met, 2 Documents disagree and 3
+  Gap.

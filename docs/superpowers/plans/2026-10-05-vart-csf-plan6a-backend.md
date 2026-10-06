@@ -33,7 +33,7 @@
 - "What the visitor sees as 'the framework' is always NIST's verbatim `outcome` text. Only `question` and `tier` are VART's." (CSF spec 4)
 - "Refreshing the file is a deliberate change with a new `retrieved` date, a re-run of the eval and a change-log line." (CSF spec 4) The change log is the comment block at the top of `data/csf/tiers.yaml`.
 - Decide does not change (CSF spec 5.3): gap labels are computed from `Decision.label` and `Decision.value` only. `app/decide.py`, `app/text.py`, `app/patterns.py`, `app/contracts.py` and the signatures in `docs/CONTRACTS.md` are not edited by any task; no frozen signature needs to change. Adding a new row for `app/csf.py` to `docs/CONTRACTS.md` (Task 7) needs the lead's OK and a change-log line (CLAUDE.md rule 10).
-- Engine code spends the budget before every model call and holds no database transaction across one (CLAUDE.md rule 11): `check_outcome` reaches a model only through `answer_item`, which already does both; Ask-me and not-checked outcomes make no model call (CSF spec 5.4-5.5).
+- Engine code spends the budget before every model call and holds no database transaction across one (CLAUDE.md rule 11): `check_outcome` reaches a model only through `answer_retrieved`, once per part (`check_parts`), with each part's draft refused before anything is spent (Task 8); Ask-me and not-checked outcomes make no model call (CSF spec 5.4-5.5).
 - `ck_answers_cited` is unchanged: no Covered or Partly covered result without a citation (CSF spec 6).
 - "Uploads and Ask-me answers are redacted before any model call" (CSF spec 9): Ask-me answers go through `store_statement`, which redacts like an upload.
 - "Every gate fails closed when it has nothing to measure. CI replays recorded model outputs; recording uses the capped eval key." (CSF spec 8) Gates tighten after the first baseline to max(spec value, baseline - 0.02).
@@ -2083,7 +2083,7 @@ alembic upgrade head
 (set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.run --pack gap-dev --mode record)
 ```
 
-Expected: about 58 model calls (a stance and a draft per Checked outcome with passages; none for Ask-me or not-checked), cents, a few minutes; the last line reads `N/8 gates pass`. A failed stance call stops the run; running it again resumes from the recordings already made. A stance reply that does not parse is recorded before it is rejected: delete that row from `evals/recorded/gap-dev.jsonl` or re-run with `--refresh stance`.
+Expected: 73 stance requests (72 live calls: GV.PO-02 part 3 replays GV.PO-01 part 2's recording) and no draft calls, cents, a few minutes; the last line reads `N/8 gates pass`. A failed stance call stops the run; running it again resumes from the recordings already made. A stance reply that does not parse is recorded before it is rejected: delete that row from `evals/recorded/gap-dev.jsonl` or re-run with `--refresh stance`.
 
 - [ ] **Step 2: Commit the recordings and results**
 
@@ -2116,7 +2116,7 @@ git commit -m "evals: gap-dev gates tightened from the approved baseline" -m "Co
 
 `CLAUDE.md` map: in the Engine line add `app/csf.py` (CSF 2.0 gap check: framework, built-in questionnaire, gap labels); add a line `data/csf/` (NIST CSF 2.0 extract, `tiers.yaml`, built `csf-2.0.json`; `python -m datakit.csf build`) and `data/dev/gap/` (the gap check's fact-sheet extension; `python -m datakit.gap dev`); in `evals/` add `gap.py` (the `gap-dev` pack) and in Commands `python -m evals.run --pack gap-dev`.
 
-`docs/CONTRACTS.md` (lead's OK, rule 10): add a row `| csf | app/csf.py (6A) | framework() -> Framework; in_scope(scope) -> tuple[Outcome, ...]; item_input(o) -> ItemInput; gap_label(o, label, value=None, statement_id=None) -> GapLabel or None; questionnaire_for(session, workspace_id, scope) -> Questionnaire; check_outcome(session, workspace_id, o, llm, models, spend) -> ItemResult or None; ask_queue(outcomes, asked) -> list[QueueEntry] | via answer_item |` and a change-log line `- <date>: csf unit added (Plan 6A); no existing signature changed.`
+`docs/CONTRACTS.md` (lead's OK, rule 10): add a row `| csf | app/csf.py (6A) | framework() -> Framework; in_scope(scope) -> tuple[Outcome, ...]; item_input(o) -> ItemInput; gap_label(o, label, value=None, statement_id=None) -> GapLabel or None; questionnaire_for(session, workspace_id, scope) -> Questionnaire; check_outcome(session, workspace_id, o, llm, models, spend) -> ItemResult or None; ask_queue(outcomes, asked) -> list[QueueEntry]; part_inputs(o) -> tuple[ItemInput, ...]; part_label(r) -> PartLabel; combine(labels) -> PartLabel; explain(o, parts) -> str; aggregate(o, parts) -> ItemResult; check_parts(session, workspace_id, o, llm, models, spend) -> list[ItemResult]; evidence(session, workspace_id, item) -> Retrieval | via answer_retrieved per part |` and a change-log line `- <date>: csf unit added (Plan 6A); no existing signature changed.`
 
 `docs/PROGRESS.md`: an at-a-glance row `6A CSF gap check, backend and evals | done | gap-dev baseline <label accuracy>; 6B (view, export, README, E2E) after Plan 3`, and decision rows dated the merge day for execution-note decisions 1-6 and "The gap check's planted cases live in a gap-only extension of the dev pack (data/dev/gap), so the questionnaire eval is unchanged".
 
@@ -2131,8 +2131,1482 @@ git commit -m "docs, ci: gap-dev replayed in CI; CSF gap check in the map, contr
 
 The final Opus review of `main..plan6a`. On a clean review the lead sends Tarun the release plan: (1) push `plan6a` and open a pull request to `main`; (2) wait for green CI; (3) Tarun runs `ops/setup.sh migrate` from the branch head (Task 2's migration reaches Neon before `main` moves); (4) fast-forward `main` and push. No visitor-facing change ships until 6B. Push and release only on his OK.
 
+### Task 8: Per-part questions
+
+**Review Focus**
+1. **Precedence and the explanation.** Documents disagree beats Not met (stated), which beats Covered, then Gap,
+   then Partly covered. The explanation quotes only the parts that decided the label, each with its own stance, so a
+   "No." never sits over yes lines (adversary C2). Pinned by the table test, the exhaustive test over every mix of
+   up to three parts, and the A/B/C test.
+2. **Citations (`ck_answers_cited`).** No Covered, Partly covered, Not met or Documents disagree outcome is left
+   without a citation, and a Gap outcome cites nothing. The citations are the parts' union, deduplicated with stance
+   in the key, and each keeps its own part's stance. The outcome's Decision is a display record. Pinned exhaustively.
+3. **The cut and the wording.** The cut is mechanical and uses NIST's text only (spec 4, amended): every listed verb
+   is a part; in a sentence with one verb, a comma list of three or more nouns is a part per noun wherever it
+   stands, inside a qualifier too (Ruling 19); pairs are never cut, and a qualifier is never a part of its own and
+   stays on the verb it follows. The csf stage fails on any added word that is not in an example
+   clause, is not mapped to a NIST word, or would make more than three on its outcome, and on any dropped NIST word.
+   The reviewer checks the 73-row table in Step 2 against the rule.
+4. **Hard rule 11, part by part.** Each part spends the budget before its stance call. No part spends on a draft or
+   calls one. No transaction is open during any part's model call. A refused budget stops the outcome after the
+   parts it paid for. Pinned in `tests/test_csf_parts.py`.
+5. **The key is independent and visible.** Expected labels stay at the outcome level, from judge 2 and its per-part
+   re-judge of PR.DS-01 and PR.DS-02: 12 Covered, 12 Partly covered, 2 Not met, 2 Documents disagree, 3 Gap. PR.DS-11
+   keeps its Partly covered override; its interval disagreement cannot be planted (C1). PR.DS-02 is Partly covered
+   because availability in transit has no line. Every override names `missing_parts`, and `part_agreement` is reported
+   without being a gate. The key is never computed through `combine`. The dev pack replays 15/15 with no diff.
+
+**Where it runs.** After tune round 1 (61484b2) and before Task 7 Step 5. Tarun chose option A on 2026-10-06.
+Rulings 15, 17, 18 and 19 govern it. Ruling 17 accepts adversary checkpoint 2 in full. Ruling 19 settles the
+recheck: the per-part re-judge of PR.DS-01 and PR.DS-02 is already done (`gap-key-judge-2.md`, "Re-judge per part")
+and is folded into Step 10, so no step here runs a judge. The tuning count restarts at no more than 2 rounds, then Tarun decides (Ruling 16). Step 1 and Steps 13-14
+belong to the lead; the implementer runs Steps 2-12.
+
+**Reviewer:** Opus (the aggregation and the key).
+
+**Files:**
+- Modify:
+  - `data/csf/tiers.yaml`: `parts`, `paraphrase_words`, ID.AM-08's question (Ruling 14), and change-log lines
+  - `data/csf/csf-2.0.json`: rebuilt
+  - `datakit/csf.py`, `tests/datakit/test_csf.py`
+  - `datakit/schemas.py`: `GapOutcome.missing_parts`
+  - `datakit/gap.py`, `tests/datakit/test_gap.py`
+  - `data/dev/gap/facts.yaml`
+  - `data/dev/key/csf-core.yaml`: re-derived, never edited by hand
+  - `app/csf.py`, `tests/test_csf_framework.py`
+  - `evals/gap.py`, `tests/test_eval_gap.py`
+- Create: `tests/test_csf_parts.py`
+- Lead only:
+  - the CSF spec and this plan's text (Step 1)
+  - the 6B carries in `progress.md` (Step 1)
+  - `evals/recorded/gap-dev.jsonl` and `evals/results/gap-dev.{json,md}` (Step 13)
+- Not touched: `app/contracts.py`, `docs/CONTRACTS.md`, `app/decide.py`, `app/stance.py`, `app/draft.py`,
+  `app/pipeline.py`, `app/retrieve.py`, `app/interview.py`, `app/text.py`, `app/patterns.py`,
+  `app/services/llm_budget.py`, and all of the dev pack
+
+**Interfaces:**
+- Consumes:
+  - `app.pipeline.answer_retrieved(session, workspace_id, item, retrieval, llm, models, spend) -> ItemResult` (unchanged)
+  - `app.draft.template_answer(decision) -> str`
+  - `app.decide.CONFIDENCE` and `app.decide.QUOTE_FAILURES`
+  - `app.retrieve.retrieve(session, workspace_id, question, topic)`
+  - `datakit.derive_key.is_usable_evidence`, `datakit.gap.derive_gap`
+- Produces, in `app/csf.py`:
+  - `PartLabel = Literal["covered", "partly_covered", "not_met", "documents_disagree", "gap"]` (`_CHECKED` now maps
+    to it)
+  - `Outcome.parts: tuple[str, ...] = ()`, its last field, non-empty exactly when `tier == "checked"` (checked at load)
+  - `part_inputs(o) -> tuple[ItemInput, ...]`, with keys `"<id>#<n>"`
+  - `part_label(r: ItemResult) -> PartLabel`
+  - `combine(labels: Sequence[PartLabel]) -> PartLabel`
+  - `explain(o, parts: Sequence[ItemResult]) -> str`
+  - `aggregate(o, parts: Sequence[ItemResult]) -> ItemResult`
+  - `check_parts(session, workspace_id, o, llm, models, spend) -> list[ItemResult]` (`[]` for Ask me; `ValueError`
+    for not checked)
+  - `PART_WORDS`, and `_DECIDE: dict[PartLabel, tuple[Label, Value | None]]`
+  - `evidence(session, workspace_id, item: ItemInput) -> Retrieval` (its last argument was `o: Outcome`)
+  - `check_outcome` keeps its signature and returns `aggregate(o, check_parts(...))`, or `None` for Ask me.
+- Produces, in `datakit/csf.py`:
+  - `FRAME`, `MAX_PARAPHRASE = 3`
+  - `words(text) -> list[str]`, `added_words(part, nist) -> list[str]`
+  - `build` writes `"parts"` on every outcome (`[]` unless checked)
+  - `problems` names every bad part.
+- Produces, elsewhere:
+  - `datakit.schemas.GapOutcome.missing_parts: tuple[int, ...] = ()`
+  - `datakit.gap.check` gains the override and conflict checks
+  - `evals.gap`: `GapPack.missing_parts`, `GapObserved.parts`, the `part_agreement` metric (reported), and
+    `items[<id>]["parts"]` and `["explanation"]` in `gap-dev.json`
+- Frozen contracts: no change. Step 1 updates the text of the `csf` row that Task 7 Step 6 will add.
+
+- [ ] **Step 1 (lead): apply the amendment, the plan edits and the 6B carries**
+
+Apply `spec-amendment-parts.md` (revision 2) to the CSF spec. Then edit this plan:
+- **Global Constraints**, the hard-rule-11 bullet: "`check_outcome` reaches a model only through
+  `answer_retrieved`, once per part (`check_parts`), with each part's draft refused before anything is spent (Task
+  8)".
+- **Task 7 Step 1**: "73 stance requests (72 live calls: GV.PO-02 part 3 replays GV.PO-01 part 2's recording)
+  and no draft calls".
+- **Task 7 Step 6**, the `csf` row: add `part_inputs(o) -> tuple[ItemInput, ...]; part_label(r) -> PartLabel;
+  combine(labels) -> PartLabel; explain(o, parts) -> str; aggregate(o, parts) -> ItemResult; check_parts(session,
+  workspace_id, o, llm, models, spend) -> list[ItemResult]; evidence(session, workspace_id, item) -> Retrieval`,
+  and change "via answer_item" to "via answer_retrieved per part".
+- **Self-review notes**, the counts line: "106 outcomes, 31 Checked, 5 Ask-me, 70 not checked, 36 in the core, 7 in
+  Govern, 73 parts; expected 12 Covered, 12 Partly covered, 2 Not met, 2 Documents disagree, 3 Gap".
+
+Add these 6B carries to `progress.md`:
+- (a) Store each part's result as it lands, so a step refused by the hourly stance cap resumes without paying again
+  for parts already done (spec 5.7, adversary I5).
+- (b) The runner claims csf items until their parts add up to 8 or fewer per step (spec 5.7, I6).
+- (c) Re-check per part: an open item per part key, and an accepted suggestion replaces that part's result before
+  `combine` and `explain` run again (spec 5.6, I8).
+- (d) The inspector shows each part's label, citations with their stance, and the document's status next to a
+  draft-only quote (`check_parts`; minor M8).
+
+Commit on the plan branch:
+
+```bash
+git add docs/superpowers/specs/2026-10-05-vart-csf-gap-check-design.md docs/superpowers/plans/2026-10-05-vart-csf-plan6a-backend.md
+git commit -m "docs(csf): per-part questions (option A), spec amendment and Task 8" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+- [ ] **Step 2: Write the parts into `data/csf/tiers.yaml`**
+
+The cut is spec 4's (amended) rule, applied to NIST's text only, the same for every outcome, with no exceptions:
+1. Every listed verb is a part, and so is every listed gerund.
+2. A sentence with one verb is cut at any comma list of three or more nouns, wherever it stands, inside a
+   qualifier too. The rest of the qualifier stays on every part (Ruling 19).
+3. A pair joined by "and" is never cut.
+4. A qualifier is never a part of its own and stays on the verb it follows.
+5. A second predicate is cut by the same rules.
+
+The middle column of the table below quotes the NIST words each part comes from. A part may keep the example clause
+the outcome's approved question had (Rulings 11a, 13 and 14): its words stand after "such as" or "for example" and
+are mapped to the NIST word they are an instance of.
+
+Two notes:
+- PR.DS-01 and PR.DS-02 are cut into confidentiality, integrity and availability by rule 2. Judge 2 re-judged both
+  per part (`gap-key-judge-2.md`, "Re-judge per part"). PR.DS-01 stays Covered, and Step 10 registers its integrity
+  line. PR.DS-02 becomes Partly covered: no line protects availability in transit.
+- ID.AM-05's four-noun list sits inside its "based on" qualifier. Rule 2 cuts it, so the outcome has four parts.
+- GV.PO-02 part 3 is the same text as GV.PO-01 part 2, so the two share a recording key. That is harmless: same
+  question, same passages, same stance (minor M3).
+
+That gives 31 outcomes and 73 parts:
+
+| Outcome | # | NIST clause, as written | Part |
+|---|---|---|---|
+| GV.PO-01 | 1 | is established based on organizational context, cybersecurity strategy, and priorities | Is the policy for managing cybersecurity risks established based on organizational context, cybersecurity strategy and priorities? |
+|  | 2 | is communicated | Is the policy for managing cybersecurity risks communicated? |
+|  | 3 | [is] enforced | Is the policy for managing cybersecurity risks enforced? |
+| GV.PO-02 | 1 | is reviewed | Is the policy for managing cybersecurity risks reviewed? |
+|  | 2 | updated | Is the policy for managing cybersecurity risks updated? |
+|  | 3 | communicated | Is the policy for managing cybersecurity risks communicated? |
+|  | 4 | and enforced to reflect changes in requirements, threats, technology, and organizational mission | Is the policy for managing cybersecurity risks enforced to reflect changes in requirements, threats, technology and organizational mission? |
+| ID.AM-01 | 1 | Inventories of hardware ... are maintained | Are inventories of hardware managed by the organization maintained? |
+| ID.AM-02 | 1 | software | Are inventories of software managed by the organization maintained? |
+|  | 2 | services | Are inventories of services managed by the organization maintained? |
+|  | 3 | and systems | Are inventories of systems managed by the organization maintained? |
+| ID.AM-03 | 1 | Representations of ... authorized network communication and internal and external network data flows are maintained | Are representations of the organization's authorized network communication and internal and external network data flows maintained? |
+| ID.AM-05 | 1 | prioritized based on classification | Are assets prioritized based on classification? |
+|  | 2 | criticality | Are assets prioritized based on criticality? |
+|  | 3 | resources | Are assets prioritized based on resources? |
+|  | 4 | and impact on the mission | Are assets prioritized based on impact on the mission? |
+| ID.AM-08 | 1 | Systems | Are systems managed throughout their life cycles, for example from acquisition to retirement? |
+|  | 2 | hardware | Is hardware managed throughout its life cycle, for example from acquisition to retirement? |
+|  | 3 | software | Is software managed throughout its life cycle, for example from acquisition to retirement? |
+|  | 4 | services | Are services managed throughout their life cycles, for example from acquisition to retirement? |
+|  | 5 | and data | Is data managed throughout its life cycle, for example from acquisition to retirement? |
+| ID.RA-01 | 1 | identified | Are vulnerabilities in assets identified? |
+|  | 2 | validated | Are vulnerabilities in assets validated? |
+|  | 3 | and recorded | Are vulnerabilities in assets recorded? |
+| ID.RA-02 | 1 | Cyber threat intelligence is received from information sharing forums and sources | Is cyber threat intelligence received from information sharing forums and sources? |
+| ID.RA-08 | 1 | Processes for receiving | Are processes for receiving vulnerability disclosures established? |
+|  | 2 | analyzing | Are processes for analyzing vulnerability disclosures established? |
+|  | 3 | and responding to vulnerability disclosures are established | Are processes for responding to vulnerability disclosures established? |
+| PR.AA-01 | 1 | authorized users | Are identities and credentials for authorized users managed by the organization? |
+|  | 2 | services | Are identities and credentials for services managed by the organization? |
+|  | 3 | and hardware | Are identities and credentials for hardware managed by the organization? |
+| PR.AA-03 | 1 | Users | Are users authenticated? |
+|  | 2 | services | Are services authenticated? |
+|  | 3 | and hardware | Is hardware authenticated? |
+| PR.AA-05 | 1 | are defined in a policy | Are access permissions, entitlements and authorizations defined in a policy? |
+|  | 2 | managed | Are access permissions, entitlements and authorizations managed? |
+|  | 3 | enforced | Are access permissions, entitlements and authorizations enforced? |
+|  | 4 | and reviewed | Are access permissions, entitlements and authorizations reviewed? |
+|  | 5 | and incorporate the principles of least privilege and separation of duties | Do access permissions, entitlements and authorizations incorporate the principles of least privilege and separation of duties? |
+| PR.AA-06 | 1 | managed | Is physical access to assets managed? |
+|  | 2 | monitored | Is physical access to assets monitored? |
+|  | 3 | and enforced commensurate with risk | Is physical access to assets enforced commensurate with risk? |
+| PR.DS-01 | 1 | The confidentiality | Is the confidentiality of data at rest protected, for example by encryption? |
+|  | 2 | integrity | Is the integrity of data at rest protected? |
+|  | 3 | and availability of data-at-rest are protected | Is the availability of data at rest protected? |
+| PR.DS-02 | 1 | The confidentiality | Is the confidentiality of data in transit protected, for example by encryption? |
+|  | 2 | integrity | Is the integrity of data in transit protected? |
+|  | 3 | and availability of data-in-transit are protected | Is the availability of data in transit protected? |
+| PR.DS-11 | 1 | created | Are backups of data created? |
+|  | 2 | protected | Are backups of data protected? |
+|  | 3 | maintained | Are backups of data maintained? |
+|  | 4 | and tested | Are backups of data tested? |
+| PR.PS-01 | 1 | established | Are configuration management practices, such as baseline configurations and change control, established? |
+|  | 2 | and applied | Are configuration management practices, such as baseline configurations and change control, applied? |
+| PR.PS-02 | 1 | maintained | Is software maintained? |
+|  | 2 | replaced | Is software replaced? |
+|  | 3 | and removed commensurate with risk | Is software removed commensurate with risk? |
+| PR.PS-04 | 1 | Log records are generated | Are log records generated? |
+|  | 2 | and made available for continuous monitoring | Are log records made available for continuous monitoring, for example centrally? |
+| PR.PS-06 | 1 | practices are integrated | Are secure software development practices, such as security testing and code review, integrated? |
+|  | 2 | and their performance is monitored throughout the software development life cycle | Is the performance of secure software development practices monitored throughout the software development life cycle? |
+| PR.IR-03 | 1 | Mechanisms are implemented to achieve resilience requirements in normal and adverse situations | Are mechanisms implemented to achieve resilience requirements, such as recovery objectives, in normal and adverse situations? |
+| PR.IR-04 | 1 | Adequate resource capacity to ensure availability is maintained | Is adequate resource capacity to ensure availability maintained? |
+| DE.CM-09 | 1 | Computing hardware and software | Are computing hardware and software monitored to find potentially adverse events? |
+|  | 2 | runtime environments | Are runtime environments monitored to find potentially adverse events? |
+|  | 3 | and their data are monitored to find potentially adverse events | Is the data of computing hardware, software and runtime environments monitored to find potentially adverse events? |
+| DE.AE-06 | 1 | Information on adverse events is provided to authorized staff and tools | Is information on adverse events provided to authorized staff and tools, for example through alerts? |
+| DE.AE-07 | 1 | Cyber threat intelligence and other contextual information are integrated into the analysis | Are cyber threat intelligence and other contextual information integrated into the analysis of adverse events? |
+| RS.MA-01 | 1 | The incident response plan is executed in coordination with relevant third parties once an incident is declared | Is the incident response plan executed in coordination with relevant third parties once an incident is declared? |
+| RS.AN-03 | 1 | Analysis is performed to establish what has taken place during an incident and the root cause of the incident | Is analysis performed to establish what has taken place during an incident and the root cause of the incident? |
+| RS.CO-02 | 1 | Internal and external stakeholders are notified of incidents | Are internal and external stakeholders, such as customers, notified of incidents? |
+| RS.MI-01 | 1 | Incidents are contained | Are incidents contained? |
+| RC.RP-01 | 1 | The recovery portion of the incident response plan is executed once initiated from the incident response process | Is the recovery portion of the incident response plan, such as disaster recovery failover and restore, executed once initiated from the incident response process? |
+
+In `data/csf/tiers.yaml`:
+- Replace ID.AM-08's question (Ruling 14) with
+  `"Are systems, hardware, software, services and data managed throughout their life cycles, from acquisition to retirement?"`.
+- In the header comment, change "a data change plus a control in data/dev/gap/facts.yaml" to "a data change (its
+  question and parts) plus a control in data/dev/gap/facts.yaml".
+- Add these change-log lines:
+
+```yaml
+#   2026-10-06  Ruling 14: ID.AM-08's question drops "including secure disposal" (not NIST's): "..., from acquisition to retirement".
+#   2026-10-06  option A (Tarun; CSF spec 4 and 5.2-5.3 amended; Rulings 15, 17): parts for every checked outcome (73), cut by
+#               spec 4's rule; paraphrase_words. Parts are frozen from the first recording: every later change is a tuning
+#               round with a line here citing NIST's clause.
+```
+
+Then append at the end:
+
+```yaml
+# Parts (CSF spec 4 and 5.2, amended 2026-10-06): each checked outcome cut by spec 4's rule (every listed verb; in a
+# one-verb sentence, a comma list of three or more nouns wherever it stands; pairs never cut; a qualifier is never
+# its own part and stays on its verb),
+# as yes/no questions in NIST's order. Each part runs through the pipeline on its own; app.csf.combine labels the
+# outcome. A part uses NIST's words for its outcome (outcome and category text) and question words
+# (datakit.csf.FRAME); any other word stands in an example clause ("such as", "for example") and is listed under
+# paraphrase_words, mapped to the NIST word it is an instance of (at most 3 per outcome). Every word of NIST's
+# outcome is in at least one part. python -m datakit.validate csf checks all of it.
+parts:
+  GV.PO-01:
+    - "Is the policy for managing cybersecurity risks established based on organizational context, cybersecurity strategy and priorities?"
+    - "Is the policy for managing cybersecurity risks communicated?"
+    - "Is the policy for managing cybersecurity risks enforced?"
+  GV.PO-02:
+    - "Is the policy for managing cybersecurity risks reviewed?"
+    - "Is the policy for managing cybersecurity risks updated?"
+    - "Is the policy for managing cybersecurity risks communicated?"
+    - "Is the policy for managing cybersecurity risks enforced to reflect changes in requirements, threats, technology and organizational mission?"
+  ID.AM-01:
+    - "Are inventories of hardware managed by the organization maintained?"
+  ID.AM-02:
+    - "Are inventories of software managed by the organization maintained?"
+    - "Are inventories of services managed by the organization maintained?"
+    - "Are inventories of systems managed by the organization maintained?"
+  ID.AM-03:
+    - "Are representations of the organization's authorized network communication and internal and external network data flows maintained?"
+  ID.AM-05:
+    - "Are assets prioritized based on classification?"
+    - "Are assets prioritized based on criticality?"
+    - "Are assets prioritized based on resources?"
+    - "Are assets prioritized based on impact on the mission?"
+  ID.AM-08:
+    - "Are systems managed throughout their life cycles, for example from acquisition to retirement?"
+    - "Is hardware managed throughout its life cycle, for example from acquisition to retirement?"
+    - "Is software managed throughout its life cycle, for example from acquisition to retirement?"
+    - "Are services managed throughout their life cycles, for example from acquisition to retirement?"
+    - "Is data managed throughout its life cycle, for example from acquisition to retirement?"
+  ID.RA-01:
+    - "Are vulnerabilities in assets identified?"
+    - "Are vulnerabilities in assets validated?"
+    - "Are vulnerabilities in assets recorded?"
+  ID.RA-02:
+    - "Is cyber threat intelligence received from information sharing forums and sources?"
+  ID.RA-08:
+    - "Are processes for receiving vulnerability disclosures established?"
+    - "Are processes for analyzing vulnerability disclosures established?"
+    - "Are processes for responding to vulnerability disclosures established?"
+  PR.AA-01:
+    - "Are identities and credentials for authorized users managed by the organization?"
+    - "Are identities and credentials for services managed by the organization?"
+    - "Are identities and credentials for hardware managed by the organization?"
+  PR.AA-03:
+    - "Are users authenticated?"
+    - "Are services authenticated?"
+    - "Is hardware authenticated?"
+  PR.AA-05:
+    - "Are access permissions, entitlements and authorizations defined in a policy?"
+    - "Are access permissions, entitlements and authorizations managed?"
+    - "Are access permissions, entitlements and authorizations enforced?"
+    - "Are access permissions, entitlements and authorizations reviewed?"
+    - "Do access permissions, entitlements and authorizations incorporate the principles of least privilege and separation of duties?"
+  PR.AA-06:
+    - "Is physical access to assets managed?"
+    - "Is physical access to assets monitored?"
+    - "Is physical access to assets enforced commensurate with risk?"
+  PR.DS-01:
+    - "Is the confidentiality of data at rest protected, for example by encryption?"
+    - "Is the integrity of data at rest protected?"
+    - "Is the availability of data at rest protected?"
+  PR.DS-02:
+    - "Is the confidentiality of data in transit protected, for example by encryption?"
+    - "Is the integrity of data in transit protected?"
+    - "Is the availability of data in transit protected?"
+  PR.DS-11:
+    - "Are backups of data created?"
+    - "Are backups of data protected?"
+    - "Are backups of data maintained?"
+    - "Are backups of data tested?"
+  PR.PS-01:
+    - "Are configuration management practices, such as baseline configurations and change control, established?"
+    - "Are configuration management practices, such as baseline configurations and change control, applied?"
+  PR.PS-02:
+    - "Is software maintained?"
+    - "Is software replaced?"
+    - "Is software removed commensurate with risk?"
+  PR.PS-04:
+    - "Are log records generated?"
+    - "Are log records made available for continuous monitoring, for example centrally?"
+  PR.PS-06:
+    - "Are secure software development practices, such as security testing and code review, integrated?"
+    - "Is the performance of secure software development practices monitored throughout the software development life cycle?"
+  PR.IR-03:
+    - "Are mechanisms implemented to achieve resilience requirements, such as recovery objectives, in normal and adverse situations?"
+  PR.IR-04:
+    - "Is adequate resource capacity to ensure availability maintained?"
+  DE.CM-09:
+    - "Are computing hardware and software monitored to find potentially adverse events?"
+    - "Are runtime environments monitored to find potentially adverse events?"
+    - "Is the data of computing hardware, software and runtime environments monitored to find potentially adverse events?"
+  DE.AE-06:
+    - "Is information on adverse events provided to authorized staff and tools, for example through alerts?"
+  DE.AE-07:
+    - "Are cyber threat intelligence and other contextual information integrated into the analysis of adverse events?"
+  RS.MA-01:
+    - "Is the incident response plan executed in coordination with relevant third parties once an incident is declared?"
+  RS.AN-03:
+    - "Is analysis performed to establish what has taken place during an incident and the root cause of the incident?"
+  RS.CO-02:
+    - "Are internal and external stakeholders, such as customers, notified of incidents?"
+  RS.MI-01:
+    - "Are incidents contained?"
+  RC.RP-01:
+    - "Is the recovery portion of the incident response plan, such as disaster recovery failover and restore, executed once initiated from the incident response process?"
+paraphrase_words:
+  ID.AM-08: {acquisition: cycles, retirement: cycles}
+  PR.DS-01: {encryption: protected}
+  PR.DS-02: {encryption: protected}
+  PR.PS-01: {baseline: configuration, change: management, control: management}
+  PR.PS-04: {centrally: available}
+  PR.PS-06: {testing: practices, code: software, review: practices}
+  PR.IR-03: {recovery: resilience, objectives: requirements}
+  DE.AE-06: {alerts: information}
+  RS.CO-02: {customers: stakeholders}
+  RC.RP-01: {disaster: recovery, failover: recovery, restore: recovery}
+```
+
+Do not run `datakit.csf build` yet: Step 5 writes the code that builds the parts.
+
+- [ ] **Step 3: Write the failing datakit tests**
+
+Append to `tests/datakit/test_csf.py` (and add `from collections.abc import Callable` to its imports):
+
+```python
+def test_inflections_of_nists_words_are_nist_words() -> None:
+    nist = "Inventories of hardware managed by the organization are maintained; processes are established"
+    assert csf.added_words("Is an inventory of hardware maintained, and are processes managed?", nist) == []
+    assert csf.added_words("Is hardware encrypted by the vendor?", nist) == ["encrypted", "vendor"]
+
+
+def test_every_checked_outcome_has_parts_and_no_other_outcome_does() -> None:
+    _, tiers, built = _committed()
+    parts = {o["id"]: o["parts"] for o in built["outcomes"]}
+    assert all(parts[i] for i in tiers["checked"]) and sum(map(len, parts.values())) == 73
+    assert all(parts[o["id"]] == [] for o in built["outcomes"] if o["tier"] != "checked")
+    assert all(len(m) <= csf.MAX_PARAPHRASE for m in tiers["paraphrase_words"].values())
+
+
+@pytest.mark.parametrize(
+    ("edit", "problem"),
+    [
+        (lambda t: t["parts"].update({"PR.DS-11": []}), "checked PR.DS-11: no parts"),
+        (lambda t: t["parts"].update({"GV.OC-01": ["Is it done?"]}), "parts GV.OC-01: not a checked outcome"),
+        (
+            lambda t: t["parts"].update({"RS.MI-01": ["Are incidents contained by the security team?"]}),
+            "RS.MI-01 part 1: adds 'security', not in NIST's text",
+        ),
+        (  # a document name is an added word
+            lambda t: t["parts"]["GV.PO-01"].append("Is the policy enforced, as the HR handbook says?"),
+            "GV.PO-01 part 4: adds 'hr', not in NIST's text",
+        ),
+        (
+            lambda t: t["parts"].update({"RS.MI-01": ['Are incidents "contained"?']}),
+            "RS.MI-01 part 1: must be ASCII, quote nothing and end with '?'",
+        ),
+        (  # Ruling 11b: separation of duties may not be dropped
+            lambda t: t["parts"].update(
+                {"PR.AA-05": [q.replace(" and separation of duties", "") for q in t["parts"]["PR.AA-05"]]}
+            ),
+            "PR.AA-05: NIST's 'separation' is in no part",
+        ),
+        (
+            lambda t: t["paraphrase_words"].pop("ID.AM-08"),
+            "ID.AM-08 part 1: adds 'acquisition', not in NIST's text",
+        ),
+        (
+            lambda t: t["paraphrase_words"].update({"RS.MI-01": {"isolation": "contained"}}),
+            "RS.MI-01: paraphrase word 'isolation' is in no part",
+        ),
+        (  # I3: a paraphrase word names an instance of a NIST word of its own outcome
+            lambda t: t["paraphrase_words"]["RC.RP-01"].update({"failover": "bcp"}),
+            "RC.RP-01: paraphrase word 'failover' must map to a word of NIST's text, not 'bcp'",
+        ),
+        (
+            lambda t: t["paraphrase_words"]["PR.PS-06"].update({"sast": "practices"}),
+            "PR.PS-06: 4 paraphrase words, at most 3",
+        ),
+        (  # an added word enters only through an example clause
+            lambda t: t["parts"]["PR.PS-04"].__setitem__(
+                1, "Are log records made available centrally for continuous monitoring?"
+            ),
+            "PR.PS-04 part 2: 'centrally' stands outside an example clause",
+        ),
+        (  # R3: the clause ends at the next comma
+            lambda t: t["parts"]["PR.PS-01"].__setitem__(
+                0,
+                "Are configuration management practices, such as baseline configurations,"
+                " established with change control?",
+            ),
+            "PR.PS-01 part 1: 'change' stands outside an example clause",
+        ),
+        (  # R4: the revision-1 list form is named, not a crash
+            lambda t: t["paraphrase_words"].update({"PR.DS-01": ["encryption"]}),
+            "paraphrase_words PR.DS-01: must map each word to a NIST word",
+        ),
+    ],
+)
+def test_a_bad_part_is_named(edit: Callable[[dict[str, Any]], object], problem: str) -> None:
+    nist, tiers, _ = _committed()
+    edit(tiers)
+    assert problem in csf.problems(nist, tiers, csf.build(nist, tiers))
+```
+
+- [ ] **Step 4: Run them to verify they fail**
+
+Run: `pytest tests/datakit/test_csf.py -q`
+Expected: FAIL. The new tests fail with `AttributeError: module 'datakit.csf' has no attribute 'added_words'` and
+`KeyError: 'parts'`. `test_the_committed_data_matches_nists_extract` fails too, because the built file is stale
+against ID.AM-08's new question.
+
+- [ ] **Step 5: Write the part checks in `datakit/csf.py` and rebuild**
+
+After `NIST_FIELDS`:
+
+```python
+# Question words a part may use besides NIST's own (CSF spec 4, amended): none names a thing or a requirement.
+FRAME = frozenset(
+    "a an the is are do does its their of and or to for in on at by with from once as such example through".split()
+)
+MAX_PARAPHRASE = 3  # words per outcome (adversary checkpoint 2, I3)
+_WORD = re.compile(r"[a-z]+")
+_EXAMPLE = re.compile(r"\b(?:such as|for example)\b")
+
+
+def _stem(word: str) -> str:
+    """Enough to match NIST's inflections: inventories/inventory, managed/manage, processes/process."""
+    for suffix in ("ies", "ing", "ed", "es", "s"):
+        if word.endswith(suffix) and not word.endswith("ss") and len(word) - len(suffix) >= 3:
+            word = word[: -len(suffix)] + ("y" if suffix == "ies" else "")
+            break
+    return word.removesuffix("e")
+
+
+def words(text: str) -> list[str]:
+    return _WORD.findall(text.lower().replace("'s", ""))
+
+
+def added_words(part: str, nist: str) -> list[str]:
+    """The words of a part that are neither question words nor NIST's (compared by stem), in order."""
+    have = {_stem(w) for w in words(nist)}
+    return [w for w in words(part) if w not in FRAME and _stem(w) not in have]
+
+
+def _part_problems(i: str, listed: list[Any], mapping: dict[str, Any], outcome: str, nist: str) -> list[str]:
+    """Each part is a question in NIST's words for this outcome. Any other word stands in an example clause
+    ("such as" or "for example", up to the next comma or the question mark) and is on the outcome's
+    paraphrase_words, mapped to the NIST word it is an instance of (at most MAX_PARAPHRASE). Together the parts
+    carry every word of NIST's outcome."""
+    if not listed:
+        return [f"checked {i}: no parts"]
+    have = {_stem(w) for w in words(nist)}
+    p = [
+        f"{i}: paraphrase word {w!r} must map to a word of NIST's text, not {t!r}"
+        for w, t in mapping.items()
+        if not (isinstance(t, str) and _stem(t.lower()) in have)
+    ]
+    if len(mapping) > MAX_PARAPHRASE:
+        p.append(f"{i}: {len(mapping)} paraphrase words, at most {MAX_PARAPHRASE}")
+    for n, q in enumerate(listed, 1):
+        if not (isinstance(q, str) and q.isascii() and q.rstrip().endswith("?") and '"' not in q):
+            p.append(f"{i} part {n}: must be ASCII, quote nothing and end with '?'")
+            continue
+        # The example clause runs from "such as" / "for example" to the next comma or the question mark.
+        m = _EXAMPLE.search(q.lower())
+        in_example = set(words(re.split(r"[,?]", q.lower()[m.end() :])[0])) if m else set()
+        for w in added_words(q, nist):
+            if w not in mapping:
+                p.append(f"{i} part {n}: adds {w!r}, not in NIST's text")
+            elif w not in in_example:
+                p.append(f"{i} part {n}: {w!r} stands outside an example clause")
+    used = [w for q in listed if isinstance(q, str) for w in words(q)]
+    stems = {_stem(w) for w in used}
+    p += [
+        f"{i}: NIST's {w!r} is in no part"
+        for w in dict.fromkeys(words(outcome))
+        if w not in FRAME and _stem(w) not in stems
+    ]
+    p += [f"{i}: paraphrase word {w!r} is in no part" for w in sorted(set(mapping) - set(used))]
+    return p
+```
+
+`build` writes the parts:
+
+```python
+def build(nist: dict[str, Any], tiers: dict[str, Any]) -> dict[str, Any]:
+    parts = tiers.get("parts") or {}
+
+    def entry(o: dict[str, Any]) -> dict[str, Any]:
+        tier = _tier(tiers, o["id"])
+        question = (tiers.get(tier) or {}).get(o["id"]) if tier != "not_checked" else None
+        listed = list(parts.get(o["id"]) or []) if tier == "checked" else []
+        return {**o, "source_url": TOOL_URL, "tier": tier, "question": question, "parts": listed}
+```
+
+(the rest of `build` is unchanged). In `problems`, after the line `p += [f"{i}: in both checked and ask" ...]`:
+
+```python
+    parts, extra = tiers.get("parts") or {}, tiers.get("paraphrase_words") or {}
+    text = {o["id"]: (o["outcome"], f"{o['outcome']} {o['category']}") for o in nist["outcomes"]}
+    p += [f"parts {i}: not a checked outcome" for i in parts if i not in checked]
+    p += [f"paraphrase_words {i}: not a checked outcome" for i in extra if i not in checked]
+    for i in (i for i in checked if i in text):
+        mapping = extra.get(i) or {}
+        if not isinstance(mapping, dict):
+            p.append(f"paraphrase_words {i}: must map each word to a NIST word")
+            mapping = {}
+        p += _part_problems(i, parts.get(i) or [], mapping, *text[i])
+```
+
+Run: `python -m datakit.csf build && pytest tests/datakit/test_csf.py -q`
+Expected: `wrote data/csf/csf-2.0.json: 0 problems`, then PASS.
+
+- [ ] **Step 6: Write the failing app tests**
+
+`tests/test_csf_parts.py`:
+
+```python
+import itertools
+import json
+import uuid
+from collections.abc import Iterator
+from dataclasses import replace
+
+import pytest
+from sqlalchemy import Engine, select
+from sqlalchemy.orm import Session
+
+from app import csf
+from app.contracts import (
+    BudgetExhausted,
+    Citation,
+    Conflict,
+    ConflictSide,
+    Decision,
+    DocInfo,
+    Draft,
+    Dropped,
+    ItemInput,
+    ItemResult,
+    Passage,
+    Retrieval,
+)
+from app.db.models import LlmUsage
+from app.llm.client import LLMRequest, LLMResult
+from app.services import llm_budget
+from app.services.llm_budget import spender
+from tests import factories as f
+from tests.fakes import FakeLLM
+
+LABELS = ("covered", "partly_covered", "not_met", "documents_disagree", "gap")
+MODELS = {"stance": "m/stance", "draft": "m/draft"}
+DOC = DocInfo("d1", "access-control-policy.md", "policy", "final", None, None, True)
+QUOTE = "Every security incident is reviewed to find its root cause."
+
+
+@pytest.fixture
+def s(db: Engine) -> Iterator[Session]:
+    with Session(db) as session:
+        yield session
+
+
+def _outcome(n: int) -> csf.Outcome:
+    return replace(csf.framework().get("PR.AA-05"), parts=tuple(f"Is part {i} done?" for i in range(1, n + 1)))
+
+
+def _part(n: int, label: str, line: int | None = None, doc: DocInfo = DOC) -> ItemResult:
+    """A part's result as decide gives it: every label but Gap cites a line; a disagreement cites one line per side."""
+    line = line or n
+    p = Passage(f"c{line}", doc, line, (f"Access rule number {line} is enforced.",), None, (), None, False)
+    decided, value = csf._DECIDE[label]  # type: ignore[index]
+    stance = {"not_met": "no", "partly_covered": "partial"}.get(label, "yes")
+    cite = Citation(p.chunk_id, doc.id, doc.filename, line, line, p.lines[0], stance)  # type: ignore[arg-type]
+    cites: tuple[Citation, ...] = () if label == "gap" else (cite,)
+    conflict = None
+    if label == "documents_disagree":
+        no = Citation(f"{p.chunk_id}n", "d9", "access-review-records.xlsx", 3, 3, "Status: Overdue", "no")
+        cites = (cite, no)
+        conflict = Conflict("documents-disagree", (ConflictSide("yes", (cite,), None), ConflictSide("no", (no,), None)))
+    decision = Decision(decided, value, cites, (), conflict, None, 0.9)
+    item = ItemInput(f"PR.AA-05#{n}", "q", None)
+    return ItemResult(item, Retrieval((p,), ()), (), decision, Draft("", "template"), 0.001, 100)
+
+
+def test_every_checked_outcome_has_its_parts_and_only_checked_ones_do() -> None:
+    outcomes = csf.framework().outcomes
+    assert all(o.parts for o in outcomes if o.tier == "checked")
+    assert all(o.parts == () for o in outcomes if o.tier != "checked")
+    assert sum(len(o.parts) for o in outcomes) == 73
+    o = csf.framework().get("PR.DS-11")
+    assert csf.part_inputs(o)[3] == ItemInput("PR.DS-11#4", "Are backups of data tested?", "Data Security")
+
+
+def test_the_decide_mapping_is_the_inverse_of_the_gap_table() -> None:
+    assert {gap: pair for pair, gap in csf._CHECKED.items()} == csf._DECIDE
+
+
+@pytest.mark.parametrize(
+    ("labels", "want"),
+    [
+        (("covered",), "covered"),
+        (("covered", "covered", "covered"), "covered"),
+        (("gap", "gap"), "gap"),
+        (("covered", "gap"), "partly_covered"),
+        (("partly_covered",), "partly_covered"),
+        (("covered", "partly_covered"), "partly_covered"),
+        (("covered", "not_met"), "not_met"),  # a stated No outranks evidenced parts
+        (("partly_covered", "not_met", "gap"), "not_met"),
+        (("not_met", "documents_disagree"), "documents_disagree"),  # a disagreement outranks a stated No
+        (("covered", "documents_disagree", "gap"), "documents_disagree"),
+    ],
+)
+def test_parts_combine_in_the_spec_order(labels: tuple[str, ...], want: str) -> None:
+    assert csf.combine(labels) == want  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("n", [1, 2, 3])
+def test_every_mix_of_part_labels_follows_the_precedence(n: int) -> None:
+    for labels in itertools.product(LABELS, repeat=n):
+        got = csf.combine(labels)  # type: ignore[arg-type]
+        assert (got == "documents_disagree") == ("documents_disagree" in labels), labels
+        assert (got == "not_met") == ("not_met" in labels and "documents_disagree" not in labels), labels
+        assert (got == "covered") == (set(labels) == {"covered"}), labels
+        assert (got == "gap") == (set(labels) == {"gap"}), labels
+        assert n > 1 or got == labels[0]  # one part maps to itself: spec 5.3's table
+
+
+def test_an_outcome_without_parts_has_no_label() -> None:
+    with pytest.raises(ValueError, match="at least one part"):
+        csf.combine([])
+
+
+@pytest.mark.parametrize("n", [1, 2, 3])
+def test_no_outcome_is_covered_or_partly_without_a_citation(n: int) -> None:
+    o = _outcome(n)
+    for labels in itertools.product(LABELS, repeat=n):
+        r = csf.aggregate(o, [_part(i, x) for i, x in enumerate(labels, 1)])
+        shown = csf.gap_label(o, r.decision.label, r.decision.value)
+        assert shown == csf.combine(labels), labels  # type: ignore[arg-type]
+        assert bool(r.decision.citations) == (shown != "gap"), labels  # ck_answers_cited
+
+
+def test_citations_and_passages_are_the_parts_union_without_duplicates() -> None:
+    o = _outcome(3)
+    r = csf.aggregate(o, [_part(1, "covered", 4), _part(2, "covered", 4), _part(3, "partly_covered", 7)])
+    assert [(c.line_start, c.stance) for c in r.decision.citations] == [(4, "yes"), (7, "partial")]
+    assert [p.chunk_id for p in r.retrieval.passages] == ["c4", "c7"]
+    assert (r.item, r.stances, r.cost_usd, r.latency_ms) == (csf.item_input(o), (), 0.003, 300)
+    same_line = csf.aggregate(_outcome(2), [_part(1, "covered", 4), _part(2, "partly_covered", 4)])
+    assert [c.stance for c in same_line.decision.citations] == ["yes", "partial"]  # M2: stance is in the key
+
+
+def test_a_quote_failure_in_any_part_lowers_the_confidence_as_decide_does() -> None:
+    dropped = (Dropped("c9", "d1", DOC.filename, "containment", "a quote not in the line"),)
+    failed = _part(2, "covered")
+    failed = replace(failed, decision=replace(failed.decision, dropped=dropped))
+    r = csf.aggregate(_outcome(2), [_part(1, "covered"), failed])
+    assert (r.decision.confidence, r.decision.dropped) == (0.7, dropped)
+    assert csf.aggregate(_outcome(2), [_part(1, "covered"), _part(2, "covered")]).decision.confidence == 0.9
+
+
+def test_a_stated_no_is_quoted_from_its_own_part_never_over_yes_lines() -> None:
+    """Adversary C2: parts covered in documents A and B and stated No in C; the outcome is Not met, and its
+    explanation quotes C's line only, after the group line."""
+    a, b, c = (replace(DOC, id=x, filename=f"{x}-policy.md") for x in ("a", "b", "c"))
+    parts = [_part(1, "covered", doc=a), _part(2, "covered", doc=b), _part(3, "not_met", doc=c)]
+    r = csf.aggregate(_outcome(3), parts)
+    assert (r.decision.label, r.decision.value) == ("verified", "No")
+    assert r.draft.text == (
+        "Evidenced: parts 1, 2. Stated as not done: part 3. "
+        'Is part 3 done? No. The c policy says: "Access rule number 3 is enforced."'
+    )
+    assert [x.stance for x in r.decision.citations] == ["yes", "yes", "no"]  # a display record: stances kept
+
+
+def test_the_explanation_shows_only_the_deciding_parts() -> None:
+    o = _outcome(3)
+    r = csf.aggregate(o, [_part(1, "covered"), _part(2, "documents_disagree"), _part(3, "gap")])
+    assert r.decision.conflict is not None and r.draft.source == "template"
+    assert r.draft.text.startswith(
+        "Evidenced: part 1. Documents disagree: part 2. No evidence: part 3. Is part 2 done? The documents disagree."
+    )
+    assert "Is part 1 done?" not in r.draft.text
+    partly = csf.aggregate(o, [_part(1, "covered"), _part(2, "partly_covered"), _part(3, "gap")])
+    assert "Is part 1 done? Yes." in partly.draft.text and "Is part 2 done? Partly." in partly.draft.text
+    gap = csf.aggregate(o, [_part(i, "gap") for i in (1, 2, 3)])
+    assert gap.draft.text == "No evidence: parts 1, 2, 3."
+
+
+def _stance(kind: str) -> str:
+    quote = "" if kind == "irrelevant" else QUOTE
+    return json.dumps({"passages": [{"passage": 1, "stance": kind, "quote": quote, "note": "judged"}]})
+
+
+def _two_parts() -> csf.Outcome:
+    return replace(
+        csf.framework().get("RS.AN-03"),
+        parts=("Is what took place during an incident established?", "Is the root cause of an incident established?"),
+    )
+
+
+def _incident_policy(s: Session) -> uuid.UUID:
+    ws = f.workspace(s)
+    f.chunk(s, f.document(s, ws, filename="incident-policy.docx"), line_start=3, line_end=3, text=QUOTE)
+    s.commit()
+    return ws.id
+
+
+def test_each_part_is_spent_and_judged_with_no_draft_and_no_open_transaction(s: Session, db: Engine) -> None:
+    ws = _incident_policy(s)
+
+    class Watching(FakeLLM):
+        def complete(self, req: LLMRequest) -> LLMResult:
+            assert not s.in_transaction(), f"{req.step} ran inside an open transaction"
+            return super().complete(req)
+
+    o = _two_parts()
+    llm = Watching([_stance("irrelevant"), _stance("yes")])
+    parts = csf.check_parts(s, ws, o, llm, MODELS, spender(s, ws))
+    assert [(q.step, q.item_id) for q in llm.requests] == [("stance", "RS.AN-03#1"), ("stance", "RS.AN-03#2")]
+    assert all(part in q.user for part, q in zip(o.parts, llm.requests, strict=True))
+    assert [csf.part_label(p) for p in parts] == ["gap", "covered"]
+    with Session(db) as other:  # each call was spent and committed first; no draft was spent
+        used = other.execute(select(LlmUsage.kind, LlmUsage.calls).where(LlmUsage.workspace_id == ws)).all()
+    assert [tuple(u) for u in used] == [("stance", 2)]
+    r = csf.aggregate(o, parts)
+    assert csf.gap_label(o, r.decision.label, r.decision.value) == "partly_covered"
+    assert [c.line_start for c in r.decision.citations] == [3]
+    assert r.draft.text.startswith(f"Evidenced: part 2. No evidence: part 1. {o.parts[1]} Yes.")
+
+
+def test_a_refused_stance_budget_stops_the_outcome_after_the_parts_it_paid_for(
+    s: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(llm_budget.CAPS, "stance", 1)
+    ws = _incident_policy(s)
+    llm = FakeLLM([_stance("yes")])
+    with pytest.raises(BudgetExhausted):
+        csf.check_outcome(s, ws, _two_parts(), llm, MODELS, spender(s, ws))
+    assert [q.step for q in llm.requests] == ["stance"]
+```
+
+In `tests/test_csf_framework.py`:
+- Add two cases to the parametrize list of `test_the_loader_rejects_a_bad_data_file`:
+
+  ```python
+          (
+              lambda os: next(o for o in os if o["tier"] == "checked").update(parts=["  "]),
+              "a checked outcome needs parts",
+          ),
+          (lambda os: os[0].update(parts=["Is it done?"]), "GV.OC-01: only a checked outcome has parts"),
+  ```
+
+- In `test_a_changed_tier_list_gives_a_new_questionnaire`, add a second change that touches one part only (minor
+  M6). After the reworded question's assertions:
+
+  ```python
+      first = q.id
+      recut = replace(
+          reworded,
+          outcomes=tuple(
+              replace(o, parts=("Is the policy approved?",)) if o.id == "GV.PO-01" else o for o in reworded.outcomes
+          ),
+      )
+      monkeypatch.setattr(csf, "framework", lambda: recut)
+      assert csf.questionnaire_for(s, ws.id, "govern").id != first  # a changed part alone gives a new questionnaire
+  ```
+
+- Replace `test_a_checked_outcome_runs_the_ordinary_pipeline` with the version below. Add `Draft` to the
+  `app.contracts` import and `from app.draft import check`. PR.DS-01 now has three parts, so the expected calls go
+  from `["stance", "draft"]` to three stance calls. The explanation is code (spec 5.3, amended), and this test now
+  pins it in full. It is stricter, not weaker.
+
+  ```python
+  def test_a_checked_outcome_runs_the_ordinary_pipeline(s: Session) -> None:
+      ws = f.workspace(s)
+      doc = f.document(s, ws, filename="crypto-policy.docx")
+      f.chunk(s, doc, line_start=4, line_end=4, text=QUOTE)
+      s.commit()
+      yes = json.dumps({"passages": [{"passage": 1, "stance": "yes", "quote": QUOTE, "note": "states it"}]})
+      nothing = json.dumps({"passages": [{"passage": 1, "stance": "irrelevant", "quote": "", "note": "other"}]})
+      llm = FakeLLM([yes, nothing, nothing])  # confidentiality, integrity, availability
+      o = csf.framework().get("PR.DS-01")
+      r = csf.check_outcome(s, ws.id, o, llm, MODELS, spender(s, ws.id))
+      assert r is not None and r.item == csf.item_input(o)
+      assert csf.gap_label(o, r.decision.label, r.decision.value) == "partly_covered"
+      assert [req.step for req in llm.requests] == ["stance"] * 3
+      text = f'Evidenced: part 1. No evidence: parts 2, 3. {o.parts[0]} Yes. The crypto policy says: "{QUOTE}"'
+      assert r.draft == Draft(text, "template")
+      # M4: every quote in the explanation is a cited line (the part numbers are code's, not evidence)
+      assert [p for p in check(r.draft.text, r.decision, ["crypto-policy.docx"]) if p.startswith("quote")] == []
+  ```
+
+- [ ] **Step 7: Run them to verify they fail**
+
+Run: `pytest tests/test_csf_parts.py tests/test_csf_framework.py -q`
+Expected: FAIL. You should see `AttributeError: module 'app.csf' has no attribute '_DECIDE'` (and `combine`,
+`aggregate`, `part_inputs`, `check_parts`), `TypeError: ... unexpected keyword argument 'parts'` from `replace`, and
+the PR.DS-01 test's extra `draft` step.
+
+- [ ] **Step 8: Write the parts into `app/csf.py`**
+
+Change the imports to:
+
+```python
+from collections.abc import Callable, Iterable, Mapping, Sequence
+...
+from app.contracts import (
+    Decision,
+    Draft,
+    Dropped,
+    ItemInput,
+    ItemLabel,
+    ItemResult,
+    Label,
+    OpenItem,
+    QueueEntry,
+    Retrieval,
+    Spend,
+    Value,
+)
+from app.db.models import Item, Questionnaire, Workspace
+from app.decide import CONFIDENCE, QUOTE_FAILURES
+from app.draft import template_answer
+```
+
+Next to `GapLabel`: `PartLabel = Literal["covered", "partly_covered", "not_met", "documents_disagree", "gap"]  # a
+Checked part's label (M12)`. Retype `_CHECKED` as `dict[tuple[str, str | None], PartLabel]`, then add:
+
+```python
+_DECIDE: dict[PartLabel, tuple[Label, Value | None]] = {  # the inverse of _CHECKED: a combined label as decide's
+    "covered": ("verified", "Yes"),
+    "partly_covered": ("partial", "Partial"),
+    "not_met": ("verified", "No"),
+    "documents_disagree": ("conflict", None),
+    "gap": ("unknown", None),
+}
+PART_WORDS: dict[PartLabel, str] = {  # the explanation's groups, in this order
+    "covered": "Evidenced",
+    "partly_covered": "Partly evidenced",
+    "not_met": "Stated as not done",
+    "documents_disagree": "Documents disagree",
+    "gap": "No evidence",
+}
+_DECIDING: dict[PartLabel, tuple[PartLabel, ...]] = {  # whose quotes explain each combined label (spec 5.3, C2)
+    "documents_disagree": ("documents_disagree",),
+    "not_met": ("not_met",),
+    "covered": ("covered",),
+    "partly_covered": ("covered", "partly_covered"),
+    "gap": (),
+}
+```
+
+`Outcome` gains a last field: `parts: tuple[str, ...] = ()  # VART's: NIST's text cut by spec 4's rule; checked
+only`. `framework()` passes `tuple(o["parts"])` after `o["question"]`. In `_validate`, after the question check:
+
+```python
+        if o.tier == "checked" and not (o.parts and all(p.strip() for p in o.parts)):
+            raise ValueError(f"{o.id}: a checked outcome needs parts")
+        if o.tier != "checked" and o.parts:
+            raise ValueError(f"{o.id}: only a checked outcome has parts")
+```
+
+In `_digest`: `rows = [[o.id, o.tier, o.question, o.category, list(o.parts)] for o in outcomes]`.
+
+Replace `evidence` and `check_outcome`, and add the rest after `evidence`:
+
+```python
+def part_inputs(o: Outcome) -> tuple[ItemInput, ...]:
+    """Each part as its own item (CSF spec 5.2, amended); the key names the outcome and the part's place."""
+    return tuple(ItemInput(f"{o.id}#{n}", p, o.category) for n, p in enumerate(o.parts, 1))
+
+
+def evidence(session: Session, workspace_id: uuid.UUID, item: ItemInput) -> Retrieval:
+    """What one part of a Checked outcome is judged on (Ruling 9, spec 5.3 "checked against documents"): its
+    retrieval without the visitor's stored answers, each dropped with reason 'statement' before any model sees
+    it. An answer reaches a Checked outcome only as a suggestion the visitor accepts (Plan 6B)."""
+    r = retrieve(session, workspace_id, item.question, item.topic)
+    said = [p for p in r.passages if p.doc.kind == "statement"]
+    return Retrieval(
+        tuple(p for p in r.passages if p.doc.kind != "statement"),
+        r.dropped + tuple(Dropped(p.chunk_id, p.doc.id, p.doc.filename, "statement") for p in said),
+    )
+
+
+def part_label(r: ItemResult) -> PartLabel:
+    """A part's label: its decide output through spec 5.3's table."""
+    return _CHECKED[(r.decision.label, r.decision.value)]
+
+
+def combine(labels: Sequence[PartLabel]) -> PartLabel:
+    """An outcome's label from its parts' labels (CSF spec 5.3, amended); the first rule that applies wins:
+    any part disagreeing is Documents disagree; any part stated No is Not met; every part Covered is Covered;
+    every part Gap is Gap; any other mix is Partly covered. One part maps to itself."""
+    if not labels:
+        raise ValueError("an outcome needs at least one part")
+    if "documents_disagree" in labels:
+        return "documents_disagree"
+    if "not_met" in labels:
+        return "not_met"
+    if all(x == "covered" for x in labels):
+        return "covered"
+    if all(x == "gap" for x in labels):
+        return "gap"
+    return "partly_covered"
+
+
+def _unique[T](items: Iterable[T], key: Callable[[T], object]) -> tuple[T, ...]:
+    """The first of each key, in order."""
+    seen: dict[object, T] = {}
+    for x in items:
+        seen.setdefault(key(x), x)
+    return tuple(seen.values())
+
+
+def _numbers(ns: list[int]) -> str:
+    return f"part {ns[0]}" if len(ns) == 1 else "parts " + ", ".join(map(str, ns))
+
+
+def explain(o: Outcome, parts: Sequence[ItemResult]) -> str:
+    """The outcome's explanation (CSF spec 5.3, amended), by code with no model call: the part numbers by
+    label, then each part that decided the combined label as its question and its own template answer, so a
+    quote always stands beside the stance it was judged with and a stated No is never shown over yes lines."""
+    labels = [part_label(r) for r in parts]
+    deciding = _DECIDING[combine(labels)]
+    groups = [
+        f"{word}: {_numbers([n for n, x in enumerate(labels, 1) if x == label])}."
+        for label, word in PART_WORDS.items()
+        if label in labels
+    ]
+    answers = [
+        f"{q} {template_answer(r.decision)}"
+        for q, r, x in zip(o.parts, parts, labels, strict=True)
+        if x in deciding
+    ]
+    return " ".join([*groups, *answers])
+
+
+def aggregate(o: Outcome, parts: Sequence[ItemResult]) -> ItemResult:
+    """One result for the outcome from its parts' results, in part order (CSF spec 5.3, amended). The Decision
+    is a display record: the label by `combine`; every part's citations (each keeping its own part's stance),
+    drops and passages without duplicates; the first disagreeing part's conflict; the parts' scope notes;
+    decide's confidence rule (spec 6.7 rule 9) over the merged drops. The explanation is `explain`. Per-passage
+    stances stay with the parts (`check_parts`): their indices point into each part's own passages."""
+    label, value = _DECIDE[combine([part_label(r) for r in parts])]
+    dropped = _unique((d for r in parts for d in r.decision.dropped), lambda d: (d.chunk_id, d.reason, d.quote))
+    confidence = CONFIDENCE[label] - (0.2 if any(d.reason in QUOTE_FAILURES for d in dropped) else 0.0)
+    decision = Decision(
+        label,
+        value,
+        _unique(
+            (c for r in parts for c in r.decision.citations),
+            lambda c: (c.document_id, c.line_start, c.line_end, c.quote, c.stance),
+        ),
+        dropped,
+        next((r.decision.conflict for r in parts if r.decision.conflict is not None), None),
+        " ".join(_unique((n for r in parts if (n := r.decision.scope_note)), lambda n: n)) or None,
+        round(max(confidence, 0.0), 2),
+    )
+    retrieval = Retrieval(
+        _unique((p for r in parts for p in r.retrieval.passages), lambda p: p.chunk_id),
+        _unique((d for r in parts for d in r.retrieval.dropped), lambda d: (d.chunk_id, d.reason, d.quote)),
+    )
+    return ItemResult(
+        item_input(o),
+        retrieval,
+        (),
+        decision,
+        Draft(explain(o, parts), "template"),
+        round(sum(r.cost_usd for r in parts), 6),
+        sum(r.latency_ms for r in parts),
+    )
+
+
+def _without_draft(spend: Spend) -> Spend:
+    """A part's own draft is never shown. Refusing its budget makes write_draft return the template with no
+    model call and nothing spent; the outcome's explanation is `explain`. Pinned by
+    tests/test_csf_parts.py::test_each_part_is_spent_and_judged_with_no_draft_and_no_open_transaction: if
+    write_draft ever raises on a refused budget, that test fails before any CSF run does (M7)."""
+    return lambda step: step != "draft" and spend(step)
+
+
+def check_parts(
+    session: Session,
+    workspace_id: uuid.UUID,
+    o: Outcome,
+    llm: LLMClient,
+    models: Mapping[str, str],
+    spend: Spend,
+) -> list[ItemResult]:
+    """The parts' own results, in part order (CSF spec 5.2, amended): each part through the ordinary pipeline
+    (answer_retrieved spends before each model call and commits before it, so no transaction is open across
+    one) on documents only (`evidence`). Ask me: [] with no retrieval and no model call (it has no parts). Not
+    checked: never part of a run."""
+    if o.tier == "not_checked":
+        raise ValueError(f"{o.id} is {NOT_CHECKED}")
+    no_draft = _without_draft(spend)
+    return [
+        answer_retrieved(session, workspace_id, item, evidence(session, workspace_id, item), llm, models, no_draft)
+        for item in part_inputs(o)
+    ]
+
+
+def check_outcome(
+    session: Session,
+    workspace_id: uuid.UUID,
+    o: Outcome,
+    llm: LLMClient,
+    models: Mapping[str, str],
+    spend: Spend,
+) -> ItemResult | None:
+    """One outcome of a gap-check run (CSF spec 5.2-5.5, amended): Checked, its parts combined (`aggregate`);
+    Ask me, None, with no retrieval and no model call (the visitor answers it through ask_queue and
+    store_statement); not checked, ValueError."""
+    parts = check_parts(session, workspace_id, o, llm, models, spend)
+    return aggregate(o, parts) if parts else None
+```
+
+Change the first sentence of the module docstring to: "... the gap labels, a display mapping over decide's output
+per part, combined by code (decide itself does not change)."
+
+Run: `pytest tests/test_csf_parts.py tests/test_csf_framework.py -q --cov=app.csf --cov-branch --cov-report=term-missing --cov-fail-under=100 && mypy app`
+Expected: PASS, `app/csf.py` at 100% with no missing lines or partial branches, and `Success: no issues found`. If a
+line written before Task 8 shows as missing, report it; do not add a test for it in this task.
+
+- [ ] **Step 9: The eval harness runs parts and reports them (adversary I4, I7)**
+
+In `evals/gap.py`:
+- Import `field` from `dataclasses`.
+- `GapPack` gains a last field
+  `missing_parts: dict[str, tuple[int, ...]] = field(default_factory=dict)  # Checked id -> parts the key says lack evidence`.
+  `load()` passes `{m.csf_id: m.missing_parts for m in gap.outcomes if m.missing_parts}`.
+- `GapObserved` gains a last field
+  `parts: dict[str, list[ItemResult]] = field(default_factory=dict)  # Checked id -> its parts' own results`.
+- The run loop:
+
+  ```python
+              results: dict[str, ItemResult] = {}
+              parts: dict[str, list[ItemResult]] = {}
+              for o in outcomes:
+                  answered = csf.check_parts(session, ws.id, o, log, models, always)
+                  if answered:  # Ask me: [] (no parts, no model call)
+                      parts[o.id] = answered
+                      results[o.id] = csf.aggregate(o, answered)
+  ```
+
+  `results` was filled by `check_outcome` before; the `if o.id not in results` test for Ask-me answers stays as it
+  is.
+- The probe runs once per part:
+
+  ```python
+              for o in outcomes:
+                  for item in csf.part_inputs(o):
+                      found = csf.evidence(session, ws.id, item)
+                      kept = sum(p.doc.id in said for p in found.passages)
+                      probe_kept += kept
+                      probe_seen += kept + sum(d.document_id in said for d in found.dropped)
+  ```
+
+- Build `GapObserved(..., probe_kept, probe_seen, parts)`.
+- In the report's `items` entry, after `"draft": r.draft.source,` add `"explanation": r.draft.text,` and
+  `"parts": [_part_report(p) for p in obs.parts.get(code, [])],`, with:
+
+  ```python
+  def _part_report(r: ItemResult) -> dict[str, Any]:
+      """One part as gap-dev.json shows it: file names and lines, never database ids, so a replay is identical."""
+      return {
+          "key": r.item.key,
+          "label": csf.part_label(r),
+          "citations": [f"{c.filename}:{c.line_start}:{c.stance}" for c in r.decision.citations],
+          "dropped": sorted(f"{d.filename}:{d.reason}" for d in r.decision.dropped),
+          "passages": [f"{p.doc.filename}:{p.line_start}" for p in r.retrieval.passages],
+      }
+  ```
+
+- In `score_gap`, before the retrieval recall:
+
+  ```python
+      # Part agreement (I4; reported, never a gate): over the outcomes whose key names missing parts, the engine
+      # left every missing part Gap or Partly and did not leave all the other parts Gap
+      agree = named = 0
+      for c, missing in pack.missing_parts.items():
+          labels = [csf.part_label(r) for r in obs.parts.get(c, [])]
+          if not labels:
+              continue
+          named += 1
+          others = [x for n, x in enumerate(labels, 1) if n not in missing]
+          agree += all(labels[n - 1] in ("gap", "partly_covered") for n in missing) and (
+              not others or any(x != "gap" for x in others)
+          )
+      m["part_agreement"] = score._gated(agree, named)
+  ```
+
+- In the module docstring, replace "every Checked outcome through answer_item" with "every Checked outcome part by
+  part through answer_retrieved (app.csf.check_parts), combined by app.csf.aggregate".
+
+In `tests/test_eval_gap.py`:
+- The three tests that stub the engine stub `check_parts` now. In each, the fake returns
+  `[] if o.tier == "ask" else [_result(o.id, UNKNOWN)]` (with return type `list[ItemResult]`), and
+  `monkeypatch.setattr(csf, "check_outcome", check)` becomes `monkeypatch.setattr(csf, "check_parts", check)`. The
+  Ruling 1 test's fake keeps `events.append(("check", o.id))` for Checked outcomes only.
+- The monkeypatched `evidence` takes an item:
+  `monkeypatch.setattr(csf, "evidence", lambda s, ws, item: retrieve(s, ws, item.question, item.topic))`.
+- In the first run test, after the `label_accuracy` assertion:
+
+  ```python
+      assert report["items"]["PR.DS-11"]["parts"] == [
+          {"key": "PR.DS-11", "label": "gap", "citations": [], "dropped": [], "passages": []}
+      ]
+      assert "part_agreement" in m and "part_agreement" not in gap.GATES
+  ```
+
+- Add:
+
+  ```python
+  def test_part_agreement_is_reported_and_never_gated() -> None:
+      pack = gap.load()
+      obs = _perfect(pack)
+      yes = Decision("verified", "Yes", (), (), None, None, 0.9)
+      assert pack.missing_parts["PR.AA-01"] == (3,)  # users, services, hardware: the key lacks hardware
+      obs.parts = {"PR.AA-01": [_result("PR.AA-01#1", yes), _result("PR.AA-01#2", yes), _result("PR.AA-01#3", UNKNOWN)]}
+      assert gap.score_gap(pack, obs)["part_agreement"] == 1.0
+      obs.parts["PR.AA-01"] = [_result("PR.AA-01#1", UNKNOWN), _result("PR.AA-01#2", yes), _result("PR.AA-01#3", yes)]
+      assert gap.score_gap(pack, obs)["part_agreement"] == 0.0  # right label, wrong parts
+      assert "part_agreement" not in gap.GATES
+  ```
+
+Run: `pytest tests/test_eval_gap.py -q` (it fails until Step 10 adds `missing_parts`; it is run again in Step 10).
+
+- [ ] **Step 10: The key adopts judge 2 under C1 (Rulings 15, 17)**
+
+The key stays outcome-level and code-derived, never computed through `app.csf.combine`. Judge 2's changes go into the
+fact sheet, never into `csf-core.yaml`:
+- PR.DS-11 keeps judge 2's own fallback: it stays Partly covered, and its interval disagreement goes into `missing`
+  (C1).
+- The per-part re-judge (Ruling 19) keeps PR.DS-01 Covered and registers its integrity line; that is a fact-sheet
+  correction, so the key's evidence covers the part.
+- The re-judge makes PR.DS-02 Partly covered with `missing_parts: [3]` (availability) and registers its integrity
+  line.
+
+The result is 12 Covered, 12 Partly covered, 2 Not met, 2 Documents disagree and 3 Gap.
+
+First the tests. In `tests/datakit/test_gap.py`, `test_the_key_plants_what_the_spec_asks`:
+
+```python
+    assert by_label["documents_disagree"] == {"PR.AA-05", "DE.AE-06"}
+    assert by_label["not_met"] == {"ID.RA-02", "DE.AE-07"}
+    assert by_label["gap"] == {"ID.AM-03", "PR.AA-06", "PR.IR-04"}
+    assert by_label["partly_covered"] == {
+        "PR.AA-03",
+        "RS.MA-01",
+        "RS.CO-02",
+        "PR.DS-02",
+        "PR.DS-11",
+        "PR.IR-03",
+        "ID.AM-05",
+        "ID.AM-08",
+        "GV.PO-02",
+        "PR.AA-01",
+        "PR.PS-02",
+        "PR.PS-06",
+    }
+    assert {"RS.AN-03", "RS.MI-01"} <= by_label["covered"]
+    assert Counter(labels.values())["covered"] == 12
+```
+
+In `test_a_label_override_changes_the_derived_label`:
+
+```python
+    assert changed == {
+        "PR.DS-02", "PR.DS-11", "PR.IR-03", "ID.AM-05", "ID.AM-08", "GV.PO-02", "PR.AA-01", "PR.PS-02", "PR.PS-06"
+    }
+```
+
+Add:
+
+```python
+def test_the_per_part_rejudge_is_in_the_key() -> None:
+    """Ruling 19: PR.DS-01 stays Covered with its integrity line as key evidence; PR.DS-02 is Partly covered,
+    availability in transit missing, with its integrity line as key evidence."""
+    facts, g = gap.load("dev")
+    keys = {k.code: k for k in gap.derive_gap(facts, g).items}
+    evidence = {c: {(e.doc, e.quote) for e in keys[c].evidence} for c in ("PR.DS-01", "PR.DS-02")}
+    assert ("lmp", "Improper alteration or loss of sensitive information.") in evidence["PR.DS-01"]
+    scope = "This policy applies to all Kestrelyn systems that store, transmit, or process sensitive information."
+    assert ("lmp", scope) in evidence["PR.DS-02"]
+    assert (keys["PR.DS-01"].expected_label, keys["PR.DS-02"].expected_label) == ("verified", "partial")
+```
+
+and:
+
+```python
+@pytest.mark.parametrize(
+    ("update", "problem"),
+    [
+        ({"missing_parts": ()}, "outcome PR.DS-11: a label override needs missing_parts"),
+        ({"missing_parts": (9,)}, "outcome PR.DS-11: no part 9"),
+        ({"label": None, "missing": None}, "outcome PR.DS-11: missing_parts without a label override"),
+    ],
+)
+def test_an_override_names_the_parts_it_misses(
+    monkeypatch: pytest.MonkeyPatch, update: dict[str, object], problem: str
+) -> None:
+    facts, g = gap.load("dev")
+    outcomes = tuple(o.model_copy(update=update) if o.csf_id == "PR.DS-11" else o for o in g.outcomes)
+    monkeypatch.setattr(gap, "load", lambda pack: (facts, g.model_copy(update={"outcomes": outcomes})))
+    assert problem in gap.check("dev")
+
+
+def test_a_planted_conflict_must_be_visible_to_a_part_without_a_threshold(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Adversary C1: 'performed annually' is a no only against a question that says quarterly; a CSF part
+    states no interval, so trap X1 cannot be a CSF disagreement. The two real ones pass: DE.AE-06's no side is
+    negated, PR.AA-05's is an overdue record row."""
+    facts, g = gap.load("dev")
+    remap = {"control": "backup-restore-test", "label": None, "missing": None, "missing_parts": ()}
+    outcomes = tuple(o.model_copy(update=remap) if o.csf_id == "PR.DS-11" else o for o in g.outcomes)
+    monkeypatch.setattr(gap, "load", lambda pack: (facts, g.model_copy(update={"outcomes": outcomes})))
+    found = gap.check("dev")
+    assert "PR.DS-11: conflict X1 rests on a thresholded no the CSF part cannot see" in found
+    assert not [p for p in found if p.startswith(("PR.AA-05:", "DE.AE-06:"))]
+```
+
+Run `pytest tests/datakit/test_gap.py -q`. Expected: FAIL (the key still holds 17 Covered; `missing_parts` is
+unknown).
+
+Then the code and the data.
+- In `datakit/schemas.py`, `GapOutcome` gets after `missing`:
+
+  ```python
+      # The parts (1-based, data/csf/tiers.yaml) the override's `missing` names; required with `label` (adversary I4).
+      missing_parts: tuple[int, ...] = ()
+  ```
+
+- In `datakit/gap.py`, import `is_usable_evidence` from `datakit.derive_key`. After the `a label override needs
+  missing` check, add:
+
+  ```python
+      count = {o.id: len(o.parts) for o in checked()}
+      p += [
+          f"outcome {m.csf_id}: a label override needs missing_parts"
+          for m in gap.outcomes
+          if m.label and not m.missing_parts
+      ]
+      p += [
+          f"outcome {m.csf_id}: missing_parts without a label override"
+          for m in gap.outcomes
+          if m.missing_parts and not m.label
+      ]
+      p += [
+          f"outcome {m.csf_id}: no part {n}"
+          for m in gap.outcomes
+          for n in m.missing_parts
+          if not 1 <= n <= count.get(m.csf_id, 0)
+      ]
+  ```
+
+  After `control = {m.csf_id: m.control for m in gap.outcomes}`, add:
+
+  ```python
+      # A CSF part states no threshold (spec 4), so a planted disagreement must rest on a no the part can see: a
+      # negated sentence or a record row's status, not a longer interval (spec 10, adversary C1).
+      p += [
+          f"{k.code}: conflict {k.conflict_trap} rests on a thresholded no the CSF part cannot see"
+          for k in key.items
+          if k.expected_label == "conflict"
+          and not all(
+              "negation" in s.flags or "Status: " in s.text
+              for s in f.statements_for(control[k.code])
+              if s.stance == "no" and is_usable_evidence(f, s)
+          )
+      ]
+  ```
+
+- In `data/dev/gap/facts.yaml`, end the header comment's `outcomes` paragraph with "... overrides the derived label
+  for a broad outcome; `missing_parts:` gives the numbers of those parts in data/csf/tiers.yaml (blind judges 1 and
+  2, Rulings 12, 15, 17 and 19)". Then change the nine override entries:
+
+  ```yaml
+    - {csf_id: GV.PO-02, control: policy-review, label: partly_covered, missing_parts: [2, 4], missing: "updated, and enforced to reflect changes in requirements, threats, technology and mission (judge 2: only reviewed, communicated and enforced have evidence)"}
+    - {csf_id: ID.AM-05, control: data-classification, label: partly_covered, missing_parts: [2, 3, 4], missing: "criticality, resources and mission impact (only classification has evidence)"}
+    - {csf_id: ID.AM-08, control: media-sanitization, label: partly_covered, missing_parts: [1, 3, 4], missing: "end-of-life for systems, software and services (only hardware disposal and data deletion have evidence)"}
+    - {csf_id: PR.AA-01, control: sso, label: partly_covered, missing_parts: [3], missing: "identities and credentials for hardware (judge 2: only users and services have evidence)"}
+    # PR.DS-02 (judge 2's per-part re-judge, Ruling 19): confidentiality (crypto) and integrity (lmp scope line) have
+    # evidence; no line protects the availability of data in transit.
+    - {csf_id: PR.DS-02, control: encryption-in-transit, label: partly_covered, missing_parts: [3], missing: "availability of data in transit (judge 2 re-judge: no redundancy, DoS or rate-limit line; pentest KL-26-01 reports missing rate limiting)"}
+    # PR.DS-11 (judge 2's fallback, Ruling 17 / adversary C1): the restore-test interval disagreement (policy quarterly,
+    # DR plan annually) is a no only against a stated threshold, which a CSF part may not state; it is reported here.
+    - {csf_id: PR.DS-11, control: backups, label: partly_covered, missing_parts: [2, 3], missing: "protected and maintained (no line on backup protection, retention or integrity); tested: the continuity policy says quarterly and the DR plan annually, an interval disagreement the part cannot see (spec 10)"}
+    - {csf_id: PR.PS-02, control: patch-sla, label: partly_covered, missing_parts: [2, 3], missing: "replaced (no end-of-life or unsupported-software line); removed commensurate with risk has weak evidence only (judge 2)"}
+    - {csf_id: PR.PS-06, control: sast, label: partly_covered, missing_parts: [2], missing: "performance monitored (judge 2: no metric or review of how the practices perform)"}
+    - {csf_id: PR.IR-03, control: rto-rpo, label: partly_covered, missing_parts: [1], missing: "normal situations, and requirements achieved (only the RTO and RPO targets have evidence, no test shows them met)"}
+  ```
+
+  These numbers follow Step 2's parts: GV.PO-02 is 2 updated and 4 enforced-to-reflect; ID.AM-05 is 2 criticality,
+  3 resources and 4 impact on the mission; ID.AM-08 is 1 systems, 3 software and 4 services; PR.AA-01 is 3
+  hardware; PR.DS-02 is 3 availability; PR.DS-11 is 2 protected and 3 maintained; PR.PS-02 is 2 replaced and 3
+  removed; PR.PS-06 is 2 monitored; PR.IR-03 has one part.
+
+  Register the re-judge's integrity lines (a fact-sheet correction, Rulings 11c, 12 and 19). Append to `statements`:
+
+  ```yaml
+    # PR.DS-01 / PR.DS-02 integrity parts (judge 2's per-part re-judge, Ruling 19): the logging policy guards against
+    # improper alteration (line 9) of sensitive information on systems that store, transmit or process it (line 10).
+    - id: lmp-integrity-at-rest
+      doc: lmp
+      control: encryption-at-rest
+      stance: yes
+      text: "Improper alteration or loss of sensitive information."
+    - id: lmp-integrity-in-transit
+      doc: lmp
+      control: encryption-in-transit
+      stance: yes
+      text: "This policy applies to all Kestrelyn systems that store, transmit, or process sensitive information."
+  ```
+
+Run: `python -m datakit.gap dev && python -m datakit.validate all && pytest tests/datakit/test_gap.py tests/test_eval_gap.py -q`
+Expected: the key is rewritten, validation finds 0 problems, and the tests PASS. `git diff data/dev/key/` changes:
+- GV.PO-02, PR.AA-01, PR.PS-02, PR.PS-06 and PR.DS-02 go from verified Yes to partial;
+- PR.DS-01 gains the lmp line 9 evidence, and PR.DS-02 the lmp line 10 evidence;
+- PR.DS-11 is unchanged, since it was already partial.
+
+- [ ] **Step 11: The updated counts and the whole chain**
+
+The counts that move together, each pinned by a test:
+- 73 parts (`tests/datakit/test_csf.py`, `tests/test_csf_parts.py`);
+- expected 12 Covered, 12 Partly covered, 2 Not met, 2 Documents disagree, 3 Gap (`tests/datakit/test_gap.py`);
+- 9 overrides with `missing_parts` (`tests/datakit/test_gap.py`).
+
+These stay the same: the tiers (31 / 5 / 70, 36 in the core), and `round(3 / 31, 4)` in `tests/test_eval_gap.py`.
+`MIN_PLANTED`'s two disagreements are still met.
+
+Run, on `vart_test_csf`:
+
+```bash
+ruff check . && ruff format --check . && mypy app scripts datakit evals && pytest -q && alembic check && python -m datakit.validate all
+python -m evals.run --pack dev; git diff --exit-code evals/results/latest.json evals/results/latest.md
+python -m evals.run --pack gap-dev; echo "exit $?"
+```
+
+Expected:
+- The chain passes.
+- The dev pack prints its unchanged gate line (15/15) with no diff.
+- gap-dev stops with `recording missing (...); re-record with --mode record` and `exit 2`, because every stance key
+  changed. That is the lead's Step 13: never record from the implementer's session.
+
+- [ ] **Step 12: Commit**
+
+```bash
+git add data/csf/tiers.yaml data/csf/csf-2.0.json datakit/csf.py tests/datakit/test_csf.py datakit/schemas.py datakit/gap.py tests/datakit/test_gap.py data/dev/gap/facts.yaml data/dev/key/csf-core.yaml app/csf.py tests/test_csf_framework.py tests/test_csf_parts.py evals/gap.py tests/test_eval_gap.py
+git commit -m "feat(csf): per-part questions combined by code; key adopts blind judge 2 (CSF spec 4, 5.2-5.3 amended)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+Then the Opus review (Review Focus above).
+
+- [ ] **Step 13 (lead, eval key): re-record gap-dev**
+
+After the review is clean:
+
+```bash
+cd ~/Desktop/portfolio/projects/VART-wt-csf && source .venv/bin/activate
+export DATABASE_URL=postgresql+psycopg://vart:vart@localhost:5434/vart_test_record_csf
+alembic upgrade head
+rm evals/recorded/gap-dev.jsonl  # every stance key changed and no draft is called: no old row is reused
+(set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.run --pack gap-dev --mode record)
+```
+
+Expected: 73 stance requests, of which 72 are live calls: GV.PO-02 part 3 has the same text as GV.PO-01 part 2, so
+it replays that recording (R6). There is no draft call. The run costs about $0.07 and takes about 13 minutes. The last line reads
+`N/9 gates pass`. If a stance call fails, the run stops; running it again resumes from the recordings already made.
+From this commit on, the parts are frozen (spec 4). Then follow Task 7 Steps 2-3:
+
+```bash
+git add evals/recorded/gap-dev.jsonl evals/results/gap-dev.json evals/results/gap-dev.md
+git commit -m "evals: gap-dev re-recorded with per-part questions" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+python -m evals.run --pack gap-dev; echo "exit $?"; python -m evals.run --pack dev; git diff --exit-code evals/results && git status --short evals/
+```
+
+Expected: the same gate line and exit code as the record run, the dev pack 15/15, and no diff.
+
+- [ ] **Step 14 (lead): baseline**
+
+If `label_accuracy` is below 0.80, diagnose before changing anything. Read the per-part report in `gap-dev.json` and
+sort each miss into part retrieval, part stance, part wording (a frozen part: a change is a tuning round with a
+change-log line that cites NIST) or the key. Ruling 16 applies: at most 2 rounds under Task 7 Step 4's rules, then
+Tarun.
+
+Then Task 7 Step 5. The report to Tarun lists:
+- the gate table and `part_agreement` (reported, not a gate). The metric is degenerate for a one-part override
+  (PR.IR-03, `missing_parts: [1]`): any Gap or Partly covered on that part counts as agreement, so do not over-read
+  it (R5);
+- every key change since the first baseline (Ruling 11), including judge 2's four changes, PR.DS-11's fallback, and
+  the per-part re-judge (PR.DS-02 Partly covered, with two lmp lines registered);
+- each miss with its parts' labels;
+- for every expected-Gap outcome, the part (if any) that cited a line, and which line (adversary I1);
+- the stance requests the run made (73; the record run makes 72 live calls, R6) and the cost and seconds per core
+  run, against today's $0.0333 and 378 s (I5);
+- the known risks:
+  - RS.CO-02: a scope over-read, accepted as a miss;
+  - PR.AA-01: the Okta row may read as no on the users part (Ruling 11d);
+  - PR.DS-01: its integrity part rests on a monitoring line (lmp line 9), the judge's weakest;
+  - PR.IR-03: "in normal and adverse situations" is a pair and stays in its one part;
+  - RC.RP-01: its one part carries "once initiated from the incident response process", which round 2's stance read
+    as a requirement bcp:30 does not state (likely Gap against an expected Covered);
+  - RS.MA-01: its one part carries both qualifiers (third parties, once declared) and may read as Gap against an
+    expected Partly covered.
+
+**Minors** (adversary checkpoint 2; Ruling 17 leaves them to the drafter):
+- M1, done: `explain` shows every disagreeing part with its own template answer, so each part's conflict is shown.
+- M2, done: the citation dedupe key includes stance (tested).
+- M3, done: GV.PO-02 parts 3-4 now follow NIST ("communicated", "enforced to reflect ..."); part 3 shares GV.PO-01
+  part 2's text and recording key (noted in Step 2).
+- M4, done: the spec no longer claims the explanation passes the answer check. The PR.DS-01 test checks that every
+  quote in the explanation is cited. The group line's part numbers are code's text, not evidence.
+- M5, partly done: the spec notes what `retrieval_recall_at_8` and the seconds now measure. **Skipped:** renaming the
+  metric, which would change the results files and both packs' report code for no new information.
+- M6, done: `test_a_changed_tier_list_gives_a_new_questionnaire` changes one part only.
+- M7, partly done: `_without_draft`'s docstring names the test that pins it. **Skipped:** the `Literal` step type,
+  because `Spend` is a frozen contract (`Callable[[str], bool]`) and narrowing it is a rule-10 change.
+- M8, **skipped in 6A**: showing a draft-only quote's document status belongs to 6B's inspector, so it is carry (d)
+  in Step 1.
+- M9, done: spec section 6 gets its sentence.
+- M10, done: the explanation lists part numbers by group, then the deciding parts' questions with their answers.
+- M11, done: the disagreement fixture cites its own no line.
+- M12, done: `PartLabel` types `combine`, `_DECIDE`, `PART_WORDS` and `_DECIDING`.
+- R3 (recheck), done: the example clause ends at the next comma or the question mark (tested).
+- R4 (recheck), done: a `paraphrase_words` entry in the old list form is named, not a crash (tested).
+- R5 (recheck), done: Step 14 notes that `part_agreement` is degenerate for the one-part override (PR.IR-03).
+- R6 (recheck), done: Steps 1 and 13 say a record run makes 72 live calls for 73 stance requests.
+- I2's "part count in the key file header", **skipped**: a re-cut already shows in `git diff` twice, in
+  `tiers.yaml` (with the required change-log line) and in `gap-dev.json`'s per-part report. A header in a file that
+  `dump_yaml` writes would need a `Key` schema change.
+
 ## Self-review notes (for the lead)
 
 - **Spec coverage.** Section 4: Task 1 (file, fields, verbatim NIST text, drift test, refresh rule, tiers fixed with Tarun). Section 5: steps 2-5 in Tasks 3-4 (`check_outcome`, gap labels, `ask_queue` + `store_statement`, not-checked makes no call); step 1 (the view starting a run, caps, expiry) and step 6 (re-check after an upload or answer) are HTTP flows, deferred to 6B with Plan 3's runner (`recheck` is reused unchanged). Section 6: Tasks 2 and 4. Section 7: 6B. Section 8: Tasks 5-7, every gate in the table (cost and speed reported), fail-closed, CI replay, eval key. Section 9: Ask-me answers redacted by `store_statement` and measured by the redaction gate; the CSF file is read, never fetched or executed. Section 11: Tarun's approvals of the IDs (Task 1 Step 7) and of the first baseline (Task 7 Step 5); README and view are 6B.
 - **Type consistency.** `gap_label(o, label, value=None, statement_id=None)` is called the same way in Tasks 3, 4, 5 and 6; `questionnaire_for`, `check_outcome`, `ask_queue`, `item_input` keep Task 4's signatures in Task 6; `datakit.gap.doc_path(pack, gap, spec)` and `trap_sources(f, control)` match their uses in `evals/gap.py`; `score.gates(metrics, table)` is the one signature change in `evals/score.py`.
-- **Counts that tests pin and that move together:** 106 outcomes, 29 Checked, 5 Ask-me, 72 not checked, 34 in the core, 7 in Govern, 17 expected Covered. If Tarun changes the tiers at the review gate, update these numbers in `tests/datakit/test_csf.py`, `tests/test_csf.py`, `tests/datakit/test_gap.py` and `tests/test_eval_gap.py` together with the outcome map.
+- **Counts that tests pin and that move together:** 106 outcomes, 31 Checked, 5 Ask-me, 70 not checked, 36 in the core, 7 in Govern, 73 parts; expected 12 Covered, 12 Partly covered, 2 Not met, 2 Documents disagree, 3 Gap. If Tarun changes the tiers at the review gate, update these numbers in `tests/datakit/test_csf.py`, `tests/test_csf.py`, `tests/datakit/test_gap.py` and `tests/test_eval_gap.py` together with the outcome map.
