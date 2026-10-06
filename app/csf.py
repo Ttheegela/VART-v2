@@ -6,16 +6,20 @@ import hashlib
 import json
 import re
 import uuid
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
 from functools import cache
 from pathlib import Path
-from typing import Literal, get_args
+from typing import Any, Literal, get_args
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.contracts import (
+    Citation,
+    Conflict,
+    ConflictSide,
     Decision,
     Draft,
     Dropped,
@@ -27,6 +31,7 @@ from app.contracts import (
     QueueEntry,
     Retrieval,
     Spend,
+    Stance,
     Value,
 )
 from app.db.models import Item, Questionnaire, Workspace
@@ -57,6 +62,9 @@ GAP_WORDS: dict[str, str] = {
     "not_answered": "Not answered",
 }
 NOT_CHECKED = "not checked in this version"
+# NIST's SP 800-53 Rev 5 page. Every related control links here: no per-control page could be verified (the
+# Reference Tool's deep links are single-page-app routes, 6A decision 3). The lead checked it (6B Task 1).
+CONTROLS_URL = "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final"
 FUNCTIONS = ("Govern", "Identify", "Protect", "Detect", "Respond", "Recover")
 _ID = re.compile(r"[A-Z]{2}\.[A-Z]{2}-\d{2}")
 _CHECKED: dict[tuple[str, str | None], PartLabel] = {  # CSF spec 5.3
@@ -114,6 +122,12 @@ class Framework:
 
     def get(self, csf_id: str) -> Outcome:
         return {o.id: o for o in self.outcomes}[csf_id]
+
+
+def outcome_or_none(csf_id: str) -> Outcome | None:
+    """The deployed outcome with this id, or None for an id a data refresh withdrew (adversary-1 N1): only a
+    run started before the deploy holds one, and it must not crash a step or a request."""
+    return next((o for o in framework().outcomes if o.id == csf_id), None)
 
 
 def _validate(outcomes: tuple[Outcome, ...]) -> None:
@@ -196,6 +210,14 @@ def _digest(outcomes: Sequence[Outcome]) -> str:
     return hashlib.sha256(json.dumps(rows).encode()).hexdigest()[:16]
 
 
+def current_mapping(scope: str) -> dict[str, str]:
+    """What names the built-in questionnaire for `scope` under the CSF data deployed now (CSF spec 6): the
+    data version, its retrieval date, the scope and a digest of its items. ValueError for an unknown scope."""
+    outcomes = in_scope(scope)
+    fw = framework()
+    return {"csf_version": fw.version, "retrieved": fw.retrieved, "scope": scope, "digest": _digest(outcomes)}
+
+
 def questionnaire_for(session: Session, workspace_id: uuid.UUID, scope: str) -> Questionnaire:
     """The workspace's built-in CSF questionnaire for `scope` (CSF spec 6), created on first use with one
     item per Checked and Ask-me outcome in scope. It is reused only while the CSF data behind it is the same
@@ -203,13 +225,7 @@ def questionnaire_for(session: Session, workspace_id: uuid.UUID, scope: str) -> 
     question gives the next run new items instead of stale ones. Found by those mapping keys (JSONB
     containment), so a key added to the mapping later does not hide it. Commits."""
     outcomes = in_scope(scope)
-    fw = framework()
-    mapping = {
-        "csf_version": fw.version,
-        "retrieved": fw.retrieved,
-        "scope": scope,
-        "digest": _digest(outcomes),
-    }
+    mapping = current_mapping(scope)
     # Lock the workspace row, as ingest does, so two first calls at once create one questionnaire.
     session.execute(select(Workspace.id).where(Workspace.id == workspace_id).with_for_update())
     q = session.scalars(
@@ -247,14 +263,10 @@ def part_inputs(o: Outcome) -> tuple[ItemInput, ...]:
 
 def evidence(session: Session, workspace_id: uuid.UUID, item: ItemInput) -> Retrieval:
     """What one part of a Checked outcome is judged on (Ruling 9, spec 5.3 "checked against documents"): its
-    retrieval without the visitor's stored answers, each dropped with reason 'statement' before any model sees
-    it. An answer reaches a Checked outcome only as a suggestion the visitor accepts (Plan 6B)."""
-    r = retrieve(session, workspace_id, item.question, item.topic)
-    said = [p for p in r.passages if p.doc.kind == "statement"]
-    return Retrieval(
-        tuple(p for p in r.passages if p.doc.kind != "statement"),
-        r.dropped + tuple(Dropped(p.chunk_id, p.doc.id, p.doc.filename, "statement") for p in said),
-    )
+    retrieval with the visitor's stored answers left out of the candidates, so none takes a passage slot
+    (adversary-1 I4). An answer reaches a Checked outcome only as a suggestion the visitor accepts
+    (Plan 6B)."""
+    return retrieve(session, workspace_id, item.question, item.topic, exclude_kinds=("statement",))
 
 
 def part_label(r: ItemResult) -> PartLabel:
@@ -291,16 +303,19 @@ def _numbers(ns: list[int]) -> str:
     return f"part {ns[0]}" if len(ns) == 1 else "parts " + ", ".join(map(str, ns))
 
 
-def explain(o: Outcome, parts: Sequence[ItemResult]) -> str:
+def explain(o: Outcome, parts: Sequence[ItemResult], filled: Collection[int] = ()) -> str:
     """The outcome's explanation (CSF spec 5.3, amended), by code with no model call: the part numbers by
-    label, then each part that decided the combined label as its question and its own template answer, so a
-    quote always stands beside the stance it was judged with and a stated No is never shown over yes lines."""
+    label, the parts `filled` from the visitor's answer first under their own group (adversary-1 I3), then
+    each part that decided the combined label as its question and its own template answer, so a quote always
+    stands beside the stance it was judged with and a stated No is never shown over yes lines."""
     labels = [part_label(r) for r in parts]
     deciding = _DECIDING[combine(labels)]
-    groups = [
-        f"{word}: {_numbers([n for n, x in enumerate(labels, 1) if x == label])}."
+    mine = [n for n in range(1, len(parts) + 1) if n in filled]
+    groups = [f"Confirmed by you: {_numbers(mine)}."] if mine else []
+    groups += [
+        f"{word}: {_numbers(ns)}."
         for label, word in PART_WORDS.items()
-        if label in labels
+        if (ns := [n for n, x in enumerate(labels, 1) if x == label and n not in filled])
     ]
     answers = [
         f"{q} {template_answer(r.decision)}"
@@ -357,6 +372,22 @@ def _without_draft(spend: Spend) -> Spend:
     return lambda step: step != "draft" and spend(step)
 
 
+def check_part(
+    session: Session,
+    workspace_id: uuid.UUID,
+    o: Outcome,
+    n: int,
+    llm: LLMClient,
+    models: Mapping[str, str],
+    spend: Spend,
+) -> ItemResult:
+    """Part `n` (1-based) of a Checked outcome through the ordinary pipeline, on documents only, its draft
+    refused before anything is spent (CSF spec 5.2): one stance call when it has passages, none otherwise."""
+    item = part_inputs(o)[n - 1]
+    retrieval = evidence(session, workspace_id, item)
+    return answer_retrieved(session, workspace_id, item, retrieval, llm, models, _without_draft(spend))
+
+
 def check_parts(
     session: Session,
     workspace_id: uuid.UUID,
@@ -371,13 +402,46 @@ def check_parts(
     checked: never part of a run."""
     if o.tier == "not_checked":
         raise ValueError(f"{o.id} is {NOT_CHECKED}")
-    no_draft = _without_draft(spend)
-    return [
-        answer_retrieved(
-            session, workspace_id, item, evidence(session, workspace_id, item), llm, models, no_draft
-        )
-        for item in part_inputs(o)
-    ]
+    return [check_part(session, workspace_id, o, n, llm, models, spend) for n in range(1, len(o.parts) + 1)]
+
+
+def _cited(rows: Sequence[Mapping[str, Any]]) -> tuple[Citation, ...]:
+    return tuple(Citation(**c) for c in rows)
+
+
+def _side(s: Mapping[str, Any]) -> ConflictSide:
+    return ConflictSide(
+        s["stance"], _cited(s["citations"]), date.fromisoformat(s["date"]) if s["date"] else None
+    )
+
+
+def part_result(o: Outcome, n: int, raw: Mapping[str, Any]) -> ItemResult:
+    """Part `n` rebuilt from its stored record with no model call (app.runs stores each part as it lands, CSF
+    spec 5.7): what `aggregate`, `explain` and the inspector need. The passages are not rebuilt; their chunk
+    ids stay in raw["chunk_ids"]. Keys beyond `runs._raw`'s (the question, the judge) are ignored."""
+    c = raw["conflict"]
+    conflict = None
+    if c:
+        first, second = (_side(s) for s in c["sides"])
+        conflict = Conflict(c["rule"], (first, second))
+    decision = Decision(
+        raw["label"],
+        raw["value"],
+        _cited(raw["citations"]),
+        tuple(Dropped(**d) for d in raw["dropped"]),
+        conflict,
+        raw["scope_note"],
+        raw["confidence"],
+    )
+    return ItemResult(
+        part_inputs(o)[n - 1],
+        Retrieval((), tuple(Dropped(**d) for d in raw["retrieval_dropped"])),
+        tuple(Stance(**s) for s in raw["stances"]),
+        decision,
+        Draft(raw["text"], "template"),
+        0.0,
+        0,
+    )
 
 
 def check_outcome(

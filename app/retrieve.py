@@ -47,13 +47,14 @@ _CANDIDATES = text(
         round(ts_rank_cd(c.tsv, q.query, 1)::numeric, 6) AS cd
     FROM chunks c JOIN documents d ON d.id = c.document_id
     CROSS JOIN websearch_to_tsquery('english', :q) AS q(query)
-    WHERE c.workspace_id = :ws AND c.tsv @@ q.query
+    WHERE c.workspace_id = :ws AND c.tsv @@ q.query AND NOT d.kind = ANY(CAST(:exclude AS text[]))
     ORDER BY cd DESC, d.filename, c.line_start
     LIMIT :limit"""
 )
 _RECORDS = text(
     f"""SELECT {_COLUMNS} FROM chunks c JOIN documents d ON d.id = c.document_id
-    WHERE c.workspace_id = :ws AND c.record ORDER BY d.filename, c.line_start"""
+    WHERE c.workspace_id = :ws AND c.record AND NOT d.kind = ANY(CAST(:exclude AS text[]))
+    ORDER BY d.filename, c.line_start"""
 )
 _DOCUMENT = text(
     f"""SELECT {_COLUMNS} FROM chunks c JOIN documents d ON d.id = c.document_id
@@ -132,7 +133,9 @@ def _chunks_naming(session: Session, workspace_id: uuid.UUID, identifier: str) -
     return int(count or 0)
 
 
-def _hop(session: Session, workspace_id: uuid.UUID, chosen: Sequence[Any]) -> list[Any]:
+def _hop(
+    session: Session, workspace_id: uuid.UUID, chosen: Sequence[Any], exclude_kinds: Sequence[str] = ()
+) -> list[Any]:
     """Record hop: record rows whose identifier (the row's first value: a system, asset or host name) is named
     in a selected passage and in at most HOP_MAX_CHUNKS chunks; rows of already-selected documents first.
     A row flagged injection is never added: it would reach the model (spec 6.5)."""
@@ -140,7 +143,7 @@ def _hop(session: Session, workspace_id: uuid.UUID, chosen: Sequence[Any]) -> li
     have = {r.id for r in chosen}
     docs = {r.document_id for r in chosen}
     rows = []
-    for row in session.execute(_RECORDS, {"ws": workspace_id}):
+    for row in session.execute(_RECORDS, {"ws": workspace_id, "exclude": list(exclude_kinds)}):
         # ponytail: reads the first "Header: value" back out of a record line (app/text.py says lines are for
         # reading, not parsing); a value holding "; " only costs a missed or extra hop, never a citation.
         first = _FIRST_VALUE.match(row.text)
@@ -172,10 +175,18 @@ def _hop(session: Session, workspace_id: uuid.UUID, chosen: Sequence[Any]) -> li
     return found
 
 
-def retrieve(session: Session, workspace_id: uuid.UUID, question: str, topic: str | None) -> Retrieval:
-    """At most K passages for one questionnaire item, best first."""
+def retrieve(
+    session: Session,
+    workspace_id: uuid.UUID,
+    question: str,
+    topic: str | None,
+    exclude_kinds: Sequence[str] = (),
+) -> Retrieval:
+    """At most K passages for one questionnaire item, best first. Documents of `exclude_kinds` are never
+    candidates, so they take no slot (Plan 6B: a Checked CSF part is judged without statements)."""
     query = build_query(question, topic)
-    rows = session.execute(_CANDIDATES, {"q": query, "ws": workspace_id, "limit": CANDIDATES}).all()
+    params = {"q": query, "ws": workspace_id, "limit": CANDIDATES, "exclude": list(exclude_kinds)}
+    rows = session.execute(_CANDIDATES, params).all()
     if not rows:
         return Retrieval((), ())
     ranked = _fused(session, workspace_id, query, rows)
@@ -200,7 +211,7 @@ def retrieve(session: Session, workspace_id: uuid.UUID, question: str, topic: st
                 per_doc[key] = per_doc.get(key, 0) + 1
 
     take(K - HOP)
-    chosen.extend(_hop(session, workspace_id, chosen))
+    chosen.extend(_hop(session, workspace_id, chosen, exclude_kinds))
     take(K)
     return Retrieval(tuple(_passage(r) for r in chosen), dropped)
 

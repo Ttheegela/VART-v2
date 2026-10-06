@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Request
 from sqlalchemy import select
 
+from app import csf
 from app import questions as qs
 from app.api.deps import LLMDep, SessionDep, WorkspaceDep
 from app.api.errors import limit, network
@@ -27,16 +28,19 @@ router = APIRouter(tags=["interview"], responses=ERRORS)
 
 
 def _suggestion_out(session: SessionDep, s: SuggestedFill) -> SuggestionOut:
+    """A fill for one part of a CSF outcome reads as that part's wording (preflight I3)."""
     item = session.get_one(Item, s.item_id)
+    o = csf.outcome_or_none(item.csf_id) if item.csf_id and s.part else None
     return SuggestionOut(
         id=s.id,
         item_id=s.item_id,
         code=item.code,
-        question=item.question,
+        question=o.parts[s.part - 1] if o and s.part <= len(o.parts) else item.question,
         label=s.label,
         value=s.value,
         text=s.text,
         status=s.status,
+        part=s.part,
     )
 
 

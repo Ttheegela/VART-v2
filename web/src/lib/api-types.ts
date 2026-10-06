@@ -192,7 +192,8 @@ export interface paths {
     /**
      * Approve Verified
      * @description Approve every verified answer not yet approved (design key A). An edited answer is left for a look
-     * (adversary-1 M5): approve it by itself; `skipped_edited` counts them.
+     * (adversary-1 M5): approve it by itself; `skipped_edited` counts them. A gap check's Not met outcome is
+     * never bulk-approved.
      */
     post: operations["approve_verified_api_runs__run_id__approve_verified_post"];
   };
@@ -202,7 +203,10 @@ export interface paths {
      * @description The original file with the answer column filled and Status, Sources and Notes columns added; csv in,
      * csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
      * with =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The
-     * response is an attachment with an ASCII-safe file name. 429 per network (`export`, 60 an hour).
+     * response is an attachment with an ASCII-safe file name. A gap-check run answers the gap-report workbook
+     * instead (CSF spec 7). An xlsx questionnaire's export also carries the workspace's latest done gap check as
+     * a `Gap report` sheet (renamed `Gap report (2)` and so on if the file has one), stating its scope and run
+     * date; a csv is unchanged. 429 per network (`export`, 60 an hour).
      */
     get: operations["export_run_api_runs__run_id__export_get"];
   };
@@ -2376,7 +2380,8 @@ export interface operations {
   /**
    * Approve Verified
    * @description Approve every verified answer not yet approved (design key A). An edited answer is left for a look
-   * (adversary-1 M5): approve it by itself; `skipped_edited` counts them.
+   * (adversary-1 M5): approve it by itself; `skipped_edited` counts them. A gap check's Not met outcome is
+   * never bulk-approved.
    */
   approve_verified_api_runs__run_id__approve_verified_post: {
     parameters: {
@@ -2434,7 +2439,10 @@ export interface operations {
    * @description The original file with the answer column filled and Status, Sources and Notes columns added; csv in,
    * csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
    * with =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The
-   * response is an attachment with an ASCII-safe file name. 429 per network (`export`, 60 an hour).
+   * response is an attachment with an ASCII-safe file name. A gap-check run answers the gap-report workbook
+   * instead (CSF spec 7). An xlsx questionnaire's export also carries the workspace's latest done gap check as
+   * a `Gap report` sheet (renamed `Gap report (2)` and so on if the file has one), stating its scope and run
+   * date; a csv is unchanged. 429 per network (`export`, 60 an hour).
    */
   export_run_api_runs__run_id__export_get: {
     parameters: {

@@ -16,8 +16,9 @@ from openpyxl.utils import column_index_from_string, get_column_letter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import csf
 from app.api.errors import Conflict
-from app.api.schemas import Mapping
+from app.api.schemas import GapRow, Mapping
 from app.db.models import Answer, Item
 from app.ingest.parse import IngestError, decode
 from app.questionnaires import MAX_COLS, MAX_ROWS, delimiter
@@ -118,7 +119,112 @@ def _validation(ws: Any, letter: str) -> set[str] | None:
     return None
 
 
-def export_xlsx(original: bytes, mapping: Mapping, rows: list[ExportRow]) -> bytes:
+GAP_SHEET = "Gap report"
+GAP_HEAD = (
+    "ID",
+    "Function",
+    "Category",
+    "Label",
+    "Explanation",
+    "Quotes",
+    "NIST outcome",
+    "Links",
+    "Related controls",
+    "Run date",
+    "CSF version",
+)  # CSF spec 7
+REVIEW = "Possible gap — review it"
+FOOTER = "Not legal advice. CSF 2.0 text © NIST, public domain."
+NOT_RUN = "Not run yet"
+FAILED_WORD = "Failed"
+FAILED_SENTENCE = "Not checked: the model call failed twice."  # the view adds its UI hint
+
+
+@dataclass(frozen=True)
+class GapSheet:
+    """One gap-check run as a sheet (CSF spec 7): built by app.api.gap.gap_sheet, written by `_write_gap`."""
+
+    rows: list[GapRow]
+    citations: dict[uuid.UUID, list[dict[str, Any]]]
+    run_date: str
+    scope: str
+    version: str
+    controls_url: str
+
+
+def _gap_word(r: GapRow) -> str:
+    if r.not_applicable:  # either tier, before the tier test (adversary-1 I1)
+        return LABEL_WORDS["na"]
+    if r.tier == "not_checked":
+        return csf.NOT_CHECKED[0].upper() + csf.NOT_CHECKED[1:]  # "Not checked in this version"
+    if r.label:
+        return csf.GAP_WORDS[r.label]
+    return FAILED_WORD if _failed(r) else NOT_RUN
+
+
+def _failed(r: GapRow) -> bool:
+    return r.explanation is not None and r.explanation.startswith(FAILED_SENTENCE)
+
+
+def _write_gap(ws: Any, g: GapSheet) -> None:
+    """The review line with the scope and run date, a header, one row per outcome in scope (unchecked ones
+    too, so coverage is never overstated), then the not-legal-advice footer. NIST's text is verbatim and
+    every cell is inert text (`_put`)."""
+    _put(ws.cell(1, 1), REVIEW)
+    _put(ws.cell(1, 2), f"Scope: {g.scope}")
+    _put(ws.cell(1, 3), f"Run date: {g.run_date}")
+    for i, title in enumerate(GAP_HEAD, 1):
+        _put(ws.cell(2, i), title)
+    for n, r in enumerate(g.rows, 3):
+        cited = g.citations.get(r.answer_id, []) if r.answer_id else []
+        quotes = "; ".join(
+            f'"{c["quote"]}" ({c["filename"]} line {c["line_start"]})'
+            + (" (your answer)" if c.get("yours") else "")
+            for c in cited
+        )
+        cells = (
+            r.csf_id,
+            r.function,
+            r.category,
+            _gap_word(r),
+            FAILED_SENTENCE if _failed(r) else r.explanation,
+            quotes or None,
+            r.outcome,
+            f"{r.source_url} {g.controls_url}",
+            ", ".join(r.related_controls) or None,
+            g.run_date,
+            g.version,
+        )
+        for i, value in enumerate(cells, 1):
+            _put(ws.cell(n, i), value)
+    _put(ws.cell(len(g.rows) + 4, 1), FOOTER)
+    for i, width in enumerate((10, 10, 28, 20, 60, 60, 60, 40, 20, 12, 10), 1):
+        ws.column_dimensions[get_column_letter(i)].width = width
+
+
+def _free_title(wb: Any, title: str) -> str:
+    """A sheet name the visitor's workbook does not use yet: never overwrite their own sheet. Excel's names
+    are case-insensitive, so the clash is too (preflight I4)."""
+    names, n, name = {x.casefold() for x in wb.sheetnames}, 2, title
+    while name.casefold() in names:
+        name, n = f"{title} ({n})", n + 1
+    return name
+
+
+def gap_report(g: GapSheet) -> bytes:
+    """A gap-check run's own export: a workbook holding only the gap sheet."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = GAP_SHEET
+    _write_gap(ws, g)
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
+
+
+def export_xlsx(
+    original: bytes, mapping: Mapping, rows: list[ExportRow], gap: GapSheet | None = None
+) -> bytes:
     wb = openpyxl.load_workbook(io.BytesIO(original))
     ws = wb[mapping.sheet] if mapping.sheet else wb.active
     h = mapping.header_row
@@ -159,6 +265,8 @@ def export_xlsx(original: bytes, mapping: Mapping, rows: list[ExportRow]) -> byt
         _put(ws.cell(r.row, first + 2), " ".join(notes) or None)
     for i in range(3):
         ws.column_dimensions[get_column_letter(first + i)].width = 28
+    if gap is not None:  # plan 6B decision 5: the workspace's latest gap check rides along, after every sheet
+        _write_gap(wb.create_sheet(_free_title(wb, GAP_SHEET)), gap)
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()
