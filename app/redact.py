@@ -5,6 +5,7 @@ product word (the small model also tags company and product names as people; Pla
 the dev pack). Place names and cloud regions are kept on purpose: data-residency answers depend on them.
 Sample packs are not redacted (Plan 1A Ruling 10); uploads and the visitor's own answers are."""
 
+import os
 import re
 import threading
 import time
@@ -202,12 +203,47 @@ def _person_results(texts: list[str]) -> list[list[Any]]:
     )
 
 
+_DIGIT_LEAD = re.compile(r"(?:\d+\s+)+")
+_DIGIT_TAIL = re.compile(r"(?:\s+\d+)+$")
+
+
+def _trim_digits(text: str, start: int, end: int) -> tuple[int, int]:
+    """Digit tokens at a span's edge are not part of a name ("Marcus Lee 2026", preflight P2)."""
+    span = text[start:end]
+    lead = _DIGIT_LEAD.match(span)
+    tail = _DIGIT_TAIL.search(span)
+    return start + (lead.end() if lead else 0), end - (len(tail.group()) if tail else 0)
+
+
+def _person_spans(text: str, people: list[Any]) -> list[tuple[int, int]]:
+    """Presidio's PERSON ranges that read as a name. A pair joined only by ", " ("Ortiz, Dana") is tried as
+    one name unless it sits in a longer comma list; when that fails, each span stands alone
+    (preflight P15; triage row 30)."""
+    groups: list[list[tuple[int, int]]] = []
+    for start, end in sorted((r.start, r.end) for r in people):
+        if groups and text[groups[-1][-1][1] : start] == ", ":
+            groups[-1].append((start, end))
+        else:
+            groups.append([(start, end)])
+    out: list[tuple[int, int]] = []
+    for group in groups:
+        first, last = group[0][0], group[-1][1]
+        in_a_list = text[:first].endswith(", ")
+        # a pair that follows a comma ("Okta, Duo, Ping") is a list of products, not "Last, First"; a pair
+        # that starts the list and is followed by a title or more ("Kim, Sarah, CISO") still is
+        for option in ([(first, last)], group) if len(group) == 2 and not in_a_list else (group,):
+            trimmed = [_trim_digits(text, a, b) for a, b in option]
+            kept = [t for t in trimmed if _looks_like_a_name(text[t[0] : t[1]])]
+            if len(kept) == len(trimmed) or option is group:
+                out += kept
+                break
+    return out
+
+
 def _spans(text: str, people: list[Any]) -> list[tuple[int, int, str]]:
     found = [(m.start(), m.end(), label) for label, rx in _PATTERNS for m in rx.finditer(text)]
     # Presidio's EmailRecognizer would fetch the Public Suffix List over HTTP; emails are the regex above.
-    for r in people:
-        if _looks_like_a_name(text[r.start : r.end]):
-            found.append((r.start, r.end, "PERSON"))
+    found += [(start, end, "PERSON") for start, end in _person_spans(text, people)]
     kept: list[tuple[int, int, str]] = []
     for start, end, label in sorted(found, key=lambda s: (s[0], -s[1])):
         if not kept or start >= kept[-1][1]:
@@ -232,6 +268,55 @@ def redact_text(text: str) -> str:
     """Each span becomes <LABEL>: <PERSON>, <EMAIL>, <PHONE>, <ADDRESS> or <SECRET>. These never look like the
     [bracketed] placeholders that app/patterns.py flags."""
     return _apply(text, spans(text))
+
+
+_FILE_CONTEXT = "Notes from "
+
+
+def _suffix_spans(root: str) -> list[tuple[int, int, str]]:
+    """Regex spans of every part of the root bounded by separators (or its ends) on both sides: "\\b" treats
+    "_" as a word character, so "notes_ghp_..._v2" hides a key from the patterns at either end (re-review
+    I-B, I-1). Cheap: a file name is at most 255 characters (0.12 s worst case)."""
+    seps = [m.start() for m in re.finditer(r"[_\W]", root)]
+    starts = [0] + [i + 1 for i in seps]
+    ends = seps + [len(root)]
+    return [
+        (a + i, b + i, label) for i in starts for e in ends if e > i for a, b, label in _spans(root[i:e], [])
+    ]
+
+
+def redact_filename(filename: str) -> str:
+    """A file name's root read as words inside a sentence, where Presidio finds a bare name it misses alone
+    ("Dana Ortiz.docx", triage row 31). Secrets, emails and the like are found on the original root and on
+    each part after a separator; names on a copy whose separator runs are one space, with an index map back,
+    so the original separators stay ("notes_from_<PERSON>_2026.md"). The extension is split off first.
+    A lower-case name ("dana_ortiz.md") stays a known gap, like a single word."""
+    root, ext = os.path.splitext(filename)
+    idx: list[int] = []
+    chars: list[str] = []
+    for i, ch in enumerate(root):
+        if re.match(r"[_\W]", ch):
+            if chars and chars[-1] != " ":
+                chars.append(" ")
+                idx.append(i)
+        else:
+            chars.append(ch)
+            idx.append(i)
+    words = "".join(chars)
+    sentence = f"{_FILE_CONTEXT}{words}."
+    offset = len(_FILE_CONTEXT)
+    found = _suffix_spans(root) + [
+        (idx[a - offset], idx[b - offset - 1] + 1, label)
+        for a, b, label in spans(sentence)
+        if label == "PERSON" and a >= offset and b <= offset + len(words)
+    ]
+    kept: list[tuple[int, int, str]] = []
+    for start, end, label in sorted(found, key=lambda s: (s[0], -s[1])):
+        if kept and start < kept[-1][1]:  # overlap: one span, so an email glued to a name loses both
+            kept[-1] = (kept[-1][0], max(end, kept[-1][1]), kept[-1][2])
+        else:
+            kept.append((start, end, label))
+    return _apply(root, kept) + ext
 
 
 def redact_lines(lines: Sequence[Line]) -> tuple[Line, ...]:

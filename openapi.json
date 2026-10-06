@@ -2620,7 +2620,7 @@
     },
     "/api/documents/{document_id}": {
       "delete": {
-        "description": "409 when a run used the document (reset the workspace to start over).",
+        "description": "409 while a run is going (a step may be citing the document) and when a run used the document (reset\nthe workspace to start over).",
         "operationId": "delete_document_api_documents__document_id__delete",
         "parameters": [
           {
@@ -2828,6 +2828,7 @@
             "required": false,
             "schema": {
               "default": 1,
+              "maximum": 20000,
               "minimum": 1,
               "title": "From",
               "type": "integer"
@@ -2840,6 +2841,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maximum": 20000,
                   "minimum": 1,
                   "type": "integer"
                 },
@@ -2966,7 +2968,7 @@
     },
     "/api/questionnaires": {
       "get": {
-        "description": "Every questionnaire in the workspace, newest first (a built-in `csf` one included, Plan 6B).",
+        "description": "The workspace's uploaded and sample questionnaires, newest first. The built-in `csf` one (Plan 6B) is\nleft out: it is not the visitor's file and does not count toward the 5-per-workspace cap.",
         "operationId": "list_questionnaires_api_questionnaires_get",
         "responses": {
           "200": {
@@ -3040,7 +3042,7 @@
         ]
       },
       "post": {
-        "description": "Multipart xlsx or csv. Answers the detected mapping and a preview; no items exist until the visitor\nconfirms with PUT .../mapping. 422 for a refused file, a file over 1 MB (`MAX_QUESTIONNAIRE_BYTES`), or a\nworkspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`); 429 per network (`upload`); 503 when\nthe demo is full. The sheet names are stored at upload, so listing never re-parses the file.",
+        "description": "Multipart xlsx or csv. Answers the detected mapping and a preview; no items exist until the visitor\nconfirms with PUT .../mapping. 422 for a refused file, a file over 1 MB (`MAX_QUESTIONNAIRE_BYTES`), or a\nworkspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`, built-in `csf` ones not counted);\n429 per network (`upload`); 503 when the demo is full. The sheet names are stored at upload, so listing\nnever re-parses the file. Also 422 for an xlsx over 4 MB unpacked, a csv over 2,000 rows or 52 columns;\nhidden sheets are skipped; the file name is normalised.",
         "operationId": "upload_questionnaire_api_questionnaires_post",
         "requestBody": {
           "content": {
@@ -3139,7 +3141,7 @@
     },
     "/api/questionnaires/sample/{name}": {
       "post": {
-        "description": "`vsq-a` (xlsx) or `mvsp-b` (csv), mapped and itemised at once. 404 for another name. Idempotent:\nwhen the workspace already has that sample, it is answered again and nothing is stored. A new one counts\nunder the per-network `upload` limit (429), the storage breaker (503) and `MAX_QUESTIONNAIRES` (422).",
+        "description": "`vsq-a` (xlsx) or `mvsp-b` (csv), mapped and itemised at once. 404 for another name. Idempotent:\nwhen the workspace already has that sample, it is answered again and nothing is stored. A new one counts\nunder the per-network `upload` limit (429), the storage breaker (503) and `MAX_QUESTIONNAIRES` (422).\nNo model call.",
         "operationId": "load_sample_questionnaire_api_questionnaires_sample__name__post",
         "parameters": [
           {
@@ -3239,7 +3241,7 @@
     },
     "/api/questionnaires/{questionnaire_id}": {
       "delete": {
-        "description": "Remove a questionnaire and its items, so the 5-per-workspace cap does not force a reset. 409 when a run\nused it (reset the workspace to start over).",
+        "description": "Remove a questionnaire and its items, so the 5-per-workspace cap does not force a reset. 409 when a\nrun used it (reset the workspace to start over). A built-in `csf` questionnaire is 404 here. The row is\nlocked before the run check, so a run being created at the same moment either wins (409) or fails.",
         "operationId": "delete_questionnaire_api_questionnaires__questionnaire_id__delete",
         "parameters": [
           {
@@ -3417,7 +3419,7 @@
     },
     "/api/questionnaires/{questionnaire_id}/mapping": {
       "put": {
-        "description": "Replace the items with the ones this mapping reads. 422 when it finds none or more than 150; 409 once a\nrun exists for the questionnaire.",
+        "description": "Replace the items with the ones this mapping reads. 422 when it finds none or more than 150; 409 once a\nrun exists for the questionnaire, or for a built-in `csf` one (it has no file to map).",
         "operationId": "confirm_mapping_api_questionnaires__questionnaire_id__mapping_put",
         "parameters": [
           {
@@ -4114,7 +4116,7 @@
     },
     "/api/runs/{run_id}/export": {
       "get": {
-        "description": "The original file with the answer column filled and Status, Sources and Notes columns added; csv in,\ncsv out. Unapproved answers read \"Draft, not approved\". Every cell written is inert text: a value starting\nwith =, +, -, @, tab or CR gets a ' prefix in csv, and xlsx cells are written with data_type 's'.",
+        "description": "The original file with the answer column filled and Status, Sources and Notes columns added; csv in,\ncsv out. Unapproved answers read \"Draft, not approved\". Every cell written is inert text: a value starting\nwith =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The\nresponse is an attachment with an ASCII-safe file name.",
         "operationId": "export_run_api_runs__run_id__export_get",
         "parameters": [
           {

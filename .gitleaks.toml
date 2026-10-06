@@ -41,3 +41,12 @@ condition = "AND"
 targetRules = ["generic-api-key"]
 paths = ['''^tests/test_ingest_store\.py$''']
 regexes = ['''^iso27001-policy\.md$''']
+
+# Why: the redaction tests build file names around fake provider keys (a Stripe key, an AWS key id, a GitLab token, a
+# JWT) to prove redact_filename removes them; every value is an invented literal, not a credential.
+[[allowlists]]
+description = "Fake provider keys in tests/test_redact.py; scoped to that file, the four matching rules and the exact fake values"
+condition = "AND"
+targetRules = ["stripe-access-token", "aws-access-token", "gitlab-pat", "jwt"]
+paths = ['''^tests/test_redact\.py$''']
+regexes = ['''^(?:sk_live_abcdef1234567890XYZ|AKIAABCDEFGHIJKLMNOP|glpat-abcdefghij1234567890|eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV)$''']

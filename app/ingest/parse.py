@@ -25,6 +25,7 @@ from app.text import cell_text, normalize, record_line
 
 MAX_BYTES = 4 * 1024 * 1024  # spec 9: 4 MB per file (Vercel's request limit is 4.5 MB)
 MAX_LINES = 20_000  # spec 9: per workspace, so also per document
+MAX_TEXT_CHARS = 1_000_000  # per document: bounds what one upload adds to the database
 MAX_LINE_CHARS = 20_000  # a line is never split, so one far longer could overflow its chunk's 1 MB tsvector
 MAX_UNZIPPED = 50 * 1024 * 1024  # an Office file larger than this once unzipped is refused (zip bomb)
 MAX_MEMBERS = 5_000
@@ -300,4 +301,6 @@ def parse(filename: str, data: bytes) -> ParsedDocument:
         raise IngestError(f"This file has more than {MAX_LINES:,} lines.")
     if any(len(x.text) > MAX_LINE_CHARS for x in lines):
         raise IngestError(f"This file has a line longer than {MAX_LINE_CHARS:,} characters.")
+    if sum(len(x.text) for x in lines) > MAX_TEXT_CHARS:
+        raise IngestError(f"This file has more than {MAX_TEXT_CHARS:,} characters of text; split it.")
     return ParsedDocument(fmt, tuple(lines), tuple(sorted(notes)))  # type: ignore[arg-type]
