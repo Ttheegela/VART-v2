@@ -17,7 +17,8 @@ LIMITS: dict[str, tuple[int, timedelta]] = {
     "workspace": (20, timedelta(hours=1)),
     "upload": (60, timedelta(hours=1)),  # documents and questionnaires
     "run": (20, timedelta(hours=1)),
-    "llm": (400, timedelta(hours=1)),  # step calls and interview answers (foundation adversary I1)
+    "llm": (400, timedelta(hours=1)),  # model calls: steps, interview rechecks (foundation adversary I1)
+    "interview": (60, timedelta(hours=1)),  # interview answers: each pays for redaction (adversary-1 N2)
 }
 KEEP = timedelta(days=2)
 

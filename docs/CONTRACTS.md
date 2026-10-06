@@ -93,7 +93,7 @@ change-log line; changing or removing a path, a field or a status needs the lead
 - Caps: per network an hour `workspace` 20, `upload` 60, `run` 20 (each through the one helper
   `app.api.errors.limit(request, session, kind)`, called before any write), and `llm` 400 model calls, counted
   per call by `llm_budget.spender(session, workspace_id, network=errors.network(request))` (steps and interview
-  answers; never through `limit`); per workspace an hour per step (`llm_budget.CAPS`); globally 1,500 model calls
+  rechecks; never through `limit`), `interview` 60 answers (through `limit`, before any write); per workspace an hour per step (`llm_budget.CAPS`); globally 1,500 model calls
   an hour and 4,000 a day.
 - Plan 6B room: `QuestionnaireOut.source` includes `csf` (with `format` `builtin`, `detected` null, and the
   scope in `Mapping.scope`); `ItemOut.csf_id`; runs scoped by questionnaire; `GET /api/questionnaires` lists
@@ -130,6 +130,17 @@ change-log line; changing or removing a path, a field or a status needs the lead
   refuses null for NOT NULL fields; `DELETE /api/questionnaires/{id}`, 5 questionnaires and 1 MB per file,
   idempotent counted sample questionnaire; inert export cells; `llm` counted per model call in the spender;
   scoped budget 429 (`llm_budget.Refused`, `refusal_scope`). Added optional fields are allowed after the freeze.
+- 2026-10-06: Plan 3A Task 9 (added optional field, allowed after the freeze): `ApprovedCount.skipped_edited` (int, default 0)
+  counts the edited verified answers `approve-verified` leaves for a look (adversary-1 M5). New per-network cap kind
+  `interview` (60 an hour) on `POST /api/questions/{id}/answer` (adversary-1 N2); no path or status changed.
+- 2026-10-06: Plan 3A Task 9 fix round 1 (wording only, no path, field or status changed): `POST /api/questions/{id}/answer`
+  keeps the answer and returns no suggestions when the re-check's model budget is refused (200); only the `interview`
+  cap is a 429; 409 also when the item was answered since. `store_statement(..., commit=False)` lets the interview
+  write statement, answer and question in one transaction (Ruling 9).
+- 2026-10-06: Plan 3A adversary-3 fix round (wording and behaviour inside existing statuses; no path or field changed):
+  `POST /api/runs/{id}/step` answers 503 with `Retry-After: 60` when the model provider is failing (401, 402, 408, 429,
+  5xx, connection errors); the items stay pending, nothing is written as failed, the cost is kept. Schema mismatches
+  and other 4xx are still the failed answer. A reset between two reads of one row is the `GONE` 404.
 - 2026-10-07: inputs lane, adversary-3 fix round (no path, field or status changed; limits only): a document
   delete answers 409 while a run in the workspace is `running`; a document over 1,000,000 characters of text, a
   question over 2,000 or a topic over 200 characters, an xlsx over 4 MB unpacked, and a csv over 2,000 rows or

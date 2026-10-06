@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "cd web && npm ci && npm run build",
   "functions": {
-    "app/main.py": { "excludeFiles": "web/**" }
+    "app/main.py": { "excludeFiles": "web/**", "maxDuration": 300 }
   },
   "git": {
     "deploymentEnabled": { "main": true, "**": false }

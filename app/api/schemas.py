@@ -305,6 +305,7 @@ class NotApplicableIn(BaseModel):
 
 class ApprovedCount(BaseModel):
     approved: int
+    skipped_edited: int = 0  # edited verified answers left for a look (adversary-1 M5)
 
 
 # ------------------------------------------------------------------ interview

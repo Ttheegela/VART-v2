@@ -144,8 +144,9 @@ export interface paths {
      * Answer Question
      * @description Accept the answer, or ask the one follow-up. An accepted answer is stored as a dated, redacted
      * statement, the item becomes "Confirmed by you", and open items in the same topic are re-checked (at most
-     * 8, budgeted) for suggested fills. 409 when the question is closed; 429 per network (`llm`, per model call)
-     * or model budget.
+     * 8, budgeted) for suggested fills; when the model budget or the network's `llm` calls are used up the
+     * answer is kept and no fills come back. 409 when the question is closed or its item was answered since;
+     * 429 when the network's `interview` cap (60 an hour) is used up.
      */
     post: operations["answer_question_api_questions__question_id__answer_post"];
   };
@@ -167,7 +168,8 @@ export interface paths {
   "/api/runs/{run_id}/approve-verified": {
     /**
      * Approve Verified
-     * @description Approve every verified answer not yet approved (design key A).
+     * @description Approve every verified answer not yet approved (design key A). An edited answer is left for a look
+     * (adversary-1 M5): approve it by itself; `skipped_edited` counts them.
      */
     post: operations["approve_verified_api_runs__run_id__approve_verified_post"];
   };
@@ -193,9 +195,11 @@ export interface paths {
     /**
      * Step Run
      * @description Claim up to 4 pending items, answer them, write one answer each. Call again while status is
-     * `running`. 429 with Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the
-     * spender) or a model budget (workspace hour, global hour, global day) is used up; the sentence names which.
-     * 503 when model calls are off.
+     * `running` (a step may answer nothing while another step holds the rest: wait a moment first). 429 with
+     * Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the spender) or a model
+     * budget (workspace hour, global hour, global day) is used up; the sentence names which. 503 when model
+     * calls are off, or the provider is failing (a bad key, no credit, a rate limit, an outage): nothing is
+     * marked failed, the items stay pending and Retry-After says when to ask again.
      */
     post: operations["step_run_api_runs__run_id__step_post"];
   };
@@ -322,6 +326,11 @@ export interface components {
     ApprovedCount: {
       /** Approved */
       approved: number;
+      /**
+       * Skipped Edited
+       * @default 0
+       */
+      skipped_edited?: number;
     };
     /** AuditEventOut */
     AuditEventOut: {
@@ -1913,8 +1922,9 @@ export interface operations {
    * Answer Question
    * @description Accept the answer, or ask the one follow-up. An accepted answer is stored as a dated, redacted
    * statement, the item becomes "Confirmed by you", and open items in the same topic are re-checked (at most
-   * 8, budgeted) for suggested fills. 409 when the question is closed; 429 per network (`llm`, per model call)
-   * or model budget.
+   * 8, budgeted) for suggested fills; when the model budget or the network's `llm` calls are used up the
+   * answer is kept and no fills come back. 409 when the question is closed or its item was answered since;
+   * 429 when the network's `interview` cap (60 an hour) is used up.
    */
   answer_question_api_questions__question_id__answer_post: {
     parameters: {
@@ -2133,7 +2143,8 @@ export interface operations {
   };
   /**
    * Approve Verified
-   * @description Approve every verified answer not yet approved (design key A).
+   * @description Approve every verified answer not yet approved (design key A). An edited answer is left for a look
+   * (adversary-1 M5): approve it by itself; `skipped_edited` counts them.
    */
   approve_verified_api_runs__run_id__approve_verified_post: {
     parameters: {
@@ -2304,9 +2315,11 @@ export interface operations {
   /**
    * Step Run
    * @description Claim up to 4 pending items, answer them, write one answer each. Call again while status is
-   * `running`. 429 with Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the
-   * spender) or a model budget (workspace hour, global hour, global day) is used up; the sentence names which.
-   * 503 when model calls are off.
+   * `running` (a step may answer nothing while another step holds the rest: wait a moment first). 429 with
+   * Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the spender) or a model
+   * budget (workspace hour, global hour, global day) is used up; the sentence names which. 503 when model
+   * calls are off, or the provider is failing (a bad key, no credit, a rate limit, an outage): nothing is
+   * marked failed, the items stay pending and Retry-After says when to ask again.
    */
   step_run_api_runs__run_id__step_post: {
     parameters: {

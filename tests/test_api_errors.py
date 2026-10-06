@@ -1,3 +1,4 @@
+import importlib
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -72,6 +73,14 @@ def test_a_foreign_key_violation_is_a_404(db: Engine) -> None:
     assert r.status_code == 404 and "reload the page" in r.json()["detail"]
 
 
+def test_a_row_deleted_between_two_reads_is_a_gone_404() -> None:
+    # Adversary-3 M7: a reset between an unlocked read and its locked re-read.
+    from sqlalchemy.exc import NoResultFound
+
+    r = _app(NoResultFound()).get("/boom")
+    assert (r.status_code, r.json()["detail"]) == (404, errors.GONE)
+
+
 def test_another_integrity_error_is_not_dressed_up_as_a_404(db: Engine) -> None:
     with Session(db) as s:
         s.add(Questionnaire(workspace_id=uuid.uuid4(), filename="q.csv", source="nope"))
@@ -142,12 +151,6 @@ def test_workspace_says_when_it_expires(db: Engine) -> None:
     assert expires - created == timedelta(hours=24)
 
 
-def test_a_stub_is_a_501_with_the_error_shape(db: Engine) -> None:
-    client, _ = visitor(db)
-    r = client.get(f"/api/runs/{U}/answers")
-    assert (r.status_code, r.json()) == (501, {"detail": "Not built yet."})
-
-
 # ------------------------------------------------------------------ fix round 1 (review + adversary 1)
 U = "00000000-0000-4000-8000-000000000000"
 MAPPING = {
@@ -158,12 +161,26 @@ MAPPING = {
     "answer_col": "B",
     "comments_col": None,
 }
+FILE = {"file": ("a.txt", b"hello", "text/plain")}
 CALLS: dict[tuple[str, str], dict[str, object]] = {
+    ("/api/documents", "get"): {},
+    ("/api/documents", "post"): {"files": FILE},
+    ("/api/documents/sample", "post"): {},
+    ("/api/documents/{document_id}", "patch"): {"json": {}},
+    ("/api/documents/{document_id}", "delete"): {},
+    ("/api/documents/{document_id}/lines", "get"): {},
+    ("/api/questionnaires", "get"): {},
+    ("/api/questionnaires", "post"): {"files": FILE},
+    ("/api/questionnaires/sample/{name}", "post"): {},
+    ("/api/questionnaires/{questionnaire_id}", "get"): {},
+    ("/api/questionnaires/{questionnaire_id}", "delete"): {},
+    ("/api/questionnaires/{questionnaire_id}/mapping", "put"): {"json": MAPPING},
     ("/api/questionnaires/{questionnaire_id}/runs", "post"): {},
     ("/api/runs/{run_id}", "get"): {},
     ("/api/runs/{run_id}/step", "post"): {},
     ("/api/runs/{run_id}/answers", "get"): {},
     ("/api/runs/{run_id}/approve-verified", "post"): {},
+    ("/api/runs/{run_id}/export", "get"): {},
     ("/api/runs/{run_id}/questions", "get"): {},
     ("/api/answers/{answer_id}", "get"): {},
     ("/api/answers/{answer_id}", "patch"): {"json": {"text": "x"}},
@@ -173,6 +190,62 @@ CALLS: dict[tuple[str, str], dict[str, object]] = {
     ("/api/questions/{question_id}/skip", "post"): {},
     ("/api/suggestions/{suggestion_id}/accept", "post"): {},
     ("/api/audit", "get"): {},
+}
+# Ruling 7: no operation is a stub after the Plan 3 merge; each is named by the test that exercises it.
+D, Q, R, E, IV = (
+    "tests.test_api_documents",
+    "tests.test_api_questionnaires",
+    "tests.test_api_runs",
+    "tests.test_export",
+    "tests.test_questions",
+)
+STUBS: set[tuple[str, str]] = set()
+COVERED: dict[tuple[str, str], str] = {
+    ("/api/documents", "get"): f"{D}::test_an_upload_is_parsed_classified_and_listed",
+    ("/api/documents", "post"): f"{D}::test_an_upload_is_parsed_classified_and_listed",
+    ("/api/documents/sample", "post"): f"{D}::test_the_sample_pack_loads_once_in_fact_sheet_order",
+    ("/api/documents/{document_id}", "patch"): f"{D}::test_a_metadata_override_is_stored_as_the_users",
+    ("/api/documents/{document_id}", "delete"): f"{D}::test_an_unused_document_is_deleted",
+    ("/api/documents/{document_id}/lines", "get"): f"{D}::test_lines_are_read_in_a_bounded_window",
+    ("/api/questionnaires", "get"): f"{Q}::test_the_samples_load_mapped",
+    (
+        "/api/questionnaires",
+        "post",
+    ): f"{Q}::test_an_upload_answers_the_detected_mapping_and_a_preview_without_items",
+    ("/api/questionnaires/sample/{name}", "post"): f"{Q}::test_the_samples_load_mapped",
+    (
+        "/api/questionnaires/{questionnaire_id}",
+        "get",
+    ): f"{Q}::test_a_mapping_is_cached_so_a_get_does_not_read_the_file",
+    (
+        "/api/questionnaires/{questionnaire_id}",
+        "delete",
+    ): f"{Q}::test_delete_removes_items_and_is_refused_after_a_run",
+    (
+        "/api/questionnaires/{questionnaire_id}/mapping",
+        "put",
+    ): f"{Q}::test_confirming_the_mapping_creates_the_items",
+    ("/api/questionnaires/{questionnaire_id}/runs", "post"): f"{R}::test_a_run_fills_through_the_step_loop",
+    ("/api/runs/{run_id}", "get"): f"{R}::test_a_run_fills_through_the_step_loop",
+    ("/api/runs/{run_id}/step", "post"): f"{R}::test_a_run_fills_through_the_step_loop",
+    ("/api/runs/{run_id}/answers", "get"): f"{R}::test_a_run_fills_through_the_step_loop",
+    ("/api/runs/{run_id}/approve-verified", "post"): f"{R}::test_approve_rules_and_bulk_approve",
+    ("/api/runs/{run_id}/export", "get"): f"{E}::test_the_endpoint_exports_a_real_run_and_isolates_it",
+    ("/api/runs/{run_id}/questions", "get"): f"{IV}::test_the_interview_over_http",
+    ("/api/answers/{answer_id}", "get"): f"{R}::test_the_drawer_rereads_each_citation_with_context",
+    ("/api/answers/{answer_id}", "patch"): f"{R}::test_approve_rules_and_bulk_approve",
+    (
+        "/api/answers/{answer_id}/approve",
+        "post",
+    ): f"{R}::test_bulk_approve_leaves_an_edited_answer_for_a_look",
+    (
+        "/api/answers/{answer_id}/not-applicable",
+        "post",
+    ): f"{R}::test_not_applicable_clears_what_the_engine_stored",
+    ("/api/questions/{question_id}/answer", "post"): f"{IV}::test_the_interview_over_http",
+    ("/api/questions/{question_id}/skip", "post"): f"{IV}::test_the_interview_over_http",
+    ("/api/suggestions/{suggestion_id}/accept", "post"): f"{IV}::test_the_interview_over_http",
+    ("/api/audit", "get"): f"{R}::test_the_audit_log_lists_this_workspaces_events_only",
 }
 
 
@@ -184,18 +257,22 @@ def _url(path: str) -> str:
     )
 
 
-def test_the_stub_table_covers_the_contract() -> None:
-    assert (
-        set(CALLS) <= CONTRACT
-    )  # a lane drops its rows as it implements them (Ruling 7: lead restores equality)
+def test_every_contract_operation_is_a_stub_or_tested() -> None:
+    assert set(CALLS) == CONTRACT
+    assert not STUBS & set(COVERED)
+    assert STUBS | set(COVERED) == CONTRACT
+    for name in COVERED.values():
+        module, test = name.split("::")
+        assert callable(getattr(importlib.import_module(module), test, None)), name
 
 
 @pytest.mark.parametrize(("path", "method"), sorted(CALLS))
-def test_every_stub_is_a_501_with_the_error_shape(db: Engine, path: str, method: str) -> None:
-    # Review I-3: every operation is reachable and none is shadowed. A lane drops its rows as it lands them.
+def test_every_operation_is_reachable_and_built(db: Engine, path: str, method: str) -> None:
+    # Review I-3: every operation is reachable and none is shadowed; after the merge none is a 501 stub.
     client, _ = visitor(db)
     r = client.request(method.upper(), _url(path), **CALLS[(path, method)])  # type: ignore[arg-type]
-    assert (r.status_code, r.json()) == (501, {"detail": "Not built yet."}), (path, method)
+    assert r.status_code not in (405, 501), (path, method, r.status_code)
+    assert r.content != b'{"detail":"Not Found"}', (path, method)  # the router's miss, not the app's 404
 
 
 def _workspaces(db: Engine) -> int:
@@ -238,7 +315,8 @@ def test_a_cross_site_write_is_a_403(db: Engine, headers: dict[str, str]) -> Non
 )
 def test_a_same_origin_write_passes_the_guard(db: Engine, headers: dict[str, str]) -> None:
     client, _ = visitor(db)
-    assert client.post(f"/api/runs/{U}/step", headers=headers).status_code == 501
+    r = client.post(f"/api/runs/{U}/step", headers=headers)
+    assert (r.status_code, r.json()) == (404, {"detail": "Not found."})  # the handler ran: the run is unknown
 
 
 def test_a_cross_site_read_is_not_refused(db: Engine) -> None:

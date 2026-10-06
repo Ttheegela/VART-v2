@@ -297,6 +297,11 @@
           "approved": {
             "title": "Approved",
             "type": "integer"
+          },
+          "skipped_edited": {
+            "default": 0,
+            "title": "Skipped Edited",
+            "type": "integer"
           }
         },
         "required": [
@@ -3631,7 +3636,7 @@
     },
     "/api/questions/{question_id}/answer": {
       "post": {
-        "description": "Accept the answer, or ask the one follow-up. An accepted answer is stored as a dated, redacted\nstatement, the item becomes \"Confirmed by you\", and open items in the same topic are re-checked (at most\n8, budgeted) for suggested fills. 409 when the question is closed; 429 per network (`llm`, per model call)\nor model budget.",
+        "description": "Accept the answer, or ask the one follow-up. An accepted answer is stored as a dated, redacted\nstatement, the item becomes \"Confirmed by you\", and open items in the same topic are re-checked (at most\n8, budgeted) for suggested fills; when the model budget or the network's `llm` calls are used up the\nanswer is kept and no fills come back. 409 when the question is closed or its item was answered since;\n429 when the network's `interview` cap (60 an hour) is used up.",
         "operationId": "answer_question_api_questions__question_id__answer_post",
         "parameters": [
           {
@@ -4022,7 +4027,7 @@
     },
     "/api/runs/{run_id}/approve-verified": {
       "post": {
-        "description": "Approve every verified answer not yet approved (design key A).",
+        "description": "Approve every verified answer not yet approved (design key A). An edited answer is left for a look\n(adversary-1 M5): approve it by itself; `skipped_edited` counts them.",
         "operationId": "approve_verified_api_runs__run_id__approve_verified_post",
         "parameters": [
           {
@@ -4305,7 +4310,7 @@
     },
     "/api/runs/{run_id}/step": {
       "post": {
-        "description": "Claim up to 4 pending items, answer them, write one answer each. Call again while status is\n`running`. 429 with Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the\nspender) or a model budget (workspace hour, global hour, global day) is used up; the sentence names which.\n503 when model calls are off.",
+        "description": "Claim up to 4 pending items, answer them, write one answer each. Call again while status is\n`running` (a step may answer nothing while another step holds the rest: wait a moment first). 429 with\nRetry-After when the network (`llm`, 400 model calls an hour, counted per call by the spender) or a model\nbudget (workspace hour, global hour, global day) is used up; the sentence names which. 503 when model\ncalls are off, or the provider is failing (a bad key, no credit, a rate limit, an outage): nothing is\nmarked failed, the items stay pending and Retry-After says when to ask again.",
         "operationId": "step_run_api_runs__run_id__step_post",
         "parameters": [
           {
