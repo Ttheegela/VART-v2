@@ -1,6 +1,6 @@
 import { act, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import { StrictMode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { RunRowsOut } from "../lib/api";
 import { fixtures, mockApi } from "../test/mockApi";
@@ -73,6 +73,41 @@ describe("RunGrid", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Run done: 3 of 3 answered.");
   });
 
+  it("under StrictMode every claimed item fills in and only one step is in flight at a time", async () => {
+    const running = { ...fixtures.run, status: "running" as const, done: 2 };
+    const answered = [{ ...fixtures.rows[2], answer: { ...fixtures.rows[1].answer!, id: "a3", item_id: "i3", label: "unknown" as const, confidence: 0 } }];
+    let inFlight = 0;
+    let most = 0;
+    let claimed = false;
+    const calls = mockApi({
+      "GET /api/runs/r1/answers": { run: running, rows: fixtures.rows },
+      // like the server: a claimed item is returned once; later steps see nothing left to claim
+      "POST /api/runs/r1/step": async () => {
+        most = Math.max(most, ++inFlight);
+        await new Promise((r) => setTimeout(r, 30));
+        inFlight -= 1;
+        const first = !claimed;
+        claimed = true;
+        return { run: fixtures.run, answered: first ? answered : [] };
+      },
+    });
+    render(<StrictMode><RunGrid {...props} /></StrictMode>);
+    const row = await screen.findByRole("row", { name: /VSQ-03/ });
+    expect(await within(row).findByText("unknown")).toBeInTheDocument();
+    expect(most).toBe(1);
+    expect(calls.filter((c) => c === "POST /api/runs/r1/step")).toHaveLength(1);
+  });
+
+  it("a 404 on a step means the workspace is gone", async () => {
+    const onGone = vi.fn();
+    mockApi({
+      "GET /api/runs/r1/answers": { run: { ...fixtures.run, status: "running" }, rows: fixtures.rows },
+      "POST /api/runs/r1/step": new Response(JSON.stringify({ detail: "gone" }), { status: 404 }),
+    });
+    render(<RunGrid {...props} onGone={onGone} />);
+    await waitFor(() => expect(onGone).toHaveBeenCalled());
+  });
+
   it("a 429 stops the loop and says why", async () => {
     mockApi({
       "GET /api/runs/r1/answers": { run: { ...fixtures.run, status: "running" }, rows: fixtures.rows },
@@ -138,6 +173,32 @@ describe("useStepLoop", () => {
     await act(() => vi.advanceTimersByTimeAsync(120_000));
     expect(times.slice(1).map((t, i) => t - times[i])).toEqual([2000, 4000, 8000, 10_000, 10_000, 0, 2000]);
     expect(onData.mock.lastCall?.[0].run.status).toBe("done");
+  });
+
+  it("under StrictMode a mount with data merges the in-flight step and never sends a second one at once", async () => {
+    let inFlight = 0;
+    let most = 0;
+    let claimed = false;
+    const calls = mockApi({
+      // like the server: a claimed item is returned once; later steps see nothing left to claim
+      "POST /api/runs/r1/step": async () => {
+        most = Math.max(most, ++inFlight);
+        await new Promise((r) => setTimeout(r, 30));
+        inFlight -= 1;
+        const first = !claimed;
+        claimed = true;
+        return { run: fixtures.run, answered: first ? answered : [] };
+      },
+    });
+    const { result } = renderHook(() => {
+      const [d, setD] = useState<RunRowsOut | null>(start);
+      useStepLoop("r1", d, setD);
+      return d;
+    }, { wrapper: StrictMode });
+    await waitFor(() => expect(result.current?.run.status).toBe("done"));
+    expect(result.current?.rows[2].answer?.id).toBe("a3");
+    expect(most).toBe(1);
+    expect(calls).toHaveLength(1);
   });
 
   it("a 429 waits for Retry-After, shows the scope sentence, then resumes", async () => {

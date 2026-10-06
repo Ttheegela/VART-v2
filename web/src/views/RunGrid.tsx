@@ -1,7 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { Shell, goneOn404, type ViewProps } from "../components/Shell";
 import { Button, ErrorLine, Kbd, LabelChip } from "../components/ui";
-import { ApiError, api, messageOf, type Label, type RunRow, type RunRowsOut } from "../lib/api";
+import { ApiError, api, messageOf, type Label, type RunRow, type RunRowsOut, type StepOut } from "../lib/api";
 import { useKeys } from "../lib/keys";
 import { FILTER_KEY, LABELS, approvalText, confidenceText } from "../lib/labels";
 import { go } from "../lib/route";
@@ -18,15 +18,22 @@ const IDLE_MAX_MS = 10_000;
 
 /** Calls step while the run is running. A step with no answers while still running (another tab holds the
  * claims) waits 2 s, doubling to 10 s, until answers arrive. A 429 with Retry-After waits as told and shows the
- * scope sentence meanwhile; any other error (a 404 GONE included) stops the loop and is shown in words. */
-export function useStepLoop(runId: string, data: RunRowsOut | null, onData: (d: RunRowsOut) => void) {
+ * scope sentence meanwhile; a 404 calls `onGone` when given; any other error stops the loop and is shown in words.
+ * A step that returns is always merged, even after a cleanup (the server has claimed those items), and a remount
+ * (StrictMode, or a status flip) awaits the call already in flight instead of sending a second one. */
+export function useStepLoop(
+  runId: string, data: RunRowsOut | null, onData: (d: RunRowsOut) => void, onGone?: () => void,
+) {
   const [failure, setFailure] = useState<{ runId: string; message: string } | null>(null);
   const [stopped, setStopped] = useState<string | null>(null); // the run whose loop an error ended
   const latest = useRef(data);
   const sink = useRef(onData);
+  const gone = useRef(onGone);
+  const flight = useRef<{ runId: string; p: Promise<StepOut> } | null>(null); // one in-flight step per run
   useLayoutEffect(() => {
     latest.current = data;
     sink.current = onData;
+    gone.current = onGone;
   });
   const status = data?.run.status;
   useEffect(() => {
@@ -34,22 +41,37 @@ export function useStepLoop(runId: string, data: RunRowsOut | null, onData: (d: 
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const wait = (ms: number) => new Promise<void>((resolve) => { timer = setTimeout(resolve, ms); });
+    const step = () => {
+      if (flight.current?.runId !== runId) {
+        const f = { runId, p: api.step(runId) };
+        const clear = () => { if (flight.current === f) flight.current = null; };
+        f.p.then(clear, clear);
+        flight.current = f;
+      }
+      return flight.current.p;
+    };
     (async () => {
       let idle = 0;
       while (alive) {
         try {
-          const out = await api.step(runId);
+          const out = await step();
           const cur = latest.current;
-          if (!alive || !cur) return;
-          const next = { run: out.run, rows: mergeRows(cur.rows, out.answered) };
-          latest.current = next;
-          sink.current(next);
+          if (cur?.run.id === out.run.id) {
+            const next = { run: out.run, rows: mergeRows(cur.rows, out.answered) }; // merging twice is harmless
+            latest.current = next;
+            sink.current(next);
+          }
+          if (!alive || !cur) return; // only the next call is cancelled, never the merge
           setFailure(null);
           if (out.run.status !== "running") return;
           if (out.answered.length > 0) idle = 0;
           else await wait(Math.min(IDLE_FIRST_MS * 2 ** idle++, IDLE_MAX_MS));
         } catch (e) {
           if (!alive) return;
+          if (e instanceof ApiError && e.status === 404 && gone.current) {
+            gone.current();
+            return setStopped(runId);
+          }
           setFailure({ runId, message: messageOf(e) });
           if (e instanceof ApiError && e.status === 429 && e.retryAfter) await wait(e.retryAfter * 1000);
           else return setStopped(runId);
@@ -104,7 +126,8 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
   const [loaded, setData] = useState<RunRowsOut | null>(null);
   const data = loaded?.run.id === runId ? loaded : null; // a re-run's new id never shows the old run's rows
   const [name, setName] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [failedLoad, setLoadError] = useState<{ runId: string; message: string | null } | null>(null);
+  const loadError = failedLoad?.runId === runId ? failedLoad.message : null; // a re-run's id starts clean
   const [filters, setFilters] = useState<Set<Label>>(new Set());
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
@@ -114,14 +137,19 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
   const body = useRef<HTMLTableSectionElement>(null);
 
   useEffect(() => {
-    api.runAnswers(runId).then(setData, (e) => setLoadError(goneOn404(e, onGone)));
+    let alive = true; // a slow load for an old run id never lands
+    api.runAnswers(runId).then(
+      (d) => { if (alive) setData(d); },
+      (e) => { if (alive) setLoadError({ runId, message: goneOn404(e, onGone) }); },
+    );
+    return () => { alive = false; };
   }, [runId, onGone]);
   const questionnaireId = data?.run.questionnaire_id;
   useEffect(() => {
     if (!questionnaireId) return;
     api.questionnaires().then((qs) => setName(qs.find((q) => q.id === questionnaireId)?.filename ?? null), () => {});
   }, [questionnaireId]);
-  const { error: loopError, running } = useStepLoop(runId, data, setData);
+  const { error: loopError, running } = useStepLoop(runId, data, setData, onGone);
 
   const rows = data?.rows;
   const counts = useMemo(() => {
