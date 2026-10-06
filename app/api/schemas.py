@@ -7,12 +7,23 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+)
+from pydantic.json_schema import SkipJsonSchema
 
 MAX_ANSWER_CHARS = 4000  # an interview answer (engine adversary-3 I3: statements bypass the line limit)
 MAX_EDIT_CHARS = 4000  # an edited answer text
 MAX_REASON_CHARS = 500  # a "not applicable" reason
 MAX_LINES_PER_READ = 200  # GET /api/documents/{id}/lines
+MAX_QUESTIONNAIRES = 5  # per workspace (adversary-1 I3: questionnaire bytes are the one stored upload)
+MAX_QUESTIONNAIRE_BYTES = 1024 * 1024  # 1 MB per questionnaire file; a 150-item questionnaire is tens of KB
 
 
 def clean_text(value: str) -> str:
@@ -51,10 +62,31 @@ class ErrorOut(BaseModel):
 
 
 ERRORS: dict[int | str, dict[str, object]] = {
+    403: {
+        "model": ErrorOut,
+        "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)",
+    },
     404: {"model": ErrorOut, "description": "Unknown id, another workspace's id, or the workspace is gone"},
     409: {"model": ErrorOut, "description": "The action conflicts with the item's state"},
     429: {"model": ErrorOut, "description": "A per-network limit or the model budget; see Retry-After"},
     503: {"model": ErrorOut, "description": "The demo is full, or model calls are off"},
+}
+# Review I-1: operations that refuse input with a sentence ({"detail": str}) as well as FastAPI's list form.
+# Declared as a raw schema: FastAPI's HTTPValidationError is a schema dict, not a model.
+SENTENCE_422: dict[int | str, dict[str, object]] = {
+    422: {
+        "description": "Refused input: a sentence, or FastAPI's validation list",
+        "content": {
+            "application/json": {
+                "schema": {
+                    "anyOf": [
+                        {"$ref": "#/components/schemas/ErrorOut"},
+                        {"$ref": "#/components/schemas/HTTPValidationError"},
+                    ]
+                }
+            }
+        },
+    }
 }
 
 
@@ -64,13 +96,16 @@ class Mapping(BaseModel):
     column); header_row is 1-based. topic_col is optional: without it, the last section row is the topic."""
 
     model_config = ConfigDict(extra="forbid")
-    sheet: CleanText | None
+    sheet: Annotated[CleanText, StringConstraints(max_length=31)] | None  # Excel's sheet-name limit
     header_row: int = Field(ge=1, le=1000)
     id_col: Column | None
     question_col: Column
     answer_col: Column
     comments_col: Column | None
     topic_col: Column | None = None
+    scope: Annotated[CleanText, StringConstraints(max_length=32)] | None = (
+        None  # Plan 6B: a csf questionnaire's scope
+    )
 
 
 class PreviewRow(BaseModel):
@@ -132,11 +167,21 @@ class DocumentPatch(BaseModel):
     """A visitor override (spec 5 step 3): only the fields sent change; metadata_source becomes 'user'."""
 
     model_config = ConfigDict(extra="forbid")
-    kind: Kind | None = None
-    status: Literal["final", "draft"] | None = None
+    # Pre-flight P8: kind, status and evidence_allowed may be left out but not sent as null (NOT NULL
+    # columns). SkipJsonSchema keeps null out of the schema; the validator refuses it. effective_date and
+    # scope may be cleared.
+    kind: Kind | SkipJsonSchema[None] = None
+    status: Literal["final", "draft"] | SkipJsonSchema[None] = None
     effective_date: date | None = None
     scope: Scope | None = None
-    evidence_allowed: bool | None = None
+    evidence_allowed: bool | SkipJsonSchema[None] = None
+
+    @field_validator("kind", "status", "evidence_allowed")
+    @classmethod
+    def _not_null(cls, value: object) -> object:
+        if value is None:
+            raise ValueError("may be left out, but not null")
+        return value
 
 
 class DocumentUpdated(DocumentOut):

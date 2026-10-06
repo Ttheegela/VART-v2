@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query, Request, UploadFile
 
 from app.api.deps import LLMDep, SessionDep, WorkspaceDep
 from app.api.errors import not_built
-from app.api.schemas import ERRORS, DocumentOut, DocumentPatch, DocumentUpdated, LinesOut
+from app.api.schemas import ERRORS, SENTENCE_422, DocumentOut, DocumentPatch, DocumentUpdated, LinesOut
 
 router = APIRouter(tags=["documents"], responses=ERRORS)
 
@@ -18,12 +18,13 @@ def list_documents(ws: WorkspaceDep, session: SessionDep) -> list[DocumentOut]:
     raise not_built()
 
 
-@router.post("/api/documents", status_code=201)
+@router.post("/api/documents", status_code=201, responses=SENTENCE_422)
 def upload_document(
     ws: WorkspaceDep, session: SessionDep, request: Request, llm: LLMDep, file: UploadFile
 ) -> DocumentOut:
     """Multipart upload of one file. Parsed in memory, redacted, classified, chunked; the bytes are not
-    stored. 422 with a sentence for a refused file; 429 per network (`upload`, 60 an hour); 503 when full."""
+    stored. 422 with a sentence for a refused file; 429 per network (`upload`, 60 an hour); 503 when full.
+    A body over Vercel's 4.5 MB limit gets the platform's own 413 (not JSON) before the app sees it."""
     raise not_built()
 
 
@@ -47,7 +48,7 @@ def delete_document(document_id: uuid.UUID, ws: WorkspaceDep, session: SessionDe
     raise not_built()
 
 
-@router.get("/api/documents/{document_id}/lines")
+@router.get("/api/documents/{document_id}/lines", responses=SENTENCE_422)
 def document_lines(
     document_id: uuid.UUID,
     ws: WorkspaceDep,

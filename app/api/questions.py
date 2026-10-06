@@ -6,7 +6,14 @@ from fastapi import APIRouter, Request
 
 from app.api.deps import LLMDep, SessionDep, WorkspaceDep
 from app.api.errors import not_built
-from app.api.schemas import ERRORS, AnswerQuestionIn, AnswerQuestionOut, AnswerSummary, QuestionOut
+from app.api.schemas import (
+    ERRORS,
+    SENTENCE_422,
+    AnswerQuestionIn,
+    AnswerQuestionOut,
+    AnswerSummary,
+    QuestionOut,
+)
 
 router = APIRouter(tags=["interview"], responses=ERRORS)
 
@@ -18,7 +25,7 @@ def list_questions(run_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -> 
     raise not_built()
 
 
-@router.post("/api/questions/{question_id}/answer")
+@router.post("/api/questions/{question_id}/answer", responses=SENTENCE_422)
 def answer_question(
     question_id: uuid.UUID,
     body: AnswerQuestionIn,
@@ -29,7 +36,8 @@ def answer_question(
 ) -> AnswerQuestionOut:
     """Accept the answer, or ask the one follow-up. An accepted answer is stored as a dated, redacted
     statement, the item becomes "Confirmed by you", and open items in the same topic are re-checked (at most
-    8, budgeted) for suggested fills. 409 when the question is closed; 429 per network (`llm`)."""
+    8, budgeted) for suggested fills. 409 when the question is closed; 429 per network (`llm`, per model call)
+    or model budget."""
     raise not_built()
 
 

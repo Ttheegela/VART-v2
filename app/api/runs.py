@@ -6,12 +6,12 @@ from fastapi import APIRouter, Request
 
 from app.api.deps import LLMDep, SessionDep, WorkspaceDep
 from app.api.errors import not_built
-from app.api.schemas import ERRORS, ApprovedCount, RunOut, RunRowsOut, StepOut
+from app.api.schemas import ERRORS, SENTENCE_422, ApprovedCount, RunOut, RunRowsOut, StepOut
 
 router = APIRouter(tags=["runs"], responses=ERRORS)
 
 
-@router.post("/api/questionnaires/{questionnaire_id}/runs", status_code=201)
+@router.post("/api/questionnaires/{questionnaire_id}/runs", status_code=201, responses=SENTENCE_422)
 def create_run(
     questionnaire_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep, request: Request
 ) -> RunOut:
@@ -25,8 +25,9 @@ def step_run(
     run_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep, request: Request, llm: LLMDep
 ) -> StepOut:
     """Claim up to 4 pending items, answer them, write one answer each. Call again while status is
-    `running`. 429 with Retry-After when the network (`llm`, 400 steps an hour) or the model budget is used
-    up; 503 when model calls are off."""
+    `running`. 429 with Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the
+    spender) or a model budget (workspace hour, global hour, global day) is used up; the sentence names which.
+    503 when model calls are off."""
     raise not_built()
 
 

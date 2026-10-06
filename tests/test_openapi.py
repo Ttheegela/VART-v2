@@ -27,6 +27,7 @@ CONTRACT = {
     ("/api/questionnaires", "post"),
     ("/api/questionnaires/sample/{name}", "post"),
     ("/api/questionnaires/{questionnaire_id}", "get"),
+    ("/api/questionnaires/{questionnaire_id}", "delete"),
     ("/api/questionnaires/{questionnaire_id}/mapping", "put"),
     ("/api/questionnaires/{questionnaire_id}/runs", "post"),
     ("/api/runs/{run_id}", "get"),
@@ -65,3 +66,29 @@ def test_every_refusal_has_the_error_shape() -> None:
                 assert ref.endswith("/ErrorOut"), (path, method, status)
                 checked += 1
     assert checked == 4 * len(CONTRACT)
+
+
+# Review I-1: these raise a sentence 422 ({"detail": str}) as well as FastAPI's list form.
+SENTENCE_422 = {
+    ("/api/documents", "post"),
+    ("/api/documents/{document_id}/lines", "get"),
+    ("/api/questionnaires", "post"),
+    ("/api/questionnaires/sample/{name}", "post"),
+    ("/api/questionnaires/{questionnaire_id}/mapping", "put"),
+    ("/api/questionnaires/{questionnaire_id}/runs", "post"),
+    ("/api/questions/{question_id}/answer", "post"),
+}
+
+
+def test_a_sentence_422_documents_both_shapes() -> None:
+    spec = json.loads(render())
+    for path, method in SENTENCE_422:
+        schema = spec["paths"][path][method]["responses"]["422"]["content"]["application/json"]["schema"]
+        refs = {s["$ref"].rsplit("/", 1)[1] for s in schema["anyOf"]}
+        assert refs == {"ErrorOut", "HTTPValidationError"}, (path, method)
+
+
+def test_document_patch_does_not_advertise_null_for_not_null_columns() -> None:
+    props = json.loads(render())["components"]["schemas"]["DocumentPatch"]["properties"]
+    for field in ("kind", "status", "evidence_allowed"):
+        assert "null" not in json.dumps(props[field]), field

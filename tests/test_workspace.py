@@ -93,9 +93,9 @@ def test_reset_without_a_live_workspace_creates_nothing_and_charges_nothing(
     rows, hits = _count(db), _new_session_hits(db)
     r = client.post("/api/workspace/reset")
     assert r.status_code == 204
-    cookies = r.headers.get_list("set-cookie")  # only the clearing one, no fresh cookie before it
-    assert len(cookies) == 1
-    assert 'vart_ws=""' in cookies[0] or "max-age=0" in cookies[0].lower()
+    # Adversary C1 (plan3a): the cookie is cleared only when a workspace was found, so a cross-site POST
+    # without the cookie can never log a visitor out. No fresh cookie either.
+    assert r.headers.get_list("set-cookie") == []
     assert (_count(db), _new_session_hits(db)) == (rows, hits)
 
 

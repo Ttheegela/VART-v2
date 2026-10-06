@@ -730,36 +730,22 @@
             "title": "Effective Date"
           },
           "evidence_allowed": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Evidence Allowed"
+            "title": "Evidence Allowed",
+            "type": "boolean"
           },
           "kind": {
-            "anyOf": [
-              {
-                "enum": [
-                  "policy",
-                  "report",
-                  "record",
-                  "contract",
-                  "plan",
-                  "questionnaire",
-                  "statement",
-                  "other"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "enum": [
+              "policy",
+              "report",
+              "record",
+              "contract",
+              "plan",
+              "questionnaire",
+              "statement",
+              "other"
             ],
-            "title": "Kind"
+            "title": "Kind",
+            "type": "string"
           },
           "scope": {
             "anyOf": [
@@ -780,19 +766,12 @@
             "title": "Scope"
           },
           "status": {
-            "anyOf": [
-              {
-                "enum": [
-                  "final",
-                  "draft"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "enum": [
+              "final",
+              "draft"
             ],
-            "title": "Status"
+            "title": "Status",
+            "type": "string"
           }
         },
         "title": "DocumentPatch",
@@ -1180,9 +1159,22 @@
             "title": "Question Col",
             "type": "string"
           },
+          "scope": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          },
           "sheet": {
             "anyOf": [
               {
+                "maxLength": 31,
                 "type": "string"
               },
               {
@@ -1934,6 +1926,16 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -2026,6 +2028,16 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -2109,6 +2121,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
           },
           "404": {
             "content": {
@@ -2204,6 +2226,16 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -2280,6 +2312,16 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -2346,6 +2388,16 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -2393,7 +2445,7 @@
         ]
       },
       "post": {
-        "description": "Multipart upload of one file. Parsed in memory, redacted, classified, chunked; the bytes are not\nstored. 422 with a sentence for a refused file; 429 per network (`upload`, 60 an hour); 503 when full.",
+        "description": "Multipart upload of one file. Parsed in memory, redacted, classified, chunked; the bytes are not\nstored. 422 with a sentence for a refused file; 429 per network (`upload`, 60 an hour); 503 when full.\nA body over Vercel's 4.5 MB limit gets the platform's own 413 (not JSON) before the app sees it.",
         "operationId": "upload_document_api_documents_post",
         "requestBody": {
           "content": {
@@ -2415,6 +2467,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
           },
           "404": {
             "content": {
@@ -2440,11 +2502,18 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused input: a sentence, or FastAPI's validation list"
           },
           "429": {
             "content": {
@@ -2491,6 +2560,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
           },
           "404": {
             "content": {
@@ -2558,6 +2637,16 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
           },
           "404": {
             "content": {
@@ -2650,6 +2739,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
           },
           "404": {
             "content": {
@@ -2763,6 +2862,16 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -2787,11 +2896,18 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused input: a sentence, or FastAPI's validation list"
           },
           "429": {
             "content": {
@@ -2867,6 +2983,16 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -2914,7 +3040,7 @@
         ]
       },
       "post": {
-        "description": "Multipart xlsx or csv. Answers the detected mapping and a preview; no items exist until the visitor\nconfirms with PUT .../mapping. 422 for a refused file; 429 per network (`upload`).",
+        "description": "Multipart xlsx or csv. Answers the detected mapping and a preview; no items exist until the visitor\nconfirms with PUT .../mapping. 422 for a refused file, a file over 1 MB (`MAX_QUESTIONNAIRE_BYTES`), or a\nworkspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`); 429 per network (`upload`); 503 when\nthe demo is full. The sheet names are stored at upload, so listing never re-parses the file.",
         "operationId": "upload_questionnaire_api_questionnaires_post",
         "requestBody": {
           "content": {
@@ -2936,6 +3062,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
           },
           "404": {
             "content": {
@@ -2961,11 +3097,18 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused input: a sentence, or FastAPI's validation list"
           },
           "429": {
             "content": {
@@ -2996,7 +3139,7 @@
     },
     "/api/questionnaires/sample/{name}": {
       "post": {
-        "description": "`vsq-a` (xlsx) or `mvsp-b` (csv), mapped and itemised at once. 404 for another name.",
+        "description": "`vsq-a` (xlsx) or `mvsp-b` (csv), mapped and itemised at once. 404 for another name. Idempotent:\nwhen the workspace already has that sample, it is answered again and nothing is stored. A new one counts\nunder the per-network `upload` limit (429), the storage breaker (503) and `MAX_QUESTIONNAIRES` (422).",
         "operationId": "load_sample_questionnaire_api_questionnaires_sample__name__post",
         "parameters": [
           {
@@ -3019,6 +3162,110 @@
               }
             },
             "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Refused input: a sentence, or FastAPI's validation list"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Load Sample Questionnaire",
+        "tags": [
+          "questionnaires"
+        ]
+      }
+    },
+    "/api/questionnaires/{questionnaire_id}": {
+      "delete": {
+        "description": "Remove a questionnaire and its items, so the 5-per-workspace cap does not force a reset. 409 when a run\nused it (reset the workspace to start over).",
+        "operationId": "delete_questionnaire_api_questionnaires__questionnaire_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "questionnaire_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Questionnaire Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
           },
           "404": {
             "content": {
@@ -3071,13 +3318,11 @@
             "description": "The demo is full, or model calls are off"
           }
         },
-        "summary": "Load Sample Questionnaire",
+        "summary": "Delete Questionnaire",
         "tags": [
           "questionnaires"
         ]
-      }
-    },
-    "/api/questionnaires/{questionnaire_id}": {
+      },
       "get": {
         "operationId": "get_questionnaire_api_questionnaires__questionnaire_id__get",
         "parameters": [
@@ -3102,6 +3347,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
           },
           "404": {
             "content": {
@@ -3197,6 +3452,16 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3221,11 +3486,18 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused input: a sentence, or FastAPI's validation list"
           },
           "429": {
             "content": {
@@ -3281,6 +3553,16 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3305,11 +3587,18 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused input: a sentence, or FastAPI's validation list"
           },
           "429": {
             "content": {
@@ -3340,7 +3629,7 @@
     },
     "/api/questions/{question_id}/answer": {
       "post": {
-        "description": "Accept the answer, or ask the one follow-up. An accepted answer is stored as a dated, redacted\nstatement, the item becomes \"Confirmed by you\", and open items in the same topic are re-checked (at most\n8, budgeted) for suggested fills. 409 when the question is closed; 429 per network (`llm`).",
+        "description": "Accept the answer, or ask the one follow-up. An accepted answer is stored as a dated, redacted\nstatement, the item becomes \"Confirmed by you\", and open items in the same topic are re-checked (at most\n8, budgeted) for suggested fills. 409 when the question is closed; 429 per network (`llm`, per model call)\nor model budget.",
         "operationId": "answer_question_api_questions__question_id__answer_post",
         "parameters": [
           {
@@ -3375,6 +3664,16 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3399,11 +3698,18 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused input: a sentence, or FastAPI's validation list"
           },
           "429": {
             "content": {
@@ -3457,6 +3763,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
           },
           "404": {
             "content": {
@@ -3540,6 +3856,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
           },
           "404": {
             "content": {
@@ -3625,6 +3951,16 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3709,6 +4045,16 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3768,7 +4114,7 @@
     },
     "/api/runs/{run_id}/export": {
       "get": {
-        "description": "The original file with the answer column filled and Status, Sources and Notes columns added; csv in,\ncsv out. Unapproved answers read \"Draft, not approved\".",
+        "description": "The original file with the answer column filled and Status, Sources and Notes columns added; csv in,\ncsv out. Unapproved answers read \"Draft, not approved\". Every cell written is inert text: a value starting\nwith =, +, -, @, tab or CR gets a ' prefix in csv, and xlsx cells are written with data_type 's'.",
         "operationId": "export_run_api_runs__run_id__export_get",
         "parameters": [
           {
@@ -3789,6 +4135,16 @@
               "text/csv": {}
             },
             "description": "The filled file"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
           },
           "404": {
             "content": {
@@ -3878,6 +4234,16 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3937,7 +4303,7 @@
     },
     "/api/runs/{run_id}/step": {
       "post": {
-        "description": "Claim up to 4 pending items, answer them, write one answer each. Call again while status is\n`running`. 429 with Retry-After when the network (`llm`, 400 steps an hour) or the model budget is used\nup; 503 when model calls are off.",
+        "description": "Claim up to 4 pending items, answer them, write one answer each. Call again while status is\n`running`. 429 with Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the\nspender) or a model budget (workspace hour, global hour, global day) is used up; the sentence names which.\n503 when model calls are off.",
         "operationId": "step_run_api_runs__run_id__step_post",
         "parameters": [
           {
@@ -3961,6 +4327,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
           },
           "404": {
             "content": {
@@ -4045,6 +4421,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
           },
           "404": {
             "content": {

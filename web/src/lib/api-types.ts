@@ -49,6 +49,7 @@ export interface paths {
      * Upload Document
      * @description Multipart upload of one file. Parsed in memory, redacted, classified, chunked; the bytes are not
      * stored. 422 with a sentence for a refused file; 429 per network (`upload`, 60 an hour); 503 when full.
+     * A body over Vercel's 4.5 MB limit gets the platform's own 413 (not JSON) before the app sees it.
      */
     post: operations["upload_document_api_documents_post"];
   };
@@ -91,20 +92,30 @@ export interface paths {
     /**
      * Upload Questionnaire
      * @description Multipart xlsx or csv. Answers the detected mapping and a preview; no items exist until the visitor
-     * confirms with PUT .../mapping. 422 for a refused file; 429 per network (`upload`).
+     * confirms with PUT .../mapping. 422 for a refused file, a file over 1 MB (`MAX_QUESTIONNAIRE_BYTES`), or a
+     * workspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`); 429 per network (`upload`); 503 when
+     * the demo is full. The sheet names are stored at upload, so listing never re-parses the file.
      */
     post: operations["upload_questionnaire_api_questionnaires_post"];
   };
   "/api/questionnaires/sample/{name}": {
     /**
      * Load Sample Questionnaire
-     * @description `vsq-a` (xlsx) or `mvsp-b` (csv), mapped and itemised at once. 404 for another name.
+     * @description `vsq-a` (xlsx) or `mvsp-b` (csv), mapped and itemised at once. 404 for another name. Idempotent:
+     * when the workspace already has that sample, it is answered again and nothing is stored. A new one counts
+     * under the per-network `upload` limit (429), the storage breaker (503) and `MAX_QUESTIONNAIRES` (422).
      */
     post: operations["load_sample_questionnaire_api_questionnaires_sample__name__post"];
   };
   "/api/questionnaires/{questionnaire_id}": {
     /** Get Questionnaire */
     get: operations["get_questionnaire_api_questionnaires__questionnaire_id__get"];
+    /**
+     * Delete Questionnaire
+     * @description Remove a questionnaire and its items, so the 5-per-workspace cap does not force a reset. 409 when a run
+     * used it (reset the workspace to start over).
+     */
+    delete: operations["delete_questionnaire_api_questionnaires__questionnaire_id__delete"];
   };
   "/api/questionnaires/{questionnaire_id}/mapping": {
     /**
@@ -127,7 +138,8 @@ export interface paths {
      * Answer Question
      * @description Accept the answer, or ask the one follow-up. An accepted answer is stored as a dated, redacted
      * statement, the item becomes "Confirmed by you", and open items in the same topic are re-checked (at most
-     * 8, budgeted) for suggested fills. 409 when the question is closed; 429 per network (`llm`).
+     * 8, budgeted) for suggested fills. 409 when the question is closed; 429 per network (`llm`, per model call)
+     * or model budget.
      */
     post: operations["answer_question_api_questions__question_id__answer_post"];
   };
@@ -157,7 +169,8 @@ export interface paths {
     /**
      * Export Run
      * @description The original file with the answer column filled and Status, Sources and Notes columns added; csv in,
-     * csv out. Unapproved answers read "Draft, not approved".
+     * csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
+     * with =, +, -, @, tab or CR gets a ' prefix in csv, and xlsx cells are written with data_type 's'.
      */
     get: operations["export_run_api_runs__run_id__export_get"];
   };
@@ -173,8 +186,9 @@ export interface paths {
     /**
      * Step Run
      * @description Claim up to 4 pending items, answer them, write one answer each. Call again while status is
-     * `running`. 429 with Retry-After when the network (`llm`, 400 steps an hour) or the model budget is used
-     * up; 503 when model calls are off.
+     * `running`. 429 with Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the
+     * spender) or a model budget (workspace hour, global hour, global day) is used up; the sentence names which.
+     * 503 when model calls are off.
      */
     post: operations["step_run_api_runs__run_id__step_post"];
   };
@@ -464,13 +478,19 @@ export interface components {
       /** Effective Date */
       effective_date?: string | null;
       /** Evidence Allowed */
-      evidence_allowed?: boolean | null;
-      /** Kind */
-      kind?: ("policy" | "report" | "record" | "contract" | "plan" | "questionnaire" | "statement" | "other") | null;
+      evidence_allowed?: boolean;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind?: "policy" | "report" | "record" | "contract" | "plan" | "questionnaire" | "statement" | "other";
       /** Scope */
       scope?: ("internal-systems" | "customer-product" | "production" | "employees" | "vendors-and-contractors") | null;
-      /** Status */
-      status?: ("final" | "draft") | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status?: "final" | "draft";
     };
     /** DocumentUpdated */
     DocumentUpdated: {
@@ -615,6 +635,8 @@ export interface components {
       id_col: string | null;
       /** Question Col */
       question_col: string;
+      /** Scope */
+      scope?: string | null;
       /** Sheet */
       sheet: string | null;
       /** Topic Col */
@@ -901,6 +923,12 @@ export interface operations {
           "application/json": components["schemas"]["AnswerDetail"];
         };
       };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
         content: {
@@ -955,6 +983,12 @@ export interface operations {
           "application/json": components["schemas"]["AnswerSummary"];
         };
       };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
         content: {
@@ -1002,6 +1036,12 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["AnswerSummary"];
+        };
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
         };
       };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
@@ -1058,6 +1098,12 @@ export interface operations {
           "application/json": components["schemas"]["AnswerSummary"];
         };
       };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
         content: {
@@ -1102,6 +1148,12 @@ export interface operations {
           "application/json": components["schemas"]["AuditEventOut"][];
         };
       };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
         content: {
@@ -1140,6 +1192,12 @@ export interface operations {
           "application/json": components["schemas"]["DocumentOut"][];
         };
       };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
         content: {
@@ -1170,6 +1228,7 @@ export interface operations {
    * Upload Document
    * @description Multipart upload of one file. Parsed in memory, redacted, classified, chunked; the bytes are not
    * stored. 422 with a sentence for a refused file; 429 per network (`upload`, 60 an hour); 503 when full.
+   * A body over Vercel's 4.5 MB limit gets the platform's own 413 (not JSON) before the app sees it.
    */
   upload_document_api_documents_post: {
     requestBody: {
@@ -1184,6 +1243,12 @@ export interface operations {
           "application/json": components["schemas"]["DocumentOut"];
         };
       };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
         content: {
@@ -1196,10 +1261,10 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
-      /** @description Validation Error */
+      /** @description Refused input: a sentence, or FastAPI's validation list */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          "application/json": components["schemas"]["ErrorOut"] | components["schemas"]["HTTPValidationError"];
         };
       };
       /** @description A per-network limit or the model budget; see Retry-After */
@@ -1226,6 +1291,12 @@ export interface operations {
       201: {
         content: {
           "application/json": components["schemas"]["DocumentOut"][];
+        };
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
         };
       };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
@@ -1268,6 +1339,12 @@ export interface operations {
       /** @description Successful Response */
       204: {
         content: never;
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
       };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
@@ -1323,6 +1400,12 @@ export interface operations {
           "application/json": components["schemas"]["DocumentUpdated"];
         };
       };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
         content: {
@@ -1376,6 +1459,12 @@ export interface operations {
           "application/json": components["schemas"]["LinesOut"];
         };
       };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
         content: {
@@ -1388,10 +1477,10 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
-      /** @description Validation Error */
+      /** @description Refused input: a sentence, or FastAPI's validation list */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          "application/json": components["schemas"]["ErrorOut"] | components["schemas"]["HTTPValidationError"];
         };
       };
       /** @description A per-network limit or the model budget; see Retry-After */
@@ -1437,6 +1526,12 @@ export interface operations {
           "application/json": components["schemas"]["QuestionnaireOut"][];
         };
       };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
         content: {
@@ -1466,7 +1561,9 @@ export interface operations {
   /**
    * Upload Questionnaire
    * @description Multipart xlsx or csv. Answers the detected mapping and a preview; no items exist until the visitor
-   * confirms with PUT .../mapping. 422 for a refused file; 429 per network (`upload`).
+   * confirms with PUT .../mapping. 422 for a refused file, a file over 1 MB (`MAX_QUESTIONNAIRE_BYTES`), or a
+   * workspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`); 429 per network (`upload`); 503 when
+   * the demo is full. The sheet names are stored at upload, so listing never re-parses the file.
    */
   upload_questionnaire_api_questionnaires_post: {
     requestBody: {
@@ -1479,6 +1576,121 @@ export interface operations {
       201: {
         content: {
           "application/json": components["schemas"]["QuestionnaireOut"];
+        };
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unknown id, another workspace's id, or the workspace is gone */
+      404: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description The action conflicts with the item's state */
+      409: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Refused input: a sentence, or FastAPI's validation list */
+      422: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"] | components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description A per-network limit or the model budget; see Retry-After */
+      429: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description The demo is full, or model calls are off */
+      503: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  /**
+   * Load Sample Questionnaire
+   * @description `vsq-a` (xlsx) or `mvsp-b` (csv), mapped and itemised at once. 404 for another name. Idempotent:
+   * when the workspace already has that sample, it is answered again and nothing is stored. A new one counts
+   * under the per-network `upload` limit (429), the storage breaker (503) and `MAX_QUESTIONNAIRES` (422).
+   */
+  load_sample_questionnaire_api_questionnaires_sample__name__post: {
+    parameters: {
+      path: {
+        name: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        content: {
+          "application/json": components["schemas"]["QuestionnaireDetail"];
+        };
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unknown id, another workspace's id, or the workspace is gone */
+      404: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description The action conflicts with the item's state */
+      409: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Refused input: a sentence, or FastAPI's validation list */
+      422: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"] | components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description A per-network limit or the model budget; see Retry-After */
+      429: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description The demo is full, or model calls are off */
+      503: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  /** Get Questionnaire */
+  get_questionnaire_api_questionnaires__questionnaire_id__get: {
+    parameters: {
+      path: {
+        questionnaire_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["QuestionnaireDetail"];
+        };
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
         };
       };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
@@ -1514,56 +1726,11 @@ export interface operations {
     };
   };
   /**
-   * Load Sample Questionnaire
-   * @description `vsq-a` (xlsx) or `mvsp-b` (csv), mapped and itemised at once. 404 for another name.
+   * Delete Questionnaire
+   * @description Remove a questionnaire and its items, so the 5-per-workspace cap does not force a reset. 409 when a run
+   * used it (reset the workspace to start over).
    */
-  load_sample_questionnaire_api_questionnaires_sample__name__post: {
-    parameters: {
-      path: {
-        name: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      201: {
-        content: {
-          "application/json": components["schemas"]["QuestionnaireDetail"];
-        };
-      };
-      /** @description Unknown id, another workspace's id, or the workspace is gone */
-      404: {
-        content: {
-          "application/json": components["schemas"]["ErrorOut"];
-        };
-      };
-      /** @description The action conflicts with the item's state */
-      409: {
-        content: {
-          "application/json": components["schemas"]["ErrorOut"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-      /** @description A per-network limit or the model budget; see Retry-After */
-      429: {
-        content: {
-          "application/json": components["schemas"]["ErrorOut"];
-        };
-      };
-      /** @description The demo is full, or model calls are off */
-      503: {
-        content: {
-          "application/json": components["schemas"]["ErrorOut"];
-        };
-      };
-    };
-  };
-  /** Get Questionnaire */
-  get_questionnaire_api_questionnaires__questionnaire_id__get: {
+  delete_questionnaire_api_questionnaires__questionnaire_id__delete: {
     parameters: {
       path: {
         questionnaire_id: string;
@@ -1571,9 +1738,13 @@ export interface operations {
     };
     responses: {
       /** @description Successful Response */
-      200: {
+      204: {
+        content: never;
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
         content: {
-          "application/json": components["schemas"]["QuestionnaireDetail"];
+          "application/json": components["schemas"]["ErrorOut"];
         };
       };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
@@ -1631,6 +1802,12 @@ export interface operations {
           "application/json": components["schemas"]["QuestionnaireDetail"];
         };
       };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
         content: {
@@ -1643,10 +1820,10 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
-      /** @description Validation Error */
+      /** @description Refused input: a sentence, or FastAPI's validation list */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          "application/json": components["schemas"]["ErrorOut"] | components["schemas"]["HTTPValidationError"];
         };
       };
       /** @description A per-network limit or the model budget; see Retry-After */
@@ -1681,6 +1858,12 @@ export interface operations {
           "application/json": components["schemas"]["RunOut"];
         };
       };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
         content: {
@@ -1693,10 +1876,10 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
-      /** @description Validation Error */
+      /** @description Refused input: a sentence, or FastAPI's validation list */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          "application/json": components["schemas"]["ErrorOut"] | components["schemas"]["HTTPValidationError"];
         };
       };
       /** @description A per-network limit or the model budget; see Retry-After */
@@ -1717,7 +1900,8 @@ export interface operations {
    * Answer Question
    * @description Accept the answer, or ask the one follow-up. An accepted answer is stored as a dated, redacted
    * statement, the item becomes "Confirmed by you", and open items in the same topic are re-checked (at most
-   * 8, budgeted) for suggested fills. 409 when the question is closed; 429 per network (`llm`).
+   * 8, budgeted) for suggested fills. 409 when the question is closed; 429 per network (`llm`, per model call)
+   * or model budget.
    */
   answer_question_api_questions__question_id__answer_post: {
     parameters: {
@@ -1737,6 +1921,12 @@ export interface operations {
           "application/json": components["schemas"]["AnswerQuestionOut"];
         };
       };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
         content: {
@@ -1749,10 +1939,10 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
-      /** @description Validation Error */
+      /** @description Refused input: a sentence, or FastAPI's validation list */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          "application/json": components["schemas"]["ErrorOut"] | components["schemas"]["HTTPValidationError"];
         };
       };
       /** @description A per-network limit or the model budget; see Retry-After */
@@ -1781,6 +1971,12 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["QuestionOut"];
+        };
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
         };
       };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
@@ -1827,6 +2023,12 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["RunOut"];
+        };
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
         };
       };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
@@ -1878,6 +2080,12 @@ export interface operations {
           "application/json": components["schemas"]["RunRowsOut"];
         };
       };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
         content: {
@@ -1927,6 +2135,12 @@ export interface operations {
           "application/json": components["schemas"]["ApprovedCount"];
         };
       };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
         content: {
@@ -1962,7 +2176,8 @@ export interface operations {
   /**
    * Export Run
    * @description The original file with the answer column filled and Status, Sources and Notes columns added; csv in,
-   * csv out. Unapproved answers read "Draft, not approved".
+   * csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
+   * with =, +, -, @, tab or CR gets a ' prefix in csv, and xlsx cells are written with data_type 's'.
    */
   export_run_api_runs__run_id__export_get: {
     parameters: {
@@ -1976,6 +2191,12 @@ export interface operations {
         content: {
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": unknown;
           "text/csv": unknown;
+        };
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
         };
       };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
@@ -2028,6 +2249,12 @@ export interface operations {
           "application/json": components["schemas"]["QuestionOut"][];
         };
       };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
       404: {
         content: {
@@ -2063,8 +2290,9 @@ export interface operations {
   /**
    * Step Run
    * @description Claim up to 4 pending items, answer them, write one answer each. Call again while status is
-   * `running`. 429 with Retry-After when the network (`llm`, 400 steps an hour) or the model budget is used
-   * up; 503 when model calls are off.
+   * `running`. 429 with Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the
+   * spender) or a model budget (workspace hour, global hour, global day) is used up; the sentence names which.
+   * 503 when model calls are off.
    */
   step_run_api_runs__run_id__step_post: {
     parameters: {
@@ -2077,6 +2305,12 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["StepOut"];
+        };
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
         };
       };
       /** @description Unknown id, another workspace's id, or the workspace is gone */
@@ -2126,6 +2360,12 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["AnswerSummary"];
+        };
+      };
+      /** @description A state-changing request from another site (POST, PUT, PATCH, DELETE) */
+      403: {
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
         };
       };
       /** @description Unknown id, another workspace's id, or the workspace is gone */

@@ -50,17 +50,37 @@ example `stances jsonb`); the passages are rebuilt from those chunks with the do
 
 Frozen after Plan 3's adversary checkpoint 1 (plan3a Task 2). The models live in `app/api/schemas.py`; the
 operations are pinned by `tests/test_openapi.py::test_the_frozen_contract_is_exactly_these_operations`;
-`web/src/lib/api-types.ts` is generated from `openapi.json`. A change needs the lead's OK and a change-log line.
+`web/src/lib/api-types.ts` is generated from `openapi.json`. After the freeze, an added optional field needs only a
+change-log line; changing or removing a path, a field or a status needs the lead's OK and a change-log line.
 
-- Workspace: the signed cookie. The frontend calls `GET /api/workspace` before any other workspace call
-  (FastAPI drops a cookie set on a response that raises). `WorkspaceOut.expires_at` is `created_at` + 24 h.
-- Errors: `{"detail": "<sentence>"}`. 404 unknown or foreign id, or a workspace gone mid-request (a foreign-key
-  violation); 409 state conflict; 422 refused input (`IngestError`'s sentence; FastAPI's list form for schema
-  validation); 429 per-network limit or model budget, with `Retry-After`; 503 demo full or model calls off; 501
-  for a stub (Part 0 only). The handlers are `app.api.errors.install`.
+- Workspace: the signed cookie. Only `GET /api/workspace` creates a workspace and sets the cookie; every other
+  endpoint without a live workspace is a 404 with the "reload the page" sentence (`errors.GONE`) and sets no
+  cookie. `POST /api/workspace/reset` clears the cookie only when it found a workspace (otherwise a quiet 204).
+  The frontend calls `GET /api/workspace` before any other call. `WorkspaceOut.expires_at` is `created_at` + 24 h.
+- Cross-site writes: a POST, PUT, PATCH or DELETE under `/api/` with `Sec-Fetch-Site: cross-site`, or with an
+  `Origin` whose host is not the request's `Host` (including `Origin: null`), is a 403 before any route runs
+  (`errors.SameOriginWrites`). Reads are not checked; there is no CORS.
+- Errors: `{"detail": "<sentence>"}`. 403 cross-site write; 404 unknown or foreign id, a missing workspace, or a
+  workspace gone mid-request (a foreign-key violation); 409 state conflict; 422 refused input, in two shapes: a
+  sentence (`IngestError`, mapping, caps; the operations listed in `SENTENCE_422` declare both) or FastAPI's
+  list form for schema validation; 429 per-network limit or model budget, with `Retry-After`; 503 demo full or
+  model calls off; 501 for a stub (Part 0 only). A body over Vercel's 4.5 MB limit gets the platform's 413 (not
+  JSON); the UI shows "Files must be 4 MB or smaller." for it. The handlers are `app.api.errors.install`.
+- Model budget 429: `llm_budget.Refused(step, scope)` names the cap; a plain `BudgetExhausted` reads as
+  `workspace`. `workspace`, `network` and `hour` say so and retry at the next hour; `day` says the demo's budget
+  for today is used up and `Retry-After` runs to midnight UTC. `llm_budget.refusal_scope(...)` tells which cap
+  refused after the spender returned False.
 - Free text: every request text is cleaned of NUL and lone surrogates; the three bounded bodies (`AnswerEdit.text`
   4,000, `NotApplicableIn.reason` 500, `AnswerQuestionIn.text` 4,000 characters) are cleaned and stripped before
-  their bounds, so blank text is a 422.
+  their bounds, so blank text is a 422. `Mapping.sheet` is at most 31 characters (Excel's limit).
+  `DocumentPatch` fields may be left out; `kind`, `status` and `evidence_allowed` may not be null.
+- Questionnaires: at most 5 per workspace (`MAX_QUESTIONNAIRES`, 422) and 1 MB per file
+  (`MAX_QUESTIONNAIRE_BYTES`, 422). `DELETE /api/questionnaires/{id}` is 204, or 409 when a run used it.
+  `POST /api/questionnaires/sample/{name}` is idempotent (the existing sample of that name is answered again);
+  a new one counts under `upload`, the storage breaker and the cap. The sheet names are stored at upload, so
+  listing never re-parses the file.
+- Export: every cell written is inert text. A value starting with `=`, `+`, `-`, `@`, tab or CR gets a `'`
+  prefix in csv; xlsx cells are written with `data_type = 's'`.
 - Step runner: create a run (`POST /api/questionnaires/{id}/runs`, all items pending), then call
   `POST /api/runs/{id}/step` while `status == "running"`. A step claims up to 4 items (`FOR UPDATE SKIP LOCKED`;
   claims older than 5 minutes are taken again), answers them outside any transaction, writes one answer per item
@@ -68,13 +88,17 @@ operations are pinned by `tests/test_openapi.py::test_the_frozen_contract_is_exa
   unstarted items to pending. A refused budget is a 429 with the unstarted items returned. An item whose model
   call fails twice is `unknown` with a sentence saying so; its cost still counts. A repeated or concurrent step
   never processes an item twice or spends twice.
-- Caps: per network an hour `workspace` 20, `upload` 60, `run` 20, `llm` 400 (steps and interview answers),
-  each enforced through the one helper `app.api.errors.limit(request, session, kind)`; per workspace an hour per
-  step (`llm_budget.CAPS`); globally 1,500 model calls an hour and 4,000 a day.
-- Plan 6B room: `QuestionnaireOut.source` includes `csf`; `ItemOut.csf_id`; runs scoped by questionnaire;
-  `GET /api/questionnaires` lists built-in questionnaires. The seam is per-item dispatch in `app/runs.py` on
-  `Questionnaire.source` / `Item.csf_id`; 6B may change the internals of `_answer`, `_values` and `step` (they are
-  not frozen), but not a path or a model defined here.
+- Caps: per network an hour `workspace` 20, `upload` 60, `run` 20 (each through the one helper
+  `app.api.errors.limit(request, session, kind)`, called before any write), and `llm` 400 model calls, counted
+  per call by `llm_budget.spender(session, workspace_id, network=errors.network(request))` (steps and interview
+  answers; never through `limit`); per workspace an hour per step (`llm_budget.CAPS`); globally 1,500 model calls
+  an hour and 4,000 a day.
+- Plan 6B room: `QuestionnaireOut.source` includes `csf` (with `format` `builtin`, `detected` null, and the
+  scope in `Mapping.scope`); `ItemOut.csf_id`; runs scoped by questionnaire; `GET /api/questionnaires` lists
+  built-in questionnaires. The seam is per-item dispatch in `app/runs.py` on `Questionnaire.source` /
+  `Item.csf_id`; 6B may change the internals of `_answer`, `_values` and `step` (they are not frozen), and may
+  add paths and optional fields (extending `CONTRACT` with a change-log line), but not change or remove ones
+  defined here.
 
 ## Change log
 
@@ -98,3 +122,9 @@ operations are pinned by `tests/test_openapi.py::test_the_frozen_contract_is_exa
   (round 2, Ruling 10: revised before acceptance from `,;:.`; still `draft@p2`).
   Signatures unchanged; re-record.
 - 2026-10-06: HTTP contract frozen (Plan 3A Task 2) after adversary checkpoint 1.
+- 2026-10-06: HTTP contract fix round 1 (review I-1..I-3, P8; adversary-1 C1, C2, I1-I5) before the freeze:
+  only `GET /api/workspace` creates a workspace (others 404 `GONE`), reset clears the cookie only when it found
+  one, cross-site writes 403; 422 documents both shapes; `Mapping.scope` and `sheet` <= 31; `DocumentPatch`
+  refuses null for NOT NULL fields; `DELETE /api/questionnaires/{id}`, 5 questionnaires and 1 MB per file,
+  idempotent counted sample questionnaire; inert export cells; `llm` counted per model call in the spender;
+  scoped budget 429 (`llm_budget.Refused`, `refusal_scope`). Added optional fields are allowed after the freeze.

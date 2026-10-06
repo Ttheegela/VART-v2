@@ -21,5 +21,6 @@ XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
 def export_run(run_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -> Response:
     """The original file with the answer column filled and Status, Sources and Notes columns added; csv in,
-    csv out. Unapproved answers read "Draft, not approved"."""
+    csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
+    with =, +, -, @, tab or CR gets a ' prefix in csv, and xlsx cells are written with data_type 's'."""
     raise not_built()

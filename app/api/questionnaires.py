@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request, UploadFile
 
 from app.api.deps import SessionDep, WorkspaceDep
 from app.api.errors import not_built
-from app.api.schemas import ERRORS, Mapping, QuestionnaireDetail, QuestionnaireOut
+from app.api.schemas import ERRORS, SENTENCE_422, Mapping, QuestionnaireDetail, QuestionnaireOut
 
 router = APIRouter(tags=["questionnaires"], responses=ERRORS)
 
@@ -18,22 +18,28 @@ def list_questionnaires(ws: WorkspaceDep, session: SessionDep) -> list[Questionn
     raise not_built()
 
 
-@router.post("/api/questionnaires", status_code=201)
+@router.post("/api/questionnaires", status_code=201, responses=SENTENCE_422)
 def upload_questionnaire(
     ws: WorkspaceDep, session: SessionDep, request: Request, file: UploadFile
 ) -> QuestionnaireOut:
     """Multipart xlsx or csv. Answers the detected mapping and a preview; no items exist until the visitor
-    confirms with PUT .../mapping. 422 for a refused file; 429 per network (`upload`)."""
+    confirms with PUT .../mapping. 422 for a refused file, a file over 1 MB (`MAX_QUESTIONNAIRE_BYTES`), or a
+    workspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`); 429 per network (`upload`); 503 when
+    the demo is full. The sheet names are stored at upload, so listing never re-parses the file."""
     raise not_built()
 
 
-@router.post("/api/questionnaires/sample/{name}", status_code=201)
-def load_sample_questionnaire(name: str, ws: WorkspaceDep, session: SessionDep) -> QuestionnaireDetail:
-    """`vsq-a` (xlsx) or `mvsp-b` (csv), mapped and itemised at once. 404 for another name."""
+@router.post("/api/questionnaires/sample/{name}", status_code=201, responses=SENTENCE_422)
+def load_sample_questionnaire(
+    name: str, ws: WorkspaceDep, session: SessionDep, request: Request
+) -> QuestionnaireDetail:
+    """`vsq-a` (xlsx) or `mvsp-b` (csv), mapped and itemised at once. 404 for another name. Idempotent:
+    when the workspace already has that sample, it is answered again and nothing is stored. A new one counts
+    under the per-network `upload` limit (429), the storage breaker (503) and `MAX_QUESTIONNAIRES` (422)."""
     raise not_built()
 
 
-@router.put("/api/questionnaires/{questionnaire_id}/mapping")
+@router.put("/api/questionnaires/{questionnaire_id}/mapping", responses=SENTENCE_422)
 def confirm_mapping(
     questionnaire_id: uuid.UUID, mapping: Mapping, ws: WorkspaceDep, session: SessionDep
 ) -> QuestionnaireDetail:
@@ -46,4 +52,11 @@ def confirm_mapping(
 def get_questionnaire(
     questionnaire_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep
 ) -> QuestionnaireDetail:
+    raise not_built()
+
+
+@router.delete("/api/questionnaires/{questionnaire_id}", status_code=204)
+def delete_questionnaire(questionnaire_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -> None:
+    """Remove a questionnaire and its items, so the 5-per-workspace cap does not force a reset. 409 when a run
+    used it (reset the workspace to start over)."""
     raise not_built()
