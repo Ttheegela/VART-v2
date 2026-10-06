@@ -318,7 +318,8 @@ def markdown(report: dict[str, Any]) -> str:
         if g.get("gating", True):
             verdict = "yes" if g["pass"] else "NO" + (f" ({g['reason']})" if "reason" in g else "")
         else:
-            verdict = "reported: met target" if g["pass"] else f"reported: below target, {REPORTED_NOTE}"
+            note = report.get("reported_note", REPORTED_NOTE)
+            verdict = "reported: met target" if g["pass"] else f"reported: below target, {note}"
         lines.append(f"| {name} | {g['op']} {g['target']} | {g['value']} | {verdict} |")
     lines += ["", "| Reported | Value |", "|---|---|"]
     lines += [f"| {k} | {v} |" for k, v in sorted(report["metrics"].items()) if k not in report["gates"]]

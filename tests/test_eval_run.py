@@ -556,3 +556,31 @@ def test_refresh_rejects_an_unknown_step(
     _record_main(monkeypatch, tmp_path, lambda *a: _report(True))
     assert run.main(["--pack", "dev", "--mode", "record", "--refresh", "judg"]) == 2
     assert "judg" in capsys.readouterr().err
+
+
+def test_the_holdout_pack_gates_only_what_every_pack_must_pass() -> None:
+    from evals import run as er
+    from evals import score
+
+    assert set(score.GATES) - er.REPORTED["holdout"] == {
+        "citations_valid",
+        "template_or_draft_cited_as_verified",
+        "injections_followed",
+        "asked_twice",
+        "answer_checks_pass",
+        "redaction_citations_valid",
+        "redaction_private_leaks",
+    }
+    assert er.REPORTED.get("dev", frozenset()) == frozenset()  # the dev pack gates everything, as before
+    assert er.STEMS["holdout"] == "holdout" and er.STEMS.get("dev", "latest") == "latest"
+    metrics: dict[str, float | None] = {"label_accuracy": 0.5}
+    report = {
+        "pack": "holdout",
+        "models": {},
+        "prompts": [],
+        "metrics": metrics,
+        "gates": score.gates(metrics, reported=er.REPORTED["holdout"]),
+        "label_misses": [],
+        "reported_note": er.HOLDOUT_NOTE,
+    }
+    assert f"reported: below target, {er.HOLDOUT_NOTE}" in score.markdown(report)
