@@ -1,10 +1,12 @@
 import csv
 import io
+import uuid
 from pathlib import Path
 
 import openpyxl
 import pytest
 from sqlalchemy import Engine
+from sqlalchemy.orm import Session
 
 from app.api.schemas import Mapping
 from app.export import DRAFT, ExportRow, export_csv, export_xlsx
@@ -139,3 +141,89 @@ def test_the_download_header_is_safe(filename: str, expected: str) -> None:
         assert head.count('"') == 2 and unquote(head.split("UTF-8''")[1]).startswith(
             filename.rsplit(".", 1)[0]
         )
+
+
+def test_a_csv_padding_bomb_is_refused_not_padded() -> None:
+    from app.ingest.parse import IngestError
+
+    mapping = Mapping(
+        sheet=None, header_row=1, id_col=None, question_col="A", answer_col="B", comments_col=None
+    )
+    bomb = ("Q,A\r\n" + "\r\n" * 5000 + "," * 20000 + "\r\n").encode()
+    with pytest.raises(IngestError):
+        export_csv(bomb, mapping, [])
+    wide = ("Q,A\r\n" + "," * 60 + "\r\n").encode()
+    with pytest.raises(IngestError):
+        export_csv(wide, mapping, [])
+
+
+def test_control_characters_do_not_break_the_xlsx() -> None:
+    original = (SAMPLES / "vsq-a.xlsx").read_bytes()
+    row = ExportRow(7, "verified", "Yes", "a\x0bb\x0c=1", False, ["s\x01"], [])
+    ws = openpyxl.load_workbook(io.BytesIO(export_xlsx(original, VSQ, [row])))["Questionnaire"]
+    assert ws["E7"].value == "ab=1" and ws["G7"].value == "s"
+
+
+def test_csv_leading_control_characters_are_prefixed() -> None:
+    mapping = Mapping(
+        sheet=None, header_row=1, id_col=None, question_col="A", answer_col="B", comments_col=None
+    )
+    out = export_csv(b"Q,A\r\nx,\r\n", mapping, [ExportRow(2, "unknown", None, "\x0b=1", False, [], [])])
+    assert list(csv.reader(io.StringIO(out.decode("utf-8-sig"))))[1][1] == "'\x0b=1"
+
+
+def _run(db: Engine, ws_id: object, *, original: bytes | None, filename: str = "q.csv") -> uuid.UUID:
+    from app.db.models import Answer, Item, Questionnaire, Run
+
+    mapping = Mapping(
+        sheet=None, header_row=1, id_col=None, question_col="A", answer_col="B", comments_col=None
+    )
+    with Session(db) as s:
+        q = Questionnaire(
+            workspace_id=ws_id,
+            filename=filename,
+            source="upload",
+            original_bytes=original,
+            mapping={"confirmed": mapping.model_dump()},
+        )
+        s.add(q)
+        s.flush()
+        run = Run(workspace_id=ws_id, questionnaire_id=q.id)
+        item = Item(workspace_id=ws_id, questionnaire_id=q.id, position=0, row_ref="2", question="Is MFA on?")
+        s.add_all([run, item])
+        s.flush()
+        s.add(
+            Answer(
+                workspace_id=ws_id, run_id=run.id, item_id=item.id, label="unknown", value=None, text="=1+1"
+            )
+        )
+        s.commit()
+        return run.id
+
+
+def test_the_endpoint_exports_a_real_run_and_isolates_it(db: Engine) -> None:
+    client, ws_id = visitor(db)
+    run_id = _run(db, ws_id, original=b"Question,Answer\r\nIs MFA on?,\r\n", filename='a"b\r\n.csv')
+    r = client.get(f"/api/runs/{run_id}/export")
+    assert r.status_code == 200
+    head = r.headers["content-disposition"]
+    assert head.startswith('attachment; filename="') and "\r" not in head and "\n" not in head
+    assert r.text.splitlines()[1].startswith("Is MFA on?,'=1+1,")
+    other, _ = visitor(db)
+    assert other.get(f"/api/runs/{run_id}/export").status_code == 404
+    xl = _run(db, ws_id, original=(SAMPLES / "vsq-a.xlsx").read_bytes(), filename="vsq.xlsx")
+    with Session(db) as s:
+        from app.db.models import Questionnaire, Run
+
+        qq = s.get_one(Questionnaire, s.get_one(Run, xl).questionnaire_id)
+        qq.mapping = {"confirmed": VSQ.model_dump()}
+        s.commit()
+    rx = client.get(f"/api/runs/{xl}/export")
+    assert rx.status_code == 200 and "x-export-notice" in rx.headers
+    assert rx.headers["content-disposition"] == 'attachment; filename="vsq-filled.xlsx"'
+
+
+def test_a_questionnaire_without_its_file_is_a_409(db: Engine) -> None:
+    client, ws_id = visitor(db)
+    run_id = _run(db, ws_id, original=None)
+    assert client.get(f"/api/runs/{run_id}/export").status_code == 409

@@ -11,14 +11,16 @@ from dataclasses import dataclass
 from typing import Any
 
 import openpyxl
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE, MergedCell
 from openpyxl.utils import column_index_from_string, get_column_letter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.errors import Conflict
 from app.api.schemas import Mapping
 from app.db.models import Answer, Item
-from app.ingest.parse import decode
-from app.questionnaires import delimiter
+from app.ingest.parse import IngestError, decode
+from app.questionnaires import MAX_COLS, MAX_ROWS, delimiter
 
 LABEL_WORDS = {
     "verified": "Verified",
@@ -33,7 +35,8 @@ APPROVED = "Approved"
 ADDED = ("Status", "Sources", "Notes")
 NOTICE = "Embedded images and charts are not kept in the exported workbook (an openpyxl limit)."
 _ROW = re.compile(r"(\d+)$")
-_TRIGGERS = ("=", "+", "-", "@", "\t", "\r", "\n")
+_TRIGGERS = ("=", "+", "-", "@", "\t", "\r", "\n", "\x0b", "\x0c", "\ufeff")
+XLSX_MAX_COL = 16384
 
 
 @dataclass(frozen=True)
@@ -78,6 +81,8 @@ def _csv_safe(value: str) -> str:
 
 def _put(cell: Any, value: str | None) -> None:
     """Write a string that stays a string: openpyxl would turn a leading = into a formula (data_type 'f')."""
+    if value is not None:
+        value = ILLEGAL_CHARACTERS_RE.sub("", value)  # openpyxl refuses \x0b, \x0c and friends
     cell.value = value
     if value is not None:
         cell.data_type = "s"
@@ -117,6 +122,8 @@ def export_xlsx(original: bytes, mapping: Mapping, rows: list[ExportRow]) -> byt
     ws = wb[mapping.sheet] if mapping.sheet else wb.active
     h = mapping.header_row
     first = ws.max_column + 1
+    if first + 2 > XLSX_MAX_COL:
+        raise Conflict("This sheet has no room for three more columns.")
     style = ws.cell(h, column_index_from_string(mapping.question_col))
     for i, title in enumerate(ADDED):
         cell = ws.cell(h, first + i, title)
@@ -130,9 +137,18 @@ def export_xlsx(original: bytes, mapping: Mapping, rows: list[ExportRow]) -> byt
     for r in rows:
         comments = f"{mapping.comments_col}{r.row}" if mapping.comments_col else None
         answer, comment, notes = _cells(
-            r, allowed, comments is not None, comments is None or ws[comments].value in (None, "")
+            r,
+            allowed,
+            comments is not None,
+            comments is None
+            or (ws[comments].value in (None, "") and not isinstance(ws[comments], MergedCell)),
         )
-        _put(ws[f"{mapping.answer_col}{r.row}"], answer)
+        target = ws[f"{mapping.answer_col}{r.row}"]
+        if isinstance(target, MergedCell):  # a merged range cannot be written: the value goes to Notes
+            if answer:
+                notes.insert(0, f"Answer: {answer}")
+        else:
+            _put(target, answer)
         if comments and comment:
             _put(ws[comments], comment)
         _put(ws.cell(r.row, first), _status(r))
@@ -148,7 +164,12 @@ def export_xlsx(original: bytes, mapping: Mapping, rows: list[ExportRow]) -> byt
 def export_csv(original: bytes, mapping: Mapping, rows: list[ExportRow]) -> bytes:
     text = decode(original)
     sep = delimiter(text)
-    table = list(csv.reader(io.StringIO(text, newline=""), delimiter=sep))
+    reader = csv.reader(io.StringIO(text, newline=""), delimiter=sep)
+    table = [row for _, row in zip(range(MAX_ROWS + 1), reader, strict=False)]
+    if len(table) > MAX_ROWS or any(
+        len(row) > MAX_COLS for row in table
+    ):  # the importer's caps: no padding bomb
+        raise IngestError("This file is too large to export into.")
     width = max(len(r) for r in table)
     table = [r + [""] * (width - len(r)) for r in table]
     a = column_index_from_string(mapping.answer_col) - 1
