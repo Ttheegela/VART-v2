@@ -10,7 +10,7 @@ from app import redact
 from app.contracts import Line
 from app.ingest.parse import IngestError, parse
 from app.patterns import PLACEHOLDER
-from app.redact import redact_lines, redact_text
+from app.redact import redact_filename, redact_lines, redact_text
 
 
 @pytest.mark.parametrize(
@@ -253,3 +253,43 @@ def test_a_keyed_secret_of_any_shape_is_redacted(text: str) -> None:
 def test_a_key_body_right_after_an_equals_sign_is_redacted(text: str) -> None:
     # adversary-3 re-review N2: the PEM-row lookbehind excluded '='
     assert redact_text(text).endswith("=<SECRET>")
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("Dana Ortiz.docx", "<PERSON>.docx"),
+        (
+            "notes_from_Marcus_Lee_2026.md",
+            "notes from <PERSON> 2026.md",
+        ),  # preflight P2: digits not in the span
+        ("access-control-policy.docx", "access-control-policy.docx"),
+        ("Access Control Policy.docx", "Access Control Policy.docx"),
+        ("SOC 2 Type II summary.pdf", "SOC 2 Type II summary.pdf"),
+        ("dana.ortiz@kestrelyn.example.xlsx", "<EMAIL>.xlsx"),  # preflight P2: extension split first
+    ],
+)
+def test_a_name_in_a_file_name_is_redacted_without_a_sentence_around_it(name: str, expected: str) -> None:
+    # Triage row 31: Presidio tags "Dana Ortiz" only inside a sentence; a bare file name slipped through.
+    assert redact_filename(name) == expected
+
+
+def test_last_comma_first_is_one_name() -> None:
+    # Triage row 30 (preflight P2c): Presidio tags "Ortiz" and "Dana" apart; each alone is one word.
+    assert redact_text("Reviewed by Ortiz, Dana on Monday.") == "Reviewed by <PERSON> on Monday."
+
+
+def test_a_comma_pair_that_is_not_a_name_keeps_the_side_that_is_one() -> None:
+    # Preflight P15: the merged span fails the name filter; the separate spans are tried instead.
+    text = "Dana Ortiz, Ltd"  # "Dana Ortiz" (0-10) is a name; ", Ltd" is not part of it
+    people = [type("R", (), {"start": 0, "end": 10})(), type("R", (), {"start": 12, "end": 15})()]
+    assert redact._spans(text, people) == [(0, 10, "PERSON")]
+
+
+def test_an_all_caps_accented_name_is_redacted() -> None:
+    assert redact_text("Signed by JOSÉ NÚÑEZ on 2026-09-01.") == "Signed by <PERSON> on 2026-09-01."
+
+
+def test_an_all_caps_accented_word_alone_or_with_a_product_word_is_kept() -> None:
+    assert redact_text("The CAFÉ policy is reviewed.") == "The CAFÉ policy is reviewed."
+    assert redact_text("The SÉCURITÉ SYSTEM is reviewed.") == "The SÉCURITÉ SYSTEM is reviewed."

@@ -5,6 +5,7 @@ product word (the small model also tags company and product names as people; Pla
 the dev pack). Place names and cloud regions are kept on purpose: data-residency answers depend on them.
 Sample packs are not redacted (Plan 1A Ruling 10); uploads and the visitor's own answers are."""
 
+import os
 import re
 import threading
 import time
@@ -202,12 +203,53 @@ def _person_results(texts: list[str]) -> list[list[Any]]:
     )
 
 
+_DIGIT_LEAD = re.compile(r"(?:\d+\s+)+")
+_DIGIT_TAIL = re.compile(r"(?:\s+\d+)+$")
+# An all-caps accented name ("JOSÉ NÚÑEZ"): the small model tags none. Needs 2-4 all-caps words, one with an
+# accented capital; an unaccented ALL CAPS name stays Presidio's call. (preflight P2)
+_CAPS_ACCENTED = re.compile(
+    r"(?<![\w-])(?=[A-ZÀ-ÖØ-Þ ]*[À-ÖØ-Þ])(?:[A-ZÀ-ÖØ-Þ]{2,} ){1,3}[A-ZÀ-ÖØ-Þ]{2,}(?![\w-])"
+)
+
+
+def _trim_digits(text: str, start: int, end: int) -> tuple[int, int]:
+    """Digit tokens at a span's edge are not part of a name ("Marcus Lee 2026", preflight P2)."""
+    span = text[start:end]
+    lead = _DIGIT_LEAD.match(span)
+    tail = _DIGIT_TAIL.search(span)
+    return start + (lead.end() if lead else 0), end - (len(tail.group()) if tail else 0)
+
+
+def _person_spans(text: str, people: list[Any]) -> list[tuple[int, int]]:
+    """Presidio's PERSON ranges that read as a name. A pair joined only by ", " ("Ortiz, Dana") is tried as
+    one name; when that fails, each span stands alone (preflight P15; triage row 30)."""
+    groups: list[list[tuple[int, int]]] = []
+    for start, end in sorted((r.start, r.end) for r in people):
+        if groups and text[groups[-1][-1][1] : start] == ", ":
+            groups[-1].append((start, end))
+        else:
+            groups.append([(start, end)])
+    out: list[tuple[int, int]] = []
+    for group in groups:
+        merged = [(group[0][0], group[-1][1])]
+        for option in (merged, group):
+            trimmed = [_trim_digits(text, a, b) for a, b in option]
+            kept = [t for t in trimmed if _looks_like_a_name(text[t[0] : t[1]])]
+            if len(kept) == len(trimmed) or option is group:
+                out += kept
+                break
+    return out
+
+
 def _spans(text: str, people: list[Any]) -> list[tuple[int, int, str]]:
     found = [(m.start(), m.end(), label) for label, rx in _PATTERNS for m in rx.finditer(text)]
+    found += [
+        (m.start(), m.end(), "PERSON")
+        for m in _CAPS_ACCENTED.finditer(text)
+        if not {w.lower() for w in m.group().split()} & _NOT_A_NAME
+    ]
     # Presidio's EmailRecognizer would fetch the Public Suffix List over HTTP; emails are the regex above.
-    for r in people:
-        if _looks_like_a_name(text[r.start : r.end]):
-            found.append((r.start, r.end, "PERSON"))
+    found += [(start, end, "PERSON") for start, end in _person_spans(text, people)]
     kept: list[tuple[int, int, str]] = []
     for start, end, label in sorted(found, key=lambda s: (s[0], -s[1])):
         if not kept or start >= kept[-1][1]:
@@ -232,6 +274,28 @@ def redact_text(text: str) -> str:
     """Each span becomes <LABEL>: <PERSON>, <EMAIL>, <PHONE>, <ADDRESS> or <SECRET>. These never look like the
     [bracketed] placeholders that app/patterns.py flags."""
     return _apply(text, spans(text))
+
+
+_FILE_CONTEXT = "This file was written by "
+
+
+def redact_filename(filename: str) -> str:
+    """A file name's root read as words inside a sentence, where Presidio finds a bare name it misses alone
+    ("Dana Ortiz.docx", triage row 31). A name span becomes <PERSON> and the separators become spaces; without
+    one the root is redacted as plain text (emails, secrets). The extension is split off first on both paths.
+    A lower-case name ("dana_ortiz.md") stays a known gap, like a single word."""
+    root, ext = os.path.splitext(filename)
+    words = re.sub(r"[_\W]+", " ", root).strip()
+    sentence = f"{_FILE_CONTEXT}{words}."
+    offset = len(_FILE_CONTEXT)
+    found = [
+        (a - offset, b - offset, label)
+        for a, b, label in spans(sentence)
+        if a >= offset and b <= offset + len(words)
+    ]
+    if not any(label == "PERSON" for _, _, label in found):
+        return redact_text(root) + ext
+    return _apply(words, found) + ext
 
 
 def redact_lines(lines: Sequence[Line]) -> tuple[Line, ...]:

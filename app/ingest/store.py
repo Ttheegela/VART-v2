@@ -25,7 +25,7 @@ from app.db.models import Chunk, Document, DocumentLine, Workspace
 from app.ingest.parse import MAX_LINE_CHARS, IngestError, parse
 from app.llm.client import LLMClient
 from app.patterns import INJECTION
-from app.redact import redact_lines, redact_text
+from app.redact import redact_filename, redact_lines, redact_text
 from app.text import normalize
 
 log = logging.getLogger(__name__)
@@ -161,9 +161,11 @@ def ingest_document(
         raise
     if source != "sample":
         _check_limits(session, workspace_id, len(parsed.lines))
+        session.commit()  # end the read before redaction (up to DEADLINE_S): never idle in a transaction
         parsed = replace(parsed, lines=redact_lines(parsed.lines))
-        filename = _cut(redact_text(filename))  # a redaction token can lengthen the name
-    session.commit()  # ends any open read: no transaction stays open across classify's model call
+        filename = _cut(redact_filename(filename))  # a redaction token can lengthen the name
+    else:
+        session.commit()  # ends any open read: no transaction stays open across classify's model call
     meta = classify(filename, parsed, llm, model, spend)
     digest = hashlib.sha256(data).hexdigest()
     return _store(session, workspace_id, filename, source, digest, meta, parsed.lines)
@@ -175,6 +177,9 @@ def store_statement(
     """The visitor's accepted interview answer as a dated statement (spec 6.9): kind and source 'statement',
     evidence, dated `today`, redacted like an upload. One plain line per non-empty line, not Markdown: an
     answer such as "#1 priority: ..." is a statement, not a heading."""
+    filename = _cut(normalize(filename.encode("utf-8", "replace").decode()))
+    if _name_reads_like_an_instruction(filename):  # triage row 38: the name is printed in every stance prompt
+        raise IngestError("The file name reads like an instruction; rename the file.")
     lines = [Line(t) for p in text.splitlines() if (t := normalize(p))]
     if len(lines) > MAX_ANSWER_LINES or any(len(x.text) > MAX_LINE_CHARS for x in lines):
         raise IngestError("The answer is too long.")
