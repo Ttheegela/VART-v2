@@ -1,4 +1,4 @@
-import type { AnswerSummary, Label } from "./api";
+import type { AnswerSummary, GapLabel, GapScope, Label } from "./api";
 
 export const LABEL_WORD: Record<Label, string> = {
   verified: "verified",
@@ -34,3 +34,35 @@ export function confidenceText(a: AnswerSummary): string {
 export function approvalText(approved: boolean): string {
   return approved ? "Approved" : "Draft, not approved";
 }
+
+/** CSF spec 7: the gap labels in words; the chip's border or fill is the second cue (design.md Label chip). */
+export const GAP_WORD: Record<GapLabel, string> = {
+  covered: "covered",
+  partly_covered: "partly",
+  not_met: "not met",
+  documents_disagree: "DISAGREE",
+  gap: "gap",
+  confirmed_by_you: "confirmed by you",
+  not_answered: "not answered",
+};
+
+export const GAP_CHIP: Record<GapLabel, string> = {
+  covered: "bg-chrome text-on-chrome",
+  confirmed_by_you: "bg-neutral-700 text-on-chrome",
+  partly_covered: "border border-ink text-ink",
+  not_met: "border border-ink font-bold text-ink",
+  documents_disagree: "border-2 border-ink font-bold uppercase text-ink",
+  gap: "border border-dashed border-neutral-400 text-ink-2",
+  not_answered: "text-ink-3",
+};
+
+export const GAP_LABELS: readonly GapLabel[] = [
+  "covered", "partly_covered", "not_met", "documents_disagree", "gap", "confirmed_by_you", "not_answered",
+];
+export const SCOPES: readonly GapScope[] = ["govern", "identify", "protect", "detect", "respond", "recover", "core"];
+/** CSF spec 7: g i p d s o for the functions (s: respond, since r runs), a for all of the core. */
+export const SCOPE_KEY: Record<GapScope, string> = {
+  govern: "g", identify: "i", protect: "p", detect: "d", respond: "s", recover: "o", core: "a",
+};
+export const GAP_REVIEW = "Possible gap — review it";
+export const GAP_FOOTER = "Not legal advice. CSF 2.0 text © NIST, public domain.";
