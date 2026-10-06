@@ -293,7 +293,8 @@ export default function WorkspaceView({ workspace, onGone }: ViewProps) {
           <p id={ids.docNotice} className="max-w-[72ch] text-xs text-ink-2">{UPLOAD_NOTICE}</p>
           {uploading && <p role="status" className="text-xs text-ink-3">{uploading}</p>}
           <div id={ids.docErr}><ErrorLine message={docError} /></div>
-          <div className="overflow-x-auto">
+          {/* relative: the header's sr-only "edit" (position absolute) scrolls inside, not past the page at 320 px */}
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[56rem] table-fixed text-sm">
               <thead>
                 <tr className="h-6 border-b border-ink text-left text-xs font-medium text-ink-2">

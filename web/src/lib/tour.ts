@@ -31,7 +31,7 @@ export const STEPS: TourStep[] = [
   },
   {
     title: "The answers",
-    body: "Each row gets a label decided by code, not by the AI: verified, partial, conflict or unknown. The keys v, p, c and u filter by label; j and k move up and down.",
+    body: "Each row gets a label decided by code, not by the AI: verified (a quote backs it), partial, conflict (the documents disagree) or unknown (nothing found). The keys v, p, c and u filter by label; j and k move up and down.",
     target: "filters",
     route: (c) => ({ view: "run", run: c.runId }),
   },
@@ -56,13 +56,13 @@ export const STEPS: TourStep[] = [
   },
   {
     title: "Audit log",
-    body: "Every upload, run, approval and edit in this workspace is listed here, so you can see who changed what.",
+    body: "Every upload, run, approval and edit in this workspace is listed here, so you can see what changed and when.",
     target: "audit",
     route: () => ({ view: "audit" }),
   },
   {
     title: "Gap check",
-    body: "This checks the documents against NIST's Cybersecurity Framework 2.0, outcome by outcome. Press r to run it. For the untouched sample company it is precomputed; after your own answers or uploads it runs live. Open an outcome to see its parts.",
+    body: "This checks the documents against NIST's Cybersecurity Framework 2.0, outcome by outcome; an outcome is one thing the framework asks a company to do. Press r to run it. For the untouched sample company it is precomputed; after your own answers or uploads it runs live. Open an outcome to see the smaller checks it is made of.",
     target: "coverage",
     route: () => ({ view: "gap" }),
   },

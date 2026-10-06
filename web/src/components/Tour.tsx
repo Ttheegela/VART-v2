@@ -26,7 +26,7 @@ export default function Tour() {
   }, [open, ctx, route.run, route.item]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || (s.target === "drawer" && narrow())) return; // under 900 px step 5 opens no drawer: nothing to outline
     let el: Element | null = null;
     const find = () => {
       el = document.querySelector(`[data-tour="${s.target}"]`);

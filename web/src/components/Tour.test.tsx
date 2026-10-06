@@ -1,12 +1,19 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { useKeys } from "../lib/keys";
 import { go } from "../lib/route";
 import { STEPS, maybeStartTour, startTour } from "../lib/tour";
 import { fixtures, mockApi } from "../test/mockApi";
 import GapCheck from "../views/GapCheck";
 import Questions from "../views/Questions";
+import { Shell } from "./Shell";
 import Tour from "./Tour";
+
+function Drawer({ onEsc }: { onEsc: () => void }) {
+  useKeys({ Escape: onEsc });
+  return <aside aria-label="drawer" />;
+}
 
 const ctx = { runId: "r1", conflictItem: "i1" };
 const dialog = () => screen.queryByRole("dialog", { name: "guided tour" });
@@ -138,6 +145,37 @@ describe("Tour", () => {
     act(() => startTour(ctx));
     await screen.findByLabelText(/^your answer to /);
     expect(screen.getByRole("button", { name: "Next" })).toHaveFocus();
+  });
+
+  it("closes the moment a gap check starts, before the request answers (review I2)", async () => {
+    mockApi({ "GET /api/gap/core": fixtures.gap, "POST /api/gap/core/run": () => new Promise(() => {}) });
+    render(<><GapCheck workspace={fixtures.workspace} onGone={() => {}} /><Tour /></>);
+    await screen.findByRole("button", { name: "Check again" });
+    act(() => startTour(ctx));
+    expect(dialog()).not.toBeNull();
+    await userEvent.keyboard("r"); // focus is on Next: r reaches the page's key map
+    expect(screen.getByRole("button", { name: "Starting…" })).toBeDisabled(); // the request is still pending
+    expect(dialog()).toBeNull();
+  });
+
+  it("Esc inside the card closes only the tour, never the drawer under it (review M6)", async () => {
+    const esc = vi.fn();
+    render(<><Drawer onEsc={esc} /><Tour /></>);
+    act(() => startTour(ctx));
+    await userEvent.keyboard("{Escape}");
+    expect(dialog()).toBeNull();
+    expect(esc).not.toHaveBeenCalled();
+  });
+
+  it("the page gets room under the card while the tour is open, so the last rows stay reachable (review M1)", () => {
+    render(<><Shell mode="RUN" cursor="" hints={[]} expiresAt={null}>x</Shell><Tour /></>);
+    expect(screen.getByRole("main")).not.toHaveClass("pb-80");
+    act(() => startTour(ctx));
+    expect(screen.getByRole("main")).toHaveClass("pb-80");
+  });
+
+  it("says the audit log shows what changed and when (review M3)", () => {
+    expect(STEPS[7].body).toContain("what changed and when");
   });
 
   it("says the gap check is precomputed only for the untouched sample company", () => {
