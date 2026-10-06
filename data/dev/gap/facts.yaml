@@ -1,18 +1,15 @@
 # Gap-check extension of data/dev/facts.yaml (datakit.gap). Read only by the CSF gap check (eval pack gap-dev), so
 # the questionnaire keys, the dev eval and its recordings do not change. Same rules as the dev fact sheet: a
 # statement appears verbatim in its document; ASCII only.
+# The planted improvement plan (sip), its statement sip-alerting and traps G1 and G4 moved to data/dev/facts.yaml in
+# Plan 6B, so the sample pack shows a stated non-compliance. Its other statements, their controls and traps G2-G3
+# stay here: datakit.validate requires every dev control and trap to be exercised by a vsq-a question, and vsq-a asks
+# about none of them.
 #   outcomes  every Checked CSF 2.0 outcome (data/csf/tiers.yaml) and the one control that answers it. `label: partly_covered`
 #             with `missing:` (the NIST parts that lack evidence) overrides the derived label for a broad outcome;
 #             `missing_parts:` gives the numbers of those parts in data/csf/tiers.yaml (blind judges 1 and 2, Rulings
 #             12, 15, 17 and 19).
 pack: dev
-
-documents:
-  - id: sip
-    filename: security-improvement-plan.md
-    format: md
-    kind: plan
-    effective_date: 2026-07-01
 
 controls:
   - {id: threat-intel-sources, topic: Detection, truth: "No threat intelligence feed yet; joining a sharing group is planned for 2027"}
@@ -34,12 +31,6 @@ statements:
     stance: no
     flags: [negation]
     text: "Threat intelligence is not yet integrated into the analysis of security events; this integration is planned for 2027."
-  - id: sip-alerting
-    doc: sip
-    control: alerting
-    stance: no
-    flags: [negation]
-    text: "Security alerts are not yet routed to the on-call rotation; on-call paging for security alerts is planned for 2027."
   - id: sip-incident-analysis
     doc: sip
     control: incident-analysis
@@ -114,10 +105,6 @@ statements:
     text: "Kestrelyn performs daily backups of all production databases."
 
 traps:
-  - id: G1
-    kind: disagree
-    statements: [lmp-alerting, sip-alerting]
-    note: "The logging policy says security events page the on-call rotation; the improvement plan says alerts are not yet routed to it."
   - id: G2
     kind: planned_only
     statements: [sip-threat-intel-sources]
@@ -126,10 +113,6 @@ traps:
     kind: planned_only
     statements: [sip-threat-intel-analysis]
     note: "Using threat intelligence in event analysis is only planned: a stated non-compliance, never Covered."
-  - id: G4
-    kind: planned_only
-    statements: [sip-alerting]
-    note: "On-call paging for security alerts is only planned in the improvement plan."
 
 outcomes:
   - {csf_id: GV.PO-01, control: infosec-program}

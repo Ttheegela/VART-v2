@@ -95,7 +95,7 @@ def test_planted_traps_come_out_as_designed() -> None:
 
 
 TALLIES = {
-    "vsq-a": {"Yes": 30, "No": 5, "Partial": 9, "Conflict": 7, "Unknown": 13},
+    "vsq-a": {"Yes": 29, "No": 5, "Partial": 9, "Conflict": 8, "Unknown": 13},  # Plan 6B: VSQ-55 is G1
     "mvsp-b": {"Yes": 17, "No": 1, "Partial": 1, "Conflict": 0, "Unknown": 6},
 }
 

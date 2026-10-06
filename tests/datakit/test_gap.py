@@ -100,7 +100,7 @@ def test_an_unmapped_checked_outcome_is_named(monkeypatch: pytest.MonkeyPatch) -
 
 def test_the_improvement_plan_is_classified_by_rules_alone() -> None:
     facts, g = gap.load("dev")
-    spec = g.documents[0]
+    spec = next(d for d in facts.documents if d.id == "sip")
     meta, sure = rules("md", lines_of(gap.doc_path("dev", g, spec)))
     assert sure and meta == DocMeta("plan", "final", date(2026, 7, 1), None, True, "rule")
 
