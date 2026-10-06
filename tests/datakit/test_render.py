@@ -147,14 +147,15 @@ def _units(path: Path) -> list[str]:
     return lines
 
 
-def test_no_unregistered_control_keywords() -> None:
-    facts = load_yaml(DATA / "dev" / "facts.yaml", Facts)
-    allowed_file = DATA / "dev" / "src" / "ALLOWED_LINES.txt"
+@pytest.mark.parametrize("pack", ["dev", "holdout"])
+def test_no_unregistered_control_keywords(pack: str) -> None:
+    facts = load_yaml(DATA / pack / "facts.yaml", Facts)
+    allowed_file = DATA / pack / "src" / "ALLOWED_LINES.txt"
     allowed = {ln.split(" # ")[0].strip() for ln in allowed_file.read_text().splitlines() if ln.strip()}
     loose = []
     for d in facts.documents:
         registered = [s.text for s in facts.statements if s.doc == d.id]
-        for unit in _units(DATA / "dev" / "docs" / d.filename):
+        for unit in _units(DATA / pack / "docs" / d.filename):
             if (
                 CONTROL_WORDS.search(unit)
                 and unit not in allowed

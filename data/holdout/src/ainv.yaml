@@ -1,0 +1,13 @@
+sheet: Register
+title: Marrowgate infrastructure register
+as_of: "2026-09-10"
+headers: [Asset, Type, Location, Owner, Data, Added]
+rows:
+  - [marrowgate-prod, AWS account, AWS eu-west-1, Tobias Achterberg, Production workloads, "2025-02-10"]
+  - [marrowgate-staging, AWS account, AWS eu-west-1, Tobias Achterberg, Test workloads, "2025-02-10"]
+  - [payroll-db-prod, Amazon RDS database, AWS eu-west-1, Tobias Achterberg, Pay run database, "2025-03-21"]
+  - [payslips-prod, Amazon S3 bucket, AWS eu-west-1, Tobias Achterberg, Rendered payslips, "2025-03-21"]
+  - [Entra ID tenant, SaaS application, SaaS, Noor Haddad, Workforce identities, "2025-01-13"]
+  - [GitHub organization, SaaS application, SaaS, Tobias Achterberg, Source code, "2025-01-13"]
+  - [Staff laptops, Laptop pool, Remote, Noor Haddad, Employee workstations, "2025-01-13"]
+  - [DUBLIN-NAS01, Network storage appliance, Dublin office, Noor Haddad, Payslip batch exports, "2026-08-26"]

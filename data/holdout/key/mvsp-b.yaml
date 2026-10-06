@@ -1,0 +1,357 @@
+pack: holdout
+questionnaire: mvsp-b
+items:
+- code: MVSP-1.1
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: faq
+    quote: Security researchers can report vulnerabilities to security-reports@marrowgate.example, and Marrowgate acknowledges
+      each report within three business days.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-1.2
+  expected_label: verified
+  expected_value: 'No'
+  must_ask: false
+  evidence:
+  - doc: vmp
+    quote: Customers may not run penetration tests against Marrowgate Payroll.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: true
+  traps:
+  - H5
+  - I1
+  fills: []
+- code: MVSP-1.3
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M8
+  fills: []
+- code: MVSP-1.4
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: vmp
+    quote: Marrowgate commissions an independent penetration test of Marrowgate Payroll every year.
+    stance: 'yes'
+  - doc: pentest
+    quote: Larchmont Security Labs, an independent third party, performed this penetration test of Marrowgate Payroll in May
+      2026.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-1.5
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: hrp
+    quote: All employees complete security awareness training when they join and every year after.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-1.6
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: soc2
+    quote: The service auditor issued an unqualified opinion on the Company's SOC 2 Type II examination for the period 2025-10-01
+      to 2026-03-31.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-1.7
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: irp
+    quote: Affected customers are notified within 72 hours of a confirmed breach.
+    stance: 'yes'
+  - doc: bcp
+    quote: Customers are notified of a confirmed breach within 5 business days.
+    stance: 'no'
+  conflict_trap: X2
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - X2
+  fills: []
+- code: MVSP-1.8
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: amp
+    quote: Storage media from retired assets is wiped to NIST SP 800-88 standards or physically destroyed before it is reused
+      or disposed of.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - R2
+  fills: []
+- code: MVSP-2.1
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: faq
+    quote: Customers can sign in to Marrowgate Payroll through SAML single sign-on with their own identity provider, at no
+      extra charge.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-2.2
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: crypto
+    quote: All data in transit is encrypted with TLS 1.2 or TLS 1.3.
+    stance: 'yes'
+  - doc: crypto
+    quote: Marrowgate Payroll is served only over HTTPS, and plain HTTP requests are refused.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-2.3
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: pentest
+    quote: Marrowgate Payroll sets a Content Security Policy and X-Frame-Options on every response.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-2.4
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: Passwords for workforce accounts must be at least 16 characters long.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-2.5
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: sdp
+    quote: Developers use the validation and output-encoding features of the maintained web framework instead of writing their
+      own.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-2.6
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: vmp
+    quote: Critical vulnerabilities are patched within 7 days of discovery.
+    stance: 'yes'
+  - doc: vmp
+    quote: Critical vulnerabilities in third-party libraries are fixed within the same time limits.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - P2
+  fills: []
+- code: MVSP-2.7
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: lmp
+    quote: Security logs from all production systems are collected centrally in Grafana Loki.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-2.8
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: crypto
+    quote: Customer data at rest is encrypted with AES-256 using AWS KMS keys.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-3.1
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: dcp
+    quote: Marrowgate classifies data as Open, Protected or Restricted.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-3.2
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M10
+  fills: []
+- code: MVSP-3.3
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: hrp
+    quote: Developers complete secure coding training every year that covers injection, cross-site scripting and authorization
+      flaws.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-3.4
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: vmp
+    quote: Critical vulnerabilities are patched within 7 days of discovery.
+    stance: 'yes'
+  - doc: vmp
+    quote: Critical vulnerabilities in third-party libraries are fixed within the same time limits.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - P2
+  fills: []
+- code: MVSP-3.5
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: sdp
+    quote: Only the CI/CD pipeline can deploy to production, and it deploys only from the main branch.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-4.1
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M9
+  fills: []
+- code: MVSP-4.2
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: Access is assigned by role and limited to what each role needs.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-4.3
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: vrm
+    quote: Marrowgate publishes its subprocessor list and gives customers 45 days' notice before adding a subprocessor.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: MVSP-4.4
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: bcp
+    quote: Failover to the secondary AWS region is tested once a year; the last test was completed in March 2026.
+    stance: 'yes'
+  - doc: sip
+    quote: Failover of the payroll calculation service to the secondary region has not been exercised; a first test is planned
+      for 2027.
+    stance: 'no'
+  conflict_trap: X4
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - G1
+  - N4
+  - X4
+  fills: []
