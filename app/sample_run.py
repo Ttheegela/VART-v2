@@ -9,7 +9,6 @@ answer is compared with the deployed ones; a stale snapshot is never copied: the
 import hashlib
 import json
 import uuid
-from collections import Counter
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from functools import cache
@@ -109,6 +108,14 @@ def swap(values: Any, chunk: Callable[[str], str], doc: Callable[[str], str]) ->
     return out
 
 
+def starts(rows: Any) -> dict[str, list[int]]:
+    """Each document's chunk line starts, sorted, from (chunk id, line start, document id, file name) rows."""
+    out: dict[str, list[int]] = {}
+    for _, line, _, name in rows:
+        out.setdefault(name, []).append(line)
+    return {name: sorted(lines) for name, lines in out.items()}
+
+
 def _sample_pack_only(session: Session, workspace_id: uuid.UUID) -> bool:
     """The workspace holds the sample pack and nothing else, with no metadata changed: only then do the
     snapshot's answers describe it (an upload, an answer to a question or an override changes what the engine
@@ -136,9 +143,10 @@ def _copy(
         .join(Document, Document.id == Chunk.document_id)
         .where(Chunk.workspace_id == workspace_id)
     ).all()
-    # adversary-1 M7: a workspace chunked by an older deploy can hold the same "<file>#<line>" names over
-    # other boundaries; only the chunking the snapshot was built on is copied
-    if dict(Counter(name for _, _, _, name in rows)) != snap["chunks"]:
+    # adversary-1 M7 (review m3): a workspace chunked by an older deploy can hold the same "<file>#<line>"
+    # names over other boundaries; only the chunking the snapshot was built on (every chunk's line start) is
+    # copied
+    if starts(rows) != snap["chunks"]:
         return None
     chunks = {f"{name}#{line}": str(cid) for cid, line, _, name in rows}
     docs = {name: str(did) for _, _, did, name in rows}
@@ -182,14 +190,14 @@ def copy_questionnaire_run(
 ) -> Run | None:
     """A bundled sample questionnaire's run, copied; None when anything differs from the snapshot's world."""
     snap = _current(models)
-    # Locked like create_run's lock in POST /api/gap/{scope}/run, so two presses at once make one copy (M6)
-    q = session.scalar(
-        select(Questionnaire)
-        .where(Questionnaire.id == questionnaire_id, Questionnaire.workspace_id == workspace_id)
-        .with_for_update()
-    )
-    if snap is None or q is None or q.source != "sample" or q.filename not in snap["questionnaires"]:
+    if snap is None:
         return None
+    mine = (Questionnaire.id == questionnaire_id, Questionnaire.workspace_id == workspace_id)
+    q = session.scalar(select(Questionnaire).where(*mine))
+    if q is None or q.source != "sample" or q.filename not in snap["questionnaires"]:
+        return None  # review m2: only a candidate copy takes the lock below
+    # Locked like start_gap locks it, so two presses at once make one copy (M6)
+    session.execute(select(Questionnaire.id).where(*mine).with_for_update())
     if not _sample_pack_only(session, workspace_id):
         return None
     copied = session.scalar(  # adversary-1 M6: a second press reloads the current copy

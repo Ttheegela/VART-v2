@@ -1,4 +1,5 @@
 import json
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app import sample_run
 from app.api.deps import get_llm
-from app.db.models import LlmUsage, Run
+from app.db.models import LlmUsage, Run, RunItem
 from app.main import app
 from app.settings import get_settings
 from scripts.sample_snapshot import build
@@ -179,7 +180,8 @@ def test_a_workspace_chunked_differently_is_never_copied(db: Engine, monkeypatch
     real = sample_run.snapshot()
     assert real is not None
     name = sample_run.SAMPLE_ORDER[0]
-    chunks = {**real["chunks"], name: real["chunks"][name] + 1}
+    old = real["chunks"][name]
+    chunks = {**real["chunks"], name: [*old[:-1], old[-1] + 1]}  # review m3: same count, one boundary moved
     monkeypatch.setattr(sample_run, "snapshot", lambda: {**real, "chunks": chunks})
     client, _ = visitor(db)
     assert _sample(client)["run"]["precomputed"] is False
@@ -197,3 +199,30 @@ def test_the_snapshot_holds_only_public_fields() -> None:
     for e in entries:
         assert set(e) <= {"position", "question", "topic", "csf_id", "values", "parts"}
         assert set(e["values"]) == set(sample_run.ANSWER_FIELDS)
+
+
+def test_check_again_after_an_upload_makes_a_copied_gap_run_live(db: Engine) -> None:
+    # review I1 (Ruling 7): a re-open drops the snapshot marker, so the run no longer reads as precomputed
+    client, _ = visitor(db)
+    assert client.post("/api/documents/sample").status_code == 201
+    run = client.post("/api/gap/core/run").json()
+    assert run["precomputed"] is True
+    note = b"# Backups\n\nBackups are encrypted and restore tests run every quarter.\n"
+    files = {"file": ("backup-notes.md", note, "text/markdown")}
+    assert client.post("/api/documents", files=files).status_code == 201
+    again = client.post("/api/gap/core/run").json()
+    live = get_settings().models()
+    assert (again["id"], again["status"], again["precomputed"]) == (run["id"], "running", False)
+    assert again["models"] == live
+    reply = json.dumps({"passages": [{"passage": 1, "stance": "irrelevant", "quote": "", "note": "x"}]})
+    app.dependency_overrides[get_llm] = lambda: ByStepLLM({"stance": reply})
+    try:
+        while client.get(f"/api/runs/{run['id']}").json()["status"] == "running":
+            assert client.post(f"/api/runs/{run['id']}/step").status_code == 200
+    finally:
+        app.dependency_overrides.pop(get_llm, None)
+    with Session(db) as s:
+        parts = s.scalars(select(RunItem.parts).where(RunItem.run_id == uuid.UUID(run["id"]))).all()
+    judged = {raw["model"] for p in parts for raw in p.values() if "model" in raw}
+    assert judged == {live["stance"]}  # the re-opened outcomes ran with the live judge
+    assert client.get(f"/api/runs/{run['id']}").json()["precomputed"] is False

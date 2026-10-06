@@ -181,6 +181,11 @@ def start_gap(scope: GapScope, ws: WorkspaceDep, session: SessionDep, request: R
         run = copy_gap_run(session, ws_id, q, models) or create_run(session, ws_id, q.id, models)
     elif run.status == "done":
         # commits; nothing changed: it stays done. Judged against the deployed models (review I1)
-        reopen_changed(session, ws_id, run.id, get_settings().models())
+        models = get_settings().models()
+        if reopen_changed(session, ws_id, run.id, models):
+            # Plan 4 Task 3 review I1: re-opened parts run live on the visitor's evidence from here, so a
+            # copied run stops reading as precomputed (drops "snapshot") and records the models they use
+            run.models = dict(models)
+            session.commit()
         session.refresh(run)
     return run_out(session, run)

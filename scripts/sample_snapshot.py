@@ -13,7 +13,6 @@ import json
 import re
 import sys
 import uuid
-from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -46,7 +45,10 @@ def _finish(client: TestClient, run_id: str) -> None:
             raise SystemExit(f"step failed: {res.status_code} {res.text[:300]}")
 
 
-def _names(s: Session, workspace_id: uuid.UUID) -> tuple[dict[str, str], dict[str, str], dict[str, int]]:
+Names = tuple[dict[str, str], dict[str, str], dict[str, list[int]]]
+
+
+def _names(s: Session, workspace_id: uuid.UUID) -> Names:
     rows = s.execute(
         select(Chunk.id, Chunk.line_start, Document.id, Document.filename)
         .join(Document, Document.id == Chunk.document_id)
@@ -55,8 +57,8 @@ def _names(s: Session, workspace_id: uuid.UUID) -> tuple[dict[str, str], dict[st
     chunks = {str(cid): f"{name}#{line}" for cid, line, _, name in rows}
     if len(set(chunks.values())) != len(chunks):
         raise SystemExit("two chunks of one document start on the same line: the snapshot cannot name them")
-    counts = dict(Counter(name for _, _, _, name in rows))
-    return chunks, {str(did): name for _, _, did, name in rows}, counts
+    starts = sample_run.starts(rows)
+    return chunks, {str(did): name for _, _, did, name in rows}, starts
 
 
 def _entries(
