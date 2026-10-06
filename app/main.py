@@ -12,7 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.concurrency import run_in_threadpool
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from app import __version__
+from app import __version__, sample_run
 from app.api import (
     answers,
     audit,
@@ -76,6 +76,7 @@ class HealthOut(BaseModel):
 class VersionOut(BaseModel):
     version: str
     models: dict[str, str]
+    sample_precomputed: bool = False
 
 
 @app.get("/api/health", response_model=HealthOut, responses={503: {"model": HealthOut}})
@@ -104,7 +105,8 @@ def health() -> JSONResponse:
 
 @app.get("/api/version")
 def version() -> VersionOut:
-    return VersionOut(version=__version__, models=get_settings().models())
+    models = get_settings().models()
+    return VersionOut(version=__version__, models=models, sample_precomputed=sample_run.ready(models))
 
 
 def mount_frontend(target: FastAPI, directory: Path) -> None:

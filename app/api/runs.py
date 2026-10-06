@@ -21,6 +21,7 @@ from app.api.schemas import (
 from app.db.models import Answer, Item, Run, RunItem
 from app.runs import create_run as start_run
 from app.runs import step
+from app.sample_run import copy_questionnaire_run
 from app.services import audit_log
 from app.services.capacity import ensure_capacity
 from app.settings import get_settings
@@ -63,6 +64,7 @@ def run_out(session: SessionDep, run: Run) -> RunOut:
         prompt_versions=run.prompt_versions,
         started_at=run.started_at,
         finished_at=run.finished_at,
+        precomputed="snapshot" in run.models,
     )
 
 
@@ -87,13 +89,19 @@ def _rows(session: SessionDep, run: Run, item_ids: list[uuid.UUID] | None = None
 
 @router.post("/api/questionnaires/{questionnaire_id}/runs", status_code=201, responses=SENTENCE_422)
 def create_run(
-    questionnaire_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep, request: Request
+    questionnaire_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep, request: Request, live: bool = False
 ) -> RunOut:
-    """A new run over every item, all pending. 422 when the questionnaire has no items yet; 429 per network
-    (`run`, 20 an hour); 503 when the demo is full."""
+    """A new run over every item, all pending. A bundled sample questionnaire over the untouched sample pack
+    copies the precomputed sample run instead (done, $0, no model call; a second press returns the same copy)
+    unless `live=true` (Re-run live). 422 when the questionnaire has no items yet; 429 per network (`run`, 20
+    an hour); 503 when the demo is full."""
+    ws_id = ws.id
     limit(request, session, "run")
     ensure_capacity(session)
-    return run_out(session, start_run(session, ws.id, questionnaire_id, get_settings().models()))
+    models = get_settings().models()
+    if not live and (copied := copy_questionnaire_run(session, ws_id, questionnaire_id, models)) is not None:
+        return run_out(session, copied)
+    return run_out(session, start_run(session, ws_id, questionnaire_id, models))
 
 
 @router.post("/api/runs/{run_id}/step")

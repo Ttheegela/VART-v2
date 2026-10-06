@@ -124,7 +124,7 @@ export const api = {
   confirmMapping: (id: string, mapping: Mapping) => send<QuestionnaireDetail>(`/api/questionnaires/${enc(id)}/mapping`, "PUT", mapping),
   deleteQuestionnaire: (id: string) => send<void>(`/api/questionnaires/${enc(id)}`, "DELETE"),
   questionnaire: (id: string) => request<QuestionnaireDetail>(`/api/questionnaires/${enc(id)}`),
-  createRun: (questionnaireId: string) => send<RunOut>(`/api/questionnaires/${enc(questionnaireId)}/runs`, "POST"),
+  createRun: (questionnaireId: string, live = false) => send<RunOut>(`/api/questionnaires/${enc(questionnaireId)}/runs${live ? "?live=true" : ""}`, "POST"),
   step: (runId: string) => send<StepOut>(`/api/runs/${enc(runId)}/step`, "POST"),
   run: (runId: string) => request<RunOut>(`/api/runs/${enc(runId)}`),
   runAnswers: (runId: string) => request<RunRowsOut>(`/api/runs/${enc(runId)}/answers`),

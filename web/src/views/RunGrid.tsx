@@ -187,7 +187,7 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
     if (!data || running || busy) return;
     setBusy("rerun");
     setActionError(null);
-    try { const run = await api.createRun(data.run.questionnaire_id); go({ view: "run", run: run.id }); } catch (e) { setActionError(messageOf(e)); }
+    try { const run = await api.createRun(data.run.questionnaire_id, true); go({ view: "run", run: run.id }); } catch (e) { setActionError(messageOf(e)); }
     setBusy(null);
   };
   const approveAll = async () => {
@@ -233,7 +233,7 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
                 {name && <>{name}<span className="px-1 text-ink-3">/</span></>}run {runId.slice(0, 8)}
               </h1>
               <p className="text-xs text-ink-3">
-                {data ? `${data.run.done} of ${data.run.total} answered · ${running ? "answering" : data.run.status} · $${data.run.cost_usd.toFixed(4)}` : "loading…"}
+                {data ? `${data.run.done} of ${data.run.total} answered · ${running ? "answering" : data.run.status}${data.run.precomputed ? " · precomputed sample answers" : ""} · $${data.run.cost_usd.toFixed(4)}` : "loading…"}
               </p>
               <p role="status" className="sr-only">{status}</p>
             </div>

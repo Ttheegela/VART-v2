@@ -159,8 +159,10 @@ export interface paths {
   "/api/questionnaires/{questionnaire_id}/runs": {
     /**
      * Create Run
-     * @description A new run over every item, all pending. 422 when the questionnaire has no items yet; 429 per network
-     * (`run`, 20 an hour); 503 when the demo is full.
+     * @description A new run over every item, all pending. A bundled sample questionnaire over the untouched sample pack
+     * copies the precomputed sample run instead (done, $0, no model call; a second press returns the same copy)
+     * unless `live=true` (Re-run live). 422 when the questionnaire has no items yet; 429 per network (`run`, 20
+     * an hour); 503 when the demo is full.
      */
     post: operations["create_run_api_questionnaires__questionnaire_id__runs_post"];
   };
@@ -916,6 +918,11 @@ export interface components {
       models: {
         [key: string]: string;
       };
+      /**
+       * Precomputed
+       * @default false
+       */
+      precomputed?: boolean;
       /** Prompt Versions */
       prompt_versions: {
         [key: string]: string;
@@ -1010,6 +1017,11 @@ export interface components {
       models: {
         [key: string]: string;
       };
+      /**
+       * Sample Precomputed
+       * @default false
+       */
+      sample_precomputed?: boolean;
       /** Version */
       version: string;
     };
@@ -2104,11 +2116,16 @@ export interface operations {
   };
   /**
    * Create Run
-   * @description A new run over every item, all pending. 422 when the questionnaire has no items yet; 429 per network
-   * (`run`, 20 an hour); 503 when the demo is full.
+   * @description A new run over every item, all pending. A bundled sample questionnaire over the untouched sample pack
+   * copies the precomputed sample run instead (done, $0, no model call; a second press returns the same copy)
+   * unless `live=true` (Re-run live). 422 when the questionnaire has no items yet; 429 per network (`run`, 20
+   * an hour); 503 when the demo is full.
    */
   create_run_api_questionnaires__questionnaire_id__runs_post: {
     parameters: {
+      query?: {
+        live?: boolean;
+      };
       path: {
         questionnaire_id: string;
       };
