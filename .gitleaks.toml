@@ -50,3 +50,12 @@ condition = "AND"
 targetRules = ["stripe-access-token", "aws-access-token", "gitlab-pat", "jwt"]
 paths = ['''^tests/test_redact\.py$''']
 regexes = ['''^(?:sk_live_abcdef1234567890XYZ|AKIAABCDEFGHIJKLMNOP|glpat-abcdefghij1234567890|eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV)$''']
+
+# Why: the gap-dev eval plants a fake API key in an Ask-me answer so the redaction gate has a secret to catch
+# (evals/fixtures/gap-dev-answers.json, and the Plan 6a draft that quotes the fixture); it is not a credential.
+[[allowlists]]
+description = "The fake planted key sk9Kestrel2026xQ in the gap-dev fixture and the Plan 6a draft; scoped to those two files, generic-api-key and that one literal"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^(?:evals/fixtures/gap-dev-answers\.json|docs/superpowers/plans/2026-10-05-vart-csf-plan6a-backend\.md)$''']
+regexes = ['''^sk9Kestrel2026xQ$''']

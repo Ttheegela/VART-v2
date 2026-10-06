@@ -9,6 +9,7 @@ _Last updated: 2026-10-06 · Branch: `main` (origin: https://github.com/Ttheegel
 | 1B Dev data | done | fact sheet, questionnaires, documents, keys |
 | 2 Engine and evals | done, live 2026-10-05 | engine, ingest, evals; baseline label accuracy 0.9213, recall@8 0.9738, cost $0.0361 per 60 items |
 | 3 API and UI | done, live 2026-10-06 | 27 operations, step runner, column mapper, export, console UI, Playwright flows on recorded model replies |
+| 6A CSF gap check, backend and evals | done, merged 2026-10-06 (backend only; view in 6B) | gap-dev baseline: label accuracy 0.7097 (22 of 31; reported, below the 0.80 target, accepted 2026-10-06), 9 other gates pass; 6B (view, export, README, E2E) after Plan 3 |
 | 4 Hardening and launch | not started | |
 | 5 Google Drive | not started | |
 
@@ -49,6 +50,15 @@ _Last updated: 2026-10-06 · Branch: `main` (origin: https://github.com/Ttheegel
 | Live canary | ok for all three models within the release script's 180 s limit; no `length` finish |
 | Daily crons (cleanup 05:00 UTC, canary 17:00 UTC) | ok: `/api/health` at 19:58 UTC on 2026-10-05 showed `"status":"ok"` and the canary ok at 17:59 UTC that day (the canary cron ran; Hobby crons fire within their hour). The cleanup cron leaves no mark in `/api/health` |
 | Vercel builds only `main` | ok: the push of this record's PR branch made no deployment (2026-10-04) |
+
+### Plan 6A (CSF gap check, backend) — 2026-10-06
+- `main` = `d071aa2`, merged by PR #7 (fast-forward of `plan6a`, which merged released Plan 3 into Plan 6A) after
+  green CI: gates (gitleaks over the full history), backend (both eval packs replayed with no drift: dev 15/15,
+  gap-dev 9/9 gating with label_accuracy reported), frontend, e2e (6/6 on recorded replies).
+- `ops/setup.sh migrate` (Tarun): Neon migrated `3a1f0c9e7b21` -> `a7c3e9d1b2f4` (widens `ck_questionnaires_source`
+  to allow `csf`) before `main` moved; Plan 3 code kept serving (`/api/health` ok).
+- Production deploy READY (Git integration); `scripts/smoke.py` ok; `/api/health` `"status":"ok"`, `"db":"ok"`; `/`
+  and `/api/docs` unchanged. Nothing in the gap check is reachable by visitors until Plan 6B.
 
 ### Plan 3 — 2026-10-06
 - `main` = `3ad741e`, merged by PR #5 (fast-forward of `plan3`) after green CI: gates (gitleaks over the full history,
@@ -112,6 +122,13 @@ plan's "Execution notes").
 | 2026-10-06 | A document a run used cannot be deleted, and neither can a questionnaire a run used (409) |
 | 2026-10-06 | E2E answers model calls from `web/e2e/recorded.jsonl` (`LLM_MODE=replay`); the sample, export and interview flows share one sample run, so the specs stay under the 400/h per-network model-call cap |
 
+| 2026-10-06 | Tarun chose option A for the CSF gap check: every Checked outcome is cut into NIST parts by a fixed rule, each part is a question run through the unchanged pipeline, and code combines the parts' labels (CSF spec 5.2-5.3, amended) |
+| 2026-10-06 | The gap-dev key is judged blind: a judge sees NIST's text, the dev documents and the fact sheet, never engine output, and the key is derived in code from that, never hand-edited or run through the engine's combination (CSF spec 8) |
+| 2026-10-06 | Tarun accepted and reported the per-part baseline: label accuracy 0.7097 (22 of 31) against the spec's 0.80, after two judged key rounds and one per-part tuning round |
+| 2026-10-06 | The 6A `app/redact.py` change (a word of a found name also names that person) ships to every upload and Ask-me answer when 6A merges, before 6B: it is a privacy gain, at the cost of over-redacting a capitalised name word used as an ordinary word in the same line |
+| 2026-10-06 | `label_accuracy` in gap-dev is reported, not gating, with its 0.80 target kept in the table and marked "reported: below target, accepted 2026-10-06", until a later plan improves stance; every other gate gates |
+
+
 ## Plan 4 carry-over (deferred from Plan 3)
 - No 409 when a second run starts while one is running (Ruling 8): two concurrent runs double the spend. Plan 4 reconsiders it with a timeout for abandoned runs.
 - A step that takes longer than 5 minutes is not handled (N1).
@@ -123,6 +140,45 @@ plan's "Execution notes").
 - The sample run is not precomputed yet; the cheapest way is to replay the dev recordings for `source = sample` runs.
 - SECURITY.md is still to write; it must carry the four known redaction gaps ("Last, First" order, accented all-caps names, single first names, lower-case names).
 - A run stuck in `running` blocks document deletes until the visitor resets the workspace.
+
+## 6A baseline (gap-dev, 2026-10-06)
+Per-part design, replayed from the recording with no key. Gates: 9/9 gating pass; `label_accuracy` 0.7097 is reported
+below its 0.80 target.
+
+| Reported | Value |
+|---|---|
+| cost per core run | $0.0378 |
+| seconds per core run | 790 |
+| retrieval_recall_at_8 | 0.75 |
+| part_agreement | 0.78 |
+
+The 9 label misses of 31 Checked outcomes, each with its cause (from `gap-parts-1-diagnosis`):
+- DE.CM-09, expected Covered, got Partly: stance; the data part reads lmp:13's "critical" as a stated limit.
+- GV.PO-01, Covered, got Partly: retrieval; the "established" and "enforced" parts miss the key lines (NIST's own words
+  rarely appear in company documents).
+- ID.RA-08, Covered, got Partly: retrieval; the key's prioritized and tracked line is not reached by the "receiving"
+  part.
+- PR.DS-01, Covered, got Partly: retrieval; the integrity part never reaches "improper alteration or loss".
+- PR.IR-03, Partly, got Covered: stance; the pair "normal and adverse situations" stays in one part, and RTO/RPO lines
+  read as yes.
+- PR.PS-01, Covered, got Gap: retrieval; the CI/CD line (sdp:17) is in neither part's top 8 after the NIST-literal cut.
+- RC.RP-01, Covered, got Gap: stance; "once initiated from the incident response process" is a qualifier no single
+  passage states.
+- RS.CO-02, Partly, got Documents disagree: stance; a draft line is judged "no" against a final "yes".
+- RS.MA-01, Partly, got Gap: stance; the plan line lacks the "third parties" qualifier, and one part carries both
+  qualifiers.
+
+Four misses are retrieval and five are stance; combine and the key caused none.
+
+## 6B carry-over
+From Ruling 18 (per-part design):
+- (a) Persist per-part results, so an outcome refused by the budget resumes without paying twice.
+- (b) The runner claims csf items until their parts sum to at most 8 per step.
+- (c) A per-part re-check: an accepted suggestion replaces that part before `combine`.
+- (d) The inspector shows each part's status (and a draft-only quote's document status).
+- Stance improvement: raise `label_accuracy` to its 0.80 target (qualifier and stated-limit reads; part retrieval
+  vocabulary), then make it gating again.
+- Also: `app.csf.evidence` drops statements after the top-8 cut, so filter before the cut when 6B touches retrieval.
 
 ## How to run
 See `CLAUDE.md` (commands) and `README.md`.

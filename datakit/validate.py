@@ -12,6 +12,7 @@ from datetime import date
 from pathlib import Path
 
 from app.text import contains
+from datakit import csf, gap
 from datakit.derive_key import derive, is_usable_evidence
 from datakit.extract import lines_of
 from datakit.mapper_variants import build_all
@@ -211,6 +212,13 @@ def check_facts(f: Facts) -> list[str]:
             for s in ss:
                 if any(f.doc(stmts[i].doc).status != "draft" for i in evidence(s.control or "")):
                     p.append(f"trap {t.id}: {s.control} must have draft-only evidence")
+        if t.kind == "planned_only" and not all(
+            "negation" in s.flags and s.stance == "no" and f.doc(s.doc).status == "final" for s in ss
+        ):
+            p.append(
+                f"trap {t.id}: planned-only statements must be flagged negation, stance no, "
+                "in a final document"
+            )
         if t.kind == "injection" and not all("injection" in s.flags and s.control is None for s in ss):
             p.append(f"trap {t.id}: injection statements need the flag and no control")
         if t.kind == "injection" and not t.controls:
@@ -336,6 +344,16 @@ def _mapper_stage(pack: str) -> list[str]:
         if stale("expected.json"):
             p.append("mapper/expected.json is stale")
     return p
+
+
+@stage("csf")
+def _csf_stage(pack: str) -> list[str]:
+    return csf.check()  # the CSF data is shared by every pack
+
+
+@stage("gap")
+def _gap_stage(pack: str) -> list[str]:
+    return gap.check(pack)
 
 
 def main(argv: list[str] | None = None) -> int:

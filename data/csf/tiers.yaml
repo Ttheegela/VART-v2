@@ -1,0 +1,191 @@
+# VART's part of data/csf/csf-2.0.json (CSF spec 4): the outcomes v1 checks against a company's documents
+# (checked), the ones it asks the visitor about (ask), and the fixed question for each. Every other outcome is
+# not_checked: stored with NIST's text and links, no question, no model call, no label. Moving an outcome into
+# checked is a data change (its question and parts) plus a control in data/dev/gap/facts.yaml; python -m
+# datakit.csf build, then python -m datakit.gap dev, then re-record the gap-dev eval.
+# Questions are generic paraphrases of NIST's outcome, never tuned to one document (CSF spec 10).
+#
+# Change log (one line per NIST refresh or tier change):
+#   2026-10-05  first version: CSF 2.0 Reference Tool export, 106 outcomes, SP 800-53 Rev 5.2.0 references.
+#   2026-10-05  Tarun's review: RS.AN-03 and RS.MI-01 added to checked (31 checked, 5 ask, 70 not checked).
+#   2026-10-06  Ruling 14: ID.AM-08's question drops "including secure disposal" (not NIST's): "..., from acquisition to retirement".
+#   2026-10-06  option A (Tarun; CSF spec 4 and 5.2-5.3 amended; Rulings 15, 17): parts for every checked outcome (73), cut by
+#               spec 4's rule; paraphrase_words. Parts are frozen from the first recording: every later change is a tuning
+#               round with a line here citing NIST's clause.
+#   2026-10-06  per-part tuning round 1 (Ruling 21; generic instances of NIST's words, as example clauses):
+#               ID.RA-08 "receiving, analyzing, and responding to vulnerability disclosures": parts 1-3 gain "such as
+#               reports", "for example prioritized", "for example tracked" (reports: disclosures, prioritized:
+#               analyzing, tracked: responding).
+#               ID.RA-01 "identified, validated, and recorded": part 3 gains "for example tracked" (tracked: recorded).
+#               PR.PS-02 "Software is maintained": part 1 gains "for example patched dependencies" (patched:
+#               maintained, dependencies: software).
+#               PR.AA-06 "Physical access to assets is managed": part 1 gains "such as facilities" (facilities: assets).
+#               GV.PO-01 "is communicated and enforced": parts 2-3 gain "for example through training" and "for
+#               example disciplinary" (training: communicated, disciplinary: enforced).
+checked:
+  GV.PO-01: "Is there a documented cybersecurity policy, based on the organization's context and strategy, that is communicated and enforced?"
+  GV.PO-02: "Are cybersecurity policies reviewed, updated, communicated and enforced on a regular schedule?"
+  ID.AM-01: "Is an inventory of the organization's hardware assets maintained?"
+  ID.AM-02: "Is an inventory of the organization's software, services and systems maintained?"
+  ID.AM-03: "Are diagrams or other representations of the organization's network communication and data flows maintained?"
+  ID.AM-05: "Are assets and data prioritized by classification, criticality and impact?"
+  ID.AM-08: "Are systems, hardware, software, services and data managed throughout their life cycles, from acquisition to retirement?"
+  ID.RA-01: "Are vulnerabilities in the organization's assets identified, validated and recorded, for example through scans or penetration tests?"
+  ID.RA-02: "Does the organization receive cyber threat intelligence from information sharing forums or other sources?"
+  ID.RA-08: "Is there a process for receiving, analyzing and responding to vulnerability reports from outside the organization?"
+  PR.AA-01: "Are identities and credentials for users, services and hardware managed by the organization?"
+  PR.AA-03: "Are users, services and hardware authenticated, including with multi-factor authentication?"
+  PR.AA-05: "Are access permissions defined in a policy, managed, enforced and reviewed, following least privilege and separation of duties?"
+  PR.AA-06: "Is physical access to offices, facilities and other assets managed, monitored and enforced?"
+  PR.DS-01: "Is data at rest protected, for example by encryption?"
+  PR.DS-02: "Is data in transit protected, for example by encryption?"
+  PR.DS-11: "Are backups of data created, protected, maintained and tested?"
+  PR.PS-01: "Are configuration management and change control practices, such as baseline configurations and controlled release of changes to production, established and applied?"
+  PR.PS-02: "Is software maintained, patched and replaced according to risk?"
+  PR.PS-04: "Are log records generated and made available, for example in a central logging system, for continuous monitoring?"
+  PR.PS-06: "Are secure software development practices, such as security testing and code review, part of the software development life cycle?"
+  PR.IR-03: "Are resilience requirements, such as recovery objectives, defined and met in normal and adverse situations?"
+  PR.IR-04: "Is enough resource capacity maintained to keep the service available?"
+  DE.CM-09: "Are computing hardware, software, runtime environments and their data monitored to find potentially adverse events?"
+  DE.AE-06: "Is information about security events provided to the staff and tools that need it, for example through alerts?"
+  DE.AE-07: "Is cyber threat intelligence integrated into the analysis of security events?"
+  RS.MA-01: "Is there an incident response plan that is executed once an incident is declared?"
+  RS.AN-03: "Is analysis performed after an incident to establish what happened and its root cause?"
+  RS.MI-01: "Are incidents contained, and is there a process for doing so?"
+  RS.CO-02: "Are customers and other stakeholders notified of security incidents?"
+  RC.RP-01: "Is the recovery portion of the incident response plan, such as disaster recovery failover and restore, executed once initiated from the incident response process?"
+ask:
+  GV.OC-03: "Which legal, regulatory and contractual cybersecurity requirements apply to your organization, and how are they managed?"
+  GV.RM-02: "Has your organization set risk appetite and risk tolerance statements for cybersecurity, and how are they communicated?"
+  GV.RR-02: "Who holds cybersecurity roles and responsibilities in your organization, and how are they communicated and enforced?"
+  GV.OV-01: "How does leadership review the results of the cybersecurity risk strategy and adjust it?"
+  GV.SC-01: "Does your organization have a cybersecurity supply chain risk management program, and who agreed to it?"
+# Parts (CSF spec 4 and 5.2, amended 2026-10-06): each checked outcome cut by spec 4's rule (every listed verb; in a
+# one-verb sentence, a comma list of three or more nouns wherever it stands; pairs never cut; a qualifier is never
+# its own part and stays on its verb),
+# as yes/no questions in NIST's order. Each part runs through the pipeline on its own; app.csf.combine labels the
+# outcome. A part uses NIST's words for its outcome (outcome and category text) and question words
+# (datakit.csf.FRAME); any other word stands in an example clause ("such as", "for example") and is listed under
+# paraphrase_words, mapped to the NIST word it is an instance of (at most 3 per outcome). Every word of NIST's
+# outcome is in at least one part. python -m datakit.validate csf checks all of it.
+parts:
+  GV.PO-01:
+    - "Is the policy for managing cybersecurity risks established based on organizational context, cybersecurity strategy and priorities?"
+    - "Is the policy for managing cybersecurity risks communicated, for example through training?"
+    - "Is the policy for managing cybersecurity risks enforced, for example disciplinary?"
+  GV.PO-02:
+    - "Is the policy for managing cybersecurity risks reviewed?"
+    - "Is the policy for managing cybersecurity risks updated?"
+    - "Is the policy for managing cybersecurity risks communicated?"
+    - "Is the policy for managing cybersecurity risks enforced to reflect changes in requirements, threats, technology and organizational mission?"
+  ID.AM-01:
+    - "Are inventories of hardware managed by the organization maintained?"
+  ID.AM-02:
+    - "Are inventories of software managed by the organization maintained?"
+    - "Are inventories of services managed by the organization maintained?"
+    - "Are inventories of systems managed by the organization maintained?"
+  ID.AM-03:
+    - "Are representations of the organization's authorized network communication and internal and external network data flows maintained?"
+  ID.AM-05:
+    - "Are assets prioritized based on classification?"
+    - "Are assets prioritized based on criticality?"
+    - "Are assets prioritized based on resources?"
+    - "Are assets prioritized based on impact on the mission?"
+  ID.AM-08:
+    - "Are systems managed throughout their life cycles, for example from acquisition to retirement?"
+    - "Is hardware managed throughout its life cycle, for example from acquisition to retirement?"
+    - "Is software managed throughout its life cycle, for example from acquisition to retirement?"
+    - "Are services managed throughout their life cycles, for example from acquisition to retirement?"
+    - "Is data managed throughout its life cycle, for example from acquisition to retirement?"
+  ID.RA-01:
+    - "Are vulnerabilities in assets identified?"
+    - "Are vulnerabilities in assets validated?"
+    - "Are vulnerabilities in assets recorded, for example tracked?"
+  ID.RA-02:
+    - "Is cyber threat intelligence received from information sharing forums and sources?"
+  ID.RA-08:
+    - "Are processes for receiving vulnerability disclosures, such as reports, established?"
+    - "Are processes for analyzing vulnerability disclosures, for example prioritized, established?"
+    - "Are processes for responding to vulnerability disclosures, for example tracked, established?"
+  PR.AA-01:
+    - "Are identities and credentials for authorized users managed by the organization?"
+    - "Are identities and credentials for services managed by the organization?"
+    - "Are identities and credentials for hardware managed by the organization?"
+  PR.AA-03:
+    - "Are users authenticated?"
+    - "Are services authenticated?"
+    - "Is hardware authenticated?"
+  PR.AA-05:
+    - "Are access permissions, entitlements and authorizations defined in a policy?"
+    - "Are access permissions, entitlements and authorizations managed?"
+    - "Are access permissions, entitlements and authorizations enforced?"
+    - "Are access permissions, entitlements and authorizations reviewed?"
+    - "Do access permissions, entitlements and authorizations incorporate the principles of least privilege and separation of duties?"
+  PR.AA-06:
+    - "Is physical access to assets, such as facilities, managed?"
+    - "Is physical access to assets monitored?"
+    - "Is physical access to assets enforced commensurate with risk?"
+  PR.DS-01:
+    - "Is the confidentiality of data at rest protected, for example by encryption?"
+    - "Is the integrity of data at rest protected?"
+    - "Is the availability of data at rest protected?"
+  PR.DS-02:
+    - "Is the confidentiality of data in transit protected, for example by encryption?"
+    - "Is the integrity of data in transit protected?"
+    - "Is the availability of data in transit protected?"
+  PR.DS-11:
+    - "Are backups of data created?"
+    - "Are backups of data protected?"
+    - "Are backups of data maintained?"
+    - "Are backups of data tested?"
+  PR.PS-01:
+    - "Are configuration management practices, such as baseline configurations and change control, established?"
+    - "Are configuration management practices, such as baseline configurations and change control, applied?"
+  PR.PS-02:
+    - "Is software maintained, for example patched dependencies?"
+    - "Is software replaced?"
+    - "Is software removed commensurate with risk?"
+  PR.PS-04:
+    - "Are log records generated?"
+    - "Are log records made available for continuous monitoring, for example centrally?"
+  PR.PS-06:
+    - "Are secure software development practices, such as security testing and code review, integrated?"
+    - "Is the performance of secure software development practices monitored throughout the software development life cycle?"
+  PR.IR-03:
+    - "Are mechanisms implemented to achieve resilience requirements, such as recovery objectives, in normal and adverse situations?"
+  PR.IR-04:
+    - "Is adequate resource capacity to ensure availability maintained?"
+  DE.CM-09:
+    - "Are computing hardware and software monitored to find potentially adverse events?"
+    - "Are runtime environments monitored to find potentially adverse events?"
+    - "Is the data of computing hardware, software and runtime environments monitored to find potentially adverse events?"
+  DE.AE-06:
+    - "Is information on adverse events provided to authorized staff and tools, for example through alerts?"
+  DE.AE-07:
+    - "Are cyber threat intelligence and other contextual information integrated into the analysis of adverse events?"
+  RS.MA-01:
+    - "Is the incident response plan executed in coordination with relevant third parties once an incident is declared?"
+  RS.AN-03:
+    - "Is analysis performed to establish what has taken place during an incident and the root cause of the incident?"
+  RS.CO-02:
+    - "Are internal and external stakeholders, such as customers, notified of incidents?"
+  RS.MI-01:
+    - "Are incidents contained?"
+  RC.RP-01:
+    - "Is the recovery portion of the incident response plan, such as disaster recovery failover and restore, executed once initiated from the incident response process?"
+paraphrase_words:
+  GV.PO-01: {training: communicated, disciplinary: enforced}
+  ID.AM-08: {acquisition: cycles, retirement: cycles}
+  ID.RA-01: {tracked: recorded}
+  ID.RA-08: {reports: disclosures, prioritized: analyzing, tracked: responding}
+  PR.AA-06: {facilities: assets}
+  PR.DS-01: {encryption: protected}
+  PR.DS-02: {encryption: protected}
+  PR.PS-01: {baseline: configuration, change: management, control: management}
+  PR.PS-02: {patched: maintained, dependencies: software}
+  PR.PS-04: {centrally: available}
+  PR.PS-06: {testing: practices, code: software, review: practices}
+  PR.IR-03: {recovery: resilience, objectives: requirements}
+  DE.AE-06: {alerts: information}
+  RS.CO-02: {customers: stakeholders}
+  RC.RP-01: {disaster: recovery, failover: recovery, restore: recovery}

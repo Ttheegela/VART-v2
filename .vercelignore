@@ -1,4 +1,5 @@
-# Keep the deployed function small: the runtime needs app/ and the sample data (data/dev/docs, data/questionnaires).
+# Keep the deployed function small: the runtime needs app/, the sample data (data/dev/docs, data/questionnaires)
+# and the CSF framework file (data/csf/csf-2.0.json, read by app/csf.py from Plan 6B).
 .venv
 .env*
 /docs
@@ -7,12 +8,14 @@ evals
 scripts
 datakit
 # The sample path (Plan 3) reads the dev documents and the two bundled questionnaires at runtime.
-# (Plan 6A also negates data/csf: the second merger writes the union of both lanes' negations.)
 /data/*
 !/data/dev
 /data/dev/*
 !/data/dev/docs
 !/data/questionnaires
+!/data/csf
+/data/csf/*
+!/data/csf/csf-2.0.json
 !/data/NOTICE.md
 !/data/LICENSE
 .github

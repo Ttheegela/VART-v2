@@ -285,3 +285,9 @@ def test_run_items_count_their_attempts(s: Session) -> None:
     s.flush()
     s.refresh(ri)
     assert ri.attempts == 0
+
+
+def test_a_questionnaire_may_be_the_built_in_csf_one(s: Session) -> None:
+    q = f.questionnaire(s, f.workspace(s), source="csf", filename="csf-2.0", mapping={"scope": "core"})
+    s.commit()
+    assert (q.source, q.mapping) == ("csf", {"scope": "core"})

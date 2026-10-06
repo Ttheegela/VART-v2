@@ -1,6 +1,7 @@
 import io
 import time
 from datetime import date
+from typing import Any
 
 import docx
 import openpyxl
@@ -424,3 +425,12 @@ def test_a_secret_followed_by_a_name_in_a_file_name_loses_both() -> None:
 def test_an_email_glued_to_a_name_in_a_file_name_loses_both() -> None:
     out = redact_filename("dana.ortiz@kestrelyn.example.Priya M. Patel.txt")
     assert "Patel" not in out and "kestrelyn" not in out
+
+
+@pytest.mark.parametrize("redact", [redact_text, lambda t: redact_lines([Line(t)])[0].text])
+def test_a_name_found_once_is_redacted_again_on_its_own_in_the_same_text(redact: Any) -> None:
+    text = "Dana Ortiz owns the program; Ortiz signs off and you can reach Dana by phone."
+    assert (
+        redact(text) == "<PERSON> owns the program; <PERSON> signs off and you can reach <PERSON> by phone."
+    )
+    assert redact("You can reach Dana by phone.") == "You can reach Dana by phone."  # alone: a known gap

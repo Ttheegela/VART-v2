@@ -19,6 +19,7 @@ TrapKind = Literal[
     "honest_negative",
     "placeholder",
     "draft_only",
+    "planned_only",
     "injection",
     "must_ask",
     "fills",
@@ -155,6 +156,29 @@ class Key(_Strict):
     pack: str
     questionnaire: str
     items: tuple[KeyItem, ...]
+
+
+class GapOutcome(_Strict):
+    csf_id: str
+    control: str
+    # A broad outcome whose control's statements answer only part of NIST's text is Partly covered, whatever
+    # the control's own stance says; `missing` names the NIST parts with no evidence (required with it).
+    label: Literal["partly_covered"] | None = None
+    missing: str | None = None
+    # The parts (1-based, data/csf/tiers.yaml) the override's `missing` names; required with `label`
+    # (adversary I4).
+    missing_parts: tuple[int, ...] = ()
+
+
+class GapFacts(_Strict):
+    """data/<pack>/gap/facts.yaml: what only the CSF gap check adds to the pack's fact sheet (datakit.gap)."""
+
+    pack: str
+    documents: tuple[DocSpec, ...] = ()
+    controls: tuple[Control, ...] = ()
+    statements: tuple[Statement, ...] = ()
+    traps: tuple[Trap, ...] = ()
+    outcomes: tuple[GapOutcome, ...]
 
 
 _BOOL = "tag:yaml.org,2002:bool"

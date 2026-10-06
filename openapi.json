@@ -928,7 +928,8 @@
               "record-field",
               "not-evidence",
               "placeholder",
-              "injection"
+              "injection",
+              "statement"
             ],
             "title": "Reason",
             "type": "string"

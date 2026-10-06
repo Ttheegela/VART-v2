@@ -2,8 +2,10 @@
 
     python -m evals.run --pack dev                  # replay recordings: no network, what CI runs
     python -m evals.run --pack dev --mode record    # needs OPENROUTER_API_KEY: the eval key, see CLAUDE.md
+    python -m evals.run --pack gap-dev              # the CSF gap check (evals/gap.py)
 
-Writes evals/results/latest.{json,md}; exits 0 when every gate passes, 1 when one fails, 2 when a recording
+Writes evals/results/latest.{json,md} (gap-dev: evals/results/gap-dev.{json,md}); exits 0 when every gate
+passes, 1 when one fails, 2 when a recording
 is missing, a record run left a request unrecorded, or the setup is wrong. Replay never calls a model; a
 missing recording stops the run (Plan 1A Task 4: ReplayMiss is caught before any other LLMError)."""
 
@@ -324,7 +326,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         drop_steps(path, refresh)
     log = Log(client(args.mode, path))
     try:
-        report = run(args.pack, log, models)
+        if args.pack == "gap-dev":
+            from evals import gap  # imported here: evals.gap imports this module
+
+            report = gap.run(log, models)
+        else:
+            report = run(args.pack, log, models)
     except ReplayMiss as exc:
         print(f"recording missing ({exc}); re-record with --mode record", file=sys.stderr)
         return 2
@@ -349,12 +356,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
         keep_used(path, keys)
     RESULTS.mkdir(parents=True, exist_ok=True)
-    (RESULTS / "latest.json").write_text(json.dumps(jsonable(report), indent=2, sort_keys=True) + "\n")
-    (RESULTS / "latest.md").write_text(score.markdown(report))
-    failed = [name for name, g in report["gates"].items() if not g["pass"]]
+    stem = "gap-dev" if args.pack == "gap-dev" else "latest"  # each pack keeps its own committed results
+    (RESULTS / f"{stem}.json").write_text(json.dumps(jsonable(report), indent=2, sort_keys=True) + "\n")
+    (RESULTS / f"{stem}.md").write_text(score.markdown(report))
+    gating = {n: g for n, g in report["gates"].items() if g.get("gating", True)}
+    failed = [name for name, g in gating.items() if not g["pass"]]
+    soft = [
+        f"{n} {g['value']} (target {g['op']} {g['target']})"
+        for n, g in report["gates"].items()
+        if n not in gating and not g["pass"]
+    ]
     print(
-        f"{len(report['gates']) - len(failed)}/{len(report['gates'])} gates pass"
+        f"{len(gating) - len(failed)}/{len(gating)} gates pass"
         + (f"; failed: {', '.join(failed)}" if failed else "")
+        + (f"; reported, below target, accepted 2026-10-06: {', '.join(soft)}" if soft else "")
     )
     return 1 if failed else 0
 

@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.contracts import BudgetExhausted, ItemInput, ItemResult, Spend, Stance
+from app.contracts import BudgetExhausted, ItemInput, ItemResult, Retrieval, Spend, Stance
 from app.db.models import Document
 from app.decide import decide
 from app.draft import write_draft
@@ -44,6 +44,19 @@ def answer_item(
     """Raises BudgetExhausted when the stance call is refused and LLMError when it fails; the draft step
     degrades to a template answer by itself."""
     retrieval = retrieve(session, workspace_id, item.question, item.topic)
+    return answer_retrieved(session, workspace_id, item, retrieval, llm, models, spend)
+
+
+def answer_retrieved(
+    session: Session,
+    workspace_id: uuid.UUID,
+    item: ItemInput,
+    retrieval: Retrieval,
+    llm: LLMClient,
+    models: Mapping[str, str],
+    spend: Spend,
+) -> ItemResult:
+    """answer_item after its retrieval: for a caller that narrows what an item is judged on (CSF Ruling 9)."""
     documents = list(session.scalars(select(Document.filename).where(Document.workspace_id == workspace_id)))
     session.commit()  # end the read transaction before any model call
     meter = _Meter(llm)

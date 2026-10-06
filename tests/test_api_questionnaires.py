@@ -1,13 +1,12 @@
 import io
 import threading
 import uuid
-from collections.abc import Iterator
 from pathlib import Path
 
 import openpyxl
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, func, select, text
+from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from app.api import documents
@@ -130,25 +129,7 @@ def test_a_file_over_1_mb_and_a_long_sheet_name_are_422(db: Engine) -> None:
     assert ok.status_code == 201 and ok.json()["sheets"] == ["S" * 31]
 
 
-@pytest.fixture
-def csf_allowed(db: Engine) -> Iterator[None]:
-    """Plan 6B adds `csf` to ck_questionnaires_source; until then the test lifts the check."""
-    with db.begin() as c:
-        c.execute(text("alter table questionnaires drop constraint ck_questionnaires_source"))
-    try:
-        yield
-    finally:
-        with db.begin() as c:
-            c.execute(text("delete from questionnaires where source = 'csf'"))
-            c.execute(
-                text(
-                    "alter table questionnaires add constraint ck_questionnaires_source "
-                    "check (source in ('sample', 'upload', 'drive'))"
-                )
-            )
-
-
-def test_a_sixth_questionnaire_is_a_422_and_a_csf_one_does_not_count(db: Engine, csf_allowed: None) -> None:
+def test_a_sixth_questionnaire_is_a_422_and_a_csf_one_does_not_count(db: Engine) -> None:
     client, ws_id = visitor(db)
     with Session(db) as s:
         s.add(Questionnaire(workspace_id=ws_id, filename="csf", source="csf"))
@@ -211,7 +192,7 @@ def test_delete_removes_items_and_is_refused_after_a_run(db: Engine) -> None:
     assert len(client.get("/api/questionnaires").json()) == 1
 
 
-def test_a_csf_questionnaire_is_not_deletable_or_mappable(db: Engine, csf_allowed: None) -> None:
+def test_a_csf_questionnaire_is_not_deletable_or_mappable(db: Engine) -> None:
     client, ws_id = visitor(db)
     with Session(db) as s:
         q = Questionnaire(workspace_id=ws_id, filename="csf", source="csf")

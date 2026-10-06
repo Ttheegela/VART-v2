@@ -267,12 +267,23 @@ def score(pack: Pack, obs: Observed) -> dict[str, float | None]:
     return m
 
 
-def gates(metrics: dict[str, float | None]) -> dict[str, dict[str, Any]]:
+REPORTED_NOTE = "accepted 2026-10-06"  # Tarun, per-part baseline
+
+
+def gates(
+    metrics: dict[str, float | None],
+    table: dict[str, tuple[str, float]] | None = None,
+    reported: frozenset[str] = frozenset(),
+) -> dict[str, dict[str, Any]]:
+    """`reported` names stay in the table with their target and an honest `pass`, but gating is False: they
+    cannot fail the run."""
     out: dict[str, dict[str, Any]] = {}
-    for name, (op, target) in GATES.items():
+    for name, (op, target) in (table or GATES).items():
         value = metrics.get(name)
         ok = value is not None and (value >= target if op == ">=" else value <= target)
         out[name] = {"op": op, "target": target, "value": value, "pass": ok}
+        if name in reported:
+            out[name]["gating"] = False
         if value is None:
             out[name]["reason"] = (
                 "nothing to measure (0 of 0, or the stage did not run): the gate would pass on nothing"
@@ -304,7 +315,10 @@ def markdown(report: dict[str, Any]) -> str:
         "|---|---|---|---|",
     ]
     for name, g in report["gates"].items():
-        verdict = "yes" if g["pass"] else "NO" + (f" ({g['reason']})" if "reason" in g else "")
+        if g.get("gating", True):
+            verdict = "yes" if g["pass"] else "NO" + (f" ({g['reason']})" if "reason" in g else "")
+        else:
+            verdict = "reported: met target" if g["pass"] else f"reported: below target, {REPORTED_NOTE}"
         lines.append(f"| {name} | {g['op']} {g['target']} | {g['value']} | {verdict} |")
     lines += ["", "| Reported | Value |", "|---|---|"]
     lines += [f"| {k} | {v} |" for k, v in sorted(report["metrics"].items()) if k not in report["gates"]]

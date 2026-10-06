@@ -16,7 +16,7 @@ Label = Literal["verified", "partial", "conflict", "unknown"]
 ItemLabel = Literal["verified", "partial", "conflict", "unknown", "user_confirmed", "na"]
 Value = Literal["Yes", "No", "Partial"]
 DropReason = Literal[
-    "containment", "quote-length", "record-field", "not-evidence", "placeholder", "injection"
+    "containment", "quote-length", "record-field", "not-evidence", "placeholder", "injection", "statement"
 ]
 ConflictRule = Literal["date", "documents-disagree"]
 SCOPES = ("internal-systems", "customer-product", "production", "employees", "vendors-and-contractors")

@@ -1,0 +1,479 @@
+pack: dev
+questionnaire: csf-core
+items:
+- code: GV.PO-01
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: isp
+    quote: Kestrelyn maintains a documented information security program that is approved by the CEO.
+    stance: 'yes'
+  - doc: hrp
+    quote: All employees complete security awareness training annually.
+    stance: 'yes'
+  - doc: hrp
+    quote: A fair disciplinary process is used for employees suspected of violating security rules.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: GV.PO-02
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: isp
+    quote: All Kestrelyn security policies are reviewed at least annually.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - P2
+  fills: []
+- code: ID.AM-01
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: amp
+    quote: Kestrelyn maintains an inventory of its information assets.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: ID.AM-02
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: amp
+    quote: Kestrelyn maintains an inventory of its information assets.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: ID.AM-03
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M11
+  fills: []
+- code: ID.AM-05
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: dcp
+    quote: 'Kestrelyn classifies data into four levels: Public, Internal, Confidential and Restricted.'
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: ID.AM-08
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: amp
+    quote: Storage media from retired assets, including media that held production data, is wiped following NIST SP 800-88
+      guidelines or physically destroyed before reuse or disposal.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: ID.RA-01
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: vmp
+    quote: An independent third party performs a penetration test of Kestrelyn Ledger annually.
+    stance: 'yes'
+  - doc: pentest
+    quote: Sablecrest Security, an independent third party, performed this penetration test of Kestrelyn Ledger in May 2026.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - P1
+  fills: []
+- code: ID.RA-02
+  expected_label: verified
+  expected_value: 'No'
+  must_ask: false
+  evidence:
+  - doc: sip
+    quote: Kestrelyn does not yet receive cyber threat intelligence from information sharing forums; joining an industry sharing
+      group is planned for 2027.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - G2
+  fills: []
+- code: ID.RA-08
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: faq
+    quote: Security researchers can report vulnerabilities to vulnerability-reports@kestrelyn.example, and Kestrelyn acknowledges
+      each report within two business days.
+    stance: 'yes'
+  - doc: vmp
+    quote: All vulnerability findings must be reported and tracked to resolution.
+    stance: 'yes'
+  - doc: vmp
+    quote: Findings are prioritized by severity and by how easily they can be exploited.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: PR.AA-01
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: All internal systems are accessed through Okta single sign-on (SSO).
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: PR.AA-03
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: Multi-factor authentication (MFA) is required for all internal systems.
+    stance: 'yes'
+  - doc: pentest
+    quote: MFA is not yet enforced for customer administrator accounts in Kestrelyn Ledger.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: true
+  honest_negative: false
+  traps:
+  - N1
+  - S1
+  fills: []
+- code: PR.AA-05
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: User access to internal systems is reviewed quarterly.
+    stance: 'yes'
+  - doc: arr
+    quote: 'System: Okta; Owner: Marcus Lee; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status: Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: AWS; Owner: Marcus Lee; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status: Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: GitHub; Owner: Priya Raman; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status: Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: Google Workspace; Owner: Marcus Lee; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status:
+      Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: Kestrelyn Ledger admin console; Owner: Priya Raman; Last review completed: 2026-01-10; Next review due:
+      2026-04-10; Status: Overdue'
+    stance: 'no'
+  conflict_trap: D1
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - D1
+  fills: []
+- code: PR.AA-06
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M10
+  fills: []
+- code: PR.DS-01
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: crypto
+    quote: Customer data at rest is encrypted with AES-256 using AWS KMS.
+    stance: 'yes'
+  - doc: lmp
+    quote: Improper alteration or loss of sensitive information.
+    stance: 'yes'
+  - doc: bcpol
+    quote: Kestrelyn performs daily backups of all production databases.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: PR.DS-02
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: crypto
+    quote: Data in transit is encrypted using TLS 1.2 or higher.
+    stance: 'yes'
+  - doc: crypto
+    quote: The Kestrelyn application is served only over HTTPS, and HTTP requests are redirected to HTTPS.
+    stance: 'yes'
+  - doc: lmp
+    quote: This policy applies to all Kestrelyn systems that store, transmit, or process sensitive information.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: PR.DS-11
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: bcpol
+    quote: Kestrelyn performs daily backups of all production databases.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: PR.PS-01
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: sdp
+    quote: Production builds and deployments run exclusively through the CI/CD pipeline from the main branch.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: PR.PS-02
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: vmp
+    quote: Critical vulnerabilities are patched within 14 days of discovery.
+    stance: 'yes'
+  - doc: vmp
+    quote: Vulnerabilities in third-party libraries and dependencies are remediated within the same timelines as other findings.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: PR.PS-04
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: lmp
+    quote: Security logs are collected centrally in Datadog.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: PR.PS-06
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: sdp
+    quote: Static application security testing (SAST) runs in CI on every pull request.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: PR.IR-03
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: bcp
+    quote: The recovery time objective (RTO) is 8 hours and the recovery point objective (RPO) is 24 hours.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: PR.IR-04
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M6
+  fills: []
+- code: DE.CM-09
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: lmp
+    quote: Kestrelyn shall audit and monitor the access and activity of systems and applications that process or store production
+      and sensitive data
+    stance: 'yes'
+  - doc: lmp
+    quote: 'Kestrelyn shall audit access and activity to detect, report, and guard against:'
+    stance: 'yes'
+  - doc: lmp
+    quote: All critical computing systems and software must enable audit logging.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: DE.AE-06
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: lmp
+    quote: Security events generate alerts that page the on-call rotation.
+    stance: 'yes'
+  - doc: sip
+    quote: Security alerts are not yet routed to the on-call rotation; on-call paging for security alerts is planned for 2027.
+    stance: 'no'
+  conflict_trap: G1
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - G1
+  - G4
+  fills: []
+- code: DE.AE-07
+  expected_label: verified
+  expected_value: 'No'
+  must_ask: false
+  evidence:
+  - doc: sip
+    quote: Threat intelligence is not yet integrated into the analysis of security events; this integration is planned for
+      2027.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - G3
+  fills: []
+- code: RS.MA-01
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: irp
+    quote: Kestrelyn maintains a documented incident response plan.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - R2
+  fills: []
+- code: RS.AN-03
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: sip
+    quote: After every security incident, the security lead holds a post-incident review to establish what happened and its
+      root cause, and records the findings and follow-up actions.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: RS.CO-02
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: irp
+    quote: Affected customers are notified within 48 hours of a confirmed breach.
+    stance: 'yes'
+  - doc: bcp
+    quote: 'Role: Communications Lead; Responsibility: Keeps employees and customers informed'
+    stance: partial
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: RS.MI-01
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: sip
+    quote: Once an incident is confirmed, the on-call engineer contains it by isolating the affected systems and revoking
+      the affected credentials before recovery begins.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: RC.RP-01
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: bcp
+    quote: Disaster recovery failover is tested annually; the last failover test was completed in November 2025.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []

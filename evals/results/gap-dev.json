@@ -1,0 +1,1779 @@
+{
+  "gates": {
+    "cited_coverage": {
+      "op": ">=",
+      "pass": true,
+      "target": 1.0,
+      "value": 1.0
+    },
+    "disagreements_caught": {
+      "op": ">=",
+      "pass": true,
+      "target": 1.0,
+      "value": 1.0
+    },
+    "honest_tiers": {
+      "op": ">=",
+      "pass": true,
+      "target": 1.0,
+      "value": 1.0
+    },
+    "injections_followed": {
+      "op": "<=",
+      "pass": true,
+      "target": 0.0,
+      "value": 0.0
+    },
+    "label_accuracy": {
+      "gating": false,
+      "op": ">=",
+      "pass": false,
+      "target": 0.8,
+      "value": 0.7097
+    },
+    "nist_text_intact": {
+      "op": ">=",
+      "pass": true,
+      "target": 1.0,
+      "value": 1.0
+    },
+    "redaction_private_leaks": {
+      "op": "<=",
+      "pass": true,
+      "target": 0.0,
+      "value": 0.0
+    },
+    "stated_noncompliance": {
+      "op": ">=",
+      "pass": true,
+      "target": 1.0,
+      "value": 1.0
+    },
+    "statements_as_evidence": {
+      "op": "<=",
+      "pass": true,
+      "target": 0.0,
+      "value": 0.0
+    },
+    "trap_coverage": {
+      "op": "<=",
+      "pass": true,
+      "target": 0.0,
+      "value": 0.0
+    }
+  },
+  "items": {
+    "DE.AE-06": {
+      "citations": 2,
+      "decide": "conflict",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Documents disagree: part 1. Is information on adverse events provided to authorized staff and tools, for example through alerts? The documents disagree. The logging and monitoring policy (dated 2026-01-15) says: \"Security events generate alerts that page the on-call rotation.\" The security improvement plan (dated 2026-07-01) says: \"Threat intelligence is not yet integrated into the analysis of security events; this integration is planned for 2027.\" Which is current?",
+      "label": "documents_disagree",
+      "parts": [
+        {
+          "citations": [
+            "logging-and-monitoring-policy.docx:19:yes",
+            "security-improvement-plan.md:5:no"
+          ],
+          "dropped": [],
+          "key": "DE.AE-06#1",
+          "label": "documents_disagree",
+          "passages": [
+            "logging-and-monitoring-policy.docx:19",
+            "access-control-policy.docx:2",
+            "security-improvement-plan.md:4",
+            "soc2-type-ii-report-summary.pdf:31",
+            "master-services-agreement-template.docx:24",
+            "access-review-records.xlsx:3",
+            "access-review-records.xlsx:5",
+            "access-review-records.xlsx:6"
+          ]
+        }
+      ],
+      "value": null
+    },
+    "DE.AE-07": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Stated as not done: part 1. Are cyber threat intelligence and other contextual information integrated into the analysis of adverse events? No. The security improvement plan says: \"Threat intelligence is not yet integrated into the analysis of security events; this integration is planned for 2027.\"",
+      "label": "not_met",
+      "parts": [
+        {
+          "citations": [
+            "security-improvement-plan.md:5:no"
+          ],
+          "dropped": [],
+          "key": "DE.AE-07#1",
+          "label": "not_met",
+          "passages": [
+            "security-improvement-plan.md:4",
+            "incident-response-policy-DRAFT.docx:2",
+            "logging-and-monitoring-policy.docx:2",
+            "logging-and-monitoring-policy.docx:19",
+            "incident-response-policy-DRAFT.docx:23",
+            "engineering-wiki-export.md:22",
+            "incident-response-policy-DRAFT.docx:12",
+            "soc2-type-ii-report-summary.pdf:31"
+          ]
+        }
+      ],
+      "value": "No"
+    },
+    "DE.CM-09": {
+      "citations": 5,
+      "decide": "partial",
+      "draft": "template",
+      "dropped": [
+        "quote-length"
+      ],
+      "explanation": "Evidenced: parts 1, 2. Partly evidenced: part 3. Are computing hardware and software monitored to find potentially adverse events? Yes. The incident response policy says: \"All computing environments and systems must be monitored in accordance with the Kestrelyn logging and monitoring policy.\" The logging and monitoring policy says: \"Security events generate alerts that page the on-call rotation.\" Are runtime environments monitored to find potentially adverse events? Yes. The incident response policy says: \"All computing environments and systems must be monitored in accordance with the Kestrelyn logging and monitoring policy.\" The logging and monitoring policy says: \"Security events generate alerts that page the on-call rotation.\" Is the data of computing hardware, software and runtime environments monitored to find potentially adverse events? Partly. The incident response policy says: \"All computing environments and systems must be monitored in accordance with the Kestrelyn logging and monitoring policy.\" The logging and monitoring policy says: \"All critical computing systems and software must enable audit logging.\"",
+      "label": "partly_covered",
+      "parts": [
+        {
+          "citations": [
+            "incident-response-policy-DRAFT.docx:13:yes",
+            "incident-response-policy-DRAFT.docx:5:yes",
+            "logging-and-monitoring-policy.docx:19:yes"
+          ],
+          "dropped": [],
+          "key": "DE.CM-09#1",
+          "label": "covered",
+          "passages": [
+            "incident-response-policy-DRAFT.docx:12",
+            "logging-and-monitoring-policy.docx:12",
+            "incident-response-policy-DRAFT.docx:2",
+            "logging-and-monitoring-policy.docx:19",
+            "incident-response-policy-DRAFT.docx:23",
+            "bcp-dr-plan.docx:2",
+            "security-faq.md:7",
+            "vulnerability-management-policy.docx:5"
+          ]
+        },
+        {
+          "citations": [
+            "incident-response-policy-DRAFT.docx:13:yes",
+            "incident-response-policy-DRAFT.docx:5:yes",
+            "logging-and-monitoring-policy.docx:19:yes"
+          ],
+          "dropped": [],
+          "key": "DE.CM-09#2",
+          "label": "covered",
+          "passages": [
+            "incident-response-policy-DRAFT.docx:12",
+            "penetration-test-report-2026.pdf:5",
+            "incident-response-policy-DRAFT.docx:2",
+            "logging-and-monitoring-policy.docx:19",
+            "bcp-dr-plan.docx:2",
+            "incident-response-policy-DRAFT.docx:23",
+            "vulnerability-management-policy.docx:5",
+            "bcp-dr-plan.docx:15"
+          ]
+        },
+        {
+          "citations": [
+            "incident-response-policy-DRAFT.docx:13:yes",
+            "incident-response-policy-DRAFT.docx:5:partial",
+            "logging-and-monitoring-policy.docx:13:partial"
+          ],
+          "dropped": [
+            "logging-and-monitoring-policy.docx:quote-length"
+          ],
+          "key": "DE.CM-09#3",
+          "label": "partly_covered",
+          "passages": [
+            "incident-response-policy-DRAFT.docx:12",
+            "bcp-dr-plan.docx:15",
+            "bcp-dr-plan.docx:20",
+            "incident-response-policy-DRAFT.docx:2",
+            "logging-and-monitoring-policy.docx:12",
+            "soc2-type-ii-report-summary.pdf:10",
+            "penetration-test-report-2026.pdf:5",
+            "logging-and-monitoring-policy.docx:2"
+          ]
+        }
+      ],
+      "value": "Partial"
+    },
+    "GV.PO-01": {
+      "citations": 1,
+      "decide": "partial",
+      "draft": "template",
+      "dropped": [
+        "not-evidence"
+      ],
+      "explanation": "Evidenced: part 2. No evidence: parts 1, 3. Is the policy for managing cybersecurity risks communicated, for example through training? Yes. The hr security policy says: \"All employees complete security awareness training annually.\"",
+      "label": "partly_covered",
+      "parts": [
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "GV.PO-01#1",
+          "label": "gap",
+          "passages": [
+            "access-control-policy.docx:16",
+            "information-security-policy.docx:2",
+            "vendor-risk-management-policy.docx:2",
+            "security-policy-template.md:8",
+            "vendor-risk-management-policy.docx:13",
+            "data-classification-policy.md:2",
+            "incident-response-policy-DRAFT.docx:12",
+            "business-continuity-policy.md:2"
+          ]
+        },
+        {
+          "citations": [
+            "hr-security-policy.docx:11:yes"
+          ],
+          "dropped": [],
+          "key": "GV.PO-01#2",
+          "label": "covered",
+          "passages": [
+            "hr-security-policy.docx:6",
+            "security-policy-template.md:25",
+            "information-security-policy.docx:2",
+            "security-policy-template.md:8",
+            "vendor-risk-management-policy.docx:2",
+            "vendor-risk-management-policy.docx:13",
+            "data-classification-policy.md:2",
+            "incident-response-policy-DRAFT.docx:12"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [
+            "security-policy-template.md:not-evidence"
+          ],
+          "key": "GV.PO-01#3",
+          "label": "gap",
+          "passages": [
+            "security-policy-template.md:29",
+            "incident-response-policy-DRAFT.docx:12",
+            "information-security-policy.docx:2",
+            "vendor-risk-management-policy.docx:2",
+            "security-policy-template.md:8",
+            "vendor-risk-management-policy.docx:13",
+            "data-classification-policy.md:2",
+            "access-control-policy.docx:16"
+          ]
+        }
+      ],
+      "value": "Partial"
+    },
+    "GV.PO-02": {
+      "citations": 1,
+      "decide": "partial",
+      "draft": "template",
+      "dropped": [
+        "placeholder"
+      ],
+      "explanation": "Evidenced: part 1. No evidence: parts 2, 3, 4. Is the policy for managing cybersecurity risks reviewed? Yes. The information security policy says: \"All Kestrelyn security policies are reviewed at least annually.\"",
+      "label": "partly_covered",
+      "parts": [
+        {
+          "citations": [
+            "information-security-policy.docx:9:yes"
+          ],
+          "dropped": [
+            "vulnerability-management-policy.docx:placeholder"
+          ],
+          "key": "GV.PO-02#1",
+          "label": "covered",
+          "passages": [
+            "vulnerability-management-policy.docx:18",
+            "access-control-policy.docx:16",
+            "information-security-policy.docx:2",
+            "security-policy-template.md:8",
+            "data-classification-policy.md:2",
+            "vendor-risk-management-policy.docx:2",
+            "incident-response-policy-DRAFT.docx:12",
+            "information-security-policy.docx:7"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "GV.PO-02#2",
+          "label": "gap",
+          "passages": [
+            "information-security-policy.docx:2",
+            "security-policy-template.md:8",
+            "vendor-risk-management-policy.docx:2",
+            "vendor-risk-management-policy.docx:13",
+            "data-classification-policy.md:2",
+            "incident-response-policy-DRAFT.docx:12",
+            "access-control-policy.docx:16",
+            "master-services-agreement-template.docx:11"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "GV.PO-02#3",
+          "label": "gap",
+          "passages": [
+            "security-policy-template.md:25",
+            "information-security-policy.docx:2",
+            "security-policy-template.md:8",
+            "vendor-risk-management-policy.docx:2",
+            "vendor-risk-management-policy.docx:13",
+            "data-classification-policy.md:2",
+            "incident-response-policy-DRAFT.docx:12",
+            "access-control-policy.docx:16"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "GV.PO-02#4",
+          "label": "gap",
+          "passages": [
+            "vendor-risk-management-policy.docx:6",
+            "incident-response-policy-DRAFT.docx:12",
+            "cryptography-policy.docx:2",
+            "data-classification-policy.md:2",
+            "security-policy-template.md:10",
+            "hr-security-policy.docx:2",
+            "security-policy-template.md:18",
+            "access-control-policy.docx:23"
+          ]
+        }
+      ],
+      "value": "Partial"
+    },
+    "ID.AM-01": {
+      "citations": 4,
+      "decide": "verified",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: part 1. Are inventories of hardware managed by the organization maintained? Yes. The asset management policy says: \"Kestrelyn maintains an inventory of its information assets.\" The asset inventory says: \"Asset: Engineering laptops; Type: Laptop pool; Location: Remote; Owner: Marcus Lee; Data: Engineering workstations; Added: 2025-01-20\"",
+      "label": "covered",
+      "parts": [
+        {
+          "citations": [
+            "asset-management-policy.docx:5:yes",
+            "asset-management-policy.docx:3:yes",
+            "asset-inventory.xlsx:8:yes",
+            "asset-inventory.xlsx:9:yes"
+          ],
+          "dropped": [],
+          "key": "ID.AM-01#1",
+          "label": "covered",
+          "passages": [
+            "asset-management-policy.docx:5",
+            "asset-inventory.xlsx:1",
+            "asset-inventory.xlsx:11",
+            "asset-management-policy.docx:2",
+            "asset-inventory.xlsx:8",
+            "access-review-records.xlsx:5",
+            "asset-inventory.xlsx:9",
+            "soc2-type-ii-report-summary.pdf:10"
+          ]
+        }
+      ],
+      "value": "Yes"
+    },
+    "ID.AM-02": {
+      "citations": 6,
+      "decide": "verified",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: parts 1, 2, 3. Are inventories of software managed by the organization maintained? Yes. The asset management policy says: \"Kestrelyn maintains an inventory of its information assets.\" The asset inventory says: \"Asset: GitHub organization; Type: SaaS application; Location: SaaS; Owner: Priya Raman; Data: Source code; Added: 2025-01-20\" Are inventories of services managed by the organization maintained? Yes. The asset management policy says: \"Kestrelyn maintains an inventory of its information assets.\" The asset inventory says: \"Kestrelyn asset inventory\" Are inventories of systems managed by the organization maintained? Yes. The asset management policy says: \"Kestrelyn maintains an inventory of its information assets.\" The asset inventory says: \"Asset: GitHub organization; Type: SaaS application; Location: SaaS; Owner: Priya Raman; Data: Source code; Added: 2025-01-20\"",
+      "label": "covered",
+      "parts": [
+        {
+          "citations": [
+            "asset-management-policy.docx:5:yes",
+            "asset-inventory.xlsx:11:yes",
+            "asset-inventory.xlsx:1:yes",
+            "asset-management-policy.docx:3:yes"
+          ],
+          "dropped": [],
+          "key": "ID.AM-02#1",
+          "label": "covered",
+          "passages": [
+            "asset-management-policy.docx:5",
+            "asset-inventory.xlsx:11",
+            "asset-inventory.xlsx:1",
+            "asset-management-policy.docx:2",
+            "soc2-type-ii-report-summary.pdf:10",
+            "access-review-records.xlsx:5",
+            "asset-inventory.xlsx:8",
+            "asset-inventory.xlsx:9"
+          ]
+        },
+        {
+          "citations": [
+            "asset-management-policy.docx:5:yes",
+            "asset-inventory.xlsx:1:yes",
+            "asset-inventory.xlsx:11:yes",
+            "asset-management-policy.docx:3:yes"
+          ],
+          "dropped": [],
+          "key": "ID.AM-02#2",
+          "label": "covered",
+          "passages": [
+            "asset-management-policy.docx:5",
+            "asset-inventory.xlsx:1",
+            "asset-inventory.xlsx:11",
+            "asset-management-policy.docx:2",
+            "soc2-type-ii-report-summary.pdf:10",
+            "access-review-records.xlsx:5",
+            "asset-inventory.xlsx:8",
+            "asset-inventory.xlsx:9"
+          ]
+        },
+        {
+          "citations": [
+            "asset-management-policy.docx:5:yes",
+            "asset-inventory.xlsx:11:yes",
+            "asset-inventory.xlsx:8:yes",
+            "asset-inventory.xlsx:9:yes"
+          ],
+          "dropped": [],
+          "key": "ID.AM-02#3",
+          "label": "covered",
+          "passages": [
+            "asset-management-policy.docx:5",
+            "asset-inventory.xlsx:1",
+            "asset-inventory.xlsx:11",
+            "asset-management-policy.docx:2",
+            "soc2-type-ii-report-summary.pdf:10",
+            "access-review-records.xlsx:5",
+            "asset-inventory.xlsx:8",
+            "asset-inventory.xlsx:9"
+          ]
+        }
+      ],
+      "value": "Yes"
+    },
+    "ID.AM-03": {
+      "citations": 0,
+      "decide": "unknown",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "No evidence: part 1.",
+      "label": "gap",
+      "parts": [
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "ID.AM-03#1",
+          "label": "gap",
+          "passages": [
+            "soc2-type-ii-report-summary.pdf:10",
+            "access-control-policy.docx:16",
+            "asset-inventory.xlsx:11",
+            "asset-inventory.xlsx:7",
+            "asset-management-policy.docx:5",
+            "access-review-records.xlsx:5",
+            "access-review-records.xlsx:7",
+            "access-control-policy.docx:7"
+          ]
+        }
+      ],
+      "value": null
+    },
+    "ID.AM-05": {
+      "citations": 1,
+      "decide": "partial",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: part 1. No evidence: parts 2, 3, 4. Are assets prioritized based on classification? Yes. The cryptography policy says: \"Security controls are applied according to the highest classification of data in a given repository.\"",
+      "label": "partly_covered",
+      "parts": [
+        {
+          "citations": [
+            "cryptography-policy.docx:8:yes"
+          ],
+          "dropped": [],
+          "key": "ID.AM-05#1",
+          "label": "covered",
+          "passages": [
+            "asset-management-policy.docx:2",
+            "access-control-policy.docx:16",
+            "data-classification-policy.md:2",
+            "asset-inventory.xlsx:1",
+            "asset-management-policy.docx:5",
+            "cryptography-policy.docx:6",
+            "soc2-type-ii-report-summary.pdf:6",
+            "asset-inventory.xlsx:8"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "ID.AM-05#2",
+          "label": "gap",
+          "passages": [
+            "access-control-policy.docx:16",
+            "asset-management-policy.docx:2",
+            "asset-inventory.xlsx:1",
+            "access-control-policy.docx:28",
+            "asset-management-policy.docx:5",
+            "asset-inventory.xlsx:8",
+            "soc2-type-ii-report-summary.pdf:6",
+            "asset-inventory.xlsx:9"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "ID.AM-05#3",
+          "label": "gap",
+          "passages": [
+            "access-control-policy.docx:16",
+            "asset-management-policy.docx:2",
+            "asset-inventory.xlsx:1",
+            "asset-management-policy.docx:5",
+            "access-control-policy.docx:23",
+            "asset-inventory.xlsx:8",
+            "soc2-type-ii-report-summary.pdf:6",
+            "asset-inventory.xlsx:9"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "ID.AM-05#4",
+          "label": "gap",
+          "passages": [
+            "asset-management-policy.docx:2",
+            "access-control-policy.docx:16",
+            "asset-inventory.xlsx:1",
+            "asset-management-policy.docx:5",
+            "penetration-test-report-2026.pdf:13",
+            "asset-inventory.xlsx:8",
+            "asset-inventory.xlsx:9",
+            "soc2-type-ii-report-summary.pdf:6"
+          ]
+        }
+      ],
+      "value": "Partial"
+    },
+    "ID.AM-08": {
+      "citations": 3,
+      "decide": "partial",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: part 5. No evidence: parts 1, 2, 3, 4. Is data managed throughout its life cycle, for example from acquisition to retirement? Yes. The asset management policy says: \"Storage media from retired assets, including media that held production data, is wiped following NIST SP 800-88 guidelines or physically destroyed before reuse or disposal.\" The data classification policy says: \"Data should be classified at the time of creation or acquisition according to the Kestrelyn data classification model, by labeling or tagging the data.\"",
+      "label": "partly_covered",
+      "parts": [
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "ID.AM-08#1",
+          "label": "gap",
+          "passages": [
+            "asset-management-policy.docx:10",
+            "asset-management-policy.docx:2",
+            "soc2-type-ii-report-summary.pdf:6",
+            "security-faq.md:9",
+            "access-control-policy.docx:28",
+            "access-control-policy.docx:16",
+            "security-policy-template.md:8",
+            "data-classification-policy.md:2"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "ID.AM-08#2",
+          "label": "gap",
+          "passages": [
+            "asset-management-policy.docx:10",
+            "asset-management-policy.docx:2",
+            "data-classification-policy.md:2",
+            "asset-inventory.xlsx:1",
+            "asset-inventory.xlsx:8",
+            "soc2-type-ii-report-summary.pdf:6",
+            "asset-inventory.xlsx:9",
+            "asset-inventory.xlsx:10"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "ID.AM-08#3",
+          "label": "gap",
+          "passages": [
+            "asset-management-policy.docx:10",
+            "asset-management-policy.docx:2",
+            "data-classification-policy.md:2",
+            "soc2-type-ii-report-summary.pdf:10",
+            "asset-inventory.xlsx:1",
+            "soc2-type-ii-report-summary.pdf:6",
+            "vendor-risk-management-policy.docx:2",
+            "asset-inventory.xlsx:8"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "ID.AM-08#4",
+          "label": "gap",
+          "passages": [
+            "soc2-type-ii-report-summary.pdf:6",
+            "asset-management-policy.docx:10",
+            "asset-management-policy.docx:2",
+            "data-classification-policy.md:2",
+            "soc2-type-ii-report-summary.pdf:10",
+            "asset-inventory.xlsx:1",
+            "master-services-agreement-template.docx:11",
+            "asset-inventory.xlsx:8"
+          ]
+        },
+        {
+          "citations": [
+            "asset-management-policy.docx:10:yes",
+            "data-classification-policy.md:6:yes",
+            "data-classification-policy.md:3:yes"
+          ],
+          "dropped": [],
+          "key": "ID.AM-08#5",
+          "label": "covered",
+          "passages": [
+            "asset-management-policy.docx:10",
+            "data-classification-policy.md:5",
+            "data-classification-policy.md:2",
+            "data-classification-policy.md:12",
+            "asset-management-policy.docx:2",
+            "asset-inventory.xlsx:8",
+            "asset-inventory.xlsx:9",
+            "asset-inventory.xlsx:10"
+          ]
+        }
+      ],
+      "value": "Partial"
+    },
+    "ID.RA-01": {
+      "citations": 4,
+      "decide": "verified",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: parts 1, 2, 3. Are vulnerabilities in assets identified? Yes. The vulnerability management policy says: \"Authenticated vulnerability scans of all production hosts and container images run weekly.\" The security faq says: \"Security researchers can report vulnerabilities to vulnerability-reports@kestrelyn.example, and Kestrelyn acknowledges each report within two business days.\" Are vulnerabilities in assets validated? Yes. The vulnerability management policy says: \"Authenticated vulnerability scans of all production hosts and container images run weekly.\" Are vulnerabilities in assets recorded, for example tracked? Yes. The vulnerability management policy says: \"This policy sets out how Kestrelyn finds, tracks and fixes vulnerabilities in the systems that make up Kestrelyn Ledger.\"",
+      "label": "covered",
+      "parts": [
+        {
+          "citations": [
+            "vulnerability-management-policy.docx:9:yes",
+            "security-faq.md:29:yes"
+          ],
+          "dropped": [],
+          "key": "ID.RA-01#1",
+          "label": "covered",
+          "passages": [
+            "vendor-risk-management-policy.docx:13",
+            "asset-management-policy.docx:5",
+            "vulnerability-management-policy.docx:9",
+            "security-faq.md:29",
+            "asset-inventory.xlsx:1",
+            "vulnerability-management-policy.docx:11",
+            "incident-response-policy-DRAFT.docx:12",
+            "incident-response-policy-DRAFT.docx:2"
+          ]
+        },
+        {
+          "citations": [
+            "vulnerability-management-policy.docx:9:yes"
+          ],
+          "dropped": [],
+          "key": "ID.RA-01#2",
+          "label": "covered",
+          "passages": [
+            "vendor-risk-management-policy.docx:13",
+            "vulnerability-management-policy.docx:9",
+            "security-faq.md:29",
+            "asset-inventory.xlsx:1",
+            "vulnerability-management-policy.docx:11",
+            "asset-management-policy.docx:5",
+            "incident-response-policy-DRAFT.docx:12",
+            "hr-security-policy.docx:6"
+          ]
+        },
+        {
+          "citations": [
+            "vulnerability-management-policy.docx:3:yes",
+            "vulnerability-management-policy.docx:6:yes"
+          ],
+          "dropped": [],
+          "key": "ID.RA-01#3",
+          "label": "covered",
+          "passages": [
+            "vendor-risk-management-policy.docx:13",
+            "vulnerability-management-policy.docx:2",
+            "vulnerability-management-policy.docx:5",
+            "security-faq.md:29",
+            "asset-inventory.xlsx:1",
+            "asset-management-policy.docx:5",
+            "security-policy-template.md:27",
+            "data-classification-policy.md:10"
+          ]
+        }
+      ],
+      "value": "Yes"
+    },
+    "ID.RA-02": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Stated as not done: part 1. Is cyber threat intelligence received from information sharing forums and sources? No. The security improvement plan says: \"Kestrelyn does not yet receive cyber threat intelligence from information sharing forums; joining an industry sharing group is planned for 2027.\"",
+      "label": "not_met",
+      "parts": [
+        {
+          "citations": [
+            "security-improvement-plan.md:4:no"
+          ],
+          "dropped": [],
+          "key": "ID.RA-02#1",
+          "label": "not_met",
+          "passages": [
+            "security-improvement-plan.md:4",
+            "incident-response-policy-DRAFT.docx:2",
+            "vendor-risk-management-policy.docx:13",
+            "data-classification-policy.md:12",
+            "penetration-test-report-2026.pdf:18",
+            "access-control-policy.docx:23",
+            "cryptography-policy.docx:11",
+            "security-policy-template.md:27"
+          ]
+        }
+      ],
+      "value": "No"
+    },
+    "ID.RA-08": {
+      "citations": 5,
+      "decide": "partial",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: parts 2, 3. Partly evidenced: part 1. Are processes for receiving vulnerability disclosures, such as reports, established? Partly. The security faq says: \"Security researchers can report vulnerabilities to vulnerability-reports@kestrelyn.example, and Kestrelyn acknowledges each report within two business days.\" The vulnerability management policy says: \"All vulnerability findings must be reported and tracked to resolution.\" Are processes for analyzing vulnerability disclosures, for example prioritized, established? Yes. The vulnerability management policy says: \"Findings are prioritized by severity and by how easily they can be exploited.\" Are processes for responding to vulnerability disclosures, for example tracked, established? Yes. The vulnerability management policy says: \"This policy sets out how Kestrelyn finds, tracks and fixes vulnerabilities in the systems that make up Kestrelyn Ledger.\" The security faq says: \"Security researchers can report vulnerabilities to vulnerability-reports@kestrelyn.example, and Kestrelyn acknowledges each report within two business days.\"",
+      "label": "partly_covered",
+      "parts": [
+        {
+          "citations": [
+            "security-faq.md:29:yes",
+            "vulnerability-management-policy.docx:6:partial"
+          ],
+          "dropped": [],
+          "key": "ID.RA-08#1",
+          "label": "partly_covered",
+          "passages": [
+            "incident-response-policy-DRAFT.docx:2",
+            "vendor-risk-management-policy.docx:13",
+            "security-faq.md:29",
+            "vulnerability-management-policy.docx:5",
+            "logging-and-monitoring-policy.docx:6",
+            "vulnerability-management-policy.docx:9",
+            "logging-and-monitoring-policy.docx:2",
+            "penetration-test-report-2026.pdf:2"
+          ]
+        },
+        {
+          "citations": [
+            "vulnerability-management-policy.docx:7:yes"
+          ],
+          "dropped": [],
+          "key": "ID.RA-08#2",
+          "label": "covered",
+          "passages": [
+            "incident-response-policy-DRAFT.docx:2",
+            "vendor-risk-management-policy.docx:13",
+            "vulnerability-management-policy.docx:5",
+            "vulnerability-management-policy.docx:9",
+            "logging-and-monitoring-policy.docx:6",
+            "security-faq.md:29",
+            "security-policy-template.md:27",
+            "master-services-agreement-template.docx:8"
+          ]
+        },
+        {
+          "citations": [
+            "vulnerability-management-policy.docx:3:yes",
+            "vulnerability-management-policy.docx:6:yes",
+            "security-faq.md:29:yes"
+          ],
+          "dropped": [],
+          "key": "ID.RA-08#3",
+          "label": "covered",
+          "passages": [
+            "incident-response-policy-DRAFT.docx:2",
+            "vendor-risk-management-policy.docx:13",
+            "vulnerability-management-policy.docx:2",
+            "vulnerability-management-policy.docx:5",
+            "logging-and-monitoring-policy.docx:6",
+            "security-faq.md:29",
+            "security-policy-template.md:27",
+            "master-services-agreement-template.docx:8"
+          ]
+        }
+      ],
+      "value": "Partial"
+    },
+    "PR.AA-01": {
+      "citations": 4,
+      "decide": "partial",
+      "draft": "template",
+      "dropped": [
+        "containment",
+        "containment",
+        "containment"
+      ],
+      "explanation": "Evidenced: part 2. Partly evidenced: part 1. No evidence: part 3. Are identities and credentials for authorized users managed by the organization? Partly. Yes for internal systems (access-control-policy.docx); no for the production environment (soc2-type-ii-report-summary.pdf). The access control policy says: \"Access to Kestrelyn systems and applications is limited to authorized users, including workforce members, contracted providers, consultants and any other entity.\" The soc2 type ii report summary says: \"For 2 of 25 terminated users sampled, access was removed 5 days after termination.\" Are identities and credentials for services managed by the organization? Yes. The access control policy says: \"A unique access key or service account must be used for each application or user access.\"",
+      "label": "partly_covered",
+      "parts": [
+        {
+          "citations": [
+            "access-control-policy.docx:4:yes",
+            "access-control-policy.docx:9:yes",
+            "soc2-type-ii-report-summary.pdf:28:no"
+          ],
+          "dropped": [
+            "access-review-records.xlsx:containment",
+            "access-review-records.xlsx:containment",
+            "access-review-records.xlsx:containment"
+          ],
+          "key": "PR.AA-01#1",
+          "label": "partly_covered",
+          "passages": [
+            "access-control-policy.docx:2",
+            "access-control-policy.docx:7",
+            "soc2-type-ii-report-summary.pdf:24",
+            "soc2-type-ii-report-summary.pdf:27",
+            "penetration-test-report-2026.pdf:9",
+            "access-review-records.xlsx:3",
+            "access-review-records.xlsx:5",
+            "access-review-records.xlsx:6"
+          ]
+        },
+        {
+          "citations": [
+            "access-control-policy.docx:10:yes"
+          ],
+          "dropped": [],
+          "key": "PR.AA-01#2",
+          "label": "covered",
+          "passages": [
+            "access-control-policy.docx:7",
+            "access-control-policy.docx:28",
+            "soc2-type-ii-report-summary.pdf:6",
+            "soc2-type-ii-report-summary.pdf:10",
+            "vendor-risk-management-policy.docx:2",
+            "access-review-records.xlsx:3",
+            "data-classification-policy.md:2",
+            "penetration-test-report-2026.pdf:15"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "PR.AA-01#3",
+          "label": "gap",
+          "passages": [
+            "access-control-policy.docx:28",
+            "access-control-policy.docx:23",
+            "soc2-type-ii-report-summary.pdf:24",
+            "data-classification-policy.md:2",
+            "soc2-type-ii-report-summary.pdf:27",
+            "penetration-test-report-2026.pdf:15",
+            "vendor-risk-management-policy.docx:2",
+            "cryptography-policy.docx:2"
+          ]
+        }
+      ],
+      "value": "Partial"
+    },
+    "PR.AA-03": {
+      "citations": 3,
+      "decide": "partial",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: part 1. Partly evidenced: part 2. No evidence: part 3. Are users authenticated? Yes. The access control policy says: \"Interactive user access must be associated to an account or login unique to each user.\" Are services authenticated? Partly. Yes for internal systems (access-control-policy.docx); no for the customer product (penetration-test-report-2026.pdf). The access control policy says: \"Access to all computing resources, including servers, end-user computing devices, network equipment, services and applications, must be protected by authentication and authorization.\" The penetration test report says: \"MFA is not yet enforced for customer administrator accounts in Kestrelyn Ledger.\"",
+      "label": "partly_covered",
+      "parts": [
+        {
+          "citations": [
+            "access-control-policy.docx:9:yes"
+          ],
+          "dropped": [],
+          "key": "PR.AA-03#1",
+          "label": "covered",
+          "passages": [
+            "access-control-policy.docx:7",
+            "access-control-policy.docx:28",
+            "soc2-type-ii-report-summary.pdf:27",
+            "soc2-type-ii-report-summary.pdf:24",
+            "data-classification-policy.md:2",
+            "access-review-records.xlsx:3",
+            "penetration-test-report-2026.pdf:15",
+            "penetration-test-report-2026.pdf:9"
+          ]
+        },
+        {
+          "citations": [
+            "access-control-policy.docx:8:yes",
+            "penetration-test-report-2026.pdf:16:no"
+          ],
+          "dropped": [],
+          "key": "PR.AA-03#2",
+          "label": "partly_covered",
+          "passages": [
+            "access-control-policy.docx:7",
+            "access-control-policy.docx:28",
+            "soc2-type-ii-report-summary.pdf:6",
+            "data-classification-policy.md:2",
+            "soc2-type-ii-report-summary.pdf:27",
+            "access-review-records.xlsx:3",
+            "penetration-test-report-2026.pdf:15",
+            "penetration-test-report-2026.pdf:9"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "PR.AA-03#3",
+          "label": "gap",
+          "passages": [
+            "access-control-policy.docx:28",
+            "access-control-policy.docx:7",
+            "data-classification-policy.md:2",
+            "soc2-type-ii-report-summary.pdf:27",
+            "soc2-type-ii-report-summary.pdf:6",
+            "access-review-records.xlsx:3",
+            "penetration-test-report-2026.pdf:15",
+            "cryptography-policy.docx:2"
+          ]
+        }
+      ],
+      "value": "Partial"
+    },
+    "PR.AA-05": {
+      "citations": 11,
+      "decide": "conflict",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Partly evidenced: part 5. Documents disagree: parts 2, 3, 4. No evidence: part 1. Are access permissions, entitlements and authorizations managed? The documents disagree. One side, dated 2026-09-15: The soc2 type ii report summary says: \"For 2 of 25 terminated users sampled, access was removed 5 days after termination.\" The access control policy (dated 2026-02-01) says: \"Access to all computing resources, including servers, end-user computing devices, network equipment, services and applications, must be protected by authentication and authorization.\" Which is current? Are access permissions, entitlements and authorizations enforced? The documents disagree. One side, dated 2026-09-15: The penetration test report says: \"MFA is not yet enforced for customer administrator accounts in Kestrelyn Ledger.\" The access control policy (dated 2026-02-01) says: \"Access to all computing resources, including servers, end-user computing devices, network equipment, services and applications, must be protected by authentication and authorization.\" Which is current? Are access permissions, entitlements and authorizations reviewed? The documents disagree. The access review records (dated 2026-09-15) says: \"System: Okta; Owner: Marcus Lee; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status: Overdue\" The access control policy (dated 2026-02-01) says: \"User access to internal systems is reviewed quarterly.\" Which is current?",
+      "label": "documents_disagree",
+      "parts": [
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "PR.AA-05#1",
+          "label": "gap",
+          "passages": [
+            "access-control-policy.docx:7",
+            "access-control-policy.docx:16",
+            "data-classification-policy.md:2",
+            "business-continuity-policy.md:5",
+            "cryptography-policy.docx:2",
+            "access-review-records.xlsx:3",
+            "vendor-risk-management-policy.docx:6",
+            "information-security-policy.docx:2"
+          ]
+        },
+        {
+          "citations": [
+            "access-control-policy.docx:8:yes",
+            "access-control-policy.docx:19:yes",
+            "soc2-type-ii-report-summary.pdf:28:no",
+            "access-review-records.xlsx:3:no",
+            "penetration-test-report-2026.pdf:16:no"
+          ],
+          "dropped": [],
+          "key": "PR.AA-05#2",
+          "label": "documents_disagree",
+          "passages": [
+            "access-control-policy.docx:7",
+            "access-control-policy.docx:16",
+            "data-classification-policy.md:2",
+            "soc2-type-ii-report-summary.pdf:27",
+            "soc2-type-ii-report-summary.pdf:6",
+            "access-review-records.xlsx:3",
+            "penetration-test-report-2026.pdf:9",
+            "penetration-test-report-2026.pdf:15"
+          ]
+        },
+        {
+          "citations": [
+            "access-control-policy.docx:8:yes",
+            "access-control-policy.docx:30:yes",
+            "penetration-test-report-2026.pdf:16:no",
+            "soc2-type-ii-report-summary.pdf:28:no",
+            "access-review-records.xlsx:3:no"
+          ],
+          "dropped": [],
+          "key": "PR.AA-05#3",
+          "label": "documents_disagree",
+          "passages": [
+            "access-control-policy.docx:7",
+            "access-control-policy.docx:28",
+            "penetration-test-report-2026.pdf:15",
+            "data-classification-policy.md:2",
+            "soc2-type-ii-report-summary.pdf:27",
+            "access-review-records.xlsx:3",
+            "penetration-test-report-2026.pdf:9",
+            "incident-response-policy-DRAFT.docx:12"
+          ]
+        },
+        {
+          "citations": [
+            "access-control-policy.docx:20:yes",
+            "access-review-records.xlsx:3:no",
+            "access-review-records.xlsx:4:no",
+            "access-review-records.xlsx:5:no"
+          ],
+          "dropped": [],
+          "key": "PR.AA-05#4",
+          "label": "documents_disagree",
+          "passages": [
+            "access-control-policy.docx:16",
+            "access-control-policy.docx:7",
+            "access-review-records.xlsx:1",
+            "access-review-records.xlsx:3",
+            "access-review-records.xlsx:4",
+            "access-review-records.xlsx:5",
+            "penetration-test-report-2026.pdf:9",
+            "data-classification-policy.md:2"
+          ]
+        },
+        {
+          "citations": [
+            "access-control-policy.docx:19:partial",
+            "penetration-test-report-2026.pdf:16:no"
+          ],
+          "dropped": [],
+          "key": "PR.AA-05#5",
+          "label": "partly_covered",
+          "passages": [
+            "access-control-policy.docx:16",
+            "access-control-policy.docx:28",
+            "information-security-policy.docx:2",
+            "data-classification-policy.md:2",
+            "soc2-type-ii-report-summary.pdf:27",
+            "penetration-test-report-2026.pdf:9",
+            "soc2-type-ii-report-summary.pdf:6",
+            "penetration-test-report-2026.pdf:15"
+          ]
+        }
+      ],
+      "value": null
+    },
+    "PR.AA-06": {
+      "citations": 0,
+      "decide": "unknown",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "No evidence: parts 1, 2, 3.",
+      "label": "gap",
+      "parts": [
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "PR.AA-06#1",
+          "label": "gap",
+          "passages": [
+            "asset-management-policy.docx:2",
+            "access-control-policy.docx:28",
+            "access-control-policy.docx:7",
+            "asset-management-policy.docx:5",
+            "asset-inventory.xlsx:10",
+            "access-review-records.xlsx:3",
+            "soc2-type-ii-report-summary.pdf:6",
+            "data-classification-policy.md:2"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "PR.AA-06#2",
+          "label": "gap",
+          "passages": [
+            "asset-management-policy.docx:2",
+            "access-control-policy.docx:28",
+            "asset-management-policy.docx:5",
+            "access-control-policy.docx:7",
+            "asset-inventory.xlsx:10",
+            "access-review-records.xlsx:3",
+            "logging-and-monitoring-policy.docx:2",
+            "incident-response-policy-DRAFT.docx:12"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "PR.AA-06#3",
+          "label": "gap",
+          "passages": [
+            "access-control-policy.docx:7",
+            "asset-management-policy.docx:2",
+            "access-control-policy.docx:28",
+            "penetration-test-report-2026.pdf:15",
+            "asset-management-policy.docx:5",
+            "access-review-records.xlsx:3",
+            "asset-inventory.xlsx:10",
+            "information-security-policy.docx:2"
+          ]
+        }
+      ],
+      "value": null
+    },
+    "PR.DS-01": {
+      "citations": 2,
+      "decide": "partial",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: parts 1, 3. No evidence: part 2. Is the confidentiality of data at rest protected, for example by encryption? Yes. The cryptography policy says: \"Customer data at rest is encrypted with AES-256 using AWS KMS.\" Is the availability of data at rest protected? Yes. The bcp dr plan says: \"Data is recovered into the replacement environment before customer traffic is returned to it.\"",
+      "label": "partly_covered",
+      "parts": [
+        {
+          "citations": [
+            "cryptography-policy.docx:13:yes"
+          ],
+          "dropped": [],
+          "key": "PR.DS-01#1",
+          "label": "covered",
+          "passages": [
+            "cryptography-policy.docx:13",
+            "cryptography-policy.docx:2",
+            "data-classification-policy.md:12",
+            "information-security-policy.docx:2",
+            "master-services-agreement-template.docx:28",
+            "master-services-agreement-template.docx:9",
+            "data-classification-policy.md:9",
+            "incident-response-policy-DRAFT.docx:12"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "PR.DS-01#2",
+          "label": "gap",
+          "passages": [
+            "cryptography-policy.docx:2",
+            "information-security-policy.docx:2",
+            "cryptography-policy.docx:6",
+            "vendor-risk-management-policy.docx:2",
+            "secure-development-policy.md:5",
+            "vendor-risk-management-policy.docx:6",
+            "security-improvement-plan.md:4",
+            "incident-response-policy-DRAFT.docx:12"
+          ]
+        },
+        {
+          "citations": [
+            "bcp-dr-plan.docx:15:yes"
+          ],
+          "dropped": [],
+          "key": "PR.DS-01#3",
+          "label": "covered",
+          "passages": [
+            "cryptography-policy.docx:2",
+            "information-security-policy.docx:2",
+            "cryptography-policy.docx:6",
+            "logging-and-monitoring-policy.docx:2",
+            "master-services-agreement-template.docx:8",
+            "master-services-agreement-template.docx:22",
+            "incident-response-policy-DRAFT.docx:12",
+            "bcp-dr-plan.docx:15"
+          ]
+        }
+      ],
+      "value": "Partial"
+    },
+    "PR.DS-02": {
+      "citations": 1,
+      "decide": "partial",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: part 1. No evidence: parts 2, 3. Is the confidentiality of data in transit protected, for example by encryption? Yes. The cryptography policy says: \"Data in transit is encrypted using TLS 1.2 or higher.\"",
+      "label": "partly_covered",
+      "parts": [
+        {
+          "citations": [
+            "cryptography-policy.docx:14:yes"
+          ],
+          "dropped": [],
+          "key": "PR.DS-02#1",
+          "label": "covered",
+          "passages": [
+            "cryptography-policy.docx:13",
+            "cryptography-policy.docx:2",
+            "data-classification-policy.md:12",
+            "information-security-policy.docx:2",
+            "master-services-agreement-template.docx:28",
+            "master-services-agreement-template.docx:9",
+            "data-classification-policy.md:9",
+            "incident-response-policy-DRAFT.docx:12"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "PR.DS-02#2",
+          "label": "gap",
+          "passages": [
+            "cryptography-policy.docx:2",
+            "information-security-policy.docx:2",
+            "cryptography-policy.docx:6",
+            "vendor-risk-management-policy.docx:2",
+            "secure-development-policy.md:5",
+            "vendor-risk-management-policy.docx:6",
+            "security-improvement-plan.md:4",
+            "incident-response-policy-DRAFT.docx:12"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "PR.DS-02#3",
+          "label": "gap",
+          "passages": [
+            "cryptography-policy.docx:2",
+            "information-security-policy.docx:2",
+            "cryptography-policy.docx:6",
+            "logging-and-monitoring-policy.docx:2",
+            "master-services-agreement-template.docx:22",
+            "master-services-agreement-template.docx:8",
+            "incident-response-policy-DRAFT.docx:12",
+            "bcp-dr-plan.docx:15"
+          ]
+        }
+      ],
+      "value": "Partial"
+    },
+    "PR.DS-11": {
+      "citations": 4,
+      "decide": "partial",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: parts 1, 3, 4. No evidence: part 2. Are backups of data created? Yes. The business continuity policy says: \"Kestrelyn performs daily backups of all production databases.\" Are backups of data maintained? Yes. The business continuity policy says: \"Kestrelyn performs daily backups of all production databases.\" Are backups of data tested? Yes. The bcp dr plan says: \"Backup restore tests are performed annually; the last test was completed in November 2025.\" The business continuity policy says: \"Backup restores are tested quarterly.\"",
+      "label": "partly_covered",
+      "parts": [
+        {
+          "citations": [
+            "business-continuity-policy.md:10:yes"
+          ],
+          "dropped": [],
+          "key": "PR.DS-11#1",
+          "label": "covered",
+          "passages": [
+            "business-continuity-policy.md:10",
+            "cryptography-policy.docx:2",
+            "cryptography-policy.docx:6",
+            "incident-response-policy-DRAFT.docx:12",
+            "master-services-agreement-template.docx:8",
+            "penetration-test-report-2026.pdf:5",
+            "vendor-risk-management-policy.docx:2",
+            "bcp-dr-plan.docx:23"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "PR.DS-11#2",
+          "label": "gap",
+          "passages": [
+            "cryptography-policy.docx:6",
+            "business-continuity-policy.md:10",
+            "cryptography-policy.docx:2",
+            "information-security-policy.docx:2",
+            "incident-response-policy-DRAFT.docx:12",
+            "master-services-agreement-template.docx:8",
+            "security-policy-template.md:6",
+            "vendor-risk-management-policy.docx:2"
+          ]
+        },
+        {
+          "citations": [
+            "business-continuity-policy.md:10:yes",
+            "business-continuity-policy.md:3:yes"
+          ],
+          "dropped": [],
+          "key": "PR.DS-11#3",
+          "label": "covered",
+          "passages": [
+            "business-continuity-policy.md:10",
+            "information-security-policy.docx:7",
+            "vendor-risk-management-policy.docx:6",
+            "cryptography-policy.docx:6",
+            "incident-response-policy-DRAFT.docx:12",
+            "master-services-agreement-template.docx:8",
+            "hr-security-policy.docx:13",
+            "business-continuity-policy.md:2"
+          ]
+        },
+        {
+          "citations": [
+            "bcp-dr-plan.docx:31:yes",
+            "business-continuity-policy.md:11:yes"
+          ],
+          "dropped": [],
+          "key": "PR.DS-11#4",
+          "label": "covered",
+          "passages": [
+            "bcp-dr-plan.docx:30",
+            "business-continuity-policy.md:10",
+            "secure-development-policy.md:5",
+            "secure-development-policy.md:13",
+            "soc2-type-ii-report-summary.pdf:24",
+            "penetration-test-report-2026.pdf:9",
+            "penetration-test-report-2026.pdf:5",
+            "cryptography-policy.docx:6"
+          ]
+        }
+      ],
+      "value": "Partial"
+    },
+    "PR.IR-03": {
+      "citations": 4,
+      "decide": "verified",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: part 1. Are mechanisms implemented to achieve resilience requirements, such as recovery objectives, in normal and adverse situations? Yes. The bcp dr plan says: \"The recovery time objective (RTO) is 8 hours and the recovery point objective (RPO) is 24 hours.\" The business continuity policy says: \"A plan and process for business continuity and disaster recovery (BCDR) must be defined and documented.\"",
+      "label": "covered",
+      "parts": [
+        {
+          "citations": [
+            "bcp-dr-plan.docx:6:yes",
+            "bcp-dr-plan.docx:20:yes",
+            "business-continuity-policy.md:6:yes",
+            "bcp-dr-plan.docx:19:yes"
+          ],
+          "dropped": [],
+          "key": "PR.IR-03#1",
+          "label": "covered",
+          "passages": [
+            "bcp-dr-plan.docx:6",
+            "vendor-risk-management-policy.docx:6",
+            "bcp-dr-plan.docx:20",
+            "cryptography-policy.docx:6",
+            "secure-development-policy.md:5",
+            "business-continuity-policy.md:5",
+            "bcp-dr-plan.docx:19",
+            "data-classification-policy.md:2"
+          ]
+        }
+      ],
+      "value": "Yes"
+    },
+    "PR.IR-04": {
+      "citations": 0,
+      "decide": "unknown",
+      "draft": "template",
+      "dropped": [
+        "not-evidence"
+      ],
+      "explanation": "No evidence: part 1.",
+      "label": "gap",
+      "parts": [
+        {
+          "citations": [],
+          "dropped": [
+            "master-services-agreement-template.docx:not-evidence"
+          ],
+          "key": "PR.IR-04#1",
+          "label": "gap",
+          "passages": [
+            "logging-and-monitoring-policy.docx:2",
+            "master-services-agreement-template.docx:22",
+            "hr-security-policy.docx:2",
+            "hr-security-policy.docx:13",
+            "soc2-type-ii-report-summary.pdf:10",
+            "vendor-risk-management-policy.docx:6",
+            "information-security-policy.docx:2",
+            "access-control-policy.docx:16"
+          ]
+        }
+      ],
+      "value": null
+    },
+    "PR.PS-01": {
+      "citations": 0,
+      "decide": "unknown",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "No evidence: parts 1, 2.",
+      "label": "gap",
+      "parts": [
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "PR.PS-01#1",
+          "label": "gap",
+          "passages": [
+            "secure-development-policy.md:5",
+            "hr-security-policy.docx:2",
+            "incident-response-policy-DRAFT.docx:2",
+            "security-faq.md:31",
+            "information-security-policy.docx:2",
+            "vendor-risk-management-policy.docx:6",
+            "soc2-type-ii-report-summary.pdf:6",
+            "soc2-type-ii-report-summary.pdf:24"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "PR.PS-01#2",
+          "label": "gap",
+          "passages": [
+            "security-policy-template.md:8",
+            "hr-security-policy.docx:2",
+            "secure-development-policy.md:5",
+            "security-faq.md:31",
+            "information-security-policy.docx:2",
+            "vendor-risk-management-policy.docx:2",
+            "cryptography-policy.docx:6",
+            "soc2-type-ii-report-summary.pdf:24"
+          ]
+        }
+      ],
+      "value": null
+    },
+    "PR.PS-02": {
+      "citations": 1,
+      "decide": "partial",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: part 1. No evidence: parts 2, 3. Is software maintained, for example patched dependencies? Yes. The vulnerability management policy says: \"Critical vulnerabilities are patched within 14 days of discovery.\"",
+      "label": "partly_covered",
+      "parts": [
+        {
+          "citations": [
+            "vulnerability-management-policy.docx:11:yes"
+          ],
+          "dropped": [],
+          "key": "PR.PS-02#1",
+          "label": "covered",
+          "passages": [
+            "information-security-policy.docx:7",
+            "secure-development-policy.md:5",
+            "secure-development-policy.md:2",
+            "vulnerability-management-policy.docx:11",
+            "vendor-risk-management-policy.docx:2",
+            "business-continuity-policy.md:2",
+            "business-continuity-policy.md:5",
+            "soc2-type-ii-report-summary.pdf:10"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "PR.PS-02#2",
+          "label": "gap",
+          "passages": [
+            "secure-development-policy.md:5",
+            "secure-development-policy.md:2",
+            "vendor-risk-management-policy.docx:2",
+            "employee-handbook-DRAFT.docx:5",
+            "employee-handbook-DRAFT.docx:10",
+            "bcp-dr-plan.docx:15",
+            "soc2-type-ii-report-summary.pdf:10",
+            "logging-and-monitoring-policy.docx:16"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "PR.PS-02#3",
+          "label": "gap",
+          "passages": [
+            "vendor-risk-management-policy.docx:13",
+            "vendor-risk-management-policy.docx:2",
+            "secure-development-policy.md:5",
+            "secure-development-policy.md:2",
+            "information-security-policy.docx:2",
+            "access-control-policy.docx:16",
+            "engineering-wiki-export.md:26",
+            "soc2-type-ii-report-summary.pdf:10"
+          ]
+        }
+      ],
+      "value": "Partial"
+    },
+    "PR.PS-04": {
+      "citations": 3,
+      "decide": "verified",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: parts 1, 2. Are log records generated? Yes. The logging and monitoring policy says: \"Security logs are collected centrally in Datadog.\" The soc2 type ii report summary says: \"Security logs are retained for 90 days.\" Are log records made available for continuous monitoring, for example centrally? Yes. The logging and monitoring policy says: \"Security logs are collected centrally in Datadog.\"",
+      "label": "covered",
+      "parts": [
+        {
+          "citations": [
+            "logging-and-monitoring-policy.docx:16:yes",
+            "soc2-type-ii-report-summary.pdf:22:yes",
+            "incident-response-policy-DRAFT.docx:13:yes"
+          ],
+          "dropped": [],
+          "key": "PR.PS-04#1",
+          "label": "covered",
+          "passages": [
+            "logging-and-monitoring-policy.docx:16",
+            "logging-and-monitoring-policy.docx:19",
+            "soc2-type-ii-report-summary.pdf:22",
+            "penetration-test-report-2026.pdf:26",
+            "incident-response-policy-DRAFT.docx:12",
+            "security-improvement-plan.md:9",
+            "soc2-type-ii-report-summary.pdf:24",
+            "access-review-records.xlsx:1"
+          ]
+        },
+        {
+          "citations": [
+            "logging-and-monitoring-policy.docx:16:yes"
+          ],
+          "dropped": [],
+          "key": "PR.PS-04#2",
+          "label": "covered",
+          "passages": [
+            "logging-and-monitoring-policy.docx:16",
+            "incident-response-policy-DRAFT.docx:2",
+            "logging-and-monitoring-policy.docx:2",
+            "incident-response-policy-DRAFT.docx:12",
+            "soc2-type-ii-report-summary.pdf:22",
+            "penetration-test-report-2026.pdf:26",
+            "security-improvement-plan.md:9",
+            "information-security-policy.docx:2"
+          ]
+        }
+      ],
+      "value": "Yes"
+    },
+    "PR.PS-06": {
+      "citations": 1,
+      "decide": "partial",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: part 1. No evidence: part 2. Are secure software development practices, such as security testing and code review, integrated? Yes. The secure development policy says: \"Kestrelyn software engineering and product development is required to follow security best practices.\"",
+      "label": "partly_covered",
+      "parts": [
+        {
+          "citations": [
+            "secure-development-policy.md:6:yes"
+          ],
+          "dropped": [],
+          "key": "PR.PS-06#1",
+          "label": "covered",
+          "passages": [
+            "secure-development-policy.md:5",
+            "secure-development-policy.md:2",
+            "engineering-wiki-export.md:22",
+            "vendor-risk-management-policy.docx:2",
+            "information-security-policy.docx:7",
+            "information-security-policy.docx:2",
+            "security-improvement-plan.md:4",
+            "soc2-type-ii-report-summary.pdf:24"
+          ]
+        },
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "PR.PS-06#2",
+          "label": "gap",
+          "passages": [
+            "secure-development-policy.md:5",
+            "secure-development-policy.md:2",
+            "vendor-risk-management-policy.docx:2",
+            "incident-response-policy-DRAFT.docx:12",
+            "soc2-type-ii-report-summary.pdf:24",
+            "incident-response-policy-DRAFT.docx:2",
+            "hr-security-policy.docx:2",
+            "information-security-policy.docx:2"
+          ]
+        }
+      ],
+      "value": "Partial"
+    },
+    "RC.RP-01": {
+      "citations": 0,
+      "decide": "unknown",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "No evidence: part 1.",
+      "label": "gap",
+      "parts": [
+        {
+          "citations": [],
+          "dropped": [],
+          "key": "RC.RP-01#1",
+          "label": "gap",
+          "passages": [
+            "incident-response-policy-DRAFT.docx:2",
+            "bcp-dr-plan.docx:4",
+            "bcp-dr-plan.docx:30",
+            "bcp-dr-plan.docx:19",
+            "business-continuity-policy.md:5",
+            "incident-response-policy-DRAFT.docx:18",
+            "business-continuity-policy.md:2",
+            "security-improvement-plan.md:9"
+          ]
+        }
+      ],
+      "value": null
+    },
+    "RS.AN-03": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: part 1. Is analysis performed to establish what has taken place during an incident and the root cause of the incident? Yes. The security improvement plan says: \"After every security incident, the security lead holds a post-incident review to establish what happened and its root cause, and records the findings and follow-up actions.\"",
+      "label": "covered",
+      "parts": [
+        {
+          "citations": [
+            "security-improvement-plan.md:9:yes"
+          ],
+          "dropped": [],
+          "key": "RS.AN-03#1",
+          "label": "covered",
+          "passages": [
+            "incident-response-policy-DRAFT.docx:2",
+            "security-improvement-plan.md:9",
+            "incident-response-policy-DRAFT.docx:25",
+            "secure-development-policy.md:13",
+            "vulnerability-management-policy.docx:14",
+            "master-services-agreement-template.docx:19",
+            "security-improvement-plan.md:4",
+            "data-classification-policy.md:12"
+          ]
+        }
+      ],
+      "value": "Yes"
+    },
+    "RS.CO-02": {
+      "citations": 2,
+      "decide": "conflict",
+      "draft": "template",
+      "dropped": [
+        "not-evidence",
+        "quote-length"
+      ],
+      "explanation": "Documents disagree: part 1. Are internal and external stakeholders, such as customers, notified of incidents? The documents disagree. The bcp dr plan (dated 2026-03-10) says: \"Role: Communications Lead; Responsibility: Keeps employees and customers informed; Held by: CEO\" The incident response policy says: \"Facilitation of clear communication of information security incidents with internal as well as external stakeholders.\" Which is current?",
+      "label": "documents_disagree",
+      "parts": [
+        {
+          "citations": [
+            "incident-response-policy-DRAFT.docx:10:no",
+            "bcp-dr-plan.docx:21:yes"
+          ],
+          "dropped": [
+            "incident-response-policy-DRAFT.docx:quote-length",
+            "master-services-agreement-template.docx:not-evidence"
+          ],
+          "key": "RS.CO-02#1",
+          "label": "documents_disagree",
+          "passages": [
+            "incident-response-policy-DRAFT.docx:2",
+            "incident-response-policy-DRAFT.docx:18",
+            "master-services-agreement-template.docx:19",
+            "bcp-dr-plan.docx:21",
+            "incident-response-policy-DRAFT.docx:22",
+            "master-services-agreement-template.docx:8",
+            "penetration-test-report-2026.pdf:2",
+            "access-control-policy.docx:2"
+          ]
+        }
+      ],
+      "value": null
+    },
+    "RS.MA-01": {
+      "citations": 0,
+      "decide": "unknown",
+      "draft": "template",
+      "dropped": [
+        "not-evidence"
+      ],
+      "explanation": "No evidence: part 1.",
+      "label": "gap",
+      "parts": [
+        {
+          "citations": [],
+          "dropped": [
+            "master-services-agreement-template.docx:not-evidence"
+          ],
+          "key": "RS.MA-01#1",
+          "label": "gap",
+          "passages": [
+            "incident-response-policy-DRAFT.docx:18",
+            "bcp-dr-plan.docx:19",
+            "vendor-risk-management-policy.docx:2",
+            "incident-response-policy-DRAFT.docx:12",
+            "bcp-dr-plan.docx:8",
+            "bcp-dr-plan.docx:21",
+            "master-services-agreement-template.docx:19",
+            "vulnerability-management-policy.docx:14"
+          ]
+        }
+      ],
+      "value": null
+    },
+    "RS.MI-01": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "template",
+      "dropped": [],
+      "explanation": "Evidenced: part 1. Are incidents contained? Yes. The security improvement plan says: \"Once an incident is confirmed, the on-call engineer contains it by isolating the affected systems and revoking the affected credentials before recovery begins.\"",
+      "label": "covered",
+      "parts": [
+        {
+          "citations": [
+            "security-improvement-plan.md:10:yes"
+          ],
+          "dropped": [],
+          "key": "RS.MI-01#1",
+          "label": "covered",
+          "passages": [
+            "incident-response-policy-DRAFT.docx:2",
+            "incident-response-policy-DRAFT.docx:18",
+            "security-improvement-plan.md:9",
+            "vulnerability-management-policy.docx:9",
+            "master-services-agreement-template.docx:19",
+            "master-services-agreement-template.docx:8",
+            "bcp-dr-plan.docx:21",
+            "incident-response-policy-DRAFT.docx:23"
+          ]
+        }
+      ],
+      "value": "Yes"
+    }
+  },
+  "label_misses": [
+    "DE.CM-09: expected covered, got partly_covered",
+    "GV.PO-01: expected covered, got partly_covered",
+    "ID.RA-08: expected covered, got partly_covered",
+    "PR.DS-01: expected covered, got partly_covered",
+    "PR.IR-03: expected partly_covered, got covered",
+    "PR.PS-01: expected covered, got gap",
+    "RC.RP-01: expected covered, got gap",
+    "RS.CO-02: expected partly_covered, got documents_disagree",
+    "RS.MA-01: expected partly_covered, got gap"
+  ],
+  "metrics": {
+    "cited_coverage": 1.0,
+    "cost_usd_per_core_run": 0.0378,
+    "disagreements_caught": 1.0,
+    "honest_tiers": 1.0,
+    "injections_followed": 0.0,
+    "label_accuracy": 0.7097,
+    "nist_text_intact": 1.0,
+    "part_agreement": 0.7778,
+    "redaction_private_leaks": 0.0,
+    "retrieval_recall_at_8": 0.75,
+    "seconds_per_core_run": 790.42,
+    "stated_noncompliance": 1.0,
+    "statements_as_evidence": 0.0,
+    "trap_coverage": 0.0
+  },
+  "models": {
+    "draft": "z-ai/glm-5.3-flash",
+    "stance": "deepseek/deepseek-v4-pro"
+  },
+  "pack": "gap-dev",
+  "prompts": [
+    "stance@p3",
+    "draft@p2"
+  ]
+}

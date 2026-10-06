@@ -1,0 +1,6 @@
+{
+  "GV.OC-03": "Kestrelyn follows HIPAA for its healthcare customers and the security terms in each customer agreement. Dana Ortiz, Head of Security, reviews these requirements every year.",
+  "GV.RM-02": "Yes. The CEO approved a cybersecurity risk tolerance statement in March 2026, and it is shared with every team lead. Questions go to dana.ortiz@kestrelyn.example or to Tomas Brandt, our risk analyst, on +1 512 555 0187.",
+  "GV.RR-02": "Dana Ortiz, Head of Security, owns the security program and Priya Raman, CTO, owns engineering security. Reach Dana at +1 512 555 0142.",
+  "GV.SC-01": "The vendor risk management policy is our supply chain program; the CEO approved it in February 2026. Our vendor portal api_key=sk9Kestrel2026xQ is rotated monthly."
+}

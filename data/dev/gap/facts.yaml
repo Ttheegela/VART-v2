@@ -1,0 +1,169 @@
+# Gap-check extension of data/dev/facts.yaml (datakit.gap). Read only by the CSF gap check (eval pack gap-dev), so
+# the questionnaire keys, the dev eval and its recordings do not change. Same rules as the dev fact sheet: a
+# statement appears verbatim in its document; ASCII only.
+#   outcomes  every Checked CSF 2.0 outcome (data/csf/tiers.yaml) and the one control that answers it. `label: partly_covered`
+#             with `missing:` (the NIST parts that lack evidence) overrides the derived label for a broad outcome;
+#             `missing_parts:` gives the numbers of those parts in data/csf/tiers.yaml (blind judges 1 and 2, Rulings
+#             12, 15, 17 and 19).
+pack: dev
+
+documents:
+  - id: sip
+    filename: security-improvement-plan.md
+    format: md
+    kind: plan
+    effective_date: 2026-07-01
+
+controls:
+  - {id: threat-intel-sources, topic: Detection, truth: "No threat intelligence feed yet; joining a sharing group is planned for 2027"}
+  - {id: threat-intel-analysis, topic: Detection, truth: "Threat intelligence is not yet used in event analysis; planned for 2027"}
+  - {id: incident-analysis, topic: Incident response, truth: "A post-incident review establishes what happened and its root cause"}
+  - {id: incident-containment, topic: Incident response, truth: "Confirmed incidents are contained by isolating systems and revoking credentials"}
+  - {id: activity-monitoring, topic: Detection, truth: "Access and activity on production systems are audited and monitored to detect intrusions and unauthorized disclosure"}
+
+statements:
+  - id: sip-threat-intel-sources
+    doc: sip
+    control: threat-intel-sources
+    stance: no
+    flags: [negation]
+    text: "Kestrelyn does not yet receive cyber threat intelligence from information sharing forums; joining an industry sharing group is planned for 2027."
+  - id: sip-threat-intel-analysis
+    doc: sip
+    control: threat-intel-analysis
+    stance: no
+    flags: [negation]
+    text: "Threat intelligence is not yet integrated into the analysis of security events; this integration is planned for 2027."
+  - id: sip-alerting
+    doc: sip
+    control: alerting
+    stance: no
+    flags: [negation]
+    text: "Security alerts are not yet routed to the on-call rotation; on-call paging for security alerts is planned for 2027."
+  - id: sip-incident-analysis
+    doc: sip
+    control: incident-analysis
+    stance: yes
+    text: "After every security incident, the security lead holds a post-incident review to establish what happened and its root cause, and records the findings and follow-up actions."
+  - id: sip-incident-containment
+    doc: sip
+    control: incident-containment
+    stance: yes
+    text: "Once an incident is confirmed, the on-call engineer contains it by isolating the affected systems and revoking the affected credentials before recovery begins."
+  # DE.CM-09: the logging and monitoring policy states the outcome itself (a scan finds weaknesses, not events).
+  - id: lmp-activity-monitoring
+    doc: lmp
+    control: activity-monitoring
+    stance: yes
+    text: "Kestrelyn shall audit and monitor the access and activity of systems and applications that process or store production and sensitive data"
+  - id: lmp-intrusion-detection
+    doc: lmp
+    control: activity-monitoring
+    stance: yes
+    text: "Kestrelyn shall audit access and activity to detect, report, and guard against:"
+  - id: lmp-audit-logging
+    doc: lmp
+    control: activity-monitoring
+    stance: yes
+    text: "All critical computing systems and software must enable audit logging."
+  # RS.CO-02: a final line, disaster scope only, so partial; it keeps the outcome from being a draft-only trap.
+  - id: bcp-communications
+    doc: bcp
+    control: breach-notification
+    stance: partial
+    text: "Role: Communications Lead; Responsibility: Keeps employees and customers informed"
+  # GV.PO-01: communicated and enforced (the key's first quote covers only "established").
+  - id: hrp-awareness-training
+    doc: hrp
+    control: infosec-program
+    stance: yes
+    text: "All employees complete security awareness training annually."
+  - id: hrp-discipline
+    doc: hrp
+    control: infosec-program
+    stance: yes
+    text: "A fair disciplinary process is used for employees suspected of violating security rules."
+  # ID.RA-08: analyzing and responding (the key's first quote covers receiving and acknowledging).
+  - id: vmp-findings-tracked
+    doc: vmp
+    control: vuln-disclosure
+    stance: yes
+    text: "All vulnerability findings must be reported and tracked to resolution."
+  - id: vmp-findings-prioritized
+    doc: vmp
+    control: vuln-disclosure
+    stance: yes
+    text: "Findings are prioritized by severity and by how easily they can be exploited."
+  # PR.DS-01 / PR.DS-02 integrity parts (judge 2's per-part re-judge, Ruling 19): the logging policy guards against
+  # improper alteration (line 9) of sensitive information on systems that store, transmit or process it (line 10).
+  - id: lmp-integrity-at-rest
+    doc: lmp
+    control: encryption-at-rest
+    stance: yes
+    text: "Improper alteration or loss of sensitive information."
+  - id: lmp-integrity-in-transit
+    doc: lmp
+    control: encryption-in-transit
+    stance: yes
+    text: "This policy applies to all Kestrelyn systems that store, transmit, or process sensitive information."
+  # PR.DS-01 availability part (Ruling 20): the continuity policy's daily backups of production databases (line 10).
+  - id: bcpol-availability-at-rest
+    doc: bcpol
+    control: encryption-at-rest
+    stance: yes
+    text: "Kestrelyn performs daily backups of all production databases."
+
+traps:
+  - id: G1
+    kind: disagree
+    statements: [lmp-alerting, sip-alerting]
+    note: "The logging policy says security events page the on-call rotation; the improvement plan says alerts are not yet routed to it."
+  - id: G2
+    kind: planned_only
+    statements: [sip-threat-intel-sources]
+    note: "Receiving threat intelligence is only planned: a stated non-compliance, never Covered."
+  - id: G3
+    kind: planned_only
+    statements: [sip-threat-intel-analysis]
+    note: "Using threat intelligence in event analysis is only planned: a stated non-compliance, never Covered."
+  - id: G4
+    kind: planned_only
+    statements: [sip-alerting]
+    note: "On-call paging for security alerts is only planned in the improvement plan."
+
+outcomes:
+  - {csf_id: GV.PO-01, control: infosec-program}
+  - {csf_id: GV.PO-02, control: policy-review, label: partly_covered, missing_parts: [2, 4], missing: "updated, and enforced to reflect changes in requirements, threats, technology and mission (judge 2: only reviewed, communicated and enforced have evidence)"}
+  - {csf_id: ID.AM-01, control: asset-inventory}
+  - {csf_id: ID.AM-02, control: asset-inventory}
+  - {csf_id: ID.AM-03, control: data-flow-diagram}
+  - {csf_id: ID.AM-05, control: data-classification, label: partly_covered, missing_parts: [2, 3, 4], missing: "criticality, resources and mission impact (only classification has evidence)"}
+  - {csf_id: ID.AM-08, control: media-sanitization, label: partly_covered, missing_parts: [1, 3, 4], missing: "end-of-life for systems, software and services (only hardware disposal and data deletion have evidence)"}
+  - {csf_id: ID.RA-01, control: pentest}
+  - {csf_id: ID.RA-02, control: threat-intel-sources}
+  - {csf_id: ID.RA-08, control: vuln-disclosure}
+  - {csf_id: PR.AA-01, control: sso, label: partly_covered, missing_parts: [3], missing: "identities and credentials for hardware (judge 2: only users and services have evidence)"}
+  - {csf_id: PR.AA-03, control: mfa}
+  - {csf_id: PR.AA-05, control: access-review}
+  - {csf_id: PR.AA-06, control: physical-access}
+  - {csf_id: PR.DS-01, control: encryption-at-rest}
+  # PR.DS-02 (judge 2's per-part re-judge, Ruling 19): confidentiality (crypto) and integrity (lmp scope line) have
+  # evidence; no line protects the availability of data in transit.
+  - {csf_id: PR.DS-02, control: encryption-in-transit, label: partly_covered, missing_parts: [3], missing: "availability of data in transit (judge 2 re-judge: no redundancy, DoS or rate-limit line; pentest KL-26-01 reports missing rate limiting)"}
+  # PR.DS-11 (judge 2's fallback, Ruling 17 / adversary C1): the restore-test interval disagreement (policy quarterly,
+  # DR plan annually) is a no only against a stated threshold, which a CSF part may not state; it is reported here.
+  - {csf_id: PR.DS-11, control: backups, label: partly_covered, missing_parts: [2, 3], missing: "protected and maintained (no line on backup protection, retention or integrity); tested: the continuity policy says quarterly and the DR plan annually, an interval disagreement the part cannot see (spec 10)"}
+  - {csf_id: PR.PS-01, control: build-release}
+  - {csf_id: PR.PS-02, control: patch-sla, label: partly_covered, missing_parts: [2, 3], missing: "replaced (no end-of-life or unsupported-software line); removed commensurate with risk has weak evidence only (judge 2)"}
+  - {csf_id: PR.PS-04, control: central-logging}
+  - {csf_id: PR.PS-06, control: sast, label: partly_covered, missing_parts: [2], missing: "performance monitored (judge 2: no metric or review of how the practices perform)"}
+  - {csf_id: PR.IR-03, control: rto-rpo, label: partly_covered, missing_parts: [1], missing: "normal situations, and requirements achieved (only the RTO and RPO targets have evidence, no test shows them met)"}
+  - {csf_id: PR.IR-04, control: uptime-sla}
+  - {csf_id: DE.CM-09, control: activity-monitoring}
+  - {csf_id: DE.AE-06, control: alerting}
+  - {csf_id: DE.AE-07, control: threat-intel-analysis}
+  - {csf_id: RS.MA-01, control: ir-plan}
+  - {csf_id: RS.AN-03, control: incident-analysis}
+  - {csf_id: RS.MI-01, control: incident-containment}
+  - {csf_id: RS.CO-02, control: breach-notification}
+  - {csf_id: RC.RP-01, control: dr-test}

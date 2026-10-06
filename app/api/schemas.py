@@ -18,6 +18,8 @@ from pydantic import (
 )
 from pydantic.json_schema import SkipJsonSchema
 
+from app.contracts import DropReason
+
 MAX_ANSWER_CHARS = 4000  # an interview answer (engine adversary-3 I3: statements bypass the line limit)
 MAX_EDIT_CHARS = 4000  # an edited answer text
 MAX_REASON_CHARS = 500  # a "not applicable" reason
@@ -266,7 +268,7 @@ class CitationOut(BaseModel):
 
 
 class DroppedOut(BaseModel):
-    reason: Literal["containment", "quote-length", "record-field", "not-evidence", "placeholder", "injection"]
+    reason: DropReason
     document_id: uuid.UUID
     filename: str
     line: int | None

@@ -569,7 +569,7 @@ export interface components {
        * Reason
        * @enum {string}
        */
-      reason: "containment" | "quote-length" | "record-field" | "not-evidence" | "placeholder" | "injection";
+      reason: "containment" | "quote-length" | "record-field" | "not-evidence" | "placeholder" | "injection" | "statement";
       /** Sentence */
       sentence: string;
     };

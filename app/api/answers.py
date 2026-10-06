@@ -37,6 +37,7 @@ WHY = {
     "not-evidence": "This document does not count as evidence (a contract, template or questionnaire).",
     "placeholder": "This passage is unfilled template text.",
     "injection": "This passage contains instructions aimed at a model, so it was never sent to one.",
+    "statement": "This is your own answer; a CSF outcome is judged on documents only.",
 }
 
 

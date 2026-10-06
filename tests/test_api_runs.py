@@ -1,12 +1,17 @@
 import json
 import threading
+import uuid
+from typing import get_args
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select, update
 from sqlalchemy.orm import Session
 
+from app.api.answers import WHY
 from app.api.deps import get_llm
+from app.api.schemas import DroppedOut
+from app.contracts import DropReason
 from app.db.models import Answer, AuditEvent, DocumentLine, Workspace
 from app.main import app
 from app.services import ip_limits
@@ -231,3 +236,11 @@ def test_the_audit_log_lists_this_workspaces_events_only(ready, db: Engine) -> N
         s.commit()
     actions = [e["action"] for e in client.get("/api/audit").json()]
     assert actions == ["run.done", "run.create"]
+
+
+@pytest.mark.parametrize("reason", get_args(DropReason))
+def test_every_drop_reason_has_a_sentence_and_a_schema_value(reason: str) -> None:
+    # final review I2: a stored "statement" drop (6B) must not KeyError (a 500) in the evidence drawer
+    assert set(WHY) == set(get_args(DropReason))
+    out = DroppedOut(reason=reason, document_id=uuid.uuid4(), filename="a.md", line=1, sentence=WHY[reason])
+    assert out.reason == reason
