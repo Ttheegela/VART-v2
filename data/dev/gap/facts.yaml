@@ -1,0 +1,99 @@
+# Gap-check extension of data/dev/facts.yaml (datakit.gap). Read only by the CSF gap check (eval pack gap-dev), so
+# the questionnaire keys, the dev eval and its recordings do not change. Same rules as the dev fact sheet: a
+# statement appears verbatim in its document; ASCII only.
+#   outcomes  every Checked CSF 2.0 outcome (data/csf/tiers.yaml) and the one control that answers it
+pack: dev
+
+documents:
+  - id: sip
+    filename: security-improvement-plan.md
+    format: md
+    kind: plan
+    effective_date: 2026-07-01
+
+controls:
+  - {id: threat-intel-sources, topic: Detection, truth: "No threat intelligence feed yet; joining a sharing group is planned for 2027"}
+  - {id: threat-intel-analysis, topic: Detection, truth: "Threat intelligence is not yet used in event analysis; planned for 2027"}
+  - {id: incident-analysis, topic: Incident response, truth: "A post-incident review establishes what happened and its root cause"}
+  - {id: incident-containment, topic: Incident response, truth: "Confirmed incidents are contained by isolating systems and revoking credentials"}
+
+statements:
+  - id: sip-threat-intel-sources
+    doc: sip
+    control: threat-intel-sources
+    stance: no
+    flags: [negation]
+    text: "Kestrelyn does not yet receive cyber threat intelligence from information sharing forums; joining an industry sharing group is planned for 2027."
+  - id: sip-threat-intel-analysis
+    doc: sip
+    control: threat-intel-analysis
+    stance: no
+    flags: [negation]
+    text: "Threat intelligence is not yet integrated into the analysis of security events; this integration is planned for 2027."
+  - id: sip-alerting
+    doc: sip
+    control: alerting
+    stance: no
+    flags: [negation]
+    text: "Security alerts are not yet routed to the on-call rotation; on-call paging for security alerts is planned for 2027."
+  - id: sip-incident-analysis
+    doc: sip
+    control: incident-analysis
+    stance: yes
+    text: "After every security incident, the security lead holds a post-incident review to establish what happened and its root cause, and records the findings and follow-up actions."
+  - id: sip-incident-containment
+    doc: sip
+    control: incident-containment
+    stance: yes
+    text: "Once an incident is confirmed, the on-call engineer contains it by isolating the affected systems and revoking the affected credentials before recovery begins."
+
+traps:
+  - id: G1
+    kind: disagree
+    statements: [lmp-alerting, sip-alerting]
+    note: "The logging policy says security events page the on-call rotation; the improvement plan says alerts are not yet routed to it."
+  - id: G2
+    kind: planned_only
+    statements: [sip-threat-intel-sources]
+    note: "Receiving threat intelligence is only planned: a stated non-compliance, never Covered."
+  - id: G3
+    kind: planned_only
+    statements: [sip-threat-intel-analysis]
+    note: "Using threat intelligence in event analysis is only planned: a stated non-compliance, never Covered."
+  - id: G4
+    kind: planned_only
+    statements: [sip-alerting]
+    note: "On-call paging for security alerts is only planned in the improvement plan."
+
+outcomes:
+  - {csf_id: GV.PO-01, control: infosec-program}
+  - {csf_id: GV.PO-02, control: policy-review}
+  - {csf_id: ID.AM-01, control: asset-inventory}
+  - {csf_id: ID.AM-02, control: asset-inventory}
+  - {csf_id: ID.AM-03, control: data-flow-diagram}
+  - {csf_id: ID.AM-05, control: data-classification}
+  - {csf_id: ID.AM-08, control: media-sanitization}
+  - {csf_id: ID.RA-01, control: pentest}
+  - {csf_id: ID.RA-02, control: threat-intel-sources}
+  - {csf_id: ID.RA-08, control: vuln-disclosure}
+  - {csf_id: PR.AA-01, control: sso}
+  - {csf_id: PR.AA-03, control: mfa}
+  - {csf_id: PR.AA-05, control: access-review}
+  - {csf_id: PR.AA-06, control: physical-access}
+  - {csf_id: PR.DS-01, control: encryption-at-rest}
+  - {csf_id: PR.DS-02, control: encryption-in-transit}
+  - {csf_id: PR.DS-11, control: backups}
+  - {csf_id: PR.PS-01, control: build-release}
+  - {csf_id: PR.PS-02, control: patch-sla}
+  - {csf_id: PR.PS-04, control: central-logging}
+  - {csf_id: PR.PS-06, control: sast}
+  - {csf_id: PR.IR-03, control: rto-rpo}
+  - {csf_id: PR.IR-04, control: uptime-sla}
+  - {csf_id: DE.CM-09, control: vuln-scanning}
+  - {csf_id: DE.AE-06, control: alerting}
+  - {csf_id: DE.AE-07, control: threat-intel-analysis}
+  - {csf_id: RS.MA-01, control: ir-plan}
+  - {csf_id: RS.AN-03, control: incident-analysis}
+  - {csf_id: RS.MI-01, control: incident-containment}
+  - {csf_id: RS.CO-02, control: breach-notification}
+  - {csf_id: RC.RP-01, control: dr-test}

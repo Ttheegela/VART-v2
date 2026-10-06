@@ -19,6 +19,7 @@ TrapKind = Literal[
     "honest_negative",
     "placeholder",
     "draft_only",
+    "planned_only",
     "injection",
     "must_ask",
     "fills",
@@ -155,6 +156,22 @@ class Key(_Strict):
     pack: str
     questionnaire: str
     items: tuple[KeyItem, ...]
+
+
+class GapOutcome(_Strict):
+    csf_id: str
+    control: str
+
+
+class GapFacts(_Strict):
+    """data/<pack>/gap/facts.yaml: what only the CSF gap check adds to the pack's fact sheet (datakit.gap)."""
+
+    pack: str
+    documents: tuple[DocSpec, ...] = ()
+    controls: tuple[Control, ...] = ()
+    statements: tuple[Statement, ...] = ()
+    traps: tuple[Trap, ...] = ()
+    outcomes: tuple[GapOutcome, ...]
 
 
 _BOOL = "tag:yaml.org,2002:bool"
