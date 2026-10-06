@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { GapLabel, Label } from "../lib/api";
-import { CHIP, GAP_CHIP, GAP_WORD, LABEL_WORD } from "../lib/labels";
+import { ANSWERED_WORD, CHIP, GAP_CHIP, GAP_WORD, LABEL_WORD } from "../lib/labels";
 
 const CHIP_BASE = "inline-block min-w-[9ch] px-1 text-center text-xs font-medium leading-[18px]";
 
@@ -50,8 +50,9 @@ export function LabelChip({ label }: { label: Label }) {
   );
 }
 
-export function GapChip({ label }: { label: GapLabel }) {
-  return <span className={`${CHIP_BASE} ${GAP_CHIP[label]}`}>{GAP_WORD[label]}</span>;
+export function GapChip({ label, tier }: { label: GapLabel; tier?: string }) {
+  const word = label === "confirmed_by_you" && tier === "ask" ? ANSWERED_WORD : GAP_WORD[label];
+  return <span className={`${CHIP_BASE} ${GAP_CHIP[label]}`}>{word}</span>;
 }
 
 export function ErrorLine({ message }: { message: string | null }) {

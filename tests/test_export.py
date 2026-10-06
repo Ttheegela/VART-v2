@@ -325,3 +325,14 @@ def test_a_questionnaire_xlsx_gains_the_gap_sheet_only_when_given_and_never_over
     lower.save(buf)
     names = openpyxl.load_workbook(io.BytesIO(export_xlsx(buf.getvalue(), VSQ, ROWS, gap))).sheetnames
     assert names[-2:] == ["gap report", "Gap report (2)"]
+
+
+def test_an_ask_me_answer_reads_answered_by_you_and_a_fill_made_covered_reads_confirmed_by_you() -> None:
+    """Ruling 14: one label id, two words by tier; an Ask-me "No, not yet" is an answer, not a verdict."""
+    rows = [
+        _gap_row("GV.RM-02", "ask", "confirmed_by_you", "Your answer: No, not yet.", uuid.uuid4()),
+        _gap_row("PR.DS-11", "checked", "confirmed_by_you", "Confirmed by you: part 3.", uuid.uuid4()),
+    ]
+    body = gap_report(GapSheet(rows, {}, "2026-10-06", "core", "2.0", CONTROLS))
+    ws = openpyxl.load_workbook(io.BytesIO(body))["Gap report"]
+    assert [ws.cell(n, 4).value for n in (3, 4)] == ["Answered by you", "Confirmed by you"]

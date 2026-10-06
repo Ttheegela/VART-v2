@@ -24,9 +24,10 @@ not compliant with those two controls, by design.
 **What it is not.** It is not legal advice, an audit, a certification or a compliance score, and no overall score
 is shown. Every finding reads "possible gap, review it". It checks 31 of CSF 2.0's 106 outcomes against documents,
 asks you about 5 governance outcomes that documents rarely state, and lists the other 70 as not checked in this
-version. The coverage line counts outcomes, not parts: how many of the 106 were checked against documents, how
-many are left to you, and how many were not checked; an Ask-me or failed outcome never counts as checked. A checked
-outcome is judged on documents only: your answers confirm the Ask-me outcomes, and can fill a checked part in the
+version. The coverage line counts outcomes by tier, not parts: 31 checked against documents in this version, 5 asked
+of you, 70 not checked, of 106. The "n of 31 checked" beside it counts only Checked outcomes with a result; an
+Ask-me, failed or not-applicable outcome never counts there. A checked outcome is judged on documents only: your
+answers to the Ask-me outcomes read "Answered by you" (an answer, not a verdict), and can fill a checked part in the
 same CSF function only as a suggestion you accept. On the dev pack its outcome labels agree with a blind judge's
 key 22 times in 31 (0.71 against a 0.80 target, reported in `evals/results/gap-dev.md`).
 

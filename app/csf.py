@@ -61,6 +61,7 @@ GAP_WORDS: dict[str, str] = {
     "confirmed_by_you": "Confirmed by you",
     "not_answered": "Not answered",
 }
+ANSWERED = "Answered by you"  # Ruling 14: an Ask-me answer is not a confirmation ("No, not yet" is an answer)
 NOT_CHECKED = "not checked in this version"
 # NIST's SP 800-53 Rev 5 page. Every related control links here: no per-control page could be verified (the
 # Reference Tool's deep links are single-page-app routes, 6A decision 3). The lead checked it (6B Task 1).
@@ -185,6 +186,12 @@ def item_input(o: Outcome) -> ItemInput:
     if o.question is None:
         raise ValueError(f"{o.id} has no question: it is {NOT_CHECKED}")
     return ItemInput(o.id, o.question, o.category)
+
+
+def gap_word(tier: Tier, label: str) -> str:
+    """The words for a label on a tier: an Ask-me answer reads "Answered by you"; "Confirmed by you" is only
+    for a Checked outcome made Covered by accepted fills (Ruling 14)."""
+    return ANSWERED if label == "confirmed_by_you" and tier == "ask" else GAP_WORDS[label]
 
 
 def gap_label(

@@ -34,9 +34,9 @@ test("the gap check runs over the sample documents, takes an Ask-me answer and e
     .getByLabel("your answer to GV.RM-02")
     .fill("Yes. The board approved a cybersecurity risk appetite statement, and the security team shares it with every new hire.");
   await drawer.getByRole("button", { name: "Send" }).click();
-  await expect(drawer.getByText("confirmed by you").first()).toBeVisible({ timeout: RUN_WAIT });
+  await expect(drawer.getByText("answered by you").first()).toBeVisible({ timeout: RUN_WAIT });
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("row", { name: /^GV\.RM-02 / })).toContainText("confirmed by you");
+  await expect(page.getByRole("row", { name: /^GV\.RM-02 / })).toContainText("answered by you");
 
   // The gap report
   const download = page.waitForEvent("download");

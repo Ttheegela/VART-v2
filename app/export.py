@@ -158,7 +158,7 @@ def _gap_word(r: GapRow) -> str:
     if r.tier == "not_checked":
         return csf.NOT_CHECKED[0].upper() + csf.NOT_CHECKED[1:]  # "Not checked in this version"
     if r.label:
-        return csf.GAP_WORDS[r.label]
+        return csf.gap_word(r.tier, r.label)
     return FAILED_WORD if _failed(r) else NOT_RUN
 
 

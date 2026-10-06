@@ -46,6 +46,9 @@ export const GAP_WORD: Record<GapLabel, string> = {
   not_answered: "not answered",
 };
 
+/** Ruling 14: an Ask-me answer is "answered by you"; "confirmed by you" is only a Checked outcome made Covered by fills. */
+export const ANSWERED_WORD = "answered by you";
+
 export const GAP_CHIP: Record<GapLabel, string> = {
   covered: "bg-chrome text-on-chrome",
   confirmed_by_you: "bg-neutral-700 text-on-chrome",

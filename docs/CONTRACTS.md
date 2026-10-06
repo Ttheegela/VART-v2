@@ -107,7 +107,7 @@ change-log line; changing or removing a path, a field or a status needs the lead
   explanation from the latest run of the scope's current built-in questionnaire; it writes nothing. An outcome
   the visitor marked not applicable has `GapRow.not_applicable`, no label and its reason as the explanation, on
   either tier, and the gap sheet writes "Not applicable". An outcome whose model call failed twice has no label
-  and the failure sentence as its explanation (never Gap); the sheet writes "Not run yet".
+  and the failure sentence as its explanation (never Gap); the sheet writes "Failed".
   `POST /api/gap/{scope}/run` creates or reuses that questionnaire (Plan 3 Ruling 5: built-in ones are never
   counted, listed or deleted), locks it, and answers the run to step: a new one, the running one, or the done
   one with every outcome whose evidence changed (compared as sets of passages) or whose answer failed re-opened
@@ -123,7 +123,7 @@ change-log line; changing or removing a path, a field or a status needs the lead
   a re-open keeps the open per-part fills. An accepted per-part fill reads "Confirmed by you: part n" in the
   explanation when its part is Covered (otherwise its label's words "in your answer", e.g. "Partly evidenced in
   your answer: part n") and "(your answer)" in the sheet's quotes (keyed on `Document.source`), and the outcome is Confirmed by you only when it would
-  otherwise read Covered (one filled part with Gaps left stays Partly covered); accepting one fill never
+  otherwise read Covered (an Ask-me outcome the visitor answered reads "Answered by you", Ruling 14) (one filled part with Gaps left stays Partly covered); accepting one fill never
   closes the others.
   On a gap-check run, `GET /api/runs/{id}/export` answers the gap-report workbook (it was a 409), and Questions
   for you holds the Ask-me outcomes only. An xlsx questionnaire export carries the latest done gap check as a
@@ -233,3 +233,4 @@ change-log line; changing or removing a path, a field or a status needs the lead
   outcome (M5, M6). `GET /api/runs/{id}/export` on a gap run that is not done is a 409 (M3).
   `AnswerSummary.sources` for Confirmed by you counts the cited documents, at least 1 (M2). No prompt or label
   rule changes, so nothing is re-recorded.
+- 2026-10-06: Plan 6B final review fix (Ruling 14; copy and mapping only, the label id `confirmed_by_you` and the OpenAPI schema are unchanged): an Ask-me outcome the visitor answered reads "Answered by you" (view chip, drawer, sheet via `csf.gap_word`) and stays in the review set; "Confirmed by you" is only for a Checked outcome made Covered by accepted fills (Ruling 6). The failed sheet word is "Failed" (stale "Not run yet" fixed). No prompt or label rule changes, so nothing is re-recorded.

@@ -410,6 +410,24 @@ def test_on_the_sample_pack_an_ask_me_answer_alone_reopens_nothing(db: Engine) -
     assert (row["label"], row["explanation"]) == ("confirmed_by_you", f"Your answer: {answer}")
 
 
+def test_an_ask_me_no_not_yet_reads_answered_by_you_in_the_sheet(db: Engine) -> None:
+    """Ruling 14: the label id stays confirmed_by_you on the Ask-me tier, the sheet says Answered by you."""
+    client, _ = visitor(db)
+    assert client.post("/api/documents/sample").status_code == 201
+    run = client.post("/api/gap/core/run").json()
+    _finish(client, run["id"], ByStepLLM({"stance": YES}))
+    _ask(client, run["id"], "GV.RM-02", "No, not yet.", NO_FILL)
+    row = next(r for r in client.get("/api/gap/core").json()["rows"] if r["csf_id"] == "GV.RM-02")
+    assert (row["tier"], row["label"]) == ("ask", "confirmed_by_you")
+    sheet = openpyxl.load_workbook(io.BytesIO(client.get(f"/api/runs/{run['id']}/export").content))[
+        "Gap report"
+    ]
+    word = next(
+        sheet.cell(n, 4).value for n in range(3, sheet.max_row + 1) if sheet.cell(n, 1).value == "GV.RM-02"
+    )
+    assert word == "Answered by you"
+
+
 def test_a_gap_outcome_is_never_edited_or_approved_from_the_run_view(db: Engine) -> None:
     """adversary-2 M5 and M6: an edit or approval would keep Check again off the outcome and put text code
     did not write into the sheet, so both are refused for a gap check's outcome."""

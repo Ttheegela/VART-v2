@@ -20,7 +20,7 @@ const same = (x: CitationOut, c: CitationOut) =>
 
 function labelOf(row: GapRow) {
   if (row.not_applicable) return <LabelChip label="na" />; // adversary-1 I1: wins over the tier's label
-  if (row.label) return <GapChip label={row.label} />;
+  if (row.label) return <GapChip label={row.label} tier={row.tier} />;
   if (row.tier === "not_checked") return "not checked in this version"; // CSF spec 5.5
   return row.answer_id ? "—" : "not run yet"; // an answer with no label failed; its sentence is the explanation (M4)
 }
@@ -66,7 +66,7 @@ function Inspector({ row, runId, controlsUrl, onClose, onChanged }: Props) {
           ))}
         </dd>
       </dl>
-      {row.label && !row.not_applicable && TO_REVIEW.has(row.label) && <p className="font-medium">{GAP_REVIEW}</p>}
+      {row.label && !row.not_applicable && (TO_REVIEW.has(row.label) || (row.tier === "ask" && row.label === "confirmed_by_you")) && <p className="font-medium">{GAP_REVIEW}</p>}
       {row.explanation && <div className="border border-rule-strong p-2 text-ink-2 [overflow-wrap:anywhere]">{row.explanation}</div>}
       {parts.length > 0 && (
         <section>
@@ -89,7 +89,7 @@ function Inspector({ row, runId, controlsUrl, onClose, onChanged }: Props) {
       {tier === "ask" && !row.not_applicable && (question ? (
         <>
           <ul>
-            <QuestionCard q={question} focus={false} onUpdated={(q) => { setQuestion(q); onChanged(); }} onStale={() => { onChanged(); setTick((t) => t + 1); }} />
+            <QuestionCard q={question} focus={false} gap onUpdated={(q) => { setQuestion(q); onChanged(); }} onStale={() => { onChanged(); setTick((t) => t + 1); }} />
           </ul>
           <p className="text-xs text-ink-3">{STATEMENT}</p>
         </>

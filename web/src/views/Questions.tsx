@@ -8,7 +8,7 @@ const MAX = 4000;
 /** A part's fill in the gap check's words (CSF spec 5.3; adversary-2 M4). */
 const PART_LABEL: Record<string, GapLabel> = { Yes: "covered", Partial: "partly_covered", No: "not_met" };
 
-export function QuestionCard({ q, focus, onUpdated, onStale }: { q: QuestionOut; focus: boolean; onUpdated: (q: QuestionOut) => void; onStale: () => void }) {
+export function QuestionCard({ q, focus, gap = false, onUpdated, onStale }: { q: QuestionOut; focus: boolean; gap?: boolean; onUpdated: (q: QuestionOut) => void; onStale: () => void }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +55,7 @@ export function QuestionCard({ q, focus, onUpdated, onStale }: { q: QuestionOut;
       <div className="flex flex-wrap items-baseline gap-2 text-sm">
         <span className="font-bold">{code}</span>
         <span className="text-xs uppercase text-ink-3">{q.reason}{q.high_weight ? " · high weight" : ""}</span>
-        {q.status === "answered" && <LabelChip label="user_confirmed" />}
+        {q.status === "answered" && (gap ? <GapChip label="confirmed_by_you" tier="ask" /> : <LabelChip label="user_confirmed" />)} {/* Ruling 14 */}
         {q.status === "skipped" && <span className="text-xs text-ink-3">skipped</span>}
       </div>
       <p className="text-base [overflow-wrap:anywhere]">{q.follow_up ?? q.text}</p>

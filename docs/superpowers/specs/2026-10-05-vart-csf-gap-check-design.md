@@ -206,6 +206,7 @@ Replace step 3 with:
 Sync (Plan 6A, Task 7), 5.3: `na` shows no label. A Checked outcome the visitor confirms shows **Confirmed by you**.
 Sync, 5.4: *Questions for you* holds Ask-me outcomes only.
 
+Sync (Plan 6B, Ruling 14, 2026-10-06), 5.4: an answered Ask-me outcome reads **Answered by you**, not Confirmed by you (a "No, not yet" is an answer, not a confirmation); it stays in the review set (review line and filter). **Confirmed by you** stays only for a Checked outcome made Covered by accepted fills. Copy and mapping only: the label id, prompts and recordings do not change.
 Sync (Plan 6B, Tarun 2026-10-06), 5.4: nothing re-checks an Ask-me outcome; the visitor's answer is stored as a statement and confirms it, and a later upload does not re-run it.
 Sync (Plan 6B, Tarun 2026-10-06), 5.6: in a gap-check run an Ask-me answer is re-checked against the open parts of Checked outcomes in the same CSF function (a questionnaire keeps the same-topic rule), at most 8 re-checks per answer; a fill stays a suggestion until accepted. Accepted fills make an outcome Confirmed by you only when its label would otherwise be Covered (one filled part with the rest Gap stays Partly covered), and accepting one fill never locks the others. Check again (r) re-runs every machine-judged part of each affected outcome; a part the visitor filled stays. Gap-check outcomes are reviewed through Check again, not approved: bulk approve skips them, and approving or editing a gap answer answers 409.
 

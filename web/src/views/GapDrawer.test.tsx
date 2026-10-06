@@ -26,7 +26,19 @@ describe("GapDrawer", () => {
     expect(within(drawer).getByRole("figure", { name: "[1] backup-policy.docx" })).toHaveTextContent("draft"); // carry d
   });
 
-  it("an Ask-me outcome is answered here and then confirmed by you", async () => {
+  it("an answered Ask-me outcome reads answered by you and stays in the review set; a Checked fill-made one reads confirmed by you", () => {
+    mockApi({ "GET /api/answers/a-GV.RM-02": fixtures.gapDetail, "GET /api/answers/a-PR.DS-11": fixtures.gapDetail });
+    const { unmount } = render(<GapDrawer {...base} row={{ ...ask, label: "confirmed_by_you", explanation: "Your answer: No, not yet." }} />);
+    expect(screen.getByText("answered by you")).toBeInTheDocument();
+    expect(screen.queryByText("confirmed by you")).toBeNull();
+    expect(screen.getByText("Possible gap — review it")).toBeInTheDocument();
+    unmount();
+    render(<GapDrawer {...base} row={{ ...checked, label: "confirmed_by_you" }} />);
+    expect(screen.getByText("confirmed by you")).toBeInTheDocument();
+    expect(screen.queryByText("Possible gap — review it")).toBeNull();
+  });
+
+  it("an Ask-me outcome is answered here and then answered by you", async () => {
     const onChanged = vi.fn();
     const q: QuestionOut = {
       ...fixtures.questions[0], id: "qq9", run_id: "r9", item_ids: ["i-GV.RM-02"], codes: ["GV.RM-02"],
@@ -44,7 +56,7 @@ describe("GapDrawer", () => {
     render(<GapDrawer {...base} row={ask} onChanged={onChanged} />);
     await userEvent.type(await screen.findByLabelText("your answer to GV.RM-02"), "Yes. The board approved a risk appetite statement.");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
-    expect(await screen.findByText("confirmed by you")).toBeInTheDocument();
+    expect(await screen.findByText("answered by you")).toBeInTheDocument();
     expect(onChanged).toHaveBeenCalled();
   });
 

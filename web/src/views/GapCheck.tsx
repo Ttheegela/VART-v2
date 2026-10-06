@@ -10,8 +10,8 @@ import { useStepLoop } from "./RunGrid";
 
 const NOT_CHECKED = "not checked in this version"; // CSF spec 5.5
 const NOTHING_CHANGED = "Nothing changed since the last check."; // adversary-1 M7
-type Filter = GapLabel | "not_applicable" | "no_result" | "not_checked";
-const FILTERS: readonly Filter[] = [...GAP_LABELS, "not_applicable", "no_result", "not_checked"];
+type Filter = GapLabel | "answered_by_you" | "not_applicable" | "no_result" | "not_checked";
+const FILTERS: readonly Filter[] = [...GAP_LABELS, "answered_by_you", "not_applicable", "no_result", "not_checked"];
 const TEXT_FILTER = { no_result: "no result", not_checked: "not checked" } as const;
 
 /** The status line (CSF spec 7): counted from the rows, never typed in, so coverage is never overstated. */
@@ -30,7 +30,8 @@ const checkedOf = (rows: GapRow[]) => {
 // adversary-1 I1: a visitor's N/A wins over the tier's label ("not answered" on Ask me, none on Checked).
 // No label otherwise is "no result" (not run yet, or failed: adversary-1 M4), so every row has exactly one filter.
 const filterOf = (r: GapRow): Filter =>
-  r.tier === "not_checked" ? "not_checked" : r.not_applicable ? "not_applicable" : (r.label ?? "no_result");
+  r.tier === "not_checked" ? "not_checked" : r.not_applicable ? "not_applicable"
+    : r.tier === "ask" && r.label === "confirmed_by_you" ? "answered_by_you" : (r.label ?? "no_result"); // Ruling 14
 const group = (r: GapRow) => `${r.function} / ${r.category}`.toLowerCase();
 
 type RowProps = { row: GapRow; i: number; cursor: boolean; selected: boolean; section: string | null; pending: boolean };
@@ -41,7 +42,7 @@ const Row = memo(function Row({ row: r, i, cursor, selected, section, pending }:
   // a FAILED outcome has no label and carries its failure sentence as the explanation (adversary-1 M4)
   const note =
     r.tier === "not_checked" ? NOT_CHECKED : (r.explanation ?? (pending ? "checking…" : r.answer_id ? "" : "not run yet"));
-  const chip = r.not_applicable ? <LabelChip label="na" /> : r.label ? <GapChip label={r.label} /> : r.tier === "not_checked" ? "not checked" : "";
+  const chip = r.not_applicable ? <LabelChip label="na" /> : r.label ? <GapChip label={r.label} tier={r.tier} /> : r.tier === "not_checked" ? "not checked" : "";
   return (
     <>
       {section !== null && (
@@ -200,7 +201,7 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
             {FILTERS.map((l) => (
               <button key={l} type="button" aria-pressed={filters.has(l)} onClick={() => toggle(l)}
                 className={`flex h-6 items-center gap-1 whitespace-nowrap border px-1 text-xs hover:border-rule-strong hover:bg-paper ${filters.has(l) ? "border-ink bg-paper" : "border-transparent"}`}>
-                {l === "no_result" || l === "not_checked" ? <span className="px-1 text-ink-3">{TEXT_FILTER[l]}</span> : l === "not_applicable" ? <LabelChip label="na" /> : <GapChip label={l} />}{" "}
+                {l === "no_result" || l === "not_checked" ? <span className="px-1 text-ink-3">{TEXT_FILTER[l]}</span> : l === "not_applicable" ? <LabelChip label="na" /> : l === "answered_by_you" ? <GapChip label="confirmed_by_you" tier="ask" /> : <GapChip label={l} />}{" "}
                 <span className="font-bold tabular-nums">{counts[l]}</span>
               </button>
             ))}
