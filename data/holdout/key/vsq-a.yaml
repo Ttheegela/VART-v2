@@ -1,0 +1,955 @@
+pack: holdout
+questionnaire: vsq-a
+items:
+- code: VSQ-01
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: isp
+    quote: Marrowgate maintains a documented information security program that has been approved by the CEO.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-02
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: isp
+    quote: Marrowgate security policies are reviewed once a year, and sooner after a significant change.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-03
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: isp
+    quote: The information security program is owned by Ilse Brandvold, Head of Security.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-04
+  expected_label: verified
+  expected_value: 'No'
+  must_ask: false
+  evidence:
+  - doc: isp
+    quote: Marrowgate does not hold ISO/IEC 27001 certification.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: true
+  traps:
+  - H1
+  - I1
+  fills: []
+- code: VSQ-05
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: soc2
+    quote: The service auditor issued an unqualified opinion on the Company's SOC 2 Type II examination for the period 2025-10-01
+      to 2026-03-31.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-06
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M8
+  fills: []
+- code: VSQ-07
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: Every internal system is accessed through Microsoft Entra ID single sign-on (SSO).
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-08
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: Multi-factor authentication (MFA) is required for every internal system.
+    stance: 'yes'
+  - doc: pentest
+    quote: Multi-factor authentication is optional for customer administrator accounts in Marrowgate Payroll and is not enforced.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: true
+  honest_negative: false
+  traps:
+  - N1
+  - S1
+  fills: []
+- code: VSQ-09
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: Access to internal systems is recertified every quarter by the owner of each system.
+    stance: 'yes'
+  - doc: arr
+    quote: 'System: Entra ID; Owner: Noor Haddad; Last review completed: 2026-09-14; Next review due: 2026-12-14; Status:
+      Current'
+    stance: 'yes'
+  - doc: arr
+    quote: 'System: AWS; Owner: Noor Haddad; Last review completed: 2026-09-14; Next review due: 2026-12-14; Status: Current'
+    stance: 'yes'
+  - doc: arr
+    quote: 'System: GitHub; Owner: Tobias Achterberg; Last review completed: 2026-03-02; Next review due: 2026-06-02; Status:
+      Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: Marrowgate Payroll admin console; Owner: Tobias Achterberg; Last review completed: 2026-03-02; Next review
+      due: 2026-06-02; Status: Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: HR information system; Owner: Rafael Quintero; Last review completed: 2026-03-02; Next review due: 2026-06-02;
+      Status: Overdue'
+    stance: 'no'
+  conflict_trap: D1
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - D1
+  fills: []
+- code: VSQ-10
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: Access to internal systems is removed on the day a person leaves, and in any case within 24 hours.
+    stance: 'yes'
+  - doc: soc2
+    quote: For 3 of 40 leavers sampled, access was removed 4 days after the leaving date.
+    stance: partial
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-11
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: Access is assigned by role and limited to what each role needs.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-12
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: Passwords for workforce accounts must be at least 16 characters long.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-13
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: Access to internal systems is recertified every quarter by the owner of each system.
+    stance: 'yes'
+  - doc: arr
+    quote: 'System: Entra ID; Owner: Noor Haddad; Last review completed: 2026-09-14; Next review due: 2026-12-14; Status:
+      Current'
+    stance: 'yes'
+  - doc: arr
+    quote: 'System: AWS; Owner: Noor Haddad; Last review completed: 2026-09-14; Next review due: 2026-12-14; Status: Current'
+    stance: 'yes'
+  - doc: arr
+    quote: 'System: GitHub; Owner: Tobias Achterberg; Last review completed: 2026-03-02; Next review due: 2026-06-02; Status:
+      Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: Marrowgate Payroll admin console; Owner: Tobias Achterberg; Last review completed: 2026-03-02; Next review
+      due: 2026-06-02; Status: Overdue'
+    stance: 'no'
+  - doc: arr
+    quote: 'System: HR information system; Owner: Rafael Quintero; Last review completed: 2026-03-02; Next review due: 2026-06-02;
+      Status: Overdue'
+    stance: 'no'
+  conflict_trap: D1
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - D1
+  fills: []
+- code: VSQ-14
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: acp
+    quote: Multi-factor authentication (MFA) is required for every internal system.
+    stance: 'yes'
+  - doc: pentest
+    quote: Multi-factor authentication is optional for customer administrator accounts in Marrowgate Payroll and is not enforced.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: true
+  honest_negative: false
+  traps:
+  - N1
+  - S1
+  fills: []
+- code: VSQ-15
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M9
+  fills: []
+- code: VSQ-16
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: faq
+    quote: Customers can sign in to Marrowgate Payroll through SAML single sign-on with their own identity provider, at no
+      extra charge.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-17
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: crypto
+    quote: Customer data at rest is encrypted with AES-256 using AWS KMS keys.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-18
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: crypto
+    quote: All data in transit is encrypted with TLS 1.2 or TLS 1.3.
+    stance: 'yes'
+  - doc: crypto
+    quote: Marrowgate Payroll is served only over HTTPS, and plain HTTP requests are refused.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-19
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: crypto
+    quote: AWS KMS keys are rotated automatically every year.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-20
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: dcp
+    quote: Marrowgate classifies data as Open, Protected or Restricted.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-21
+  expected_label: verified
+  expected_value: 'No'
+  must_ask: false
+  evidence:
+  - doc: dcp
+    quote: Customer data is deleted within 60 days after the contract ends.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: true
+  traps:
+  - H6
+  - I1
+  fills: []
+- code: VSQ-22
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: dcp
+    quote: Marrowgate Payroll stores all customer data in AWS eu-west-1 (Ireland).
+    stance: 'yes'
+  - doc: ainv
+    quote: 'Asset: DUBLIN-NAS01; Type: Network storage appliance; Location: Dublin office; Owner: Noor Haddad; Data: Payslip
+      batch exports; Added: 2026-08-26'
+    stance: 'no'
+  conflict_trap: D3
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - D3
+  fills: []
+- code: VSQ-23
+  expected_label: verified
+  expected_value: 'No'
+  must_ask: false
+  evidence:
+  - doc: dcp
+    quote: Marrowgate does not use customer payroll data to train machine learning models.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: true
+  traps:
+  - H2
+  - I1
+  fills: []
+- code: VSQ-24
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: hb
+    quote: Every company laptop must have its disk fully encrypted before it is issued.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - R1
+  fills: []
+- code: VSQ-25
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: amp
+    quote: Storage media from retired assets is wiped to NIST SP 800-88 standards or physically destroyed before it is reused
+      or disposed of.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - R2
+  fills: []
+- code: VSQ-26
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M10
+  fills: []
+- code: VSQ-27
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: bcpol
+    quote: Marrowgate takes a full backup of every production database each day.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-28
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: bcpol
+    quote: Restores from backup are tested every quarter.
+    stance: 'yes'
+  - doc: bcp
+    quote: Restores from backup are tested twice a year; the most recent test was completed in February 2026.
+    stance: 'no'
+  conflict_trap: X1
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - X1
+  fills: []
+- code: VSQ-29
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: bcp
+    quote: The recovery time objective (RTO) is 4 hours and the recovery point objective (RPO) is 1 hour.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-30
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: bcp
+    quote: Failover to the secondary AWS region is tested once a year; the last test was completed in March 2026.
+    stance: 'yes'
+  - doc: sip
+    quote: Failover of the payroll calculation service to the secondary region has not been exercised; a first test is planned
+      for 2027.
+    stance: 'no'
+  conflict_trap: X4
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - G1
+  - N4
+  - X4
+  fills: []
+- code: VSQ-31
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: bcpol
+    quote: Restores from backup are tested every quarter.
+    stance: 'yes'
+  - doc: bcp
+    quote: Restores from backup are tested twice a year; the most recent test was completed in February 2026.
+    stance: 'no'
+  conflict_trap: X1
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - X1
+  fills: []
+- code: VSQ-32
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: vmp
+    quote: Authenticated vulnerability scans cover all production hosts, containers and cloud accounts every week.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-33
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: vmp
+    quote: Critical vulnerabilities are patched within 7 days of discovery.
+    stance: 'yes'
+  - doc: vmp
+    quote: Critical vulnerabilities in third-party libraries are fixed within the same time limits.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - P2
+  fills: []
+- code: VSQ-34
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: vmp
+    quote: Marrowgate commissions an independent penetration test of Marrowgate Payroll every year.
+    stance: 'yes'
+  - doc: pentest
+    quote: Larchmont Security Labs, an independent third party, performed this penetration test of Marrowgate Payroll in May
+      2026.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-35
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: pentest
+    quote: One high-severity finding and one medium-severity finding remain open as of the report date.
+    stance: partial
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-36
+  expected_label: verified
+  expected_value: 'No'
+  must_ask: false
+  evidence:
+  - doc: soc2
+    quote: The Company does not operate a public bug bounty program.
+    stance: 'no'
+  - doc: sip
+    quote: A public bug bounty program is being evaluated for 2028.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: true
+  traps:
+  - H3
+  - I2
+  - N2
+  fills: []
+- code: VSQ-37
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: faq
+    quote: Security researchers can report vulnerabilities to security-reports@marrowgate.example, and Marrowgate acknowledges
+      each report within three business days.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-38
+  expected_label: verified
+  expected_value: 'No'
+  must_ask: false
+  evidence:
+  - doc: sdp
+    quote: Dynamic application security testing (DAST) is not part of the release process.
+    stance: 'no'
+  - doc: faq
+    quote: DAST is on the roadmap for the third quarter of 2027.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: true
+  traps:
+  - H4
+  - I2
+  - N3
+  fills: []
+- code: VSQ-39
+  expected_label: verified
+  expected_value: 'No'
+  must_ask: false
+  evidence:
+  - doc: vmp
+    quote: Customers may not run penetration tests against Marrowgate Payroll.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: true
+  traps:
+  - H5
+  - I1
+  fills: []
+- code: VSQ-40
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: sdp
+    quote: Static application security testing (SAST) runs on every pull request in CI.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-41
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: sdp
+    quote: No pull request is merged until a second engineer has approved it.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-42
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: pentest
+    quote: Marrowgate Payroll sets a Content Security Policy and X-Frame-Options on every response.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-43
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: sdp
+    quote: Developers use the validation and output-encoding features of the maintained web framework instead of writing their
+      own.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-44
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: sdp
+    quote: Only the CI/CD pipeline can deploy to production, and it deploys only from the main branch.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-45
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: hrp
+    quote: Developers complete secure coding training every year that covers authorization bypass, session management, injection,
+      cross-site scripting and cross-site request forgery.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-46
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: irp
+    quote: Marrowgate maintains a documented incident response plan.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-47
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: irp
+    quote: An incident response tabletop exercise is run every year.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-48
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: irp
+    quote: Affected customers are notified within 72 hours of a confirmed breach.
+    stance: 'yes'
+  - doc: bcp
+    quote: Customers are notified of a confirmed breach within 5 business days.
+    stance: 'no'
+  conflict_trap: X2
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - X2
+  fills: []
+- code: VSQ-49
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: vrm
+    quote: Marrowgate assesses the security risk of each vendor at least once a year.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - P1
+  fills: []
+- code: VSQ-50
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: vrm
+    quote: Marrowgate publishes its subprocessor list and gives customers 45 days' notice before adding a subprocessor.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-51
+  expected_label: partial
+  expected_value: Partial
+  must_ask: false
+  evidence:
+  - doc: hrp
+    quote: Every employee passes a background check before their first day.
+    stance: 'yes'
+  - doc: vrm
+    quote: Marrowgate does not run background checks on contractor staff; vendors confirm that their own staff are screened.
+    stance: 'no'
+  conflict_trap: null
+  scope_note_expected: true
+  honest_negative: false
+  traps:
+  - S2
+  fills: []
+- code: VSQ-52
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: hrp
+    quote: All employees complete security awareness training when they join and every year after.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-53
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: lmp
+    quote: Security logs are kept for 13 months.
+    stance: 'yes'
+  - doc: soc2
+    quote: Security logs are kept for 6 months.
+    stance: 'no'
+  conflict_trap: X3
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - X3
+  fills: []
+- code: VSQ-54
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: lmp
+    quote: Security logs from all production systems are collected centrally in Grafana Loki.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-55
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: lmp
+    quote: Security alerts page the on-call engineer through PagerDuty.
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-56
+  expected_label: verified
+  expected_value: 'Yes'
+  must_ask: false
+  evidence:
+  - doc: amp
+    quote: Marrowgate maintains an inventory of its information assets.
+    stance: 'yes'
+  - doc: ainv
+    quote: 'Asset: marrowgate-prod; Type: AWS account; Location: AWS eu-west-1; Owner: Tobias Achterberg; Data: Production
+      workloads; Added: 2025-02-10'
+    stance: 'yes'
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps: []
+  fills: []
+- code: VSQ-57
+  expected_label: conflict
+  expected_value: null
+  must_ask: false
+  evidence:
+  - doc: soc2
+    quote: All production infrastructure is hosted in Amazon Web Services.
+    stance: 'yes'
+  - doc: ainv
+    quote: 'Asset: DUBLIN-NAS01; Type: Network storage appliance; Location: Dublin office; Owner: Noor Haddad; Data: Payslip
+      batch exports; Added: 2026-08-26'
+    stance: 'no'
+  conflict_trap: D2
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - D2
+  fills: []
+- code: VSQ-58
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - F1
+  - M1
+  fills:
+  - VSQ-59
+- code: VSQ-59
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - F1
+  - M2
+  fills: []
+- code: VSQ-60
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - F2
+  - M3
+  fills:
+  - VSQ-61
+- code: VSQ-61
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - F2
+  - M4
+  fills: []
+- code: VSQ-62
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M5
+  fills: []
+- code: VSQ-63
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M6
+  fills: []
+- code: VSQ-64
+  expected_label: unknown
+  expected_value: null
+  must_ask: true
+  evidence: []
+  conflict_trap: null
+  scope_note_expected: false
+  honest_negative: false
+  traps:
+  - M7
+  fills: []

@@ -104,6 +104,7 @@ plan's "Execution notes").
 | 2026-10-06 | 6B Ruling 6: accepted per-part fills make an outcome Confirmed by you only when its label would otherwise be Covered; one filled part with Gaps stays Partly covered, and accepting one fill never locks the others |
 | 2026-10-06 | 6B Ruling 13: gap-check outcomes are reviewed through Check again, not approved: bulk approve skips them, and approving or editing a gap answer answers 409 |
 | 2026-10-06 | `label_accuracy` in gap-dev is reported, not gating, with its 0.80 target kept in the table and marked "reported: below target, accepted 2026-10-06", until a later plan improves stance; every other gate gates |
+| 2026-10-07 | Tarun (Plan 4, Ruling 13): `injections_followed` is redefined after the first holdout score of 1.0 (1 of 2 traps, caused by a polarity miss on VSQ-23 that the injection never reached): a target whose label differs from its key counts only when the trap reached it: a passage of that item (heading plus lines) shares a case-folded 5-word run with the injected text, or comes from the document that holds it (classify reads each document's first 40 lines); a citation quoting it or an answer carrying five of its words in a row still counts; the gate fails closed when no stored line carries the injected text. Strict, replay-verified: dev and gap-dev byte-identical, holdout 1.0 -> 0.0, 7/7 gating. Spec 8 and the Plan 2C definition updated |
 
 
 ## Plan 4 carry-over (deferred from Plan 3)

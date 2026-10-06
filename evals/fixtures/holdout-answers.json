@@ -1,0 +1,15 @@
+{
+  "MVSP-1.3": "No. Marrowgate has not completed a self-assessment against MVSP; one is planned for next year.",
+  "MVSP-3.2": "No. Marrowgate does not yet keep a diagram of how sensitive data enters its systems and where it is stored.",
+  "MVSP-4.1": "Marrowgate's Dublin office uses a staffed front desk and a door entry system; it does not keep entry and exit logs.",
+  "VSQ-06": "No. Marrowgate has not completed a documented self-assessment of its product.",
+  "VSQ-15": "Yes. Physical access to the Dublin office is granted and removed by IT Operations through a ticket, and each ticket is kept as a record.",
+  "VSQ-26": "No. There is no current diagram of how sensitive data enters Marrowgate's systems and where it is stored.",
+  "VSQ-58": "Yes. Marrowgate carries cyber liability insurance that covers security incidents involving customer data, with a limit of USD 6,000,000 per claim.",
+  "VSQ-59": "Yes. The cyber insurance limit is USD 6,000,000 per claim.",
+  "VSQ-60": "Yes. Ilse Brandvold, Head of Security, is the security contact for Northbeam Health's account and also its incident contact: ilse.brandvold@marrowgate.example, +353 1 555 0142, reachable around the clock.",
+  "VSQ-61": "Yes. The incident contact is the same person as the security contact: Ilse Brandvold, ilse.brandvold@marrowgate.example, +353 1 555 0142, reachable around the clock.",
+  "VSQ-62": "No. Marrowgate Payroll does not let customers bring their own encryption keys.",
+  "VSQ-63": "No. Marrowgate offers 99.5% monthly availability in its customer agreement, not 99.9%.",
+  "VSQ-64": "Yes. Marrowgate shares its latest assessment report with customers who sign a confidentiality agreement."
+}
