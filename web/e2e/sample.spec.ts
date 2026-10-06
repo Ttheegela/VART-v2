@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { sampleRun, xlsxCells } from "./helpers.ts";
+import { RUN_WAIT, sampleRun, xlsxCells } from "./helpers.ts";
 
 // One sample run feeds all four tests: each run spends ~120 model calls, and the network cap is 400 an hour
 // (Ruling 20). Serial, in this order: the export approves the verified answers, and the interview changes an item.
@@ -71,12 +71,13 @@ test("an answer in Questions for you fills its item", async () => {
   await box.fill("Yes. Customers can bring their own encryption keys, and keys are rotated every 90 days.");
   await page.getByRole("button", { name: "Send" }).first().click();
   const outcome = page.getByText(/also needs|^confirmed by you$/).first();
-  await expect(outcome).toBeVisible();
+  await expect(outcome).toBeVisible({ timeout: RUN_WAIT });
   if ((await outcome.textContent())?.includes("also needs")) {
     await box.fill("The security team owns it and reviews it quarterly.");
     await page.getByRole("button", { name: "Send" }).first().click();
   }
-  await expect(page.getByText("confirmed by you").first()).toBeVisible();
+  // an accepted answer re-checks up to 8 open items, one model call each (~10 s live, 90 s cap)
+  await expect(page.getByText("confirmed by you").first()).toBeVisible({ timeout: RUN_WAIT });
   await page.keyboard.press("2");
   await expect(page.getByRole("row", { name: new RegExp(`^${code} `) })).toContainText("confirmed by you");
 });
