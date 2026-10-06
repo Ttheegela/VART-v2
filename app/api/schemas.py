@@ -226,7 +226,7 @@ class AnswerSummary(BaseModel):
     value: Value | None
     text: str
     confidence: float
-    sources: int  # cited documents; 1 for confirmed by you (the statement)
+    sources: int  # cited documents; at least 1 for confirmed by you (the statement)
     approved: bool
     edited: bool
     statement_id: uuid.UUID | None
@@ -298,7 +298,8 @@ class PartOut(BaseModel):
     citations: list[CitationOut]
     dropped: list[DroppedOut]
     # An accepted fill from the visitor's answer replaced this part (CSF spec 5.6); the explanation names it
-    # under "Confirmed by you" and the gap sheet marks its quote "(your answer)" (adversary-1 I3).
+    # under "Confirmed by you" when it is Covered, "... in your answer" otherwise (adversary-2 M2), and the
+    # gap sheet marks its quote "(your answer)" (adversary-1 I3).
     from_statement: bool
 
 

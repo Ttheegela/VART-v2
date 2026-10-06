@@ -410,9 +410,9 @@ def accept_suggestion(session: Session, workspace_id: uuid.UUID, suggestion_id: 
 def _fill_part(session: Session, sg: SuggestedFill, a: Answer) -> None:
     """Accept a fill for one part of a Checked outcome (CSF spec 5.6): it replaces that part's stored result
     (with the statement it came from and no judge of its own), then the parts are combined and explained
-    again (`outcome_values`: the part is named "Confirmed by you", and the outcome is Confirmed by you only
-    when it would otherwise read Covered, Ruling 6). The outcome's answer is never replaced directly. Locks
-    the run item last (the lock order above)."""
+    again (`outcome_values`: a Covered part is named "Confirmed by you", and the outcome is Confirmed by you
+    only when it would otherwise read Covered, Ruling 6). The outcome's answer is never replaced directly.
+    Locks the run item last (the lock order above)."""
     item = session.get_one(Item, sg.item_id)
     o = csf.outcome_or_none(item.csf_id or "")
     ri = session.scalars(

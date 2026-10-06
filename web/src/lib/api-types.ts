@@ -14,14 +14,14 @@ export interface paths {
     get: operations["get_answer_api_answers__answer_id__get"];
     /**
      * Edit Answer
-     * @description Edit the text; the answer becomes unapproved and `edited`.
+     * @description Edit the text; the answer becomes unapproved and `edited`. 409 for a gap check's outcome.
      */
     patch: operations["edit_answer_api_answers__answer_id__patch"];
   };
   "/api/answers/{answer_id}/approve": {
     /**
      * Approve Answer
-     * @description 409 for a conflict or an unknown answer (answer the question first).
+     * @description 409 for a conflict or an unknown answer (answer the question first), and for a gap check's outcome.
      */
     post: operations["approve_answer_api_answers__answer_id__approve_post"];
   };
@@ -69,7 +69,9 @@ export interface paths {
     delete: operations["delete_document_api_documents__document_id__delete"];
     /**
      * Update Document
-     * @description Override metadata; every answer that used this document is decided again with no model call.
+     * @description Override metadata; every answer that used this document is decided again with no model call. 409 for
+     * the visitor's own answer (a statement): its kind would pass it off as document evidence, and nothing is
+     * decided on its other details (adversary-2 I1, M7).
      */
     patch: operations["update_document_api_documents__document_id__patch"];
   };
@@ -192,8 +194,8 @@ export interface paths {
     /**
      * Approve Verified
      * @description Approve every verified answer not yet approved (design key A). An edited answer is left for a look
-     * (adversary-1 M5): approve it by itself; `skipped_edited` counts them. A gap check's Not met outcome is
-     * never bulk-approved.
+     * (adversary-1 M5): approve it by itself; `skipped_edited` counts them. A gap check's outcomes are never
+     * approved (adversary-2 M5).
      */
     post: operations["approve_verified_api_runs__run_id__approve_verified_post"];
   };
@@ -204,9 +206,9 @@ export interface paths {
      * csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
      * with =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The
      * response is an attachment with an ASCII-safe file name. A gap-check run answers the gap-report workbook
-     * instead (CSF spec 7). An xlsx questionnaire's export also carries the workspace's latest done gap check as
-     * a `Gap report` sheet (renamed `Gap report (2)` and so on if the file has one), stating its scope and run
-     * date; a csv is unchanged. 429 per network (`export`, 60 an hour).
+     * instead (CSF spec 7), 409 while it is running. An xlsx questionnaire's export also carries the
+     * workspace's latest done gap check as a `Gap report` sheet (renamed `Gap report (2)` and so on if the file
+     * has one), stating its scope and run date; a csv is unchanged. 429 per network (`export`, 60 an hour).
      */
     get: operations["export_run_api_runs__run_id__export_get"];
   };
@@ -1096,7 +1098,7 @@ export interface operations {
   };
   /**
    * Edit Answer
-   * @description Edit the text; the answer becomes unapproved and `edited`.
+   * @description Edit the text; the answer becomes unapproved and `edited`. 409 for a gap check's outcome.
    */
   edit_answer_api_answers__answer_id__patch: {
     parameters: {
@@ -1156,7 +1158,7 @@ export interface operations {
   };
   /**
    * Approve Answer
-   * @description 409 for a conflict or an unknown answer (answer the question first).
+   * @description 409 for a conflict or an unknown answer (answer the question first), and for a gap check's outcome.
    */
   approve_answer_api_answers__answer_id__approve_post: {
     parameters: {
@@ -1514,7 +1516,9 @@ export interface operations {
   };
   /**
    * Update Document
-   * @description Override metadata; every answer that used this document is decided again with no model call.
+   * @description Override metadata; every answer that used this document is decided again with no model call. 409 for
+   * the visitor's own answer (a statement): its kind would pass it off as document evidence, and nothing is
+   * decided on its other details (adversary-2 I1, M7).
    */
   update_document_api_documents__document_id__patch: {
     parameters: {
@@ -2380,8 +2384,8 @@ export interface operations {
   /**
    * Approve Verified
    * @description Approve every verified answer not yet approved (design key A). An edited answer is left for a look
-   * (adversary-1 M5): approve it by itself; `skipped_edited` counts them. A gap check's Not met outcome is
-   * never bulk-approved.
+   * (adversary-1 M5): approve it by itself; `skipped_edited` counts them. A gap check's outcomes are never
+   * approved (adversary-2 M5).
    */
   approve_verified_api_runs__run_id__approve_verified_post: {
     parameters: {
@@ -2440,9 +2444,9 @@ export interface operations {
    * csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
    * with =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The
    * response is an attachment with an ASCII-safe file name. A gap-check run answers the gap-report workbook
-   * instead (CSF spec 7). An xlsx questionnaire's export also carries the workspace's latest done gap check as
-   * a `Gap report` sheet (renamed `Gap report (2)` and so on if the file has one), stating its scope and run
-   * date; a csv is unchanged. 429 per network (`export`, 60 an hour).
+   * instead (CSF spec 7), 409 while it is running. An xlsx questionnaire's export also carries the
+   * workspace's latest done gap check as a `Gap report` sheet (renamed `Gap report (2)` and so on if the file
+   * has one), stating its scope and run date; a csv is unchanged. 429 per network (`export`, 60 an hour).
    */
   export_run_api_runs__run_id__export_get: {
     parameters: {

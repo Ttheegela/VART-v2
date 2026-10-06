@@ -20,6 +20,13 @@ export function coverage(rows: GapRow[]): string {
   return `checked ${n("checked")} · ask me ${n("ask")} · not checked ${n("not_checked")} · of ${rows.length}`;
 }
 
+/** "n of m": Checked outcomes with a label, of the Checked ones; an Ask-me, failed or N/A one is never counted
+ * as checked (adversary-2 M1). */
+const checkedOf = (rows: GapRow[]) => {
+  const tier = rows.filter((r) => r.tier === "checked");
+  return `${tier.filter((r) => r.label && !r.not_applicable).length} of ${tier.length}`;
+};
+
 // adversary-1 I1: a visitor's N/A wins over the tier's label ("not answered" on Ask me, none on Checked).
 // No label otherwise is "no result" (not run yet, or failed: adversary-1 M4), so every row has exactly one filter.
 const filterOf = (r: GapRow): Filter =>
@@ -148,7 +155,8 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
   }, !open);
 
   const said = notice?.scope === current ? notice.text : null;
-  const status = running ? "Checking." : run?.status === "done" ? `Gap check done: ${run.done} of ${run.total} checked.` : "";
+  const checked = data ? checkedOf(data.rows) : "";
+  const status = running ? "Checking." : run?.status === "done" ? `Gap check done: ${checked} checked.` : "";
   // no scope hint in the status line: the keys sit on the scope line, and the coverage line keeps the room
   return (
     <Shell
@@ -166,7 +174,7 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
               </h1>
               <p className="text-xs text-ink-3">
                 {GAP_REVIEW} · labels decided by code
-                {run ? ` · ${run.done} of ${run.total} checked · ${running ? "checking" : run.status} · $${run.cost_usd.toFixed(4)}` : " · not run yet"}
+                {run ? ` · ${checked} checked · ${running ? "checking" : run.status} · $${run.cost_usd.toFixed(4)}` : " · not run yet"}
               </p>
               {data && <p aria-hidden="true" className="text-xs text-ink-2">{coverage(data.rows)}</p>}
               <p role="status" className={said ? "text-xs text-ink-2" : "sr-only"}>{said ?? status}</p>

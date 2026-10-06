@@ -13,7 +13,7 @@ the change log at the end, and a re-recording of the evals when a prompt or a la
 | classify | `app/classify.py` (plan2b) | `PROMPT_VERSION = "classify@p1"`; `rules(fmt, texts) -> tuple[DocMeta, bool]`; `classify(filename, parsed, llm, model, spend) -> DocMeta` | fallback only |
 | chunk | `app/chunk.py` (plan2b) | `chunk_lines(lines) -> list[ChunkSpec]`; `flags_of(text) -> tuple[Flag, ...]` | no |
 | store | `app/ingest/store.py` (plan2b) | `ingest_document(session, workspace_id, filename, data, *, source, llm, model, spend) -> Document`; `store_statement(session, workspace_id, text, *, filename, today) -> Document` | via classify |
-| retrieve | `app/retrieve.py` (2A) | `build_query(question, topic) -> str`; `retrieve(session, workspace_id, question, topic, exclude_kinds=()) -> Retrieval` (6B: `exclude_kinds` drops those document kinds from the candidates; the default is unchanged); `document_passages(session, workspace_id, document_id) -> tuple[Passage, ...]` | no |
+| retrieve | `app/retrieve.py` (2A) | `build_query(question, topic) -> str`; `retrieve(session, workspace_id, question, topic, exclude_sources=()) -> Retrieval` (6B: documents from `exclude_sources` are neither candidates nor hopped to, and count in neither the IDF nor the chunk total; the default is unchanged); `document_passages(session, workspace_id, document_id) -> tuple[Passage, ...]` | no |
 | stance | `app/stance.py` (2A) | `PROMPT_VERSION = "stance@p3"`; `user_prompt(item, passages) -> str`; `stance(llm, item, passages, model, step="stance") -> tuple[Stance, ...]` | yes |
 | decide | `app/decide.py` (2A) | `decide(passages, stances, dropped=()) -> Decision` | no |
 | draft | `app/draft.py` (2A) | `PROMPT_VERSION = "draft@p2"`; `plain_name(filename: str) -> str`; `user_prompt(item: ItemInput, decision: Decision) -> str`; `check(text, decision, documents) -> list[str]`; `template_answer(decision) -> str`; `write_draft(llm, item, decision, model, spend, documents) -> Draft` | yes |
@@ -116,11 +116,13 @@ change-log line; changing or removing a path, a field or a status needs the lead
   A step claims csf items until their parts add up to `STEP_PARTS` (8), stores each part's result in
   `run_items.parts` as it lands, and checks its deadline before each part not yet stored: an outcome cut off
   there is released with its stored parts kept and no attempt counted, and the next step resumes it.
-  A Checked part's evidence never includes statements (`retrieve(..., exclude_kinds=("statement",))`).
+  A Checked part's evidence never includes statements (`retrieve(..., exclude_sources=("statement",))`, keyed on
+  `Document.source`, so no kind the visitor sets lets one in); a statement's metadata cannot be patched (409).
   `AnswerDetail.parts` lists a Checked outcome's parts; `SuggestionOut.part` names the part a fill is for (0:
   the whole item); on a gap-check run an answer is re-checked against the open parts in its CSF function, and
   a re-open keeps the open per-part fills. An accepted per-part fill reads "Confirmed by you: part n" in the
-  explanation and "(your answer)" in the sheet's quotes, and the outcome is Confirmed by you only when it would
+  explanation when its part is Covered (otherwise its label's words "in your answer", e.g. "Partly evidenced in
+  your answer: part n") and "(your answer)" in the sheet's quotes (keyed on `Document.source`), and the outcome is Confirmed by you only when it would
   otherwise read Covered (one filled part with Gaps left stays Partly covered); accepting one fill never
   closes the others.
   On a gap-check run, `GET /api/runs/{id}/export` answers the gap-report workbook (it was a 409), and Questions
@@ -221,3 +223,13 @@ change-log line; changing or removing a path, a field or a status needs the lead
   re-opens an outcome once, not on every press. Check again and re-decide also take a Checked outcome that reads
   Confirmed by you through a part fill: its document-judged parts are checked and decided again, its filled parts
   kept. `retrieve`'s `exclude_kinds` also applies to the record hop. No prompt or label rule changes.
+- 2026-10-06: Plan 6B adversary checkpoint 2 fix (lead's OK, Ruling 12, under rule 10 for `retrieve` and `csf`):
+  `retrieve`'s `exclude_kinds` becomes `exclude_sources` and keys on `Document.source` (I1); its documents also
+  count in neither the IDF (`ts_stat`) nor the chunk total, nor the hop's chunk count (I2). The default `()` is
+  unchanged, so no questionnaire prompt, label or replay moves. `PATCH /api/documents/{id}` on a statement is a
+  409 (I1, M7). `csf.explain` names a filled part "Confirmed by you" only when the part is Covered; any other
+  filled part reads "<label words> in your answer" (M2). `PATCH /api/answers/{id}` and `POST
+  /api/answers/{id}/approve` on a gap check's outcome are a 409, and `approve-verified` skips every gap check
+  outcome (M5, M6). `GET /api/runs/{id}/export` on a gap run that is not done is a 409 (M3).
+  `AnswerSummary.sources` for Confirmed by you counts the cited documents, at least 1 (M2). No prompt or label
+  rule changes, so nothing is re-recorded.

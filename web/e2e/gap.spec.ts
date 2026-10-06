@@ -14,7 +14,7 @@ test("the gap check runs over the sample documents, takes an Ask-me answer and e
   // the body's coverage line (the status bar repeats it)
   await expect(page.getByRole("main").getByText("checked 31 · ask me 5 · not checked 70 · of 106")).toBeVisible();
   await page.keyboard.press("r");
-  await expect(page.getByText(/36 of 36 checked · done/)).toBeVisible({ timeout: RUN_WAIT });
+  await expect(page.getByText(/31 of 31 checked · done/)).toBeVisible({ timeout: RUN_WAIT }); // Ask me is not checked
   await expect(page.getByRole("row", { name: /^[A-Z]{2}\.[A-Z]{2}-\d\d / })).toHaveCount(106);
   // the planted improvement plan: at least one stated non-compliance shows
   const filters = page.getByRole("group", { name: "filter by label" });

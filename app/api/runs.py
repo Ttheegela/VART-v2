@@ -3,7 +3,7 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException, Request
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import func, select, update
 
 from app.api.deps import LLMDep, SessionDep, WorkspaceDep
 from app.api.errors import NotFound, limit, network
@@ -37,7 +37,7 @@ def summary(a: Answer) -> AnswerSummary:
         value=a.value,
         text=a.text,
         confidence=a.confidence,
-        sources=1 if a.label == "user_confirmed" else len(docs),
+        sources=(len(docs) or 1) if a.label == "user_confirmed" else len(docs),  # adversary-2 M2: a fill
         approved=a.approved_at is not None,
         edited=a.edited,
         statement_id=a.statement_id,
@@ -130,20 +130,18 @@ def run_answers(run_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -> Run
 @router.post("/api/runs/{run_id}/approve-verified")
 def approve_verified(run_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -> ApprovedCount:
     """Approve every verified answer not yet approved (design key A). An edited answer is left for a look
-    (adversary-1 M5): approve it by itself; `skipped_edited` counts them. A gap check's Not met outcome is
-    never bulk-approved."""
+    (adversary-1 M5): approve it by itself; `skipped_edited` counts them. A gap check's outcomes are never
+    approved (adversary-2 M5)."""
     run = _own(session, ws, run_id)
     open_verified = (
         Answer.run_id == run.id,
         Answer.label == "verified",
         Answer.edited.is_(False),
         Answer.approved_at.is_(None),
-        # a gap check's Not met outcome (verified, No) is a finding to look at, not a bulk approval (adv-1 N3)
-        or_(
-            Answer.value.is_distinct_from("No"),
-            Answer.item_id.not_in(
-                select(Item.id).where(Item.questionnaire_id == run.questionnaire_id, Item.csf_id.is_not(None))
-            ),
+        # a gap check's outcome is a finding, not a draft: an approval would keep Check again off it
+        # (adversary-1 N3, adversary-2 M5)
+        Answer.item_id.not_in(
+            select(Item.id).where(Item.questionnaire_id == run.questionnaire_id, Item.csf_id.is_not(None))
         ),
     )
     # lock in id order first, as redecide does, so the two bulk lockers cannot deadlock (task-6 review M2)

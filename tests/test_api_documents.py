@@ -155,6 +155,28 @@ def test_an_empty_patch_changes_nothing(db: Engine) -> None:
     assert actions == ["document.upload"]
 
 
+@pytest.mark.parametrize(
+    "patch", [{"kind": "policy"}, {"status": "draft"}, {"evidence_allowed": False}, {"scope": "production"}]
+)
+def test_a_statement_is_the_visitors_answer_and_its_metadata_cannot_change(
+    db: Engine, patch: dict[str, object]
+) -> None:
+    """adversary-2 I1 and M7: a kind patch would pass the visitor's own answer off as document evidence, and
+    the engine keeps a statement's other details (nothing re-decides on them)."""
+    client, ws_id = visitor(db)
+    with Session(db) as s:
+        stmt = f.document(
+            s, s.get_one(Workspace, ws_id), source="statement", filename="answer-001.txt", kind="statement"
+        )
+        s.commit()
+        stmt_id = stmt.id
+    r = client.patch(f"/api/documents/{stmt_id}", json=patch)
+    assert r.status_code == 409 and r.json()["detail"] == api.STATEMENT_FIXED
+    with Session(db) as s:
+        d = s.get_one(Document, stmt_id)
+        assert (d.kind, d.status, d.evidence_allowed, d.scope) == ("statement", "final", True, None)
+
+
 def test_another_workspaces_document_is_a_404(db: Engine) -> None:
     client, _ = visitor(db)
     with Session(db) as s:

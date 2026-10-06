@@ -32,6 +32,14 @@ describe("GapCheck", () => {
     expect(coverage(rows)).toBe("checked 31 · ask me 5 · not checked 70 · of 106");
   });
 
+  it("never counts an Ask-me or a failed outcome as checked (adversary-2 M1)", async () => {
+    const failed: GapRow = { ...fixtures.gap.rows[2], label: null, answer_id: "a-x", explanation: FAILED };
+    const [ask, covered, , unchecked] = fixtures.gap.rows;
+    mockApi({ "GET /api/gap/core": { ...fixtures.gap, run: { ...fixtures.gap.run!, total: 3, done: 3 }, rows: [ask, covered, failed, unchecked] } });
+    render(<GapCheck {...props} />);
+    expect(await screen.findByText(/1 of 2 checked · done/)).toBeInTheDocument();
+  });
+
   it("lists every outcome in grouped rows with the review line and the footer", async () => {
     mockApi({ "GET /api/gap/core": fixtures.gap });
     render(<GapCheck {...props} />);

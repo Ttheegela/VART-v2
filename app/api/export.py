@@ -43,15 +43,18 @@ def export_run(run_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep, request
     csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
     with =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The
     response is an attachment with an ASCII-safe file name. A gap-check run answers the gap-report workbook
-    instead (CSF spec 7). An xlsx questionnaire's export also carries the workspace's latest done gap check as
-    a `Gap report` sheet (renamed `Gap report (2)` and so on if the file has one), stating its scope and run
-    date; a csv is unchanged. 429 per network (`export`, 60 an hour)."""
+    instead (CSF spec 7), 409 while it is running. An xlsx questionnaire's export also carries the
+    workspace's latest done gap check as a `Gap report` sheet (renamed `Gap report (2)` and so on if the file
+    has one), stating its scope and run date; a csv is unchanged. 429 per network (`export`, 60 an hour)."""
     limit(request, session, "export")
     run = session.scalar(select(Run).where(Run.id == run_id, Run.workspace_id == ws.id))
     if run is None:
         raise NotFound()
     q = session.get_one(Questionnaire, run.questionnaire_id)
     if q.source == "csf":
+        # re-opened rows would read "Not run yet" under the old date (adversary-2 M3)
+        if run.status != "done":
+            raise Conflict("The check is running; export when it is done.")
         return _gap_report(session, ws.id, run, q)
     confirmed = (q.mapping or {}).get("confirmed")
     if not q.original_bytes or not confirmed:

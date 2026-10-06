@@ -72,12 +72,21 @@ def gap_rows(session: Session, scope: str, q: Questionnaire | None, run: Run | N
                 item_id=item.id if item is not None else None,
                 answer_id=a.id if a else None,
                 label=label,
-                explanation=FAILED_VIEW if failed else (a.text or None) if a and (label or na) else None,
+                explanation=FAILED_VIEW if failed else _explanation(o, a, label, na),
                 sources=summary(a).sources if a and label else 0,
                 not_applicable=na,
             )
         )
     return rows
+
+
+def _explanation(o: csf.Outcome, a: Answer | None, label: str | None, na: bool) -> str | None:
+    """Code's text, or the visitor's own words, said as theirs (adversary-2 M8); none before a label."""
+    if a is None or not (label or na):
+        return None
+    if o.tier == "ask" and label == "confirmed_by_you":
+        return f"Your answer: {a.text}"
+    return a.text or None
 
 
 def gap_sheet(session: Session, q: Questionnaire, run: Run) -> GapSheet:
@@ -88,7 +97,7 @@ def gap_sheet(session: Session, q: Questionnaire, run: Run) -> GapSheet:
     said = {  # the visitor's own answers, marked "(your answer)" in the sheet (adversary-1 I3)
         str(d)
         for d in session.scalars(
-            select(Document.id).where(Document.workspace_id == q.workspace_id, Document.kind == "statement")
+            select(Document.id).where(Document.workspace_id == q.workspace_id, Document.source == "statement")
         )
     }
     cited = {a.id: [c | {"yours": c["document_id"] in said} for c in a.citations] for a in answers}
@@ -160,7 +169,10 @@ def start_gap(scope: GapScope, ws: WorkspaceDep, session: SessionDep, request: R
     ensure_capacity(session)
     q = csf.questionnaire_for(session, ws_id, scope)  # commits, releasing its lock
     # Lock the questionnaire so two first presses at once make one run (adversary-1 I2); create_run only
-    # takes it FOR SHARE. The lock is held through create_run's commit.
+    # takes it FOR SHARE. The lock is held through create_run's commit. ponytail: also through
+    # reopen_changed's scan (0.5 s on the 23-document pack), so a second press on the scope waits for it
+    # (adversary-2 M10); commit after latest_run when a run exists (the run lock then serialises) if
+    # workspaces grow past that.
     session.execute(select(Questionnaire.id).where(Questionnaire.id == q.id).with_for_update())
     run = latest_run(session, q.id)
     if run is None:

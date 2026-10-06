@@ -2241,7 +2241,7 @@
         ]
       },
       "patch": {
-        "description": "Edit the text; the answer becomes unapproved and `edited`.",
+        "description": "Edit the text; the answer becomes unapproved and `edited`. 409 for a gap check's outcome.",
         "operationId": "edit_answer_api_answers__answer_id__patch",
         "parameters": [
           {
@@ -2345,7 +2345,7 @@
     },
     "/api/answers/{answer_id}/approve": {
       "post": {
-        "description": "409 for a conflict or an unknown answer (answer the question first).",
+        "description": "409 for a conflict or an unknown answer (answer the question first), and for a gap check's outcome.",
         "operationId": "approve_answer_api_answers__answer_id__approve_post",
         "parameters": [
           {
@@ -2953,7 +2953,7 @@
         ]
       },
       "patch": {
-        "description": "Override metadata; every answer that used this document is decided again with no model call.",
+        "description": "Override metadata; every answer that used this document is decided again with no model call. 409 for\nthe visitor's own answer (a statement): its kind would pass it off as document evidence, and nothing is\ndecided on its other details (adversary-2 I1, M7).",
         "operationId": "update_document_api_documents__document_id__patch",
         "parameters": [
           {
@@ -4474,7 +4474,7 @@
     },
     "/api/runs/{run_id}/approve-verified": {
       "post": {
-        "description": "Approve every verified answer not yet approved (design key A). An edited answer is left for a look\n(adversary-1 M5): approve it by itself; `skipped_edited` counts them. A gap check's Not met outcome is\nnever bulk-approved.",
+        "description": "Approve every verified answer not yet approved (design key A). An edited answer is left for a look\n(adversary-1 M5): approve it by itself; `skipped_edited` counts them. A gap check's outcomes are never\napproved (adversary-2 M5).",
         "operationId": "approve_verified_api_runs__run_id__approve_verified_post",
         "parameters": [
           {
@@ -4568,7 +4568,7 @@
     },
     "/api/runs/{run_id}/export": {
       "get": {
-        "description": "The original file with the answer column filled and Status, Sources and Notes columns added; csv in,\ncsv out. Unapproved answers read \"Draft, not approved\". Every cell written is inert text: a value starting\nwith =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The\nresponse is an attachment with an ASCII-safe file name. A gap-check run answers the gap-report workbook\ninstead (CSF spec 7). An xlsx questionnaire's export also carries the workspace's latest done gap check as\na `Gap report` sheet (renamed `Gap report (2)` and so on if the file has one), stating its scope and run\ndate; a csv is unchanged. 429 per network (`export`, 60 an hour).",
+        "description": "The original file with the answer column filled and Status, Sources and Notes columns added; csv in,\ncsv out. Unapproved answers read \"Draft, not approved\". Every cell written is inert text: a value starting\nwith =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The\nresponse is an attachment with an ASCII-safe file name. A gap-check run answers the gap-report workbook\ninstead (CSF spec 7), 409 while it is running. An xlsx questionnaire's export also carries the\nworkspace's latest done gap check as a `Gap report` sheet (renamed `Gap report (2)` and so on if the file\nhas one), stating its scope and run date; a csv is unchanged. 429 per network (`export`, 60 an hour).",
         "operationId": "export_run_api_runs__run_id__export_get",
         "parameters": [
           {

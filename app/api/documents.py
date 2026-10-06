@@ -43,6 +43,7 @@ from app.settings import get_settings
 
 router = APIRouter(tags=["documents"], responses=ERRORS)
 
+STATEMENT_FIXED = "This is your own answer; it stays as you gave it, so its details cannot change."
 SAMPLE_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "dev" / "docs"
 # The fact sheet's order (data/dev/facts.yaml), never a glob (Plan 2 addendum): the dev recordings assume it.
 SAMPLE_ORDER = (  # pinned by tests/test_api_documents.py::test_the_sample_pack_loads_once_in_fact_sheet_order
@@ -167,12 +168,16 @@ def load_sample_documents(ws: WorkspaceDep, session: SessionDep) -> list[Documen
 def update_document(
     document_id: uuid.UUID, patch: DocumentPatch, ws: WorkspaceDep, session: SessionDep
 ) -> DocumentUpdated:
-    """Override metadata; every answer that used this document is decided again with no model call."""
+    """Override metadata; every answer that used this document is decided again with no model call. 409 for
+    the visitor's own answer (a statement): its kind would pass it off as document evidence, and nothing is
+    decided on its other details (adversary-2 I1, M7)."""
     doc = _own(session, ws, document_id)  # an empty patch changes nothing, not even metadata_source
     changes = patch.model_dump(exclude_unset=True)
     ws_id, doc_id = ws.id, doc.id
     if not changes:
         return DocumentUpdated(**document_out(doc).model_dump(), redecided=0)
+    if doc.source == "statement":
+        raise Conflict(STATEMENT_FIXED)
     for field, value in changes.items():
         setattr(doc, field, value)
     doc.metadata_source = "user"

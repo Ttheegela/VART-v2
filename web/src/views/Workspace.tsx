@@ -63,7 +63,10 @@ function DocumentRow({ d, onSaved }: { d: DocumentOut; onSaved: (n: number, d: D
         <td className="truncate px-2 text-ink-3">{d.source}{d.metadata_source === "user" ? " · edited" : ""}</td>
         <td className="px-2 text-right tabular-nums">{d.line_count}</td>
         <td className="px-2">
-          <button ref={edit} type="button" aria-label={`Edit ${d.filename}`} aria-expanded={editing} className="text-xs underline" onClick={toggle}>edit</button>
+          {/* adversary-2 I1: the visitor's own answer stays a statement; the API refuses a change (409) */}
+          {d.source === "statement" ? <span className="text-xs text-ink-3">your answer</span> : (
+            <button ref={edit} type="button" aria-label={`Edit ${d.filename}`} aria-expanded={editing} className="text-xs underline" onClick={toggle}>edit</button>
+          )}
         </td>
       </tr>
       {editing && (

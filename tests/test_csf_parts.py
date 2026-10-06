@@ -232,6 +232,18 @@ def test_a_refused_stance_budget_stops_the_outcome_after_the_parts_it_paid_for(
     assert [q.step for q in llm.requests] == ["stance"]
 
 
+def test_a_part_filled_from_the_visitors_answer_is_confirmed_by_them_only_when_covered() -> None:
+    """adversary-2 M2 (Ruling 6): a partial fill reads as the visitor's answer with its own label word, never
+    as Confirmed by you."""
+    o = _outcome(3)
+    parts = [_part(1, "covered"), _part(2, "partly_covered"), _part(3, "gap")]
+    said = csf.explain(o, parts, filled=(1, 2))
+    assert said.startswith(
+        "Confirmed by you: part 1. Partly evidenced in your answer: part 2. No evidence: part 3."
+    )
+    assert "Confirmed by you: part 2" not in csf.explain(o, parts, filled=(2,))
+
+
 def test_a_stored_part_rebuilds_to_the_same_decision_and_explanation() -> None:
     o = _outcome(4)
     parts = [_part(1, "covered"), _part(2, "documents_disagree"), _part(3, "not_met"), _part(4, "gap")]

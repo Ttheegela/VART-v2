@@ -1,6 +1,6 @@
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from datetime import date
 
 import pytest
@@ -151,16 +151,34 @@ def test_the_record_hop_never_adds_an_injection_flagged_row(s: Session) -> None:
     assert [p.lines[0] for p in r.passages if p.record] == ["Asset: Okta; Owner: IT"]
 
 
-def test_excluded_kinds_are_neither_candidates_nor_hopped_to(s: Session) -> None:
+def test_excluded_sources_are_neither_candidates_nor_hopped_to(s: Session) -> None:
     ws = f.workspace(s)
     _doc(s, ws, "acp.docx", "Quarterly reviews cover Okta.")
-    _doc(s, ws, "answer-001.txt", "Asset: Okta; Owner: IT", record=True, kind="statement")
-    _doc(s, ws, "answer-002.txt", "Reviews are quarterly.", kind="statement")
+    _doc(s, ws, "answer-001.txt", "Asset: Okta; Owner: IT", record=True, kind="record", source="statement")
+    # adversary-2 I1: keyed on where the document came from, so a kind the visitor set cannot let it in
+    _doc(s, ws, "answer-002.txt", "Reviews are quarterly.", kind="policy", source="statement")
     s.commit()
     files = lambda r: sorted(p.doc.filename for p in r.passages)  # noqa: E731
     question = "Are reviews quarterly?"
     assert files(retrieve(s, ws.id, question, None)) == ["acp.docx", "answer-001.txt", "answer-002.txt"]
-    assert files(retrieve(s, ws.id, question, None, exclude_kinds=("statement",))) == ["acp.docx"]
+    assert files(retrieve(s, ws.id, question, None, exclude_sources=("statement",))) == ["acp.docx"]
+
+
+def test_an_excluded_source_moves_no_ranking(s: Session) -> None:
+    """adversary-2 I2: the IDF weights and the chunk total leave excluded documents out too, so storing one
+    changes neither the order nor the set of what is retrieved."""
+    ws = f.workspace(s)
+    for n in range(8):  # nine candidates for eight slots, so the order decides the set
+        _doc(s, ws, f"access-{n}.docx", "Access reviews happen.")
+    _doc(s, ws, "cadence.docx", "Quarterly.")  # "quarterly" is rare, so this line ranks high on IDF
+    s.commit()
+    question = "Are access reviews quarterly?"
+    before = retrieve(s, ws.id, question, None, exclude_sources=("statement",))
+    # many chunks holding "quarterly" would make it common and drop that line
+    for n in range(20):
+        _doc(s, ws, f"answer-{n:03}.txt", "Quarterly, quarterly.", kind="statement", source="statement")
+    s.commit()
+    assert retrieve(s, ws.id, question, None, exclude_sources=("statement",)) == before
 
 
 def test_a_common_identifier_does_not_hop(s: Session) -> None:
@@ -472,9 +490,9 @@ def test_the_hop_counts_at_most_hop_max_identifiers(s: Session, monkeypatch: pyt
     asked: list[str] = []
     real = app.retrieve._chunks_naming
 
-    def spy(session: Session, ws_id: uuid.UUID, identifier: str) -> int:
+    def spy(session: Session, ws_id: uuid.UUID, identifier: str, exclude: Sequence[str]) -> int:
         asked.append(identifier)
-        return real(session, ws_id, identifier)
+        return real(session, ws_id, identifier, exclude)
 
     monkeypatch.setattr(app.retrieve, "_chunks_naming", spy)
     r = retrieve(s, ws.id, "Are reviews quarterly?", None)

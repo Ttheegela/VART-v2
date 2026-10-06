@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 
 from app import csf, runs
 from app.api.deps import get_llm
-from app.db.models import Answer, DocumentLine, Item, Questionnaire, Run, RunItem, Workspace
+from app.api.runs import summary
+from app.db.models import Answer, Document, DocumentLine, Item, Questionnaire, Run, RunItem, Workspace
 from app.export import FOOTER
 from app.main import app
 from app.services.ip_limits import LIMITS
@@ -23,6 +24,9 @@ from tests.fakes import ByStepLLM
 
 LINE = "Backups of data are created, protected, maintained and tested every day."
 YES = json.dumps({"passages": [{"passage": 1, "stance": "yes", "quote": LINE, "note": "states it"}]})
+SAID = "Our cybersecurity policy is established and communicated to all staff."
+FILL = json.dumps({"passages": [{"passage": 1, "stance": "yes", "quote": SAID, "note": "says it"}]})
+NO_FILL = json.dumps({"passages": []})
 
 
 def _finish(client: TestClient, run_id: str, llm: object) -> None:
@@ -227,7 +231,7 @@ def test_a_failed_outcome_shows_no_parts_and_an_incomplete_one_neither(db: Engin
     assert client.get(f"/api/answers/{aid}").json()["parts"] == []
 
 
-def test_bulk_approve_skips_a_gap_checks_not_met_outcomes_only(db: Engine) -> None:
+def test_bulk_approve_skips_every_gap_check_outcome(db: Engine) -> None:
     client, ws_id = visitor(db)
     run = client.post("/api/gap/recover/run").json()
     _finish(client, run["id"], ByStepLLM({}))
@@ -243,7 +247,8 @@ def test_bulk_approve_skips_a_gap_checks_not_met_outcomes_only(db: Engine) -> No
     with Session(db) as s:
         s.execute(update(Answer).where(Answer.id == aid).values(value="Yes"))
         s.commit()
-    assert client.post(f"/api/runs/{run['id']}/approve-verified").json()["approved"] == 1
+    # adversary-2 M5: a Covered outcome is not approved either; an approval would keep Check again off it
+    assert client.post(f"/api/runs/{run['id']}/approve-verified").json()["approved"] == 0
     q = client.post(
         "/api/questionnaires/sample/vsq-a"
     ).json()  # a questionnaire's verified No is still approved
@@ -321,7 +326,8 @@ def test_check_again_after_an_upload_reopens_the_outcomes_the_new_document_reach
     assert len(llm.requests) == calls
 
 
-def test_an_ask_me_answer_alone_reopens_nothing(db: Engine) -> None:
+def test_on_a_one_document_workspace_an_ask_me_answer_alone_reopens_nothing(db: Engine) -> None:
+    """One policy line only: the sample pack's case is the test below (adversary-2 I2)."""
     client, ws_id = visitor(db)
     with Session(db) as s:
         _policy(s, ws_id)
@@ -341,3 +347,107 @@ def test_an_ask_me_answer_alone_reopens_nothing(db: Engine) -> None:
     assert client.post("/api/gap/core/run").json()["status"] == "done"
     _finish(client, run["id"], llm)
     assert llm.requests == []
+
+
+def _ask(client: TestClient, run_id: str, csf_id: str, text: str, reply: str) -> Any:
+    """Answer an Ask-me outcome's question, the re-check replying `reply`."""
+    question = next(q for q in client.get(f"/api/runs/{run_id}/questions").json() if q["codes"] == [csf_id])
+    app.dependency_overrides[get_llm] = lambda: ByStepLLM({"recheck": reply})
+    try:
+        r = client.post(f"/api/questions/{question['id']}/answer", json={"text": text})
+    finally:
+        app.dependency_overrides.pop(get_llm, None)
+    assert r.status_code == 200
+    return r.json()
+
+
+def test_the_visitors_answer_never_passes_as_document_evidence(db: Engine) -> None:
+    """adversary-2 I1, the probe replayed: a statement's kind cannot be patched, and a statement whose kind
+    changed anyway is still left out of every Checked part's evidence and still marked "(your answer)"."""
+    client, ws_id = visitor(db)
+    with Session(db) as s:
+        _policy(s, ws_id)
+    run = client.post("/api/gap/core/run").json()
+    _finish(client, run["id"], ByStepLLM({"stance": YES}))
+    found = _ask(client, run["id"], "GV.RM-02", SAID, FILL)["suggestions"]
+    fill = next(x for x in found if x["code"] == "GV.PO-01" and x["part"] == 1)
+    assert client.post(f"/api/suggestions/{fill['id']}/accept").status_code == 200
+    stmt = next(d for d in client.get("/api/documents").json() if d["source"] == "statement")
+    assert client.patch(f"/api/documents/{stmt['id']}", json={"kind": "policy"}).status_code == 409
+    with Session(db) as s:  # as if laundered before the guard: nothing keys on a statement's kind
+        s.execute(update(Document).where(Document.id == uuid.UUID(stmt["id"])).values(kind="policy"))
+        s.commit()
+        o = csf.framework().get("GV.PO-01")
+        for part in csf.part_inputs(o):
+            assert stmt["filename"] not in {p.doc.filename for p in csf.evidence(s, ws_id, part).passages}
+    assert client.post("/api/gap/core/run").json()["status"] == "done"  # nothing re-opened, nothing paid
+    row = next(r for r in client.get("/api/gap/core").json()["rows"] if r["csf_id"] == "GV.PO-01")
+    assert row["label"] not in ("covered", "confirmed_by_you")  # one part from the answer, the rest Gaps
+    sheet = openpyxl.load_workbook(io.BytesIO(client.get(f"/api/runs/{run['id']}/export").content))[
+        "Gap report"
+    ]
+    quotes = next(
+        sheet.cell(n, 6).value for n in range(3, sheet.max_row + 1) if sheet.cell(n, 1).value == "GV.PO-01"
+    )
+    assert f'"{SAID}" ({stmt["filename"]} line 1) (your answer)' in quotes
+
+
+def test_on_the_sample_pack_an_ask_me_answer_alone_reopens_nothing(db: Engine) -> None:
+    """adversary-2 I2: on the real 23 documents, storing the E2E's own answer moves no part's evidence (the
+    IDF and the chunk total leave statements out too), so Check again stays done."""
+    client, _ = visitor(db)
+    assert client.post("/api/documents/sample").status_code == 201
+    run = client.post("/api/gap/core/run").json()
+    _finish(client, run["id"], ByStepLLM({"stance": YES}))
+    answer = (
+        "Yes. The board approved a cybersecurity risk appetite statement, and the security team shares it "
+        "with every new hire."
+    )  # web/e2e/gap.spec.ts
+    _ask(client, run["id"], "GV.RM-02", answer, NO_FILL)
+    assert client.post("/api/gap/core/run").json()["status"] == "done"
+    row = next(r for r in client.get("/api/gap/core").json()["rows"] if r["csf_id"] == "GV.RM-02")
+    # adversary-2 M8: the visitor's own words are said to be theirs
+    assert (row["label"], row["explanation"]) == ("confirmed_by_you", f"Your answer: {answer}")
+
+
+def test_a_gap_outcome_is_never_edited_or_approved_from_the_run_view(db: Engine) -> None:
+    """adversary-2 M5 and M6: an edit or approval would keep Check again off the outcome and put text code
+    did not write into the sheet, so both are refused for a gap check's outcome."""
+    client, _ = visitor(db)
+    run = client.post("/api/gap/recover/run").json()
+    _finish(client, run["id"], ByStepLLM({}))
+    aid = _answer(db, "RC.RP-01")
+    assert client.patch(f"/api/answers/{aid}", json={"text": "We test it."}).status_code == 409
+    approve = client.post(f"/api/answers/{aid}/approve")
+    assert approve.status_code == 409 and "question" not in approve.json()["detail"]
+    with Session(db) as s:
+        a = s.get_one(Answer, aid)
+        assert (a.edited, a.approved_at, a.label) == (False, None, "unknown")
+
+
+def test_a_running_gap_check_is_not_exported(db: Engine) -> None:
+    """adversary-2 M3: re-opened rows would read "Not run yet" under the first run's date."""
+    client, _ = visitor(db)
+    run = client.post("/api/gap/recover/run").json()
+    assert client.get(f"/api/runs/{run['id']}/export").status_code == 409
+    _finish(client, run["id"], ByStepLLM({}))
+    assert client.get(f"/api/runs/{run['id']}/export").status_code == 200
+
+
+def test_an_outcome_confirmed_through_a_fill_counts_every_cited_document() -> None:
+    """adversary-2 M2: Confirmed by you through a part fill cites documents and the statement."""
+
+    def confirmed(*docs: str) -> Answer:
+        cites = [{"document_id": d} for d in docs]
+        return Answer(
+            id=uuid.uuid4(),
+            item_id=uuid.uuid4(),
+            label="user_confirmed",
+            text="x",
+            confidence=1.0,
+            edited=False,
+            citations=cites,
+        )
+
+    assert summary(confirmed("doc-1", "doc-2", "answer-1")).sources == 3
+    assert summary(confirmed()).sources == 1  # an Ask-me confirmation: the statement

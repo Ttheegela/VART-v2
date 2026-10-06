@@ -52,7 +52,7 @@ describe("GapDrawer", () => {
     const q: QuestionOut = {
       ...fixtures.questions[0], id: "qq9", run_id: "r9", item_ids: ["i-GV.RM-02"], codes: ["GV.RM-02"], text: "Risk appetite?",
     };
-    const fill = { id: "s1", item_id: "i-PR.DS-11", code: "PR.DS-11", part: 2, question: "Are backups of data tested?", label: "verified" as const, status: "open" as const };
+    const fill = { id: "s1", item_id: "i-PR.DS-11", code: "PR.DS-11", part: 2, question: "Are backups of data tested?", label: "verified" as const, value: "Yes" as const, status: "open" as const };
     mockApi({
       "GET /api/answers/a-GV.RM-02": { ...fixtures.detail, id: "a-GV.RM-02", label: "unknown", value: null, text: "", citations: [], dropped: [], parts: [] },
       "GET /api/runs/r9/questions": [{ ...q, suggestions: [fill] }],
@@ -62,6 +62,9 @@ describe("GapDrawer", () => {
     expect(await screen.findByText("Your answer is saved as a dated statement and can be cited in your questionnaires.")).toBeInTheDocument();
     // preflight I3: the fill's question is its part's wording, and the card says which part
     expect(screen.getByText("Are backups of data tested?").closest("li")).toHaveTextContent(/PR\.DS-11.*part 2/);
+    // adversary-2 M4: a part's fill speaks the gap check's words
+    expect(screen.getByText("Are backups of data tested?").closest("li")).toHaveTextContent("covered");
+    expect(screen.getByText("Are backups of data tested?").closest("li")).not.toHaveTextContent("verified");
   });
 
   it("a 409 on the Ask-me card reloads the inspector, so the card shows the question as it is now (Task 6 review M2)", async () => {

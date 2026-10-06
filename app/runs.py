@@ -261,7 +261,7 @@ def outcome_values(o: csf.Outcome, parts: Mapping[str, Mapping[str, Any]]) -> di
     """A Checked outcome's answer row from its stored parts, all present (CSF spec 5.3): the label by
     `combine`, code's explanation, the parts' citations and drops. Its chunk ids are the parts' union, so a
     metadata override finds it (app.redecide decides it again part by part); no stances of its own. Parts
-    filled from the visitor's answer are named "Confirmed by you" in the explanation, and an outcome that
+    filled from the visitor's answer are named first in the explanation (`csf.explain`), and an outcome that
     would read Covered with any of them is Confirmed by you, citing the first one's statement (Ruling 6:
     with a Gap or Partly part left it stays Partly covered)."""
     raws = [parts[str(n)] for n in range(1, len(o.parts) + 1)]

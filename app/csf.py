@@ -266,7 +266,7 @@ def evidence(session: Session, workspace_id: uuid.UUID, item: ItemInput) -> Retr
     retrieval with the visitor's stored answers left out of the candidates, so none takes a passage slot
     (adversary-1 I4). An answer reaches a Checked outcome only as a suggestion the visitor accepts
     (Plan 6B)."""
-    return retrieve(session, workspace_id, item.question, item.topic, exclude_kinds=("statement",))
+    return retrieve(session, workspace_id, item.question, item.topic, exclude_sources=("statement",))
 
 
 def part_label(r: ItemResult) -> PartLabel:
@@ -305,13 +305,20 @@ def _numbers(ns: list[int]) -> str:
 
 def explain(o: Outcome, parts: Sequence[ItemResult], filled: Collection[int] = ()) -> str:
     """The outcome's explanation (CSF spec 5.3, amended), by code with no model call: the part numbers by
-    label, the parts `filled` from the visitor's answer first under their own group (adversary-1 I3), then
-    each part that decided the combined label as its question and its own template answer, so a quote always
-    stands beside the stance it was judged with and a stated No is never shown over yes lines."""
+    label, the parts `filled` from the visitor's answer first under their own groups (adversary-1 I3): a
+    Covered one as "Confirmed by you", any other with its label's word "in your answer", so a partial fill is
+    never announced as confirmed (adversary-2 M2, Ruling 6); then each part that decided the combined label as
+    its question and its own template answer, so a quote always stands beside the stance it was judged with
+    and a stated No is never shown over yes lines."""
     labels = [part_label(r) for r in parts]
     deciding = _DECIDING[combine(labels)]
-    mine = [n for n in range(1, len(parts) + 1) if n in filled]
+    mine = [n for n, x in enumerate(labels, 1) if n in filled and x == "covered"]
     groups = [f"Confirmed by you: {_numbers(mine)}."] if mine else []
+    groups += [
+        f"{word} in your answer: {_numbers(ns)}."
+        for label, word in PART_WORDS.items()
+        if label != "covered" and (ns := [n for n, x in enumerate(labels, 1) if x == label and n in filled])
+    ]
     groups += [
         f"{word}: {_numbers(ns)}."
         for label, word in PART_WORDS.items()

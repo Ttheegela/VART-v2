@@ -53,6 +53,16 @@ def _own(session: SessionDep, ws: WorkspaceDep, answer_id: uuid.UUID, *, lock: b
     return a
 
 
+def _not_gap(session: SessionDep, a: Answer) -> None:
+    """A gap check's outcome is code's finding: an edit would reach the sheet as code's words, and an edit or
+    an approval would keep Check again off it (adversary-2 M5). Its labels change only through the gap view
+    (Check again, Ask me, a fill, not applicable)."""
+    if session.scalar(select(Item.csf_id).where(Item.id == a.item_id)) is not None:
+        raise Conflict(
+            "A gap check's outcome is not edited or approved; press r in the gap check to check it again."
+        )
+
+
 def _lines(session: SessionDep, document_id: uuid.UUID, start: int, end: int) -> list[tuple[int, str]]:
     return list(
         session.execute(
@@ -168,8 +178,9 @@ def get_answer(answer_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -> A
 def edit_answer(
     answer_id: uuid.UUID, edit: AnswerEdit, ws: WorkspaceDep, session: SessionDep
 ) -> AnswerSummary:
-    """Edit the text; the answer becomes unapproved and `edited`."""
+    """Edit the text; the answer becomes unapproved and `edited`. 409 for a gap check's outcome."""
     a = _own(session, ws, answer_id, lock=True)
+    _not_gap(session, a)
     a.text, a.edited, a.approved_at = edit.text, True, None
     audit_log.record(session, ws.id, "answer.edit", ref=str(a.id))
     session.commit()
@@ -178,8 +189,9 @@ def edit_answer(
 
 @router.post("/api/answers/{answer_id}/approve")
 def approve_answer(answer_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -> AnswerSummary:
-    """409 for a conflict or an unknown answer (answer the question first)."""
+    """409 for a conflict or an unknown answer (answer the question first), and for a gap check's outcome."""
     a = _own(session, ws, answer_id, lock=True)
+    _not_gap(session, a)
     if a.label == "conflict":
         raise Conflict("Resolve the conflict first: answer the question for this item.")
     if a.label == "unknown":
