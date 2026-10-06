@@ -144,7 +144,7 @@ def test_workspace_says_when_it_expires(db: Engine) -> None:
 
 def test_a_stub_is_a_501_with_the_error_shape(db: Engine) -> None:
     client, _ = visitor(db)
-    r = client.get(f"/api/runs/{U}/export")
+    r = client.get(f"/api/runs/{U}/answers")
     assert (r.status_code, r.json()) == (501, {"detail": "Not built yet."})
 
 
@@ -164,7 +164,6 @@ CALLS: dict[tuple[str, str], dict[str, object]] = {
     ("/api/runs/{run_id}/step", "post"): {},
     ("/api/runs/{run_id}/answers", "get"): {},
     ("/api/runs/{run_id}/approve-verified", "post"): {},
-    ("/api/runs/{run_id}/export", "get"): {},
     ("/api/runs/{run_id}/questions", "get"): {},
     ("/api/answers/{answer_id}", "get"): {},
     ("/api/answers/{answer_id}", "patch"): {"json": {"text": "x"}},

@@ -80,7 +80,9 @@ change-log line; changing or removing a path, a field or a status needs the lead
   a new one counts under `upload`, the storage breaker and the cap. The sheet names are stored at upload, so
   listing never re-parses the file.
 - Export: every cell written is inert text. A value starting with `=`, `+`, `-`, `@`, tab or CR gets a `'`
-  prefix in csv; xlsx cells are written with `data_type = 's'`.
+  prefix in csv; xlsx cells are written with `data_type = 's'`. The response is a download:
+  `Content-Disposition: attachment; filename="<ASCII letters, digits, - _ .>-filled.<xlsx|csv>"`, plus a
+  percent-encoded `filename*=UTF-8''...` when the file name had anything else; no raw user text in the header.
 - Step runner: create a run (`POST /api/questionnaires/{id}/runs`, all items pending), then call
   `POST /api/runs/{id}/step` while `status == "running"`. A step claims up to 4 items (`FOR UPDATE SKIP LOCKED`;
   claims older than 5 minutes are taken again), answers them outside any transaction, writes one answer per item

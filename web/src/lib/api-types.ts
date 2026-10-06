@@ -174,7 +174,8 @@ export interface paths {
      * Export Run
      * @description The original file with the answer column filled and Status, Sources and Notes columns added; csv in,
      * csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
-     * with =, +, -, @, tab or CR gets a ' prefix in csv, and xlsx cells are written with data_type 's'.
+     * with =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The
+     * response is an attachment with an ASCII-safe file name.
      */
     get: operations["export_run_api_runs__run_id__export_get"];
   };
@@ -2185,7 +2186,8 @@ export interface operations {
    * Export Run
    * @description The original file with the answer column filled and Status, Sources and Notes columns added; csv in,
    * csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
-   * with =, +, -, @, tab or CR gets a ' prefix in csv, and xlsx cells are written with data_type 's'.
+   * with =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The
+   * response is an attachment with an ASCII-safe file name.
    */
   export_run_api_runs__run_id__export_get: {
     parameters: {

@@ -4114,7 +4114,7 @@
     },
     "/api/runs/{run_id}/export": {
       "get": {
-        "description": "The original file with the answer column filled and Status, Sources and Notes columns added; csv in,\ncsv out. Unapproved answers read \"Draft, not approved\". Every cell written is inert text: a value starting\nwith =, +, -, @, tab or CR gets a ' prefix in csv, and xlsx cells are written with data_type 's'.",
+        "description": "The original file with the answer column filled and Status, Sources and Notes columns added; csv in,\ncsv out. Unapproved answers read \"Draft, not approved\". Every cell written is inert text: a value starting\nwith =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The\nresponse is an attachment with an ASCII-safe file name.",
         "operationId": "export_run_api_runs__run_id__export_get",
         "parameters": [
           {
