@@ -8,7 +8,7 @@
 - inspect each outcome part by part, next to NIST's text and the cited lines;
 - export a gap-report sheet, alone or inside their filled questionnaire.
 
-The sample pack gains the planted improvement plan, so the live demo shows a stated non-compliance. Every label is decided by code.
+The sample pack gains the planted improvement plan, so the live demo shows a stated non-compliance. "Try with a sample company" is instant and spends no model call: it copies a run the real engine made once. A live run answers a step's items at the same time, so 64 items take about 3 minutes instead of 11. Every label is decided by code.
 
 **Architecture:** Part 0 (Task 1) adds one additive migration (`run_items.parts`, `suggestions.part`) and freezes the contract additions:
 - two paths under `/api/gap/{scope}` (answering 501 until built);
@@ -17,14 +17,23 @@ The sample pack gains the planted improvement plan, so the live demo shows a sta
 - the new `app/csf.py` signatures in `docs/CONTRACTS.md`.
 
 After adversary checkpoint 1, three lanes run in parallel on disjoint files:
-- **api** (Tasks 2-4):
+- **api** (Tasks 2, 2b, 3, 4):
   - the step runner answers csf items part by part, claiming outcomes until their parts reach 8 and storing each part's result as it lands;
+  - a step answers its claimed items, or parts, at the same time, each worker on its own session (Task 2b, speed-up A);
   - the gap endpoints, the inspector's parts, and the gap-report sheet (alone, and inside a questionnaire's xlsx);
   - check again (every part of each affected outcome), Ask-me answers that fill Checked parts in the same CSF function, and re-decide per part.
 - **ui** (Tasks 5-6): the Gap check view (tab 6) and its inspector, built against the generated types and the fetch mock.
 - **data** (Task 7, the lead): the planted `security-improvement-plan.md` moves from the gap-only extension into the dev pack, which is also the sample pack. The dev keys are re-derived from the fact sheet and the dev eval is re-recorded. If a gating dev gate fails, the plan stops at Tarun.
 
-The lead merges the three lanes into `plan6b` and re-records the E2E suite with one new Playwright flow (Task 8). The whole-branch adversary checkpoint, the docs, the final review and the release plan follow (Task 9). Decide, stance, the draft prompt, retrieval and `answer_retrieved` do not change. Only Task 7's new document re-records anything: the dev eval, and the E2E's sample flow.
+The lead merges the three lanes into `plan6b` (Task 7b Step 1).
+- Task 7b (speed-up B) makes "Try with a sample company" copy a precomputed run of the sample questionnaire and of the core gap check. The lead generates the snapshot once, with the eval key.
+- Task 8 re-records the E2E suite with one new Playwright flow.
+- The whole-branch adversary checkpoint, the docs, the final review and the release plan follow (Task 9).
+
+Decide, stance, the draft prompt and `answer_retrieved` do not change. Retrieval gains one optional keyword, with its default unchanged (Task 4, adversary-1 I4). Model calls are made in three places:
+- Task 7's new document re-records the dev eval;
+- Task 7b generates the snapshot;
+- Task 8 re-records the E2E.
 
 **Tech Stack:** Python 3.12, FastAPI, SQLAlchemy 2 + Alembic (JSONB), openpyxl, pytest with Postgres, the datakit fact-sheet tools; React 19 + Vite + TypeScript + Tailwind v4, Vitest + Testing Library, Playwright with `LLM_MODE=replay`.
 
@@ -49,11 +58,11 @@ Other inputs:
 
   | Lane | Branch | Worktree | Tasks | Database |
   |---|---|---|---|---|
-  | api | `plan6b-api` | `~/Desktop/portfolio/projects/VART-wt-6b-api` | 2-4, in order | `vart_test_6b_api` |
+  | api | `plan6b-api` | `~/Desktop/portfolio/projects/VART-wt-6b-api` | 2, 2b, 3, 4, in order | `vart_test_6b_api` |
   | ui | `plan6b-ui` | `~/Desktop/portfolio/projects/VART-wt-6b-ui` | 5-6, in order | none |
   | data | `plan6b-data` | `~/Desktop/portfolio/projects/VART-wt-6b-data` | 7, the lead | `vart_test_6b_data` |
 
-  The lead merges all three into `plan6b` (Task 8). Part 0, integration and the E2E use `vart_test_plan6b`. The lead creates each database once from the main checkout: `docker compose exec db createdb -U vart <name>`.
+  The lead merges all three into `plan6b` (Task 7b Step 1); Task 7b then runs on `plan6b`, because it touches files from both the api and the ui lane. Part 0, integration and the E2E use `vart_test_plan6b`. The lead creates each database once from the main checkout: `docker compose exec db createdb -U vart <name>`.
 - **Decisions.** Tarun answered open questions 1-4 on 2026-10-06; decisions 3, 5, 7 and 8 are his answers.
   1. **One migration, additive** (`c4e8a2d6f1b3`). Carry (a) needs somewhere to keep a part's result before its outcome is whole, and carry (c) needs a fill to name its part. Two columns do it, and no table:
      - `run_items.parts JSONB NOT NULL DEFAULT '{}'`, keyed `"1"`..`"n"`, each the part's stored result plus its wording;
@@ -61,7 +70,11 @@ Other inputs:
 
      Old code runs on the new schema unchanged, so Tarun migrates Neon before `main` moves, as for every release.
   2. **Where the parts live.** A part's stored result is `{"question": <part wording>, **runs._raw(result)}`, plus `"statement_id"` when an accepted fill wrote it. The `answers` row stays the outcome's display record (CSF spec 5.3). Its `chunk_ids` are the union of the parts' chunk ids, so `redecide` still finds it, and it has no stances of its own.
-  3. **Check again re-runs every part of each affected outcome** (CSF spec 5.6, as written). The trigger is `r` on a scope whose run is done (`POST /api/gap/{scope}/run`); an upload never starts model calls by itself, and the view offers "Check again". An outcome counts as affected when any of its parts now retrieves other passages than it was judged on, when its wording changed, or when it is incomplete. The comparison is retrieval only, with no model call. Every machine-judged part of an affected outcome is dropped and runs again. A part filled by a fill the visitor accepted stays: it is the visitor's work, like an approved outcome.
+  3. **Check again re-runs every part of each affected outcome** (CSF spec 5.6, as written). Adversary checkpoint 1 tightened what "affected" means (Ruling 4):
+     - passages are compared as sets;
+     - a Checked part's retrieval leaves statements out before its top 8 (`retrieve(..., exclude_kinds=("statement",))`, lead's OK under rule 10), so an Ask-me answer alone re-opens nothing;
+     - a part judged by another stance prompt or model counts as changed (M5);
+     - open per-part fills survive a re-open (I4). The trigger is `r` on a scope whose run is done (`POST /api/gap/{scope}/run`); an upload never starts model calls by itself, and the view offers "Check again". An outcome counts as affected when any of its parts now retrieves other passages than it was judged on, when its wording changed, or when it is incomplete. The comparison is retrieval only, with no model call. Every machine-judged part of an affected outcome is dropped and runs again. A part filled by a fill the visitor accepted stays: it is the visitor's work, like an approved outcome.
   4. **Paths.** `GET /api/gap/{scope}` and `POST /api/gap/{scope}/run`. `Mapping.scope`, kept free in Plan 3 for 6B, stays unused, because `GapOut.scope` and the questionnaire's stored mapping carry the scope.
   5. **The gap sheet goes in both exports.**
      - A gap-check run's export (`GET /api/runs/{id}/export`) is the gap-report workbook. That path answered 409 for such a run before, so the change adds a status there.
@@ -78,53 +91,82 @@ Other inputs:
      - `app.interview.recheck` is frozen and filters by topic, so `app/questions.py` calls it once per topic group; nothing frozen changes.
      - The calls stay under the per-answer cap: at most `MAX_RECHECKS` (8) re-checks within `RECHECK_SECONDS` (90 s), each spent through the per-network `llm` counter.
      - A fill stays a suggestion until the visitor accepts it.
+     - An accepted fill is the visitor's word, never a document's (adversary-1 I3, Ruling 4). The explanation names it under "Confirmed by you: part n", and the gap sheet marks its quote "(your answer)". The outcome reads Confirmed by you once every part that is not a Gap was filled; a stated No or a disagreement on an unfilled part still decides the label.
   9. **Questions for you on a gap-check run holds its Ask-me outcomes only** (6A decision 6, now enforced in `ensure_questions`). As for any run, they are planned once the run is done.
   10. **The view's path is `workspace / csf 2.0 / <scope>`.** The API has no company name for spec 7's `<company>`.
   11. **The gap view's filter toggles have no single keys.** `g i p d s o a r e` are taken, and spare letters would read as noise. The toggles are Tab-reached buttons, like the Workspace row actions; design.md gets a line.
+  12. **A step answers its claimed items at the same time** (Tarun, 2026-10-06; Task 2b). Up to `STEP_ITEMS` questionnaire items, or up to `STEP_PARTS` gap-check parts, run in a thread pool:
+      - each worker has its own session, spender and cost meter;
+      - the request's thread writes the answers in claim order and raises after writing.
+
+      Calls per run are unchanged; only the wall-clock drops (about 3 min for 64 items, about 4 min for a core gap run).
+  13. **The precomputed sample run** (Tarun, 2026-10-06; Task 7b). It moves from the Plan 4 carry-over into 6B.
+      - Coverage: the sample questionnaire and the core gap check over the untouched sample pack.
+      - The snapshot `data/dev/sample-run.json` is generated by `scripts/sample_snapshot.py` (the lead, eval key) and never hand-written.
+      - Its digest covers the sample documents, the questionnaire, the prompt versions, the step models and the core CSF data.
+      - A stale snapshot is never used: the run goes live, and a test fails in CI.
+      - Re-run live (`?live=true`) always calls the engine. A function scope always runs live.
 - **Network budget for the E2E.** The CI suite shares one per-network cap of 400 model calls an hour.
-  - Plan 3's specs use about 150. The sample run's 64 items make the same number of calls with one more document in the pack.
-  - The gap flow runs one core check over the sample documents: at most 73 stance calls (one per part with passages) and no draft call.
-  - Its Ask-me answer (GV.RM-02, Govern) is re-checked against GV.PO-01 and GV.PO-02's open parts: at most 7 recheck calls, under the cap of 8.
-  - Total about 231. Task 8 Step 5 measures it from `ip_limits` after a full replay.
+  - After Task 7b, the sample flow's run and the gap flow's core check are copied, with no model call.
+  - What still calls a model:
+    - the upload flow, 20 items, about 40 calls;
+    - the sample interview's re-check, up to 8;
+    - the Govern re-checks after the Ask-me answer, up to 7;
+    - one live Recover part.
+  - Total about 55, down from about 231. Task 8 Step 4 measures it from `ip_limits` after a full replay.
+  - Task 2b makes the calls arrive faster, but the cap counts calls per hour, so the total is what matters.
 - **Eval-key spend** (lead only; `~/.config/vart/eval.env`, $5 cap):
 
   | Task | Spend |
   |---|---|
-  | 1-6 | none |
-  | 7 | dev re-record about $0.10 (only items whose prompts changed are paid); gap-dev $0.04 only if it drifts |
-  | 8 | E2E re-record about $0.15: sample flow about $0.05, gap flow about $0.08, re-checks about $0.01 |
-  | Total | about $0.25-0.30; ask Tarun if the key's remaining credit is under $1 |
+  | 1-6, 2b | none |
+  | 7 | dev re-record under $0.25 (the new document may re-rank most items, adversary-1 M10); gap-dev $0.04 only if it drifts |
+  | 7b | the sample snapshot about $0.08: 64 questionnaire items about $0.04, a core gap run about $0.04 |
+  | 8 | E2E re-record about $0.03: the upload flow, the re-checks, one Recover part |
+  | Total | about $0.20-0.40; ask Tarun if the key's remaining credit is under $1 |
 
 ## Lanes
 
 | Part | Tasks | Runs on | Implementer | Reviewer |
 |---|---|---|---|---|
 | Part 0: migration and contract additions | 1 | `plan6b` | lead (Opus 5.5) | Opus |
-| Lane api | 2, 3, 4 | `plan6b-api` | Opus 5.5 (2, 4), Sonnet 5.5 (3) | Opus (2, 4), Sonnet (3) |
+| Lane api | 2, 2b, 3, 4 | `plan6b-api` | Opus 5.5 (2, 2b, 4), Sonnet 5.5 (3) | Opus (2, 2b, 4), Sonnet (3) |
 | Lane ui | 5, 6 | `plan6b-ui` | Opus 5.5 | Opus |
 | Lane data | 7 | `plan6b-data` | lead (Opus 5.5; recording) | Opus (keys derived, gates held) |
-| Integration and E2E | 8 | `plan6b` | lead | Opus |
+| Merge and precomputed sample | 7b | `plan6b` | lead merges; Opus 5.5 implements; lead generates the snapshot | Opus |
+| E2E | 8 | `plan6b` | lead | Opus |
 | Checkpoint, docs, release | 9 | `plan6b` | lead | final Opus review; Tarun approves every outward step |
 
-The lanes share only Task 1's frozen output (`openapi.json`, `web/src/lib/api-types.ts`, the migration), so their files are disjoint. The data lane touches only `data/dev`, the sample list, two count tests, and the dev eval's recordings and results. Inside the api lane, Task 3 calls Task 2's runner and Task 4 changes Task 3's POST handler, so those three run in order. Inside the ui lane, Task 6 renders its drawer inside Task 5's view.
+The lanes share only Task 1's frozen output (`openapi.json`, `web/src/lib/api-types.ts`, the migration), so their files are disjoint. The data lane touches only `data/dev`, the sample list, two count tests, and the dev eval's recordings and results. Inside the api lane, the tasks run in order:
+- Task 2b rewrites Task 2's step loop;
+- Task 3 calls the runner;
+- Task 4 changes Task 3's POST handler.
+
+Task 7b needs all three lanes merged (Task 7's 23-document pack; the api lane's endpoints; the ui lane's run grid), so it runs after them on `plan6b`. Task 8 records after Task 7b, because the copied runs change what the E2E calls. Inside the ui lane, Task 6 renders its drawer inside Task 5's view.
 
 ## Global Constraints
 
 - Every commit message ends with exactly this paragraph: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` (also when a Sonnet model commits).
 - Never open, list, copy or quote anything under `~/Desktop/portfolio/projects/ai-money-hackathon/`; never type the sponsor's company or people names.
 - Never use `git stash`. Set work aside with a WIP commit on your own branch.
-- Tests never touch the network or a real key (pytest-socket): model calls go through `tests/fakes.py` (`FakeLLM`, `ByStepLLM`). Only the lead records, with the eval key: the dev eval in Task 7, and the E2E (replayed from `web/e2e/recorded.jsonl`) in Task 8.
+- Tests never touch the network or a real key (pytest-socket): model calls go through `tests/fakes.py` (`FakeLLM`, `ByStepLLM`). Only the lead calls a real model, with the eval key:
+  - the dev eval in Task 7;
+  - the sample snapshot in Task 7b;
+  - the E2E (replayed from `web/e2e/recorded.jsonl`) in Task 8.
+
+  `data/dev/sample-run.json` is written only by `scripts/sample_snapshot.py`.
+- Concurrency (Task 2b): a `Session` never crosses threads. Every worker spends before its call and holds no transaction across it, and a worker's error comes back to the request's thread with its cost.
 - Backend chain, green before every commit (run `ruff format .` first; with `export TEST_DATABASE_URL=postgresql+psycopg://vart:vart@localhost:5434/<lane db> && export DATABASE_URL=$TEST_DATABASE_URL`): `ruff check . && ruff format --check . && mypy app scripts datakit evals && pytest -q && alembic check`. Never run `docker compose` from a worktree.
 - Frontend chain: `cd web && npm run lint && npm test && npm run build`, then `python scripts/check_monochrome.py` from the repo root.
 - After any change to `app/api/schemas.py` or a route: `python scripts/export_openapi.py && (cd web && npm run gen:api)`, and commit both files. No hand-written request or response type under `web/src`.
 - Hard rule 11: engine code spends the budget before every model call and holds no database transaction across one. Each part reaches a model only through `app.csf.check_part` → `answer_retrieved`; a re-check only through `app.interview.recheck`. Ask-me and not-checked outcomes make no model call of their own (CSF spec 5.4-5.5).
 - `ck_answers_cited` is unchanged: no Covered or Partly covered result without a citation (CSF spec 6).
-- Frozen, never edited by a task: `app/text.py`, `app/patterns.py`, `app/contracts.py`, `app/decide.py`, `app/stance.py`, `app/draft.py`, `app/pipeline.py`, `app/retrieve.py`, `app/interview.py`, `app/ingest/`, `app/redact.py`, every prompt, `data/csf/`, `evals/*.py`, and the gates in `evals/score.py`.
+- Frozen, never edited by a task: `app/text.py`, `app/patterns.py`, `app/contracts.py`, `app/decide.py`, `app/stance.py`, `app/draft.py`, `app/pipeline.py`, `app/retrieve.py` (except Task 4's `exclude_kinds` keyword, approved under rule 10 by Ruling 4), `app/interview.py`, `app/ingest/`, `app/redact.py`, every prompt, `data/csf/`, `evals/*.py`, and the gates in `evals/score.py`.
   - `data/dev` and the dev eval's recordings and results change only in Task 7, and only as it says.
   - After adversary checkpoint 1, the Task 1 additions to `app/api/schemas.py`, and every path, method and status in `openapi.json`, are frozen too. A change needs the lead's OK and a change-log line in `docs/CONTRACTS.md`.
 - Keys come only from the fact sheet: `data/dev/key/*.yaml` are written by `python -m datakit.derive_key dev` and `python -m datakit.gap dev`, never by hand.
 - No gate is lowered. When a gating gate fails after Task 7's re-record, the plan stops and the lead takes the misses to Tarun.
-- The evals do not move outside Task 7: `python -m evals.run --pack dev && python -m evals.run --pack gap-dev && git diff --exit-code evals/results` passes after every api-lane task (against the lane's base) and on `plan6b` after Task 8's merge.
+- The evals do not move outside Task 7: `python -m evals.run --pack dev && python -m evals.run --pack gap-dev && git diff --exit-code evals/results` passes after every api-lane task (against the lane's base) and on `plan6b` after Task 7b's merge.
 - CSF spec 4: "What the visitor sees as 'the framework' is always NIST's verbatim `outcome` text." The view, the inspector and both exports show `outcome` unedited.
 - CSF spec 5.5: "Not-checked outcomes make no model call and carry no label." CSF spec 2: "Every finding reads 'possible gap, review it'; the view and the export say so."
 - Copy, exactly (CSF spec 7): `Possible gap — review it` and `Not legal advice. CSF 2.0 text © NIST, public domain.` (an em dash, and the © sign).
@@ -144,7 +186,10 @@ The lanes share only Task 1's frozen output (`openapi.json`, `web/src/lib/api-ty
    - with nothing changed, the run stays done and no model is called;
    - two presses re-open an outcome once.
 
-   Pinned in Task 4: `test_check_again_reruns_every_part_of_an_affected_outcome`, `test_check_again_keeps_the_visitors_outcomes_and_accepted_parts`, `test_check_again_with_nothing_changed_stays_done`, `test_check_again_after_an_upload_reopens_the_outcomes_the_new_document_reaches`.
+   - an Ask-me answer alone re-opens nothing; the same passages in another order are the same evidence; open per-part fills survive (adversary-1 I4);
+   - two first presses make one run (adversary-1 I2).
+
+   Pinned in Task 4: `test_check_again_reruns_every_part_of_an_affected_outcome`, `test_check_again_keeps_the_visitors_outcomes_and_accepted_parts`, `test_check_again_with_nothing_changed_stays_done`, `test_check_again_after_an_upload_reopens_the_outcomes_the_new_document_reaches`, `test_an_ask_me_answer_alone_reopens_nothing`, `test_the_same_passages_in_another_order_are_the_same_evidence`. Pinned in Task 3: `test_two_first_presses_at_once_make_one_run`.
 4. **A deploy rewords a part** while results for the old wording are stored, mid-run or after. Expect: a stored part whose wording differs from the deployed one runs again; the others are kept. Pinned in Task 2 (`test_a_stored_part_with_other_wording_is_run_again`).
 5. **Coverage overstated in the view or an export.** That would be:
    - a label on a not-checked outcome;
@@ -160,7 +205,24 @@ The lanes share only Task 1's frozen output (`openapi.json`, `web/src/lib/api-ty
    - it reaches only Checked parts in the same CSF function, never another function's;
    - it makes at most 8 re-check calls within 90 s per answer.
 
-   Pinned in Task 4 (`test_a_govern_answer_suggests_fills_for_govern_parts_only_until_accepted`, `test_an_answer_never_fills_another_functions_parts`).
+   - an accepted fill never makes an outcome read Covered: it reads Confirmed by you, and its quote is marked "(your answer)" (adversary-1 I3).
+
+   Pinned in Task 4 (`test_a_govern_answer_suggests_fills_for_govern_parts_only_until_accepted`, `test_an_answer_never_fills_another_functions_parts`, `test_a_filled_part_never_makes_documents_read_covered`) and Task 3 (the "(your answer)" cell in `test_the_gap_report_lists_every_outcome_in_scope_with_inert_cells`).
+7. **Several workers hitting one condition at once** (Task 2b). Conditions: a budget refusal, a provider outage or the deadline in the middle of a concurrent step, or two parts of one outcome finishing together. Expect:
+   - every paid call is counted once, and every answer that came back is written once;
+   - refused and untried items go back with their attempt refunded, and outage-hit items keep theirs;
+   - nothing is written as failed for an outage, and the 503 comes only when nothing was answered;
+   - no stored part is lost to a concurrent write, and the answers come back in questionnaire order;
+   - no worker holds a transaction across its call, and the spend counters stay exact.
+
+   Pinned in Task 2b: `test_four_items_take_about_a_quarter_of_the_sequential_time`, `test_a_gap_outcomes_parts_run_at_once`, `test_spending_is_exact_under_concurrency`, `test_a_budget_refusal_mid_step_writes_what_was_paid_and_gives_the_rest_back`, `test_an_outage_mid_step_writes_the_others_and_keeps_the_attempt_of_the_item_that_met_it`, `test_an_outage_on_every_item_is_a_503_with_no_failed_answer`, `test_no_worker_holds_a_transaction_while_it_calls_a_model`.
+8. **A stale or mismatched sample snapshot.** This happens after a prompt, model, sample-document, questionnaire or CSF-data change, or in a workspace that is no longer the plain sample (an upload, an override, an answered question). Expect:
+   - the snapshot is never copied, and the run goes live;
+   - CI fails until the lead regenerates the snapshot;
+   - a copied run keeps every invariant: citations re-read from the visitor's own documents, `ck_answers_cited`, done at $0, marked precomputed;
+   - Re-run live, Questions for you, the re-check and re-decide work on it.
+
+   Pinned in Task 7b: `test_the_sample_snapshot_is_current`, `test_the_digest_moves_with_every_input`, `test_a_stale_snapshot_is_never_copied`, `test_an_override_or_an_upload_falls_back_to_a_live_run`, `test_try_with_a_sample_company_copies_the_snapshot_with_no_model_call`, `test_questions_rechecks_and_redecide_work_on_a_copied_run`, `test_re_run_live_runs_the_engine`, `test_the_core_gap_check_is_copied_too`.
 
 ## Review gates (run by the lead)
 
@@ -171,10 +233,13 @@ The lanes share only Task 1's frozen output (`openapi.json`, `web/src/lib/api-ty
   - does any path let an Ask-me answer or a not-checked outcome reach a model, other than the re-check of a stored answer;
   - can moving the planted document change a key by hand rather than by derivation?
 
-  Fixes land in Part 0, with the types regenerated, before the lanes start.
+  Fixes land in Part 0, with the types regenerated, before the lanes start. **Recheck** (Ruling 3): after Rulings 3-4 are folded in and the Task 1 fix round lands, the same adversary rechecks the amended plan before the lanes start. The recheck covers:
+  - Task 2b's concurrency (threads and sessions, the refusal, outage and deadline semantics, the edited tests);
+  - Task 7b's snapshot (staleness, id mapping, the fallback to a live run, the contract additions);
+  - Task 4's `retrieve` keyword.
 - **Two-failure rule**: the same failure twice in a task stops it for a Fable look.
 - **Task 7's gate check** is a stop point: a gating dev gate below its value goes to Tarun before anything else merges.
-- **Adversary checkpoint 2** (Fable 5.1) on `main..plan6b` after Task 8 (Task 9 Step 1): what input, label, lock order, copy or fill did everyone miss? Fixes land before the docs and the final review.
+- **Adversary checkpoint 2** (Fable 5.1) on `main..plan6b` after Task 8 (Task 9 Step 1): what input, label, lock order, copy, fill, thread or stale snapshot did everyone miss? Fixes land before the docs and the final review.
 - **Final Opus review** of `main..plan6b` after Task 9 Step 6. Pushing, the pull request, the migration and the fast-forward of `main` are Tarun's.
 
 ## File Structure
@@ -189,12 +254,16 @@ openapi.json, web/src/lib/api-types.ts          GEN (T1, T3)  regenerated
 docs/CONTRACTS.md                               MOD (T1, T9)
 tests/test_models.py, tests/test_openapi.py     MOD (T1)
 app/csf.py                                      MOD (T2 current_mapping, check_part, part_result; T3 CONTROLS_URL)
-app/runs.py                                     MOD (T2 per-part runner, outcome_values; T4 reopen_changed)
+app/runs.py                                     MOD (T2 per-part runner, outcome_values, _is_current; T2b worker pool; T4 reopen_changed, Confirmed by you)
+tests/test_runs_concurrent.py                   NEW (T2b)
+tests/test_runs.py                              MOD (T2b)  one outage test's expected numbers
+app/retrieve.py, tests/test_retrieve.py         MOD (T4)  exclude_kinds keyword (rule 10, Ruling 4)
 tests/test_csf_parts.py                         MOD (T2)
 tests/test_runs_csf.py                          NEW (T2, T4)
 app/api/answers.py                              MOD (T3)  AnswerDetail.parts
 app/export.py, app/api/export.py                MOD (T3)  GapSheet; gap-report workbook; gap sheet in a questionnaire's xlsx
 tests/test_api_gap.py                           NEW (T3, T4)
+tests/test_api_errors.py                        MOD (T3)  gap paths from STUBS to COVERED (Ruling 2)
 tests/test_export.py                            MOD (T3)
 app/questions.py, app/api/questions.py          MOD (T4)  Ask-me only; per-part fills in the same CSF function; accept per part
 app/redecide.py, tests/test_redecide.py         MOD (T4)  re-decide per part
@@ -215,6 +284,11 @@ data/dev/key/vsq-a.yaml, data/dev/key/mvsp-b.yaml   MOD (T7, re-derived)  data/d
 app/api/documents.py                            MOD (T7)  SAMPLE_ORDER gains the document (23)
 tests/test_api_documents.py, tests/test_eval_run.py   MOD (T7)  22 -> 23 sample documents
 evals/recorded/dev.jsonl, evals/results/latest.{json,md}   MOD (T7, the lead's record run)
+app/sample_run.py, scripts/sample_snapshot.py   NEW (T7b)
+data/dev/sample-run.json                        NEW (T7b, written by the script)
+tests/test_sample_run.py                        NEW (T7b)
+app/api/runs.py, .vercelignore                  MOD (T7b)  live query parameter, RunOut.precomputed; ship the snapshot
+web/src/views/RunGrid.tsx (+ .test.tsx)         MOD (T7b)  Re-run live asks for live; precomputed shown
 web/e2e/gap.spec.ts                             NEW (T8)
 web/e2e/recorded.jsonl                          MOD (T8, the lead's record run)
 README.md, CLAUDE.md, docs/PROGRESS.md, the CSF spec   MOD (T9)
@@ -558,7 +632,8 @@ Dispatch Fable 5.1 on `main..plan6b` with this plan's Tasks 2-7 and the question
   - `runs.STEP_PARTS = 8`
   - `runs.ASK: dict[str, Any]` (an Ask-me outcome's row before the visitor answers it)
   - `runs.outcome_values(o: csf.Outcome, parts: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]`: an `answers` row's values, every key an `Answer` column
-  - A stored part is `{"question": str, "label", "value", "text", "citations", "dropped", "conflict", "scope_note", "confidence", "stances", "chunk_ids", "retrieval_dropped"}` (the keys of `runs._raw`), plus `"statement_id": str` when an accepted fill wrote it (Task 4).
+  - A stored part is `{"question": str, "stance_prompt": str, "model": str, "label", "value", "text", "citations", "dropped", "conflict", "scope_note", "confidence", "stances", "chunk_ids", "retrieval_dropped"}` (the judge, then the keys of `runs._raw`). A part an accepted fill wrote (Task 4) has `"statement_id": str` and no judge. `csf.part_result` ignores the extra keys.
+  - `runs._is_current(o, n, raw, models) -> bool`: the part's wording, stance prompt and model are the deployed ones (or it was filled from the visitor's answer).
 
 - [ ] **Step 1: Write the failing engine tests**
 
@@ -809,6 +884,22 @@ def test_a_stored_part_with_other_wording_is_run_again(s: Session) -> None:
     assert _parts_of(s, run.id).parts["2"]["question"] == csf.framework().get("PR.DS-11").parts[1]
 
 
+def test_a_stored_part_judged_by_another_model_is_run_again(s: Session) -> None:
+    ws, it, run = _backups(s)
+    llm = ByStepLLM({"stance": YES})
+    runs.step(s, ws.id, run.id, llm, MODELS)
+    stored = dict(_parts_of(s, run.id).parts)
+    assert (stored["1"]["stance_prompt"], stored["1"]["model"]) == ("stance@p3", MODELS["stance"])
+    stored["3"] = {**stored["3"], "model": "old/stance-model"}  # judged before a model change (adversary-1 M5)
+    s.execute(delete(Answer).where(Answer.run_id == run.id))
+    s.execute(update(RunItem).where(RunItem.run_id == run.id).values(parts=stored, state="pending"))
+    s.execute(update(Run).where(Run.id == run.id).values(status="running", finished_at=None))
+    s.commit()
+    llm.requests.clear()
+    assert runs.step(s, ws.id, run.id, llm, MODELS) == [it.id]
+    assert [q.item_id for q in llm.requests] == ["PR.DS-11#3"]
+
+
 def test_no_transaction_is_open_while_a_part_runs(s: Session) -> None:
     ws, it, run = _backups(s)
 
@@ -921,6 +1012,16 @@ def _answer(
     return _once(session, partial(answer_item, session, workspace_id, item, llm, models, spend), can_retry)
 
 
+def _is_current(o: csf.Outcome, n: int, raw: Mapping[str, Any], models: Mapping[str, str]) -> bool:
+    """A stored part still stands for part n as deployed: the same wording, judged by the same stance prompt and
+    model (adversary-1 M5). A part filled from the visitor's answer has no judge of its own; only its wording
+    counts."""
+    if not 1 <= n <= len(o.parts) or raw.get("question") != o.parts[n - 1]:
+        return False
+    judged = (raw.get("stance_prompt"), raw.get("model")) == (STANCE_PROMPT, models["stance"])
+    return judged or bool(raw.get("statement_id"))
+
+
 def _answer_outcome(
     session: Session,
     workspace_id: uuid.UUID,
@@ -933,21 +1034,27 @@ def _answer_outcome(
 ) -> dict[str, Any]:
     """One gap-check outcome (CSF spec 5.2-5.5, 5.7). Ask me: no retrieval and no call. Checked: every part
     not stored yet runs through the pipeline (each retried once, `_once`) and is stored the moment it lands, so
-    a step refused by the budget mid-outcome resumes without paying again. A stored part whose wording differs
-    from the deployed one runs again. Then code combines the parts (`outcome_values`)."""
+    a step refused by the budget mid-outcome resumes without paying again. A stored part whose wording, stance
+    prompt or model differs from the deployed one runs again (`_is_current`). Then code combines the parts
+    (`outcome_values`). Task 2b turns the part loop into concurrent part jobs."""
     # ponytail: an id NIST withdrew in a data refresh is a KeyError here; the step's crash path ends the item
     # at MAX_ATTEMPTS. A refresh changes the digest, so only a run started before the deploy can meet one.
     o = csf.framework().get(row.csf_id or "")
     if o.tier != "checked":
         return dict(ASK)
     have = session.scalar(select(RunItem.parts).where(RunItem.run_id == run_id, RunItem.item_id == row.id)) or {}
-    parts = {str(n): have[str(n)] for n, text in enumerate(o.parts, 1) if have.get(str(n), {}).get("question") == text}
+    parts = {
+        str(n): have[str(n)]
+        for n in range(1, len(o.parts) + 1)
+        if str(n) in have and _is_current(o, n, have[str(n)], models)
+    }
     session.commit()  # no transaction stays open into the first model call
     for n, text in enumerate(o.parts, 1):
         if str(n) in parts:
             continue
         call = partial(csf.check_part, session, workspace_id, o, n, llm, models, spend)
-        parts[str(n)] = _no_nul({"question": text, **_raw(_once(session, call, can_retry))})
+        judged = {"question": text, "stance_prompt": STANCE_PROMPT, "model": models["stance"]}
+        parts[str(n)] = _no_nul({**judged, **_raw(_once(session, call, can_retry))})
         session.execute(
             update(RunItem).where(RunItem.run_id == run_id, RunItem.item_id == row.id).values(parts=dict(parts))
         )
@@ -1011,6 +1118,611 @@ git commit -m "feat(csf): the step runner answers gap-check outcomes part by par
 
 ---
 
+### Task 2b: Speed-up A — a step answers its claimed items at the same time
+
+**Lane:** api (after Task 2, before Task 3). **Implementer:** Opus 5.5. **Reviewer:** Opus (threads, sessions, budget, outage and deadline semantics). **Eval key:** none.
+
+**Files:**
+- Modify: `app/runs.py` (`step` answers through a worker pool; Task 2's `_answer_outcome` becomes part jobs plus `_keep_current_parts`)
+- Modify: `tests/test_runs.py` (one test's expected numbers, see Step 6), `tests/test_runs_csf.py` (Task 2's resume test no longer assumes which two parts were paid first)
+- Create: `tests/test_runs_concurrent.py`
+- Modify: `docs/CONTRACTS.md` (one change-log line)
+
+**Interfaces:**
+- Consumes:
+  - from Task 2: `csf.check_part`, `outcome_values`, `ASK`, `STEP_PARTS`, `_once`, `_raw`, `_values`, `_no_nul`, `_claim(..., by_parts=)`;
+  - existing: `spender` (its counters are already atomic: `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` per call, see `llm_budget.try_consume` and `ip_limits.bump`), `CostMeter`, `_release`, `_write`, `_add_cost`, `_provider_down`, `_retryable`.
+- Produces:
+  - `runs._session(engine) -> Session`: a worker's own session (tests patch it to watch each worker's transactions);
+  - `runs._Done(values: dict[str, Any] | None, cost: float, error: Exception | None = None)`;
+  - `runs.step(...)`: same signature and return type. It answers the claimed items concurrently and returns their ids in questionnaire order.
+
+**What changes and what stays.**
+
+Each claimed questionnaire item is one job, at most `STEP_ITEMS` (4) a step. Each missing part of a claimed gap-check outcome is one job, at most `STEP_PARTS` (8) parts a step. The jobs run in a `ThreadPoolExecutor` of `STEP_PARTS` workers. Each worker:
+- opens its own `Session` on the step's engine, never sharing one across threads;
+- builds its own spender (which spends before every call and commits at once, so no transaction is held across a call);
+- wraps the client in its own `CostMeter`;
+- returns a `_Done` with its cost, even when it fails.
+
+A part job stores its part with one atomic `UPDATE run_items SET parts = parts || jsonb_build_object(n, part)`. Two parts of one outcome finishing together cannot lose each other.
+
+Back on the request's thread, the step settles each claimed item in claim order:
+1. **Writes.** Every answer that came back is written (one row per item; `ON CONFLICT DO NOTHING` keeps a repeated write a no-op), and every paid call is added to `runs.cost_usd`.
+2. **Give-backs.** These items go back to pending with their attempt refunded:
+   - a job that met a refused budget;
+   - a job that met a missing recording;
+   - a job the deadline kept from starting;
+   - a retry the deadline cut.
+
+   A job that met a provider outage goes back with its attempt kept, as today.
+3. **Raises.** After everything is written, the step raises, in this order:
+   - `ReplayMiss`;
+   - a `llm_budget.Refused` naming the cap;
+   - an unexpected error (that item stays claimed, its attempt counted);
+   - `ModelsUnavailable` (503), only when nothing was answered.
+
+The one change in behaviour: items that ran beside a refused or failed one are answered and written, where the sequential runner gave them back untried. They were already paid for, so nothing is spent twice.
+
+Model calls carry no order: a recording key is the request's content, so the order in which workers call the model changes no key and no result. The evals do not use `step`, and replay byte-identical.
+
+**Limits.**
+- A step now takes about as long as its slowest item: p90 about 15 s for a questionnaire item (stance then draft), and about 15 s for 8 parts. That is far under `DEADLINE_S` (240 s) and Vercel's 300 s.
+- Calls per run do not change; they arrive faster.
+  - The per-workspace hourly caps (stance 150, draft 120) and the per-network 400 are counts per hour, so a run hits them at the same total as before.
+  - A second run inside the same hour is now likelier, and the caps refuse it as they already would.
+- Each worker opens its own Postgres connection (the engine uses `NullPool`): up to 9 per step request. Production reaches Neon through its pooled URL, which multiplexes them.
+
+**Expected wall-clock**, measured in Task 7b Step 6 when the lead generates the sample snapshot live:
+- a 64-item questionnaire takes about 3 minutes (16 steps of about 12 s), down from about 11;
+- a core gap run (73 parts, about 12 steps of up to 8 parts at about 15 s) takes about 4 minutes, down from about 13.
+
+- [ ] **Step 1: Write the failing concurrency tests**
+
+`tests/test_runs_concurrent.py`:
+
+```python
+import json
+import threading
+import time
+from collections.abc import Iterator
+
+import httpx
+import openai
+import pytest
+from sqlalchemy import Engine, func, select
+from sqlalchemy.orm import Session
+
+from app import csf, runs
+from app.api.errors import ModelsUnavailable
+from app.contracts import BudgetExhausted
+from app.db.models import Answer, Item, LlmUsage, RunItem
+from app.llm.client import LLMError, LLMRequest, LLMResult
+from app.services import llm_budget
+from app.services.llm_budget import spender
+from tests import factories as f
+from tests.fakes import ByStepLLM
+
+MODELS = {"stance": "m/stance", "draft": "m/draft", "classify": "m/c", "recheck": "m/stance", "judge": "m/j"}
+QUOTE = "Customer data at rest is encrypted with AES-256."
+STANCE = json.dumps({"passages": [{"passage": 1, "stance": "yes", "quote": QUOTE, "note": "states it"}]})
+DRAFT = json.dumps({"text": 'Yes. The crypto policy says "Customer data at rest is encrypted with AES-256."'})
+LINE = "Backups of data are created, protected, maintained and tested every day."
+YES = json.dumps({"passages": [{"passage": 1, "stance": "yes", "quote": LINE, "note": "states it"}]})
+PAUSE = 0.5  # seconds per model call
+
+
+@pytest.fixture
+def s(db: Engine) -> Iterator[Session]:
+    with Session(db) as session:
+        yield session
+
+
+class Slow(ByStepLLM):
+    """Every call takes PAUSE seconds; a question containing a marker can be made to fail."""
+
+    def __init__(self, replies: dict[str, str | Exception], fail: str = "", error: Exception | None = None) -> None:
+        super().__init__(replies, cost=0.01)
+        self.fail, self.error = fail, error
+
+    def complete(self, req: LLMRequest) -> LLMResult:
+        time.sleep(PAUSE)
+        if self.fail and self.fail in req.user and self.error is not None:
+            with self._lock:
+                self.requests.append(req)
+            raise self.error
+        return super().complete(req)
+
+
+def _questionnaire(s: Session, n: int):  # type: ignore[no-untyped-def]
+    ws = f.workspace(s)
+    f.chunk(s, f.document(s, ws, filename="crypto-policy.docx"), line_start=4, line_end=4, text=QUOTE)
+    q = f.questionnaire(s, ws)
+    for i in range(1, n + 1):
+        f.item(s, q, position=i, row_ref=f"Q!C{i}", code=f"DS-{i:02d}", topic="Data Security",
+               question=f"Is customer data encrypted at rest? (item {i})")
+    s.commit()
+    return ws, runs.create_run(s, ws.id, q.id, MODELS)
+
+
+def _outage() -> LLMError:
+    err = LLMError("stance: 503")
+    err.__cause__ = openai.APIStatusError(
+        "down", response=httpx.Response(503, request=httpx.Request("POST", "http://x")), body=None
+    )
+    return err
+
+
+def test_four_items_take_about_a_quarter_of_the_sequential_time(s: Session) -> None:
+    ws, run = _questionnaire(s, 4)
+    llm = Slow({"stance": STANCE, "draft": DRAFT})
+    start = time.monotonic()
+    answered = runs.step(s, ws.id, run.id, llm, MODELS)
+    took = time.monotonic() - start
+    assert len(answered) == 4 and len(llm.requests) == 8
+    assert took < 2 * 2 * PAUSE  # sequential: 4 items x (stance + draft) = 8 x PAUSE; concurrent: about 2 x PAUSE
+    positions = [s.get_one(Item, i).position for i in answered]
+    assert positions == [1, 2, 3, 4]  # questionnaire order, whatever order the workers finished in
+    s.refresh(run)
+    assert float(run.cost_usd) == pytest.approx(0.08)  # every paid call counted once
+
+
+def test_a_gap_outcomes_parts_run_at_once(s: Session) -> None:
+    ws = f.workspace(s)
+    f.chunk(s, f.document(s, ws, filename="backup-policy.docx"), line_start=2, line_end=2, text=LINE)
+    q = f.questionnaire(s, ws, source="csf", filename="csf-2.0")
+    o = csf.framework().get("PR.DS-11")
+    it = f.item(s, q, csf_id=o.id, code=o.id, row_ref=o.id, topic=o.category, question=o.question)
+    s.commit()
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    llm = Slow({"stance": YES})
+    start = time.monotonic()
+    assert runs.step(s, ws.id, run.id, llm, MODELS) == [it.id]
+    assert time.monotonic() - start < 2.5 * PAUSE  # four parts; sequential would be 4 x PAUSE
+    assert sorted(r.item_id for r in llm.requests) == [f"PR.DS-11#{n}" for n in (1, 2, 3, 4)]
+    ri = s.scalars(select(RunItem).where(RunItem.run_id == run.id)).one()
+    assert sorted(ri.parts) == ["1", "2", "3", "4"]  # no part lost to a concurrent write
+    a = s.scalars(select(Answer).where(Answer.run_id == run.id)).one()
+    assert (a.label, a.value) == ("verified", "Yes")
+
+
+def test_spending_is_exact_under_concurrency(s: Session, db: Engine, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(llm_budget.CAPS, "stance", 10)
+    ws = f.workspace(s)
+    s.commit()
+    allowed: list[bool] = []
+    lock = threading.Lock()
+
+    def spend_once() -> None:
+        with Session(db) as own:
+            ok = spender(own, ws.id, network="net-1")("stance")
+        with lock:
+            allowed.append(ok)
+
+    threads = [threading.Thread(target=spend_once) for _ in range(16)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert allowed.count(True) == 10  # exactly the cap, never one more
+    used = s.scalar(select(LlmUsage.calls).where(LlmUsage.workspace_id == ws.id, LlmUsage.kind == "stance"))
+    assert used == 16  # every attempt counted once (a refusal still counts, as before)
+
+
+def test_a_budget_refusal_mid_step_writes_what_was_paid_and_gives_the_rest_back(
+    s: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(llm_budget.CAPS, "stance", 2)
+    ws, run = _questionnaire(s, 4)
+    llm = Slow({"stance": STANCE, "draft": DRAFT})
+    with pytest.raises(BudgetExhausted) as err:
+        runs.step(s, ws.id, run.id, llm, MODELS)
+    assert isinstance(err.value, llm_budget.Refused) and err.value.scope == "workspace"
+    states = sorted(s.execute(select(RunItem.state, RunItem.attempts)).all())
+    assert states == [("done", 1), ("done", 1), ("pending", 0), ("pending", 0)]  # refused items: attempt refunded
+    assert s.scalar(select(func.count()).select_from(Answer)) == 2
+    s.refresh(run)
+    assert float(run.cost_usd) == pytest.approx(0.04)  # two items, stance and draft each
+    monkeypatch.setitem(llm_budget.CAPS, "stance", 10)
+    assert len(runs.step(s, ws.id, run.id, llm, MODELS)) == 2
+    assert [r.step for r in llm.requests].count("stance") == 4  # no item's stance was paid twice
+
+
+def test_an_outage_mid_step_writes_the_others_and_keeps_the_attempt_of_the_item_that_met_it(s: Session) -> None:
+    ws, run = _questionnaire(s, 4)
+    llm = Slow({"stance": STANCE, "draft": DRAFT}, fail="(item 3)", error=_outage())
+    answered = runs.step(s, ws.id, run.id, llm, MODELS)  # something was answered: no 503
+    assert [s.get_one(Item, i).position for i in answered] == [1, 2, 4]
+    item3 = s.execute(
+        select(RunItem.state, RunItem.attempts).join(Item, Item.id == RunItem.item_id).where(Item.position == 3)
+    ).one()
+    assert tuple(item3) == ("pending", 1)  # given back untried-as-failed; the attempt it met stays counted
+    assert s.scalar(select(func.count()).where(Answer.text == runs.FAILED_TEXT)) == 0
+
+
+def test_an_outage_on_every_item_is_a_503_with_no_failed_answer(s: Session) -> None:
+    ws, run = _questionnaire(s, 3)
+    llm = Slow({"stance": _outage()})
+    with pytest.raises(ModelsUnavailable):
+        runs.step(s, ws.id, run.id, llm, MODELS)
+    assert s.scalars(select(Answer)).all() == []
+    assert sorted(s.execute(select(RunItem.state, RunItem.attempts)).all()) == [("pending", 1)] * 3
+
+
+def test_no_worker_holds_a_transaction_while_it_calls_a_model(s: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    ws, run = _questionnaire(s, 4)
+    mine = threading.local()
+    real = runs._session
+
+    def watched(engine):  # type: ignore[no-untyped-def]
+        mine.session = real(engine)
+        return mine.session
+
+    monkeypatch.setattr(runs, "_session", watched)
+
+    class Watching(ByStepLLM):
+        def complete(self, req: LLMRequest) -> LLMResult:
+            assert not mine.session.in_transaction(), f"{req.step} ran inside its worker's open transaction"
+            assert not s.in_transaction(), "the request's session held a transaction during a call"
+            return super().complete(req)
+
+    llm = Watching({"stance": STANCE, "draft": DRAFT})
+    assert len(runs.step(s, ws.id, run.id, llm, MODELS)) == 4
+    assert len(llm.requests) == 8
+```
+
+- [ ] **Step 2: Run them to verify they fail**
+
+Run: `pytest tests/test_runs_concurrent.py -v`
+Expected: FAIL.
+- The timing tests take the sequential time (`took` about 8 x PAUSE).
+- The refusal test finds the items after the refusal given back untried: one `done`, not two.
+- `runs._session` does not exist.
+
+`test_spending_is_exact_under_concurrency` passes already. It pins that the counters are atomic, since `try_consume` and `bump` upsert with `RETURNING`; keep it as the guard.
+
+- [ ] **Step 3: Write the worker pool**
+
+In `app/runs.py`:
+- add `from concurrent.futures import ThreadPoolExecutor` and `from dataclasses import dataclass`;
+- add `from sqlalchemy import Engine, literal` (beside the existing imports) and `from sqlalchemy.dialects.postgresql import JSONB`.
+
+Then replace Task 2's `_answer_outcome` and the item loop of `step` with:
+
+```python
+@dataclass
+class _Done:
+    """One job's result: the values to write (None for a part job, or on an error), its cost, its error."""
+
+    values: dict[str, Any] | None
+    cost: float
+    error: Exception | None = None
+
+
+def _session(engine: Engine) -> Session:
+    """A worker's own session: a Session is never shared across threads (Task 2b)."""
+    return Session(engine, expire_on_commit=False)
+
+
+def _item_job(
+    engine: Engine,
+    workspace_id: uuid.UUID,
+    item_id: uuid.UUID,
+    llm: LLMClient,
+    models: Mapping[str, str],
+    network: str | None,
+    can_retry: Callable[[], bool],
+) -> _Done:
+    """One questionnaire item on a worker thread: its own session, spender and cost meter."""
+    meter = CostMeter(llm)
+    try:
+        with _session(engine) as s:
+            row = s.get_one(Item, item_id)
+            item = ItemInput(str(row.id), row.question, row.topic)
+            s.commit()
+            spend = spender(s, workspace_id, network=network)
+            return _Done(_values(_answer(s, workspace_id, item, meter, models, spend, can_retry)), meter.take())
+    except Exception as exc:  # reported to the request's thread with the cost it paid
+        return _Done(None, meter.take(), exc)
+
+
+def _part_job(
+    engine: Engine,
+    workspace_id: uuid.UUID,
+    run_id: uuid.UUID,
+    item_id: uuid.UUID,
+    o: csf.Outcome,
+    n: int,
+    llm: LLMClient,
+    models: Mapping[str, str],
+    network: str | None,
+    can_retry: Callable[[], bool],
+) -> _Done:
+    """One part of a gap-check outcome on a worker thread, stored the moment it lands (CSF spec 5.7) with one
+    atomic `parts || {n: part}` update, so two parts of one outcome finishing together never lose each other."""
+    meter = CostMeter(llm)
+    try:
+        with _session(engine) as s:
+            spend = spender(s, workspace_id, network=network)
+            r = _once(s, partial(csf.check_part, s, workspace_id, o, n, meter, models, spend), can_retry)
+            judged = {"question": o.parts[n - 1], "stance_prompt": STANCE_PROMPT, "model": models["stance"]}
+            part = _no_nul({**judged, **_raw(r)})
+            s.execute(
+                update(RunItem)
+                .where(RunItem.run_id == run_id, RunItem.item_id == item_id)
+                .values(parts=RunItem.parts.op("||")(func.jsonb_build_object(str(n), literal(part, JSONB))))
+            )
+            s.commit()
+            return _Done(None, meter.take())
+    except Exception as exc:
+        return _Done(None, meter.take(), exc)
+
+
+def _keep_current_parts(
+    session: Session, run_id: uuid.UUID, item_id: uuid.UUID, o: csf.Outcome, models: Mapping[str, str]
+) -> list[int]:
+    """Drop stored parts that are not current (`_is_current`: wording, stance prompt, model; Review Focus 4,
+    adversary-1 M5); return the parts still to run."""
+    have = session.scalar(select(RunItem.parts).where(RunItem.run_id == run_id, RunItem.item_id == item_id)) or {}
+    keep = {k: v for k, v in have.items() if k.isdigit() and _is_current(o, int(k), v, models)}
+    if keep != have:
+        session.execute(
+            update(RunItem).where(RunItem.run_id == run_id, RunItem.item_id == item_id).values(parts=keep)
+        )
+    return [n for n in range(1, len(o.parts) + 1) if str(n) not in keep]
+
+
+def _run_all(
+    jobs: dict[uuid.UUID, list[Callable[[], _Done]]], in_time: Callable[[], bool]
+) -> dict[uuid.UUID, list[_Done | None]]:
+    """Every job at once (at most STEP_PARTS); a job the pool would start after the deadline is not started
+    (None). Results come back per item in the order the jobs were listed, whatever order they finished in."""
+
+    def guarded(job: Callable[[], _Done]) -> _Done | None:
+        return job() if in_time() else None
+
+    flat = [(item_id, job) for item_id, listed in jobs.items() for job in listed]
+    with ThreadPoolExecutor(max_workers=max(1, min(len(flat), STEP_PARTS))) as pool:
+        futures = [(item_id, pool.submit(guarded, job)) for item_id, job in flat]
+    out: dict[uuid.UUID, list[_Done | None]] = {item_id: [] for item_id in jobs}
+    for item_id, fut in futures:
+        out[item_id].append(fut.result())
+    return out
+
+
+_WORST = (ReplayMiss, BudgetExhausted)  # an item's errors, most decisive first; then outage, then the rest
+
+
+def _worst(errors: list[Exception]) -> Exception:
+    for kind in _WORST:
+        for e in errors:
+            if isinstance(e, kind):
+                return e
+    for e in errors:
+        if isinstance(e, LLMError) and _provider_down(e):
+            return e
+    return errors[0]
+```
+
+Rewrite `step`'s body after the claim. Its signature, its run check, `by_parts`, `deadline` and `_claim` stay as Task 2 wrote them:
+
+```python
+    claimed = _claim(session, run_id, now or datetime.now(UTC), by_parts=by_parts)
+    engine = session.get_bind()
+    assert isinstance(engine, Engine)
+
+    def in_time() -> bool:
+        return clock() <= deadline
+
+    jobs: dict[uuid.UUID, list[Callable[[], _Done]]] = {}
+    ready: dict[uuid.UUID, dict[str, Any]] = {}  # answered with no model call
+    outcomes: dict[uuid.UUID, csf.Outcome] = {}
+    for n, (item_id, attempts) in enumerate(claimed):
+        try:
+            if attempts >= MAX_ATTEMPTS:
+                ready[item_id] = FAILED
+                continue
+            row = session.get_one(Item, item_id)
+            if row.csf_id is None:
+                jobs[item_id] = [partial(_item_job, engine, workspace_id, item_id, llm, models, network, in_time)]
+                continue
+            # ponytail: an id NIST withdrew in a data refresh is a KeyError here; the crash path below ends the
+            # item at MAX_ATTEMPTS. A refresh changes the digest, so only a run started before the deploy meets one.
+            o = csf.framework().get(row.csf_id)
+            if o.tier != "checked":
+                ready[item_id] = dict(ASK)
+                continue
+            outcomes[item_id] = o
+            jobs[item_id] = [
+                partial(_part_job, engine, workspace_id, run_id, item_id, o, k, llm, models, network, in_time)
+                for k in _keep_current_parts(session, run_id, item_id, o, models)
+            ]
+        except Exception:
+            _keep_cost(session, run_id, 0.0, claimed[n + 1 :])  # this item stays claimed; the rest go back
+            raise
+    session.commit()  # the request's session holds no transaction while the workers call models
+    results = _run_all(jobs, in_time)
+
+    answered: list[uuid.UUID] = []
+    give_back: list[uuid.UUID] = []
+    keep_attempt: list[uuid.UUID] = []
+    replay: ReplayMiss | None = None
+    refused: BudgetExhausted | None = None
+    crashed: Exception | None = None
+    for n, (item_id, _) in enumerate(claimed):
+        if item_id in ready:
+            _write(session, workspace_id, run_id, item_id, ready[item_id], 0.0)
+            answered.append(item_id)
+            continue
+        done = results.get(item_id, [])
+        cost = sum(d.cost for d in done if d is not None)
+        errors = [d.error for d in done if d is not None and d.error is not None]
+        if not errors and None not in done:
+            values = (
+                outcome_values(outcomes[item_id], _stored(session, run_id, item_id))
+                if item_id in outcomes
+                else done[0].values  # type: ignore[union-attr]
+            )
+            try:
+                _safe_write(session, workspace_id, run_id, item_id, values or FAILED, cost)
+            except Exception:
+                rest = sum(d.cost for i, _ in claimed[n + 1 :] for d in results.get(i, []) if d is not None)
+                _keep_cost(session, run_id, cost + rest, claimed[n + 1 :])
+                raise
+            answered.append(item_id)
+            continue
+        _add_cost(session, run_id, cost)
+        session.commit()
+        if not errors:  # the deadline kept a job from starting
+            give_back.append(item_id)
+            continue
+        err = _worst(errors)
+        if isinstance(err, ReplayMiss):
+            replay = replay or err
+            give_back.append(item_id)
+        elif isinstance(err, BudgetExhausted):
+            refused = refused or err
+            give_back.append(item_id)
+        elif isinstance(err, LLMError) and _provider_down(err):
+            keep_attempt.append(item_id)  # an item the provider always fails still ends FAILED (adversary-3 N1)
+        elif isinstance(err, LLMError) and _retryable(err) and not in_time():
+            give_back.append(item_id)  # the deadline cut the retry: not tried twice, so not failed
+        elif isinstance(err, (LLMError, SQLAlchemyError)):
+            if isinstance(err, SQLAlchemyError):  # the type only: parameters carry the question's words
+                log.error("run %s item %s: %s; answered as failed", run_id, item_id, type(err).__name__)
+            _write(session, workspace_id, run_id, item_id, FAILED, 0.0)  # its cost is already added
+            answered.append(item_id)
+        else:
+            crashed = crashed or err  # stays claimed with its attempt counted: a crash loop ends at MAX_ATTEMPTS
+    _release(session, run_id, give_back)
+    _release(session, run_id, keep_attempt, refund=False)
+    if replay is not None:
+        raise replay
+    if refused is not None:
+        kind = str(refused.args[0]) if refused.args else "stance"
+        scope = (
+            refused.scope if isinstance(refused, Refused) else refusal_scope(session, workspace_id, kind, network)
+        )
+        raise Refused(kind, scope) from None
+    if crashed is not None:
+        raise crashed
+    if keep_attempt and not answered:
+        raise ModelsUnavailable()  # the next step meets the outage itself when something was answered
+    _finish_if_done(session, run)
+    return answered
+```
+
+And the two helpers it uses:
+
+```python
+def _stored(session: Session, run_id: uuid.UUID, item_id: uuid.UUID) -> dict[str, Any]:
+    parts: dict[str, Any] = session.scalar(
+        select(RunItem.parts).where(RunItem.run_id == run_id, RunItem.item_id == item_id)
+    ) or {}
+    return parts
+
+
+def _safe_write(
+    session: Session,
+    workspace_id: uuid.UUID,
+    run_id: uuid.UUID,
+    item_id: uuid.UUID,
+    values: dict[str, Any],
+    cost: float,
+) -> None:
+    """The database refused a value: write the failure, not a reclaim loop (as before)."""
+    try:
+        _write(session, workspace_id, run_id, item_id, values, cost)
+    except DataError as exc:
+        session.rollback()
+        log.error("run %s item %s: %s on write; answered as failed", run_id, item_id, type(exc).__name__)
+        _write(session, workspace_id, run_id, item_id, FAILED, cost)
+```
+
+`_answer`, `_once`, `_is_current`, `_write`, `_release`, `_keep_cost`, `_add_cost`, `CostMeter`, `outcome_values` and `_claim` stay. Delete Task 2's `_answer_outcome`: the part jobs and `_keep_current_parts` replace it.
+
+Adversary-1 M3 (no deadline check between an outcome's parts) has no separate fix here. Every part job is guarded by `in_time()` when it starts. All of a claim's parts (at most 8) start together, so no part waits behind another outcome's slow parts.
+
+Replace the docstring of `step` with:
+
+```python
+    """Answer the claimed items at once (Task 2b): up to STEP_ITEMS questionnaire items, or up to STEP_PARTS parts
+    of gap-check outcomes, each job on a worker thread with its own session, spender and cost meter, spending
+    before its model call and holding no transaction across it. Then, on this thread in claim order: write every
+    answer that came back (one row per item; a duplicate write does nothing), count every paid call, and give
+    back the items that met a refusal, a missing recording, the deadline or an outage (an outage keeps the
+    attempt). Raises ReplayMiss, then a `llm_budget.Refused` naming the cap, then an unexpected error, then
+    ModelsUnavailable when nothing was answered, always after the rest is written. Returns the item ids
+    answered, in questionnaire order. `network` is `errors.network(request)`: each worker's spender counts
+    each call."""
+```
+
+- [ ] **Step 4: Run the new tests**
+
+Run: `pytest tests/test_runs_concurrent.py -v`
+Expected: PASS.
+
+- [ ] **Step 5: Run the runner suites to see what moved**
+
+Run: `pytest tests/test_runs.py tests/test_runs_csf.py tests/test_api_runs.py -v`
+Expected: every test passes except two. Both encode the sequential order, not a guarantee:
+1. `test_a_provider_outage_writes_no_failed_answers`. Its three items now all start, and each meets the outage:
+   - `len(llm.requests) == calls` becomes `3 * calls`;
+   - the attempts become `[("pending", 1)] * 3`.
+
+   Its guarantees hold: no failed answer, the cost is kept, a 503, and every item that met the outage keeps its attempt.
+2. Task 2's `test_a_refused_budget_keeps_the_paid_parts_and_the_next_step_pays_only_the_rest`. Its four parts start together, so the two paid ones are any two:
+   - `sorted(ri.parts) == ["1", "2"]` becomes `len(ri.parts) == 2`;
+   - the request check becomes `sorted(q.item_id for q in llm.requests) == [f"PR.DS-11#{n}" for n in (1, 2, 3, 4)]`. Each part is still paid exactly once.
+
+Every other test in `tests/test_runs.py` passes unchanged:
+- the deadline tests: each job reads the clock once when it starts and once before a retry, and `next()` on a list iterator is atomic;
+- the refused-budget and network-limit tests, because exactly one call fits the cap;
+- the cost, crash and database-error tests.
+
+If any other test fails, that is a behaviour change: stop and report it, do not edit the test.
+
+- [ ] **Step 6: Make exactly those two edits**
+
+In `tests/test_runs.py`, `test_a_provider_outage_writes_no_failed_answers`:
+
+```python
+    assert len(llm.requests) == 3 * calls  # Task 2b: all three items start; each meets the outage
+    assert s.scalars(select(Answer)).all() == []
+    assert sorted(s.execute(select(RunItem.state, RunItem.attempts)).all()) == [("pending", 1)] * 3
+```
+
+with the comment line above the test extended by: `Task 2b: items run at once, so each item meets the outage and keeps its attempt.`
+
+In `tests/test_runs_csf.py`, the two lines named in Step 5, with the comment `# Task 2b: parts start together, so the two paid parts are any two`.
+
+Run: `pytest tests/test_runs.py tests/test_runs_csf.py tests/test_runs_concurrent.py tests/test_api_runs.py tests/test_csf_parts.py -v`
+Expected: PASS.
+
+- [ ] **Step 7: Add the contract line, run the chain and the replays**
+
+Add to `docs/CONTRACTS.md`'s change log:
+
+```markdown
+- 2026-10-06: Plan 6B Task 2b (behaviour inside existing statuses; no path or field changed): a step answers its
+  claimed items at once, each on its own session and spender. Items that ran beside a refused, outage-hit or
+  missing-recording item are written, not given back (they were paid). The order of raises after the writes is
+  ReplayMiss, a refused budget, an unexpected error, then the 503 when nothing was answered. Every item that met
+  an outage keeps its attempt. The answers come back in questionnaire order.
+```
+
+Run: the backend chain, then `python -m evals.run --pack dev && python -m evals.run --pack gap-dev && git diff --exit-code evals/results`.
+Expected: PASS with no diff. The evals call `answer_item` and `check_outcome`, not `step`.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add app/runs.py tests/test_runs.py tests/test_runs_csf.py tests/test_runs_concurrent.py docs/CONTRACTS.md
+git commit -m "perf(runs): a step answers its claimed items and parts at once, each worker on its own session" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
 ### Task 3: The gap endpoints, the inspector's parts and the gap sheet in both exports
 
 **Lane:** api (after Task 2). **Implementer:** Sonnet 5.5. **Reviewer:** Sonnet (Opus looks at the exports' inert cells in checkpoint 2). **Eval key:** none.
@@ -1018,7 +1730,7 @@ git commit -m "feat(csf): the step runner answers gap-check outcomes part by par
 **Files:**
 - Modify: `app/csf.py` (`CONTROLS_URL`), `app/api/gap.py` (replace the stubs), `app/api/answers.py` (`_dropped`, `_parts`, `detail`), `app/export.py` (`GapSheet`, `gap_report`, `export_xlsx(..., gap=None)`), `app/api/export.py` (a gap-check run's report; the latest gap sheet in a questionnaire's xlsx)
 - Create: `tests/test_api_gap.py`
-- Modify: `tests/test_export.py`, `docs/CONTRACTS.md` (one change-log line)
+- Modify: `tests/test_export.py`, `tests/test_api_errors.py` (the two gap paths move from `STUBS` to `COVERED`, Ruling 2), `docs/CONTRACTS.md` (one change-log line)
 
 **Interfaces:**
 - Consumes:
@@ -1032,7 +1744,9 @@ git commit -m "feat(csf): the step runner answers gap-check outcomes part by par
   - `app.api.gap.gap_rows(session, scope: str, q: Questionnaire | None, run: Run | None) -> list[GapRow]`
   - `app.api.gap.gap_sheet(session, q: Questionnaire, run: Run) -> GapSheet`
   - `app.api.gap.latest_gap(session, workspace_id) -> tuple[Questionnaire, Run] | None` (the latest *done* gap-check run)
-  - `app.export.GapSheet(rows: list[GapRow], citations: dict[uuid.UUID, list[dict[str, Any]]], run_date: str, scope: str, version: str, controls_url: str)` (frozen dataclass)
+  - `app.export.GapSheet(rows: list[GapRow], citations: dict[uuid.UUID, list[dict[str, Any]]], run_date: str, scope: str, version: str, controls_url: str, statement_docs: frozenset[str] = frozenset())` (frozen dataclass; `statement_docs` are the workspace's statement document ids, whose quotes the sheet marks "(your answer)", adversary-1 I3)
+  - `app.api.gap.FAILED_SENTENCE` (the explanation of an outcome whose model call failed twice, adversary-1 M4)
+  - consumes Task 1's fix-round field `GapRow.not_applicable: bool = False` (adversary-1 I1)
   - `app.export.gap_report(g: GapSheet) -> bytes`
   - `app.export.export_xlsx(original, mapping, rows, gap: GapSheet | None = None) -> bytes` (the existing function gains the optional last argument)
   - `app.export.REVIEW`, `FOOTER`, `GAP_SHEET = "Gap report"`, `GAP_HEAD`
@@ -1045,19 +1759,22 @@ Create `tests/test_api_gap.py`:
 ```python
 import io
 import json
+import threading
 import uuid
 from datetime import timedelta
 
 import openpyxl
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, func, select
+from sqlalchemy import Engine, func, select, update
 from sqlalchemy.orm import Session
 
 from app import csf
 from app.api.deps import get_llm
-from app.db.models import DocumentLine, Questionnaire, Workspace
+from app.api.gap import FAILED_SENTENCE
+from app.db.models import Answer, DocumentLine, Questionnaire, Run, Workspace
 from app.export import FOOTER
+from app.runs import FAILED_TEXT
 from app.main import app
 from app.services.ip_limits import LIMITS
 from tests import factories as f
@@ -1167,7 +1884,60 @@ def test_the_gap_report_downloads_for_a_gap_run(db: Engine) -> None:
     recover = [o for o in csf.framework().outcomes if o.function == "Recover"]
     assert [ws.cell(n, 1).value for n in range(3, 3 + len(recover))] == [o.id for o in recover]
     assert ws.cell(len(recover) + 4, 1).value == FOOTER
-    assert (ws["B1"].value, ws["C1"].value) == ("Scope: recover", f"Run date: {run['started_at'][:10]}")
+    done = client.get(f"/api/runs/{run['id']}").json()
+    assert (ws["B1"].value, ws["C1"].value) == ("Scope: recover", f"Run date: {done['finished_at'][:10]}")
+
+
+def test_two_first_presses_at_once_make_one_run(db: Engine) -> None:
+    client, _ = visitor(db)
+    other = TestClient(app)
+    other.cookies.update(client.cookies)  # the same workspace, a second tab
+    ids: list[str] = []
+    lock = threading.Lock()
+
+    def press(c: TestClient) -> None:
+        run_id = c.post("/api/gap/recover/run").json()["id"]
+        with lock:
+            ids.append(run_id)
+
+    threads = [threading.Thread(target=press, args=(c,)) for c in (client, other)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(ids) == 2 and len(set(ids)) == 1  # adversary-1 I2: one run, the same id in both answers
+    with Session(db) as s:
+        assert s.scalar(select(func.count()).select_from(Run)) == 1
+
+
+def test_not_applicable_reads_as_such_on_both_tiers(db: Engine) -> None:
+    client, _ = visitor(db)
+    run = client.post("/api/gap/core/run").json()
+    _finish(client, run["id"], ByStepLLM({}))
+    rows = {r["csf_id"]: r for r in client.get("/api/gap/core").json()["rows"]}
+    for code in ("PR.DS-11", "GV.RM-02"):  # one Checked, one Ask-me outcome (adversary-1 I1)
+        res = client.post(f"/api/answers/{rows[code]['answer_id']}/not-applicable", json={"reason": "We hold no such data."})
+        assert res.status_code == 200
+    after = {r["csf_id"]: r for r in client.get("/api/gap/core").json()["rows"]}
+    for code in ("PR.DS-11", "GV.RM-02"):
+        r = after[code]
+        assert (r["not_applicable"], r["label"]) == (True, None)
+        assert r["explanation"].startswith("Not applicable: We hold no such data.")
+    assert client.get(f"/api/answers/{after['PR.DS-11']['answer_id']}").json()["parts"] == []  # adversary-1 M2
+    ws = openpyxl.load_workbook(io.BytesIO(client.get(f"/api/runs/{run['id']}/export").content))["Gap report"]
+    words = {ws.cell(n, 1).value: ws.cell(n, 4).value for n in range(3, 109)}
+    assert words["PR.DS-11"] == words["GV.RM-02"] == "Not applicable"
+
+
+def test_a_failed_outcome_never_reads_gap(db: Engine) -> None:
+    client, _ = visitor(db)
+    run = client.post("/api/gap/recover/run").json()
+    _finish(client, run["id"], ByStepLLM({}))
+    with Session(db) as s:
+        s.execute(update(Answer).where(Answer.run_id == uuid.UUID(run["id"])).values(text=FAILED_TEXT))
+        s.commit()
+    row = next(r for r in client.get("/api/gap/recover").json()["rows"] if r["csf_id"] == "RC.RP-01")
+    assert (row["label"], row["explanation"]) == (None, FAILED_SENTENCE)  # adversary-1 M4
 
 
 def test_a_questionnaire_export_carries_the_latest_gap_sheet_only_when_one_exists(db: Engine) -> None:
@@ -1191,7 +1961,9 @@ Append to `tests/test_export.py`, adding `from typing import Any`, `GapRow` to t
 CONTROLS = "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final"
 
 
-def _gap_row(csf_id: str, tier: Any, label: Any, explanation: str | None, answer_id: Any = None) -> GapRow:
+def _gap_row(
+    csf_id: str, tier: Any, label: Any, explanation: str | None, answer_id: Any = None, na: bool = False
+) -> GapRow:
     return GapRow(
         csf_id=csf_id,
         function="Protect",
@@ -1205,30 +1977,41 @@ def _gap_row(csf_id: str, tier: Any, label: Any, explanation: str | None, answer
         label=label,
         explanation=explanation,
         sources=1 if answer_id else 0,
+        not_applicable=na,
     )
 
 
 def test_the_gap_report_lists_every_outcome_in_scope_with_inert_cells() -> None:
     aid = uuid.uuid4()
-    cite = {"quote": "=cmd|' /C calc'!A0", "filename": "backup-policy.docx", "line_start": 2}
+    cite = {"quote": "=cmd|' /C calc'!A0", "filename": "backup-policy.docx", "line_start": 2, "document_id": "d1"}
+    said = {"quote": "We review it yearly.", "filename": "answer-002.txt", "line_start": 1, "document_id": "s1"}
     rows = [
         _gap_row("PR.DS-11", "checked", "covered", "=SUM(A1)", aid),
         _gap_row("PR.DS-10", "not_checked", None, None),
         _gap_row("PR.DS-01", "checked", None, None),  # not answered yet
+        _gap_row("PR.DS-02", "checked", None, "Not applicable: no transit", uuid.uuid4(), na=True),
     ]
-    body = gap_report(GapSheet(rows, {aid: [cite]}, "2026-10-06", "core", "2.0", CONTROLS))
+    body = gap_report(
+        GapSheet(rows, {aid: [cite, said]}, "2026-10-06", "core", "2.0", CONTROLS, frozenset({"s1"}))
+    )
     ws = openpyxl.load_workbook(io.BytesIO(body))["Gap report"]
     assert ws["A1"].value == REVIEW == "Possible gap — review it"
     assert (ws["B1"].value, ws["C1"].value) == ("Scope: core", "Run date: 2026-10-06")
     assert tuple(c.value for c in ws[2]) == GAP_HEAD
-    assert [ws.cell(n, 4).value for n in (3, 4, 5)] == ["Covered", "Not checked in this version", "Not run yet"]
+    assert [ws.cell(n, 4).value for n in (3, 4, 5, 6)] == [
+        "Covered", "Not checked in this version", "Not run yet", "Not applicable"  # adversary-1 I1
+    ]
     assert (ws["E3"].value, ws["E3"].data_type) == ("=SUM(A1)", "s")
-    assert (ws["F3"].value, ws["F3"].data_type) == ("\"=cmd|' /C calc'!A0\" (backup-policy.docx line 2)", "s")
+    assert (ws["F3"].value, ws["F3"].data_type) == (
+        "\"=cmd|' /C calc'!A0\" (backup-policy.docx line 2); "
+        "\"We review it yearly.\" (answer-002.txt line 1) (your answer)",  # adversary-1 I3
+        "s",
+    )
     assert (ws["G3"].value, ws["I3"].value, ws["J3"].value, ws["K3"].value) == (
         "NIST text of PR.DS-11", "CP-09", "2026-10-06", "2.0"
     )
     assert ws["H3"].value.endswith(CONTROLS)
-    assert ws.cell(7, 1).value == FOOTER == "Not legal advice. CSF 2.0 text © NIST, public domain."
+    assert ws.cell(8, 1).value == FOOTER == "Not legal advice. CSF 2.0 text © NIST, public domain."
 
 
 def test_a_questionnaire_xlsx_gains_the_gap_sheet_only_when_given_and_never_overwrites_a_sheet() -> None:
@@ -1252,7 +2035,7 @@ def test_a_questionnaire_xlsx_gains_the_gap_sheet_only_when_given_and_never_over
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `pytest tests/test_api_gap.py tests/test_export.py -k "gap or outcome or scope or starting or workspace_sees or questionnaire" -v`
+Run: `pytest tests/test_api_gap.py tests/test_export.py -k "gap or outcome or scope or starting or workspace_sees or questionnaire or presses or applicable or failed" -v`
 Expected: FAIL. The gap paths answer 501, `app.export` has no `GapSheet` or `gap_report`, `export_xlsx` takes no gap, and `AnswerDetail.parts` is `[]`.
 
 - [ ] **Step 3: Write `CONTROLS_URL` and the endpoints**
@@ -1283,13 +2066,14 @@ from app.api.errors import limit
 from app.api.runs import run_out, summary
 from app.api.schemas import ERRORS, GapOut, GapRow, GapScope, RunOut
 from app.contracts import ItemLabel, Value
-from app.db.models import Answer, Item, Questionnaire, Run
+from app.db.models import Answer, Document, Item, Questionnaire, Run
 from app.export import GapSheet
-from app.runs import create_run
+from app.runs import FAILED_TEXT, create_run
 from app.services.capacity import ensure_capacity
 from app.settings import get_settings
 
 router = APIRouter(tags=["gap"], responses=ERRORS)
+FAILED_SENTENCE = "Not checked: the model call failed twice. Press r to check again."
 
 
 def latest_run(session: Session, questionnaire_id: uuid.UUID) -> Run | None:
@@ -1304,7 +2088,7 @@ def latest_run(session: Session, questionnaire_id: uuid.UUID) -> Run | None:
 def gap_rows(session: Session, scope: str, q: Questionnaire | None, run: Run | None) -> list[GapRow]:
     """Every outcome of the scope's functions in NIST's order, with the run's answer where it has one. The label
     is code's (`csf.gap_label`): none for a not-checked outcome, none before an outcome is answered, none for
-    one marked not applicable."""
+    one marked not applicable (which sets `not_applicable`), none for one whose model call failed twice."""
     items = {} if q is None else {i.csf_id: i for i in session.scalars(select(Item).where(Item.questionnaire_id == q.id))}
     answers = (
         {}
@@ -1320,6 +2104,10 @@ def gap_rows(session: Session, scope: str, q: Questionnaire | None, run: Run | N
         label = (
             csf.gap_label(o, cast(ItemLabel, a.label), cast(Value | None, a.value), a.statement_id) if a else None
         )
+        failed = a is not None and o.tier == "checked" and a.text == FAILED_TEXT
+        na = a is not None and a.label == "na"
+        if failed or na:
+            label = None  # a model failure is not "no evidence" (M4); N/A is its own word on either tier (I1)
         rows.append(
             GapRow(
                 csf_id=o.id,
@@ -1332,8 +2120,9 @@ def gap_rows(session: Session, scope: str, q: Questionnaire | None, run: Run | N
                 item_id=item.id if item is not None else None,
                 answer_id=a.id if a else None,
                 label=label,
-                explanation=(a.text or None) if a and label else None,
+                explanation=FAILED_SENTENCE if failed else (a.text or None) if a and (label or na) else None,
                 sources=summary(a).sources if a and label else 0,
+                not_applicable=na,  # adversary-1 I1: either tier; the reason is the explanation
             )
         )
     return rows
@@ -1344,13 +2133,17 @@ def gap_sheet(session: Session, q: Questionnaire, run: Run) -> GapSheet:
     data version it ran on (stored in the questionnaire's mapping)."""
     scope = q.mapping["scope"]
     cited = {a.id: a.citations for a in session.scalars(select(Answer).where(Answer.run_id == run.id))}
+    statements = session.scalars(
+        select(Document.id).where(Document.workspace_id == q.workspace_id, Document.kind == "statement")
+    )
     return GapSheet(
         gap_rows(session, scope, q, run),
         cited,
-        run.started_at.date().isoformat(),
+        (run.finished_at or run.started_at).date().isoformat(),  # the last check, not the first (adversary-1 M6)
         scope,
         q.mapping["csf_version"],
         csf.CONTROLS_URL,
+        frozenset(str(i) for i in statements),
     )
 
 
@@ -1382,7 +2175,7 @@ def _questionnaire(session: Session, ws_id: uuid.UUID, scope: str) -> Questionna
 
 @router.get("/api/gap/{scope}")
 def gap_view(scope: GapScope, ws: WorkspaceDep, session: SessionDep) -> GapOut:
-    """<the Task 1 docstring, unchanged>"""
+    """<the docstring of the committed stub in app/api/gap.py, unchanged (Ruling 2)>"""
     q = _questionnaire(session, ws.id, scope)
     run = latest_run(session, q.id) if q is not None else None
     fw = csf.framework()
@@ -1398,20 +2191,38 @@ def gap_view(scope: GapScope, ws: WorkspaceDep, session: SessionDep) -> GapOut:
 
 @router.post("/api/gap/{scope}/run")
 def start_gap(scope: GapScope, ws: WorkspaceDep, session: SessionDep, request: Request) -> RunOut:
-    """<the Task 1 docstring, unchanged>"""
+    """<the docstring of the committed stub in app/api/gap.py, unchanged (Ruling 2)>"""
     ws_id = ws.id
     limit(request, session, "run")
     ensure_capacity(session)
     q = csf.questionnaire_for(session, ws_id, scope)  # commits
+    # Two first presses at once (two tabs) must make one run, not two (adversary-1 I2): hold the questionnaire
+    # row until the run exists. create_run's FOR SHARE on the same row is already ours.
+    session.execute(select(Questionnaire.id).where(Questionnaire.id == q.id).with_for_update())
     run = latest_run(session, q.id)
     if run is None:
-        run = create_run(session, ws_id, q.id, get_settings().models())
+        run = create_run(session, ws_id, q.id, get_settings().models())  # commits: the lock ends here
+    else:
+        session.commit()
     return run_out(session, run)
 ```
 
+In `tests/test_api_errors.py` (Ruling 2), empty `STUBS` and add the two gap paths to `COVERED`:
+
+```python
+STUBS: set[tuple[str, str]] = set()  # Plan 6B Task 3 built the gap stubs
+```
+
+```python
+    ("/api/gap/{scope}", "get"): "tests.test_api_gap::test_the_view_lists_every_outcome_and_labels_only_what_was_checked",
+    ("/api/gap/{scope}/run", "post"): "tests.test_api_gap::test_starting_twice_continues_the_same_run_and_the_questionnaire_stays_built_in",
+```
+
+Keep the docstrings exactly as the committed stubs in `app/api/gap.py` have them, so `openapi.json` does not move.
+
 - [ ] **Step 4: Write the parts in the evidence**
 
-In `app/api/answers.py`, add `from app import csf` and import `PartOut` from the schemas and `RunItem` from the models. Replace the dropped loop in `detail` with a helper, and add `_parts`:
+In `app/api/answers.py`, add `from app import csf` and `from app.runs import FAILED_TEXT`, and import `PartOut` from the schemas and `RunItem` from the models. Replace the dropped loop in `detail` with a helper, and add `_parts`:
 
 ```python
 def _dropped(session: SessionDep, d: dict) -> DroppedOut:  # type: ignore[type-arg]
@@ -1426,13 +2237,17 @@ def _dropped(session: SessionDep, d: dict) -> DroppedOut:  # type: ignore[type-a
 
 
 def _parts(session: SessionDep, a: Answer, item: Item) -> list[PartOut]:
-    """A Checked CSF outcome's parts as the runner stored them (CSF spec 5.2, carry d); [] for anything else."""
-    if item.csf_id is None:
+    """A Checked CSF outcome's parts as the runner stored them (CSF spec 5.2, carry d); [] for anything else,
+    and [] for an outcome marked not applicable, a failed one, or one whose parts are not all stored: their
+    documents may since have been deleted (adversary-1 M2)."""
+    if item.csf_id is None or a.label == "na" or a.text == FAILED_TEXT:
         return []
     o = csf.framework().get(item.csf_id)
     stored = (
         session.scalar(select(RunItem.parts).where(RunItem.run_id == a.run_id, RunItem.item_id == a.item_id)) or {}
     )
+    if len(stored) != len(o.parts):
+        return []
     return [
         PartOut(
             n=int(k),
@@ -1474,9 +2289,12 @@ class GapSheet:
     scope: str
     version: str
     controls_url: str
+    statement_docs: frozenset[str] = frozenset()
 
 
 def _gap_word(r: GapRow) -> str:
+    if r.not_applicable:
+        return LABEL_WORDS["na"]  # "Not applicable", on either tier (adversary-1 I1)
     if r.tier == "not_checked":
         return csf.NOT_CHECKED[0].upper() + csf.NOT_CHECKED[1:]  # "Not checked in this version"
     return csf.GAP_WORDS[r.label] if r.label else NOT_RUN
@@ -1493,7 +2311,11 @@ def _write_gap(ws: Any, g: GapSheet) -> None:
         _put(ws.cell(2, i), title)
     for n, r in enumerate(g.rows, 3):
         cited = g.citations.get(r.answer_id, []) if r.answer_id else []
-        quotes = "; ".join(f'"{c["quote"]}" ({c["filename"]} line {c["line_start"]})' for c in cited)
+        quotes = "; ".join(
+            f'"{c["quote"]}" ({c["filename"]} line {c["line_start"]})'
+            + (" (your answer)" if c.get("document_id") in g.statement_docs else "")  # adversary-1 I3
+            for c in cited
+        )
         cells = (
             r.csf_id, r.function, r.category, _gap_word(r), r.explanation, quotes or None, r.outcome,
             f"{r.source_url} {g.controls_url}", ", ".join(r.related_controls) or None, g.run_date, g.version,
@@ -1588,12 +2410,29 @@ git commit -m "feat(csf): gap check endpoints, per-part evidence and the gap she
 
 ### Task 4: Check again, Ask-me questions, per-part fills in the same CSF function, per-part re-decide
 
-**Lane:** api (after Task 3). **Implementer:** Opus 5.5. **Reviewer:** Opus (lock order, what survives a re-check, what an answer may fill). **Eval key:** none.
+**Lane:** api (after Task 3). **Implementer:** Opus 5.5. **Reviewer:** Opus (lock order, what survives a re-check, what an answer may fill, the `retrieve` change). **Eval key:** none.
+
+Adversary checkpoint 1 (Ruling 4) shaped four parts of this task:
+- **I3, Confirmed by you.** An accepted fill is the visitor's word, not a document's. The explanation names filled parts in their own group ("Confirmed by you: part 2."). The outcome reads Confirmed by you (`user_confirmed` with the statement) once every part that is not a Gap was filled from the visitor's answer. Not met and Documents disagree still win, because their parts are not filled. The gap sheet marks such quotes "(your answer)" (Task 3).
+- **I4, Check again.**
+  - A stored part is compared with today's retrieval as a set of passages, not an ordered list.
+  - A Checked part's retrieval leaves statements out before its top 8, through the new optional `exclude_kinds` keyword on `app.retrieve.retrieve`. It is approved under rule 10, its default is unchanged, and it gets a CONTRACTS change-log line. So an Ask-me answer alone re-opens nothing.
+  - Re-opening an outcome no longer dismisses its open per-part fills.
+- **M1.** A stale accept on a re-opened outcome is a 409, not a 404.
+- **M5.** A part judged by another stance prompt or model counts as changed (`runs._is_current`, Task 2).
 
 **Files:**
-- Modify: `app/runs.py` (`reopen_changed`, `_same_evidence`), `app/api/gap.py` (`start_gap`), `app/questions.py` (`ensure_questions`, `_suggest`, `accept_suggestion`), `app/api/questions.py` (`_suggestion_out`), `app/redecide.py`
-- Modify: `tests/test_runs_csf.py`, `tests/test_api_gap.py`, `tests/test_redecide.py`
-- Create: `tests/test_questions_csf.py`
+- Modify:
+  - `app/runs.py` (`reopen_changed`, `_same_evidence`; `outcome_values` gains the Confirmed-by-you rule);
+  - `app/csf.py` (`explain` and `aggregate` take `filled`; `evidence` excludes statements from the top K);
+  - `app/retrieve.py` (`exclude_kinds`, approved under rule 10);
+  - `app/api/gap.py` (`start_gap`);
+  - `app/questions.py` (`ensure_questions`, `_suggest`, `accept_suggestion`);
+  - `app/api/questions.py` (`_suggestion_out`);
+  - `app/redecide.py`;
+  - `docs/CONTRACTS.md` (two change-log lines).
+- Modify tests: `tests/test_runs_csf.py`, `tests/test_api_gap.py`, `tests/test_redecide.py`, `tests/test_retrieve.py`, `tests/test_csf_parts.py`.
+- Create: `tests/test_questions_csf.py`.
 
 **Interfaces:**
 - Consumes:
@@ -1601,12 +2440,16 @@ git commit -m "feat(csf): gap check endpoints, per-part evidence and the gap she
   - from Task 1: `SuggestedFill.part`;
   - existing: `app.interview.recheck` (unchanged, takes keyed `OpenItem`s), `app.redecide.passages_for`.
 - Produces:
-  - `runs.reopen_changed(session, workspace_id, run_id) -> int` (outcomes re-opened)
+  - `runs.reopen_changed(session, workspace_id, run_id, models: Mapping[str, str] | None = None) -> int` (outcomes re-opened). `models` are today's judges; None means the run's own. The optional argument is added beside Task 1's recorded signature, with a change-log line.
   - `runs.REOPEN = ("verified", "partial", "conflict", "unknown")`
   - `questions._opens(session, run_id, item, answer) -> list[OpenItem]`
   - `questions._same_area(asked: Item, item: Item) -> bool` (a questionnaire: the same topic; a gap-check run: the same CSF function)
   - `questions._fill_part(session, sg, answer) -> None`
   - `redecide._redecide_parts(session, workspace_id, answer, parts) -> int`
+  - `app.retrieve.retrieve(session, workspace_id, question, topic, *, exclude_kinds: tuple[str, ...] = ())`. Documents of those kinds never enter the candidates; the default changes nothing.
+  - `csf.evidence(...)`: the top K comes from documents only. Statements a plain retrieval would have ranked are still reported as dropped, with reason `statement`.
+  - `csf.explain(o, parts, filled: frozenset[int] = frozenset())` and `csf.aggregate(o, parts, filled: frozenset[int] = frozenset())`. With no `filled`, both give exactly 6A's output, so gap-dev replays unchanged.
+  - `runs.outcome_values(o, parts)`: when at least one part is filled and every part that is not a Gap is filled, the outcome is `user_confirmed` with the first filled part's `statement_id`.
   - A filled part carries `"statement_id"` and is never re-decided or re-opened.
   - Lock order everywhere: answer, then run item, then question, then suggestions (as in `app/questions.py`).
 
@@ -1638,6 +2481,9 @@ def test_check_again_with_nothing_changed_stays_done(s: Session) -> None:
 
 def test_check_again_reruns_every_part_of_an_affected_outcome(s: Session) -> None:
     ws, it, run = _done(s)
+    statement = f.document(s, ws, source="statement", kind="statement", filename="answer-001.txt")
+    fill = f.suggestion(s, run, it, statement, part=2)  # an open per-part fill (adversary-1 I4 c)
+    s.commit()
     _stale(s, run.id, "3")  # one part's evidence changed: the whole outcome is affected (CSF spec 5.6)
     assert runs.reopen_changed(s, ws.id, run.id) == 1
     assert runs.reopen_changed(s, ws.id, run.id) == 0  # a second press re-opens nothing more
@@ -1647,7 +2493,22 @@ def test_check_again_reruns_every_part_of_an_affected_outcome(s: Session) -> Non
     assert s.scalar(select(Answer).where(Answer.run_id == run.id)) is None
     llm = ByStepLLM({"stance": YES})
     assert runs.step(s, ws.id, run.id, llm, MODELS) == [it.id]
-    assert [q.item_id for q in llm.requests] == [f"PR.DS-11#{n}" for n in (1, 2, 3, 4)]
+    assert sorted(q.item_id for q in llm.requests) == [f"PR.DS-11#{n}" for n in (1, 2, 3, 4)]  # Task 2b: any order
+    s.refresh(fill)
+    assert fill.status == "open"  # a per-part fill survives the re-open; accepting it re-checks the part then
+
+
+def test_the_same_passages_in_another_order_are_the_same_evidence(s: Session) -> None:
+    ws, it, run = _backups(s)
+    second = f.document(s, ws, filename="backup-schedule.docx")
+    f.chunk(s, second, line_start=1, line_end=1, text="Backups of data are kept for thirty days.")
+    s.commit()
+    runs.step(s, ws.id, run.id, ByStepLLM({"stance": YES}), MODELS)
+    ri = _parts_of(s, run.id)
+    assert all(len(v["chunk_ids"]) == 2 for v in ri.parts.values())  # two passages, so order can differ
+    ri.parts = {k: {**v, "chunk_ids": v["chunk_ids"][::-1]} for k, v in ri.parts.items()}
+    s.commit()
+    assert runs.reopen_changed(s, ws.id, run.id) == 0  # adversary-1 I4 a: compared as sets
 
 
 def test_check_again_keeps_the_visitors_outcomes_and_accepted_parts(s: Session) -> None:
@@ -1679,6 +2540,16 @@ def test_check_again_after_an_upload_reopens_the_outcomes_the_new_document_reach
     llm = ByStepLLM({"stance": YES})
     again = client.post("/api/gap/core/run").json()
     assert (again["id"], again["status"]) == (run["id"], "running")
+    reopened = {r["csf_id"] for r in client.get("/api/gap/core").json()["rows"] if r["tier"] == "checked" and r["answer_id"] is None}
+    with Session(db) as s:  # exactly the outcomes whose parts now retrieve the new line (adversary-1 I4 d)
+        new = {str(c) for c in s.scalars(select(Chunk.id).where(Chunk.workspace_id == ws_id))}
+        reached = {
+            o.id
+            for o in csf.in_scope("core")
+            if o.tier == "checked"
+            and any(new & {p.chunk_id for p in csf.evidence(s, ws_id, part).passages} for part in csf.part_inputs(o))
+        }
+    assert reopened == reached and "PR.DS-11" in reached
     _finish(client, run["id"], llm)
     rows = {r["csf_id"]: r for r in client.get("/api/gap/core").json()["rows"]}
     assert rows["PR.DS-11"]["label"] == "covered"
@@ -1687,12 +2558,35 @@ def test_check_again_after_an_upload_reopens_the_outcomes_the_new_document_reach
     assert 4 <= calls <= 73  # every part with passages, of the outcomes the new line reaches
     assert client.post("/api/gap/core/run").json()["status"] == "done"  # nothing changed since
     assert len(llm.requests) == calls
+
+
+def test_an_ask_me_answer_alone_reopens_nothing(db: Engine) -> None:
+    client, ws_id = visitor(db)
+    with Session(db) as s:
+        _policy(s, ws_id)
+    stance = ByStepLLM({"stance": YES})
+    run = client.post("/api/gap/core/run").json()
+    _finish(client, run["id"], stance)
+    paid = len(stance.requests)
+    question = next(q for q in client.get(f"/api/runs/{run['id']}/questions").json() if q["codes"] == ["GV.RM-02"])
+    irrelevant = json.dumps({"passages": [{"passage": 1, "stance": "irrelevant", "quote": "", "note": "x"}]})
+    app.dependency_overrides[get_llm] = lambda: ByStepLLM({"recheck": irrelevant})
+    try:
+        text = "Our risk appetite statement and our policy reviews are approved by the board each year."
+        assert client.post(f"/api/questions/{question['id']}/answer", json={"text": text}).status_code == 200
+    finally:
+        app.dependency_overrides.pop(get_llm, None)
+    again = client.post("/api/gap/core/run").json()
+    assert (again["id"], again["status"]) == (run["id"], "done")  # the statement takes no Checked part's slot
+    assert len(stance.requests) == paid
 ```
+
+Add `Chunk` to that file's `app.db.models` import.
 
 - [ ] **Step 2: Run them to verify they fail**
 
 Run: `pytest tests/test_runs_csf.py tests/test_api_gap.py -k "check_again" -v`
-Expected: FAIL. `runs` has no `reopen_changed`, and the POST on a done run answers it unchanged.
+Expected: FAIL. `runs` has no `reopen_changed`, the POST on a done run answers it unchanged, and a statement still takes a part's top-K slot.
 
 - [ ] **Step 3: Write `reopen_changed` and wire it into the POST**
 
@@ -1702,27 +2596,39 @@ In `app/runs.py`, add `delete` to the `sqlalchemy` import and `SuggestedFill` to
 REOPEN = ("verified", "partial", "conflict", "unknown")  # machine labels; the visitor's own labels stay
 
 
-def _same_evidence(session: Session, workspace_id: uuid.UUID, o: csf.Outcome, n: int, raw: Mapping[str, Any]) -> bool:
-    """A stored part still describes the documents: the deployed wording, and the same passages retrieved now
-    (retrieval only, no model call)."""
-    if n > len(o.parts) or raw.get("question") != o.parts[n - 1]:
+def _same_evidence(
+    session: Session,
+    workspace_id: uuid.UUID,
+    o: csf.Outcome,
+    n: int,
+    raw: Mapping[str, Any],
+    models: Mapping[str, str],
+) -> bool:
+    """A stored part still describes the documents (retrieval only, no model call). It must have the deployed
+    wording, stance prompt and model (`_is_current`), and the same passages retrieved now, compared as a set:
+    the same passages in another order are the same evidence for decide (adversary-1 I4)."""
+    if not _is_current(o, n, raw, models):
         return False
     found = csf.evidence(session, workspace_id, csf.part_inputs(o)[n - 1])
-    return [p.chunk_id for p in found.passages] == raw["chunk_ids"]
+    return {p.chunk_id for p in found.passages} == set(raw["chunk_ids"])
 
 
-def reopen_changed(session: Session, workspace_id: uuid.UUID, run_id: uuid.UUID) -> int:
+def reopen_changed(
+    session: Session, workspace_id: uuid.UUID, run_id: uuid.UUID, models: Mapping[str, str] | None = None
+) -> int:
     """Check again after an upload (CSF spec 5.6; plan 6B decision 3), with no model call. A Checked outcome is
-    affected when any stored part's evidence or wording changed, or a part is missing. Every machine-judged part
-    of an affected outcome is dropped, and the outcome goes back to pending with its answer removed and its
-    open fills dismissed, so the step loop runs all of its parts again. A part filled by a fill the visitor
+    affected when any stored part's evidence, wording or judge changed, or a part is missing. Every
+    machine-judged part of an affected outcome is dropped, and the outcome goes back to pending with its answer
+    removed and its whole-item fills dismissed, so the step loop runs all of its parts again. A part filled by a fill the visitor
     accepted stays, and so does an outcome the visitor edited, approved, confirmed or marked not applicable.
     Locks the run first, so two presses re-open once. Returns the outcomes re-opened; with any, the run is
-    running again."""
+    running again. Open per-part fills survive a re-open (adversary-1 I4): a fill is the visitor's statement
+    judged against the part's wording, and accepting it later re-checks the part."""
     run = session.scalar(select(Run).where(Run.id == run_id, Run.workspace_id == workspace_id).with_for_update())
     if run is None or run.status != "done":
         session.commit()
         return 0
+    judges = models or run.models  # a part judged by another prompt or model re-opens (adversary-1 M5)
     rows = session.execute(
         select(Item, RunItem.parts)
         .join(RunItem, RunItem.item_id == Item.id)
@@ -1742,7 +2648,7 @@ def reopen_changed(session: Session, workspace_id: uuid.UUID, run_id: uuid.UUID)
         if o.tier != "checked":
             continue
         affected = len(stored) < len(o.parts) or any(
-            not raw.get("statement_id") and not _same_evidence(session, workspace_id, o, int(k), raw)
+            not raw.get("statement_id") and not _same_evidence(session, workspace_id, o, int(k), raw, judges)
             for k, raw in stored.items()
         )
         if affected:  # every machine-judged part runs again; the visitor's accepted parts stay
@@ -1756,7 +2662,12 @@ def reopen_changed(session: Session, workspace_id: uuid.UUID, run_id: uuid.UUID)
         )
         session.execute(
             update(SuggestedFill)
-            .where(SuggestedFill.run_id == run_id, SuggestedFill.item_id == item_id, SuggestedFill.status == "open")
+            .where(
+                SuggestedFill.run_id == run_id,
+                SuggestedFill.item_id == item_id,
+                SuggestedFill.status == "open",
+                SuggestedFill.part == 0,  # per-part fills stay open (adversary-1 I4 c)
+            )
             .values(status="dismissed")
         )
     if reopened:
@@ -1772,7 +2683,7 @@ In `app/api/gap.py`, import `reopen_changed` from `app.runs`. In `start_gap`, re
     if run is None:
         run = create_run(session, ws_id, q.id, get_settings().models())
     elif run.status == "done":
-        reopen_changed(session, ws_id, run.id)  # commits; nothing changed: it stays done
+        reopen_changed(session, ws_id, run.id, get_settings().models())  # commits; nothing changed: stays done
         session.refresh(run)
 ```
 
@@ -1791,7 +2702,7 @@ from collections.abc import Iterator
 from datetime import date
 
 import pytest
-from sqlalchemy import Engine, func, select, update
+from sqlalchemy import Engine, delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app import csf, runs
@@ -1870,9 +2781,12 @@ def test_a_govern_answer_suggests_fills_for_govern_parts_only_until_accepted(s: 
     ]
     fill = next(sg for sg in found if sg.item_id == po1.id and sg.part == 2)
     a = qs.accept_suggestion(s, ws.id, fill.id)
-    assert (a.label, a.value, a.approved_at) == ("partial", "Partial", None)  # Covered + Gap + Gap
-    assert a.text.startswith("Evidenced: part 2. No evidence: parts 1, 3.")
+    # adversary-1 I3 (Ruling 4): the visitor's words never read as document evidence. Every part that is not a
+    # Gap is filled from the answer, so the outcome reads Confirmed by you, citing the statement.
+    assert (a.label, a.value, a.statement_id, a.approved_at) == ("user_confirmed", None, fill.statement_id, None)
+    assert a.text.startswith("Confirmed by you: part 2. No evidence: parts 1, 3.")
     assert a.citations[0]["filename"] == "answer-002.txt"  # the visitor's statement (GV.RM-02 is item 2)
+    assert csf.gap_label(csf.framework().get("GV.PO-01"), a.label, a.value, a.statement_id) == "confirmed_by_you"
     stored = s.scalars(select(RunItem).where(RunItem.run_id == run.id, RunItem.item_id == po1.id)).one().parts
     assert (stored["2"]["label"], stored["2"]["statement_id"]) == ("verified", str(fill.statement_id))
     states = dict(
@@ -1881,6 +2795,21 @@ def test_a_govern_answer_suggests_fills_for_govern_parts_only_until_accepted(s: 
     assert states == {1: "open", 2: "accepted", 3: "open"}  # only that part's other fills are dismissed
     with pytest.raises(qs.Conflict):
         qs.accept_suggestion(s, ws.id, fill.id)
+    for n in (1, 3):  # the other parts' fills still apply to a confirmed outcome
+        a = qs.accept_suggestion(s, ws.id, next(sg.id for sg in found if sg.item_id == po1.id and sg.part == n))
+    assert (a.label, a.text.split(". ")[0]) == ("user_confirmed", "Confirmed by you: parts 1, 2, 3")
+
+
+def test_a_stale_accept_on_a_re_opened_outcome_is_a_409(s: Session) -> None:
+    ws, q, run = _core_done(s)
+    question = next(x for x in qs.ensure_questions(s, ws.id, run.id) if _code(s, x.item_ids) == "GV.RM-02")
+    reply = json.dumps({"passages": [{"passage": 1, "stance": "yes", "quote": SAID, "note": "x"}]})
+    _, _, found = qs.answer_question(s, ws.id, question.id, SAID, ByStepLLM({"recheck": reply}), MODELS, TODAY)
+    po1 = _item(s, q.id, "GV.PO-01")
+    s.execute(delete(Answer).where(Answer.run_id == run.id, Answer.item_id == po1.id))  # as reopen_changed does
+    s.commit()
+    with pytest.raises(qs.Conflict, match="being checked again"):  # adversary-1 M1: not the GONE 404
+        qs.accept_suggestion(s, ws.id, next(sg.id for sg in found if sg.item_id == po1.id))
 
 
 def test_an_answer_never_fills_another_functions_parts(s: Session) -> None:
@@ -1894,6 +2823,51 @@ def test_an_answer_never_fills_another_functions_parts(s: Session) -> None:
     _, answer, found = qs.answer_question(s, ws.id, question.id, SAID, llm, MODELS, TODAY)
     assert answer is not None and answer.label == "user_confirmed"
     assert (llm.requests, found) == ([], [])  # no Protect, Detect, Identify, Respond or Recover part is asked
+```
+
+Append to `tests/test_runs_csf.py`:
+
+```python
+def test_a_filled_part_never_makes_documents_read_covered(s: Session) -> None:
+    ws, it, run = _done(s)
+    o = csf.framework().get("PR.DS-11")
+    parts = dict(_parts_of(s, run.id).parts)
+    said = str(uuid.uuid4())
+    parts["2"] = {**parts["2"], "statement_id": said}
+    v = runs.outcome_values(o, parts)  # parts 1, 3, 4 Covered by the policy; part 2 filled
+    assert (v["label"], v["value"]) == ("verified", "Yes")  # the documents still carry it
+    assert v["text"].startswith("Confirmed by you: part 2. Evidenced: parts 1, 3, 4.")
+    every = {k: {**p, "statement_id": said} for k, p in parts.items()}
+    v = runs.outcome_values(o, every)
+    assert (v["label"], v["value"], str(v["statement_id"])) == ("user_confirmed", None, said)
+```
+
+Append to `tests/test_csf_parts.py`:
+
+```python
+def test_with_no_fill_the_explanation_is_6a_s() -> None:
+    o = _outcome(3)
+    parts = [_part(1, "covered"), _part(2, "gap"), _part(3, "partly_covered")]
+    assert csf.explain(o, parts, frozenset()) == csf.explain(o, parts)
+    assert csf.explain(o, parts, frozenset({1})).startswith(
+        "Confirmed by you: part 1. Partly evidenced: part 3. No evidence: part 2."
+    )
+```
+
+Append to `tests/test_retrieve.py` (it has the `s` fixture, `f`, and imports `retrieve` from `app.retrieve`):
+
+```python
+def test_excluded_kinds_never_take_a_slot(s: Session) -> None:
+    ws = f.workspace(s)
+    policy = f.document(s, ws, filename="backup-policy.docx")
+    f.chunk(s, policy, line_start=1, line_end=1, text="Backups of data are tested every quarter.")
+    said = f.document(s, ws, filename="answer-001.txt", source="statement", kind="statement")
+    f.chunk(s, said, line_start=1, line_end=1, text="Backups of data are tested and restored by our team.")
+    s.commit()
+    every = retrieve(s, ws.id, "Are backups of data tested?", None)
+    docs_only = retrieve(s, ws.id, "Are backups of data tested?", None, exclude_kinds=("statement",))
+    assert {p.doc.kind for p in every.passages} == {"policy", "statement"}  # the default is unchanged
+    assert {p.doc.kind for p in docs_only.passages} == {"policy"}
 ```
 
 Append to `tests/test_redecide.py` (add `from app import csf, runs`, `from app.db.models import RunItem` and `from tests.fakes import ByStepLLM`):
@@ -1931,7 +2905,13 @@ def test_a_metadata_override_redecides_each_part_and_recombines(db: Engine) -> N
 - [ ] **Step 6: Run them to verify they fail**
 
 Run: `pytest tests/test_questions_csf.py tests/test_redecide.py -v`
-Expected: FAIL. The Checked Gap outcomes are queued as questions; an Ask-me answer re-checks nothing (no Checked outcome shares its topic), or per outcome; and `redecide` turns the outcome into `unknown`.
+Expected: FAIL.
+- The Checked Gap outcomes are queued as questions.
+- An Ask-me answer re-checks nothing, because no Checked outcome shares its topic; or it re-checks per outcome.
+- A filled part reads as document evidence.
+- `explain` takes no `filled`, and `retrieve` takes no `exclude_kinds`.
+- A stale accept is a 404.
+- `redecide` turns the outcome into `unknown`.
 
 - [ ] **Step 7: Write the interview changes**
 
@@ -2065,7 +3045,103 @@ def _fill_part(session: Session, sg: SuggestedFill, a: Answer) -> None:
     a.approved_at, a.edited = None, False
 ```
 
+In `accept_suggestion`, read the answer so a re-opened outcome is a conflict, not a 404 (adversary-1 M1). Let a per-part fill still apply to an outcome that reads Confirmed by you (adversary-1 I3), and replace the `_still_open` check:
+
+```python
+    a = session.scalars(
+        select(Answer).where(Answer.run_id == sg.run_id, Answer.item_id == sg.item_id).with_for_update()
+    ).one_or_none()
+    if a is None:
+        session.rollback()
+        raise Conflict("This outcome is being checked again; the suggestion no longer applies.")
+```
+
+```python
+    confirmed_part = sg.part > 0 and a.label == "user_confirmed" and not a.edited and a.approved_at is None
+    if not (_still_open(a) or confirmed_part):
+        session.rollback()
+        raise Conflict("This item was answered, edited or approved since; the suggestion no longer applies.")
+```
+
 In `app/api/questions.py`, `_suggestion_out` passes `part=s.part`.
+
+**Confirmed by you (adversary-1 I3).** In `app/csf.py`, `explain` and `aggregate` take the filled part numbers. Change `explain`'s signature and its group lines:
+
+```python
+def explain(o: Outcome, parts: Sequence[ItemResult], filled: frozenset[int] = frozenset()) -> str:
+    """<keep the existing docstring, adding:> Parts filled from the visitor's answer are named first, in their
+    own group ("Confirmed by you: part 2."), never among the evidenced parts (adversary-1 I3)."""
+    labels = [part_label(r) for r in parts]
+    deciding = _DECIDING[combine(labels)]
+    mine = [f"Confirmed by you: {_numbers(sorted(filled))}."] if filled else []
+    groups = [
+        f"{word}: {_numbers(ns)}."
+        for label, word in PART_WORDS.items()
+        if (ns := [n for n, x in enumerate(labels, 1) if x == label and n not in filled])
+    ]
+    answers = [
+        f"{q} {template_answer(r.decision)}"
+        for q, r, x in zip(o.parts, parts, labels, strict=True)
+        if x in deciding
+    ]
+    return " ".join([*mine, *groups, *answers])
+```
+
+`aggregate(o, parts, filled: frozenset[int] = frozenset())` passes `filled` to `explain` and is otherwise unchanged. With no `filled`, both return exactly what they returned before (pinned by `test_with_no_fill_the_explanation_is_6a_s`; gap-dev replays unchanged).
+
+In `app/runs.py`, `outcome_values` becomes:
+
+```python
+def outcome_values(o: csf.Outcome, parts: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    """<keep the existing docstring, adding:> A part filled from the visitor's answer is named "Confirmed by you".
+    When every part that is not a Gap was filled, the outcome is the visitor's: `user_confirmed` with the first
+    filled part's statement, so it reads Confirmed by you and never Covered (adversary-1 I3, Ruling 4). A stated
+    No or a disagreement on an unfilled part still decides the label."""
+    raws = [parts[str(n)] for n in range(1, len(o.parts) + 1)]
+    filled = frozenset(n for n, r in enumerate(raws, 1) if r.get("statement_id"))
+    results = [csf.part_result(o, n, r) for n, r in enumerate(raws, 1)]
+    values = _values(csf.aggregate(o, results, filled))
+    values["chunk_ids"] = list(dict.fromkeys(c for r in raws for c in r["chunk_ids"]))
+    rest = [n for n, r in enumerate(results, 1) if csf.part_label(r) != "gap"]
+    if filled and all(n in filled for n in rest):
+        said = uuid.UUID(raws[min(filled) - 1]["statement_id"])
+        values.update(label="user_confirmed", value=None, statement_id=said)
+    return values
+```
+
+`_write` inserts `statement_id` like any other column, and `ck_answers_statement` holds: a `user_confirmed` row always has its statement. A confirmed outcome is not `REOPEN`ed or re-decided (both select machine labels only), so the visitor's confirmation stands.
+
+**Statements leave a Checked part's top K (adversary-1 I4 b; lead's OK under rule 10).** In `app/retrieve.py`, `retrieve` gains a keyword:
+
+```python
+def retrieve(
+    session: Session, workspace_id: uuid.UUID, question: str, topic: str | None, *, exclude_kinds: tuple[str, ...] = ()
+) -> Retrieval:
+    """At most K passages for one questionnaire item, best first. Documents of a kind in `exclude_kinds` never
+    become candidates (a CSF Checked part leaves out the visitor's statements; the default changes nothing)."""
+```
+
+Its candidate query passes `"exclude": list(exclude_kinds)`, and `_CANDIDATES`' `WHERE` gains `AND NOT (d.kind = ANY(CAST(:exclude AS text[])))`. An empty array makes that clause true, so every existing caller's query returns what it did. The IDF over the workspace (`_fused`) and the record hop are unchanged.
+
+In `app/csf.py`, `evidence` keeps the statements out of the top K, and still reports the ones a plain retrieval would have ranked, so the inspector's "This is your own answer" line stays (6A's `test_a_checked_outcome_is_judged_on_documents_never_on_a_stored_answer` passes unchanged):
+
+```python
+def evidence(session: Session, workspace_id: uuid.UUID, item: ItemInput) -> Retrieval:
+    """<keep the existing docstring, adding:> Statements never take one of the part's K slots (adversary-1 I4)."""
+    r = retrieve(session, workspace_id, item.question, item.topic, exclude_kinds=("statement",))
+    said = [p for p in retrieve(session, workspace_id, item.question, item.topic).passages if p.doc.kind == "statement"]
+    return Retrieval(r.passages, r.dropped + tuple(Dropped(p.chunk_id, p.doc.id, p.doc.filename, "statement") for p in said))
+```
+
+Add to `docs/CONTRACTS.md`'s unit table: the `retrieve` row reads `retrieve(session, workspace_id, question, topic, *, exclude_kinds=())`, and the `csf` row's `explain` and `aggregate` gain `filled=frozenset()`. Then add to the change log:
+
+```markdown
+- 2026-10-06: Plan 6B Task 4 (lead's OK under rule 10; adversary-1 I3, I4, M5, Ruling 4): `app.retrieve.retrieve`
+  gains the keyword `exclude_kinds` (default `()`, every existing caller unchanged); `csf.evidence` keeps statements
+  out of a Checked part's top K. `csf.explain` and `csf.aggregate` gain `filled` (default empty: 6A's output).
+  `runs.reopen_changed` gains an optional `models`. A Checked outcome whose every non-Gap part was filled from the
+  visitor's answer is `user_confirmed`. No prompt or label of a questionnaire changes; nothing is re-recorded.
+```
 
 - [ ] **Step 8: Write the per-part re-decide**
 
@@ -2120,14 +3196,14 @@ def _redecide_parts(session: Session, workspace_id: uuid.UUID, a: Answer, parts:
 
 - [ ] **Step 9: Run the tests, the chain and the eval replays**
 
-Run: `pytest tests/test_questions_csf.py tests/test_redecide.py tests/test_questions.py tests/test_runs_csf.py tests/test_api_gap.py -v`, then the backend chain, then `python -m evals.run --pack dev && python -m evals.run --pack gap-dev && git diff --exit-code evals/results`
-Expected: PASS. The existing interview tests show that a questionnaire's fills (part 0) behave as before.
+Run: `pytest tests/test_questions_csf.py tests/test_redecide.py tests/test_questions.py tests/test_runs_csf.py tests/test_api_gap.py tests/test_retrieve.py tests/test_csf_parts.py tests/test_csf_framework.py -v`, then the backend chain, then `python -m evals.run --pack dev && python -m evals.run --pack gap-dev && git diff --exit-code evals/results`
+Expected: PASS. The existing interview tests show that a questionnaire's fills (part 0) behave as before. The eval replays prove the `retrieve` default and the unfilled explanation are unchanged.
 
 - [ ] **Step 10: Commit**
 
 ```bash
-git add app/runs.py app/api/gap.py app/questions.py app/api/questions.py app/redecide.py tests/test_runs_csf.py tests/test_api_gap.py tests/test_redecide.py tests/test_questions_csf.py
-git commit -m "feat(csf): check again per changed part, Ask-me questions, per-part fills and re-decide" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git add app/runs.py app/csf.py app/retrieve.py app/api/gap.py app/questions.py app/api/questions.py app/redecide.py docs/CONTRACTS.md tests/test_runs_csf.py tests/test_api_gap.py tests/test_redecide.py tests/test_retrieve.py tests/test_csf_parts.py tests/test_questions_csf.py
+git commit -m "feat(csf): check again per affected outcome, Ask-me questions, per-part fills, Confirmed by you, re-decide" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -2142,7 +3218,7 @@ git commit -m "feat(csf): check again per changed part, Ask-me questions, per-pa
 
 **Interfaces:**
 - Consumes:
-  - from Task 1 (generated types): `GapOut`, `GapRow`, `PartOut`;
+  - from Task 1 (generated types): `GapOut`, `GapRow` (including the fix round's `not_applicable`, adversary-1 I1), `PartOut`;
   - existing: `useStepLoop(runId, data: RunRowsOut | null, onData, onGone)` from `RunGrid.tsx`, `Shell`, `Button`, `Kbd`, `ErrorLine`, `useKeys`, `go`, `goneOn404`;
   - the API: `GET /api/gap/{scope}`, `POST /api/gap/{scope}/run`, `POST /api/runs/{id}/step`, `GET /api/runs/{id}/export`.
 - Produces:
@@ -2373,6 +3449,23 @@ describe("GapCheck", () => {
     expect(container.querySelector("a[download]")).toHaveAttribute("href", "/api/runs/r9/export");
   });
 
+  it("an outcome marked not applicable says so, on either tier", async () => {
+    const na = { ...fixtures.gap.rows[2], label: null, not_applicable: true, explanation: "Not applicable: no such data" };
+    mockApi({ "GET /api/gap/core": { ...fixtures.gap, rows: [fixtures.gap.rows[0], fixtures.gap.rows[1], na, fixtures.gap.rows[3]] } });
+    render(<GapCheck {...props} />);
+    const row = await screen.findByRole("row", { name: /^PR\.DS-01 / });
+    expect(row).toHaveTextContent("not applicable");
+    expect(row).toHaveTextContent("Not applicable: no such data");
+  });
+
+  it("check again with nothing changed says so", async () => {
+    mockApi({ "GET /api/gap/core": fixtures.gap, "POST /api/gap/core/run": fixtures.gap.run });
+    render(<GapCheck {...props} />);
+    await screen.findByRole("button", { name: "Check again" });
+    await userEvent.keyboard("r");
+    expect(await screen.findByText("Nothing changed since the last check.")).toBeInTheDocument();
+  });
+
   it("a click or enter on a row opens that outcome", async () => {
     mockApi({ "GET /api/gap/core": fixtures.gap });
     render(<GapCheck {...props} />);
@@ -2421,6 +3514,7 @@ const Row = memo(function Row({ row: r, i, cursor, selected, section, pending }:
   const quiet = r.tier === "not_checked" || !r.label;
   const note =
     r.tier === "not_checked" ? NOT_CHECKED : (r.explanation ?? (pending ? "checking…" : r.answer_id ? "" : "not run yet"));
+  const word = r.label ? <GapChip label={r.label} /> : r.not_applicable ? "not applicable" : r.tier === "not_checked" ? "not checked" : "";
   return (
     <>
       {section !== null && (
@@ -2437,7 +3531,7 @@ const Row = memo(function Row({ row: r, i, cursor, selected, section, pending }:
       >
         <td aria-hidden="true" className="pl-2 font-bold">{cursor ? ">" : ""}</td>
         <td className="truncate px-2">{r.csf_id}</td>
-        <td className="truncate px-2">{r.label ? <GapChip label={r.label} /> : r.tier === "not_checked" ? "not checked" : ""}</td>
+        <td className="truncate px-2">{word}</td>
         <td className="px-2 text-right tabular-nums">{r.label ? r.sources : ""}</td>
         <td className="truncate px-2">{r.outcome}</td>
         <td className={`truncate px-2 ${quiet ? "" : "text-ink-2"}`}>{note}</td>
@@ -2499,11 +3593,18 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
     const tr = (e.target as HTMLElement).closest<HTMLElement>("tr[data-i]");
     return tr ? Number(tr.dataset.i) : null;
   };
+  const [note, setNote] = useState<string | null>(null);
   const start = async () => {
     if (!data || busy || running) return;
     setBusy(true);
     setError(null);
-    try { await api.startGap(current); reload(); } catch (e) { setError(messageOf(e)); }
+    setNote(null);
+    try {
+      const out = await api.startGap(current);
+      // adversary-1 M7: say so when Check again found nothing to re-open (the press still counts under `run`)
+      if (data.run?.id === out.id && out.status === "done") setNote("Nothing changed since the last check.");
+      reload();
+    } catch (e) { setError(messageOf(e)); }
     setBusy(false);
   };
   const exportFile = () => { if (run) download.current?.click(); };
@@ -2566,6 +3667,7 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
             ))}
           </div>
           <div className="px-4"><ErrorLine message={error ?? loopError} /></div>
+          {note && <p role="status" className="px-4 text-xs text-ink-2">{note}</p>}
           <div className="min-h-0 flex-1 overflow-auto">
             <table aria-label="outcomes" aria-rowcount={visible.length + 1} className="w-full min-w-[56rem] table-fixed border-collapse text-sm">
               <colgroup>
@@ -2607,7 +3709,7 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
 In the keyboard map table:
 - the `1`–`5` row becomes `` | `1`–`6` | workspace · run · questions for you · export · audit log · gap check | everywhere in a workspace | ``;
 - add `` | `g` `i` `p` `d` `s` `o` `a` | scope: govern · identify · protect · detect · respond · recover · all core | Gap check | ``;
-- add `` | `r` | run the gap check, or check again | Gap check | ``;
+- add `` | `r` | run the gap check, or check again (each press counts under the per-network `run` limit, 20 an hour) | Gap check | ``;
 - add `` | `e` | export the gap report (xlsx) | Gap check | ``.
 
 Add to the change log:
@@ -2734,6 +3836,13 @@ describe("GapDrawer", () => {
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("confirmed by you")).toBeInTheDocument();
     expect(onChanged).toHaveBeenCalled();
+    expect(screen.getByText(/saved as a dated statement and can be cited in your questionnaires/)).toBeInTheDocument(); // adversary-1 M9
+  });
+
+  it("an outcome marked not applicable reads so in the inspector", () => {
+    mockApi({});
+    render(<GapDrawer {...base} row={{ ...unchecked, tier: "checked", not_applicable: true, answer_id: null }} />);
+    expect(screen.getByText("not applicable")).toBeInTheDocument();
   });
 
   it("a not-checked outcome says so and asks the API for nothing", () => {
@@ -2895,7 +4004,7 @@ function Inspector({ row, runId, controlsUrl, onClose, onChanged }: Props) {
       </p>
       <dl className="grid grid-cols-[11ch_minmax(0,1fr)] gap-y-1">
         <dt className="text-ink-3">label</dt>
-        <dd>{row.label ? <GapChip label={row.label} /> : tier === "not_checked" ? "not checked in this version" : "not run yet"}</dd>
+        <dd>{row.label ? <GapChip label={row.label} /> : row.not_applicable ? "not applicable" : tier === "not_checked" ? "not checked in this version" : "not run yet"}</dd>
         <dt className="text-ink-3">function</dt><dd>{row.function}</dd>
         <dt className="text-ink-3">category</dt><dd>{row.category}</dd>
         <dt className="text-ink-3">800-53</dt>
@@ -2931,9 +4040,12 @@ function Inspector({ row, runId, controlsUrl, onClose, onChanged }: Props) {
       )}
       {a && a.dropped.length > 0 && <DroppedList dropped={a.dropped} />}
       {tier === "ask" && (question ? (
-        <ul>
-          <QuestionCard q={question} focus={false} onUpdated={(q) => { setQuestion(q); onChanged(); }} onStale={onChanged} />
-        </ul>
+        <>
+          <ul>
+            <QuestionCard q={question} focus={false} onUpdated={(q) => { setQuestion(q); onChanged(); }} onStale={onChanged} />
+          </ul>
+          <p className="text-xs text-ink-3">Your answer is saved as a dated statement and can be cited in your questionnaires.</p>
+        </>
       ) : (
         <p className="text-ink-2">{runId ? "This question opens when the gap check is done." : "Run the gap check first, then answer this here."}</p>
       ))}
@@ -2984,7 +4096,7 @@ git commit -m "feat(web): the gap inspector: NIST's text and links, per-part sta
 
 ### Task 7: The planted improvement plan joins the sample pack (data lane)
 
-**Lane:** data, worktree `VART-wt-6b-data`, database `vart_test_6b_data`, run by the lead (it records). It starts after adversary checkpoint 1 and runs in parallel with the api and ui lanes. **Reviewer:** Opus (every key change derived, no gate touched). **Eval key:** about $0.10 for the dev re-record; $0.04 more only if gap-dev drifts. **Stop point:** Step 6.
+**Lane:** data, worktree `VART-wt-6b-data`, database `vart_test_6b_data`, run by the lead (it records). It starts after adversary checkpoint 1 and runs in parallel with the api and ui lanes. **Reviewer:** Opus (every key change derived, no gate touched). **Eval key:** under $0.25 for the dev re-record (most items may re-rank, adversary-1 M10); $0.04 more only if gap-dev drifts. **Stop point:** Step 6.
 
 **Files:**
 - Create: `data/dev/src/sip.md` (the planted plan's source, for `datakit.render`)
@@ -3033,6 +4145,7 @@ Expected: FAIL. The pack still has 22 documents, and `SAMPLE_ORDER` does not mat
   - every gap-sheet control that a moved statement names and the dev sheet lacks (`threat-intel-sources`, `threat-intel-analysis`, `incident-analysis` and `incident-containment`; `alerting` is already a dev control);
   - traps G1-G4 (each names a `sip-*` statement).
 - Appending keeps the merged sheet `datakit.gap` builds (dev first, then gap) in the same order as before, so the gap key and gap-dev do not move.
+- Delete the emptied `documents:` and `traps:` keys from `data/dev/gap/facts.yaml`: a bare key loads as `None`, which `GapFacts` refuses, and its tuple fields default to `()` (adversary-1 M10).
 - In `data/dev/gap/facts.yaml`'s header comment, add the line: `The planted improvement plan (sip) and its traps G1-G4 moved to data/dev/facts.yaml in Plan 6B, so the sample pack shows a stated non-compliance.`
 - In `app/api/documents.py`, append `"security-improvement-plan.md"` to `SAMPLE_ORDER`, and change the comment's 22 to 23.
 
@@ -3068,12 +4181,18 @@ Expected: PASS. That includes `test_the_sample_pack_loads_once_in_fact_sheet_ord
 (set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.run --pack dev --mode record)
 ```
 
-Expected: about $0.10. Only items whose prompts changed (passages that now include the new file) are paid, and the rest replay. The command writes `evals/results/latest.{json,md}`.
+Expected: under $0.25. Only items whose prompts changed are paid, and the rest replay. But a 23rd document shifts the IDF for every query, so most items may re-rank and re-record (adversary-1 M10). The command writes `evals/results/latest.{json,md}`.
 
 - [ ] **Step 6 (lead): Re-check every dev gate — the stop point**
 
-Run: `python -m evals.run --pack dev && python -m evals.run --pack dev && git diff --exit-code evals/results`
-Expected: exit 0 both times, with no diff between the two replays.
+Run:
+
+```bash
+python -m evals.run --pack dev && cp evals/results/latest.json "$TMPDIR/first.json" \
+  && python -m evals.run --pack dev && cmp evals/results/latest.json "$TMPDIR/first.json"
+```
+
+Expected: exit 0 both times, and the two replays write identical results (preflight B1 as ruled). The re-recorded results differ from `HEAD` by design, so do not compare against it.
 
 Read `evals/results/latest.md` and check every gating gate in `evals/score.py`'s dev table against its committed value:
 - `label_accuracy` ≥ 0.90: 82 of 89 today; at least 81 of 89 passes, if the item count stays 89;
@@ -3082,7 +4201,7 @@ Read `evals/results/latest.md` and check every gating gate in `evals/score.py`'s
 - the planted-conflict gate, which now counts G1 as a sixth planted trap;
 - the date-rule gate, and every other gate at its spec value.
 
-**If any gating gate fails, stop here.** Do not merge the lane, do not tune a prompt, a phrasing or the key, and do not lower a gate. Send Tarun the gate, its value, the items it missed with their causes, and the cost so far. He decides whether the demo keeps the document.
+**If any gating gate fails, stop here.** Do not merge the lane, do not tune a prompt, a phrasing or the key, and do not lower a gate. Send Tarun the gate, its value, the items it missed with their causes, and the cost so far. List the misses on items no `sip-*` statement names separately, as ranking drift from the new document (adversary-1 M10). He decides whether the demo keeps the document.
 
 - [ ] **Step 7 (lead): gap-dev must not move**
 
@@ -3107,9 +4226,618 @@ git commit -m "data(dev): the planted improvement plan joins the sample pack; ke
 
 ---
 
-### Task 8: Integration and the E2E suite re-recorded with the gap flow
+### Task 7b: Speed-up B — the precomputed sample run
 
-**Runs on:** `plan6b`, by the lead (database `vart_test_plan6b`). **Reviewer:** Opus. **Lead-run steps:** the merges, the recording and the cap measurement. **Eval key:** about $0.15: the sample flow about $0.05 (the sample pack changed), the gap flow about $0.08, the Govern re-checks about $0.01.
+**Runs on:** `plan6b`, after the three lanes merge. It touches files from both the api lane (`app/api/runs.py`, `app/api/gap.py`) and the ui lane (`RunGrid.tsx`), and it needs Task 7's 23-document pack. **Implementer:** Opus 5.5 (Steps 2-5, 7). **Lead:** Step 1 (the merges) and Step 6 (the snapshot, live). **Reviewer:** Opus (invariants, staleness, contract additions). **Eval key:** about $0.08 (64 questionnaire items, about $0.04, plus a core gap run, about $0.04).
+
+**Decision (Tarun, 2026-10-06; this plan's decision 13).** "Try with a sample company" copies a precomputed run instead of calling a model, so it is instant and spends nothing.
+- The precomputed path covers both:
+  - the sample questionnaire (`vsq-a.xlsx`) over the sample pack;
+  - the **core** gap check over the sample pack. Covering it is cheap (the same script, about $0.04 more), and it makes the demo's gap view instant too. A function scope runs live.
+- `data/dev/sample-run.json` is the snapshot:
+  - the real engine wrote it, once, through the real endpoints (`scripts/sample_snapshot.py`, run by the lead with the eval key);
+  - nobody edits it by hand;
+  - it stores a digest of everything that could change an answer: the sample documents, the questionnaire, the prompt versions, the step models and the core CSF data.
+- When the snapshot is stale, it is never used: the run goes live. A test fails in CI until the lead runs the script again.
+
+**Files:**
+- Create: `app/sample_run.py`, `scripts/sample_snapshot.py`, `tests/test_sample_run.py`
+- Create (by the script, Step 6): `data/dev/sample-run.json`
+- Modify:
+  - `app/api/runs.py`: the `live` query parameter; `RunOut.precomputed`;
+  - `app/api/gap.py`: `start_gap` copies the core snapshot;
+  - `app/api/schemas.py`: `RunOut.precomputed: bool = False`;
+  - `.vercelignore`: ship the snapshot;
+  - `docs/CONTRACTS.md`: change-log lines;
+  - `openapi.json`, `web/src/lib/api-types.ts`: regenerated;
+  - `web/src/lib/api.ts`: `createRun(id, live = false)`;
+  - `web/src/views/RunGrid.tsx`: Re-run live passes `live`, and the meta line names a precomputed run;
+  - `web/src/views/RunGrid.test.tsx`.
+
+**Interfaces:**
+- Consumes:
+  - `SAMPLE_DIR` and `SAMPLE_ORDER` (`app/api/documents.py`, 23 documents after Task 7);
+  - `app.questionnaires.SAMPLE_DIR`;
+  - the prompt versions in `app/stance.py`, `app/draft.py` and `app/classify.py`;
+  - `csf.current_mapping`;
+  - `runs.create_run`;
+  - the stored part shape (Task 2).
+- Produces:
+  - `sample_run.SNAPSHOT: Path`, `QUESTIONNAIRE = "vsq-a.xlsx"`, `STEPS = ("stance", "draft", "classify", "recheck")`, `ANSWER_FIELDS` (the 11 `answers` columns `_raw` writes);
+  - `sample_run.digest(models: Mapping[str, str]) -> str`;
+  - `sample_run.snapshot() -> dict[str, Any] | None` (cached);
+  - `sample_run.swap(values: Any, chunk: Callable[[str], str], doc: Callable[[str], str]) -> Any`: rewrites every `chunk_id`, `document_id` and `chunk_ids` in a nested value;
+  - `sample_run.copy_questionnaire_run(session, workspace_id, questionnaire_id, models) -> Run | None`;
+  - `sample_run.copy_gap_run(session, workspace_id, q: Questionnaire, models) -> Run | None`;
+  - `POST /api/questionnaires/{id}/runs?live=true`: optional, default false;
+  - `RunOut.precomputed: bool`.
+
+**Invariants the copy keeps:**
+1. Labels and citations are the engine's, copied as they are, so `ck_answers_cited` holds and is enforced by the database.
+2. Every chunk and document id is mapped to the visitor's own copies of the sample documents, by file name and chunk start line (chunking the same bytes gives the same chunks). A citation re-reads as `found_in_source`.
+3. The run is `done`, costs $0.0000, carries `models["snapshot"] = <digest>`, and reads as precomputed in the UI.
+4. The copy applies only when all of these hold:
+   - the workspace holds exactly the sample pack, with no metadata override (`metadata_source == "rule"`), no upload and no statement;
+   - the questionnaire is the sample `vsq-a.xlsx` with the snapshot's items, or the core gap questionnaire under the current CSF data;
+   - the digest matches.
+
+   Anything else runs live.
+5. Re-run live (`r` in the run grid) still runs the engine. Check again on a copied gap run compares evidence as usual; with only the sample pack, nothing changed and it stays done.
+6. Questions for you, the re-check and re-decide work on a copied run: they read `answers.stances`, `chunk_ids` and `run_items.parts`, which are the visitor's own ids.
+7. The `run` cap, the demo-full 503 and the cookie flow are unchanged: the endpoint counts and checks before it copies.
+
+- [ ] **Step 1 (lead): Merge the lanes**
+
+On `plan6b`, merge the lanes with `git merge --no-ff`, in this order (each merge commit gets the trailer paragraph):
+1. `plan6b-data`: first re-run its gate, `python -m evals.run --pack dev` on the data branch, which must exit 0 (preflight B1 as ruled);
+2. `plan6b-api`;
+3. `plan6b-ui`.
+
+Then run `python scripts/export_openapi.py && (cd web && npm run gen:api) && git diff --exit-code openapi.json web/src/lib/api-types.ts`, the backend chain, the frontend chain, and `python -m evals.run --pack dev && python -m evals.run --pack gap-dev`.
+Expected: PASS. Every merge is clean, because the lanes touch disjoint files.
+
+- [ ] **Step 2: Write the failing tests**
+
+`tests/test_sample_run.py`:
+
+```python
+import json
+from collections.abc import Iterator
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import Engine, func, select
+from sqlalchemy.orm import Session
+
+from app import sample_run
+from app.api.deps import get_llm
+from app.db.models import LlmUsage
+from app.main import app
+from app.settings import get_settings
+from tests.apiclient import visitor
+from tests.fakes import ByStepLLM
+
+ROOT = Path(__file__).resolve().parent.parent
+REGENERATE = "stale sample snapshot: the lead runs scripts/sample_snapshot.py with the eval key (Plan 6B Task 7b)"
+
+
+def _sample(client: TestClient) -> dict:  # type: ignore[type-arg]
+    assert client.post("/api/documents/sample").status_code == 201
+    q = client.post("/api/questionnaires/sample/vsq-a").json()
+    res = client.post(f"/api/questionnaires/{q['id']}/runs")
+    assert res.status_code == 201
+    return {"q": q, "run": res.json()}
+
+
+def test_the_sample_snapshot_is_current() -> None:
+    snap = sample_run.snapshot()
+    assert snap is not None, REGENERATE
+    assert snap["digest"] == sample_run.digest(get_settings().models()), REGENERATE
+    assert len(snap["questionnaire"]["items"]) == 64 and len(snap["gap"]["items"]) == 36
+
+
+def test_the_digest_moves_with_every_input(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    models = dict(get_settings().models())
+    base = sample_run.digest(models)
+    assert sample_run.digest({**models, "stance": "other/model"}) != base
+    sample_run.sample_digest.cache_clear()
+    monkeypatch.setattr(sample_run, "STANCE_PROMPT", "stance@p999")
+    assert sample_run.digest(models) != base
+    monkeypatch.undo()
+    sample_run.sample_digest.cache_clear()
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    for name in sample_run.SAMPLE_ORDER:
+        (docs / name).write_bytes((sample_run.DOCS / name).read_bytes())
+    (docs / sample_run.SAMPLE_ORDER[0]).write_bytes(b"changed")
+    monkeypatch.setattr(sample_run, "DOCS", docs)
+    assert sample_run.digest(models) != base
+    sample_run.sample_digest.cache_clear()
+
+
+def test_try_with_a_sample_company_copies_the_snapshot_with_no_model_call(db: Engine) -> None:
+    client, ws_id = visitor(db)
+    run = _sample(client)["run"]
+    assert (run["status"], run["total"], run["done"], run["cost_usd"], run["precomputed"]) == ("done", 64, 64, 0.0, True)
+    rows = client.get(f"/api/runs/{run['id']}/answers").json()["rows"]
+    own = {d["id"] for d in client.get("/api/documents").json()}
+    cited = [r["answer"] for r in rows if r["answer"]["label"] in ("verified", "partial")]
+    assert cited
+    for a in cited:
+        detail = client.get(f"/api/answers/{a['id']}").json()
+        assert detail["citations"]  # ck_answers_cited, and the drawer has something to show
+        for c in detail["citations"]:
+            assert c["document_id"] in own and c["found_in_source"], c  # the visitor's own copies
+    with Session(db) as s:
+        assert s.scalar(select(func.count()).select_from(LlmUsage).where(LlmUsage.workspace_id == ws_id)) == 0
+
+
+def test_re_run_live_runs_the_engine(db: Engine) -> None:
+    client, _ = visitor(db)
+    q = _sample(client)["q"]
+    live = client.post(f"/api/questionnaires/{q['id']}/runs", params={"live": "true"}).json()
+    assert (live["status"], live["precomputed"], live["done"]) == ("running", False, 0)
+
+
+def test_an_override_or_an_upload_falls_back_to_a_live_run(db: Engine) -> None:
+    client, _ = visitor(db)
+    q = _sample(client)["q"]
+    doc = client.get("/api/documents").json()[0]
+    assert client.patch(f"/api/documents/{doc['id']}", json={"status": "draft"}).status_code == 200
+    after = client.post(f"/api/questionnaires/{q['id']}/runs").json()
+    assert (after["status"], after["precomputed"]) == ("running", False)
+
+
+def test_a_stale_snapshot_is_never_copied(db: Engine, monkeypatch: pytest.MonkeyPatch) -> None:
+    real = sample_run.snapshot()
+    assert real is not None
+    monkeypatch.setattr(sample_run, "snapshot", lambda: {**real, "digest": "0" * 16})
+    client, _ = visitor(db)
+    assert _sample(client)["run"]["status"] == "running"
+
+
+def test_questions_rechecks_and_redecide_work_on_a_copied_run(db: Engine) -> None:
+    client, _ = visitor(db)
+    run = _sample(client)["run"]
+    questions = client.get(f"/api/runs/{run['id']}/questions").json()
+    assert questions  # the copied run has open items, planned as for any done run
+    reply = json.dumps({"passages": [{"passage": 1, "stance": "irrelevant", "quote": "", "note": "x"}]})
+    app.dependency_overrides[get_llm] = lambda: ByStepLLM({"recheck": reply})
+    try:
+        res = client.post(
+            f"/api/questions/{questions[0]['id']}/answer",
+            json={"text": "Yes. The security team reviews this every quarter and keeps a record."},
+        )
+    finally:
+        app.dependency_overrides.pop(get_llm, None)
+    assert res.status_code == 200 and res.json()["question"]["status"] in ("answered", "follow_up")
+    doc = client.get("/api/documents").json()[0]
+    assert client.patch(f"/api/documents/{doc['id']}", json={"evidence_allowed": False}).status_code == 200
+
+
+def test_the_core_gap_check_is_copied_too(db: Engine) -> None:
+    client, _ = visitor(db)
+    _sample(client)
+    run = client.post("/api/gap/core/run").json()
+    assert (run["status"], run["done"], run["cost_usd"], run["precomputed"]) == ("done", 36, 0.0, True)
+    rows = {r["csf_id"]: r for r in client.get("/api/gap/core").json()["rows"]}
+    assert all(r["label"] for r in rows.values() if r["tier"] == "checked")
+    detail = client.get(f"/api/answers/{rows['PR.DS-11']['answer_id']}").json()
+    assert len(detail["parts"]) == 4
+    assert all(c["found_in_source"] for p in detail["parts"] for c in p["citations"])
+    again = client.post("/api/gap/core/run").json()  # Check again: only the sample pack, nothing changed
+    assert (again["id"], again["status"]) == (run["id"], "done")
+    assert client.post("/api/gap/protect/run").json()["status"] == "running"  # a function scope runs live
+
+
+def test_the_snapshot_ships_with_the_function() -> None:
+    lines = (ROOT / ".vercelignore").read_text(encoding="utf-8").splitlines()
+    assert "!/data/dev/sample-run.json" in lines
+```
+
+Append to `web/src/views/RunGrid.test.tsx`'s describe block:
+
+```tsx
+  it("re-run live asks for a live run, and a copied run says it is precomputed", async () => {
+    const calls: string[] = [];
+    mockApi({
+      "GET /api/runs/r1/answers": { run: { ...fixtures.run, precomputed: true, cost_usd: 0 }, rows: fixtures.rows },
+      "GET /api/questionnaires": [],
+      "POST /api/questionnaires/q1/runs": (_init: RequestInit | undefined, url: URL) => {
+        calls.push(url.search);
+        return { ...fixtures.run, id: "r2", status: "running", done: 0, precomputed: false };
+      },
+    });
+    render(<RunGrid workspace={fixtures.workspace} onGone={() => {}} runId="r1" />);
+    expect(await screen.findByText(/precomputed sample answers/)).toBeInTheDocument();
+    await userEvent.keyboard("r");
+    await waitFor(() => expect(calls).toEqual(["?live=true"]));
+  });
+```
+
+(`render`, `screen`, `waitFor`, `userEvent`, `mockApi` and `fixtures` are already imported in that file.)
+
+- [ ] **Step 3: Run them to verify they fail**
+
+Run: `pytest tests/test_sample_run.py -v && (cd web && npx vitest run src/views/RunGrid.test.tsx)`
+Expected: FAIL. `app.sample_run` does not exist, `RunOut` has no `precomputed`, and Re-run live sends no `live`.
+
+- [ ] **Step 4: Write `app/sample_run.py`**
+
+```python
+"""The precomputed sample run (Plan 6B Task 7b): "Try with a sample company" copies the sample questionnaire's
+answers, and the core gap check's, from data/dev/sample-run.json instead of calling a model. The file is written
+by scripts/sample_snapshot.py (the lead, with the eval key), never by hand. It stores a digest of everything that
+could change an answer: the sample documents, the questionnaire, the prompt versions, the step models and the
+core CSF data. A stale or missing file is never used: the run goes live."""
+
+import hashlib
+import json
+import uuid
+from collections.abc import Callable, Mapping
+from datetime import UTC, datetime
+from functools import cache
+from pathlib import Path
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app import csf
+from app.api.documents import SAMPLE_DIR as DOCS
+from app.api.documents import SAMPLE_ORDER
+from app.classify import PROMPT_VERSION as CLASSIFY_PROMPT
+from app.db.models import Answer, Chunk, Document, Item, Questionnaire, Run, RunItem
+from app.draft import PROMPT_VERSION as DRAFT_PROMPT
+from app.questionnaires import SAMPLE_DIR as QUESTIONNAIRES
+from app.services import audit_log
+from app.stance import PROMPT_VERSION as STANCE_PROMPT
+
+SNAPSHOT = Path(__file__).resolve().parent.parent / "data" / "dev" / "sample-run.json"
+QUESTIONNAIRE = "vsq-a.xlsx"
+STEPS = ("stance", "draft", "classify", "recheck")
+ANSWER_FIELDS = (
+    "label", "value", "text", "citations", "dropped", "conflict", "scope_note", "confidence", "stances",
+    "chunk_ids", "retrieval_dropped",
+)
+
+
+@cache
+def sample_digest(models_key: tuple[tuple[str, str], ...]) -> str:
+    h = hashlib.sha256()
+    for name in SAMPLE_ORDER:
+        h.update(name.encode() + b"\0" + (DOCS / name).read_bytes())
+    h.update((QUESTIONNAIRES / QUESTIONNAIRE).read_bytes())
+    meta = {
+        "prompts": [STANCE_PROMPT, DRAFT_PROMPT, CLASSIFY_PROMPT],
+        "models": dict(models_key),
+        "csf": csf.current_mapping("core"),
+    }
+    h.update(json.dumps(meta, sort_keys=True).encode())
+    return h.hexdigest()[:16]
+
+
+def digest(models: Mapping[str, str]) -> str:
+    return sample_digest(tuple((k, models[k]) for k in STEPS))
+
+
+@cache
+def snapshot() -> dict[str, Any] | None:
+    return json.loads(SNAPSHOT.read_text(encoding="utf-8")) if SNAPSHOT.exists() else None
+
+
+def swap(values: Any, chunk: Callable[[str], str], doc: Callable[[str], str]) -> Any:
+    """Every chunk id, document id and chunk id list in a nested answer value, rewritten. The snapshot holds
+    "<file name>#<line>" and file names; a workspace holds its own ids."""
+    if isinstance(values, list):
+        return [swap(v, chunk, doc) for v in values]
+    if not isinstance(values, dict):
+        return values
+    out = {k: swap(v, chunk, doc) for k, v in values.items()}
+    if isinstance(out.get("chunk_id"), str):
+        out["chunk_id"] = chunk(out["chunk_id"])
+    if isinstance(out.get("document_id"), str):
+        out["document_id"] = doc(out["document_id"])
+    if isinstance(out.get("chunk_ids"), list):
+        out["chunk_ids"] = [chunk(c) for c in out["chunk_ids"]]
+    return out
+
+
+def _current(models: Mapping[str, str]) -> dict[str, Any] | None:
+    snap = snapshot()
+    return snap if snap is not None and snap["digest"] == digest(models) else None
+
+
+def _sample_pack_only(session: Session, workspace_id: uuid.UUID) -> bool:
+    """The workspace holds the sample pack and nothing else, with no metadata changed: only then do the
+    snapshot's answers describe it (an upload, an answer to a question or an override changes what the engine
+    would say)."""
+    docs = session.execute(
+        select(Document.filename, Document.source, Document.metadata_source).where(
+            Document.workspace_id == workspace_id
+        )
+    ).all()
+    return sorted(d.filename for d in docs) == sorted(SAMPLE_ORDER) and all(
+        d.source == "sample" and d.metadata_source == "rule" for d in docs
+    )
+
+
+def _copy(
+    session: Session,
+    workspace_id: uuid.UUID,
+    q: Questionnaire,
+    pairs: list[tuple[Item, dict[str, Any]]],
+    snap: dict[str, Any],
+) -> Run | None:
+    rows = session.execute(
+        select(Chunk.id, Chunk.line_start, Document.id, Document.filename)
+        .join(Document, Document.id == Chunk.document_id)
+        .where(Chunk.workspace_id == workspace_id)
+    ).all()
+    chunks = {f"{name}#{line}": str(cid) for cid, line, _, name in rows}
+    docs = {name: str(did) for _, _, did, name in rows}
+    try:
+        local = [
+            (
+                item,
+                swap(e["values"], chunks.__getitem__, docs.__getitem__),
+                swap(e.get("parts", {}), chunks.__getitem__, docs.__getitem__),
+            )
+            for item, e in pairs
+        ]
+    except KeyError:  # a chunk the snapshot cites is not in this workspace: never copy a dangling citation
+        return None
+    run = Run(
+        workspace_id=workspace_id,
+        questionnaire_id=q.id,
+        status="done",
+        finished_at=datetime.now(UTC),
+        prompt_versions=snap["prompt_versions"],
+        models={**snap["models"], "snapshot": snap["digest"]},
+    )
+    session.add(run)
+    session.flush()
+    for item, values, parts in local:
+        session.add(RunItem(run_id=run.id, item_id=item.id, state="done", parts=parts))
+        session.add(Answer(workspace_id=workspace_id, run_id=run.id, item_id=item.id, **values))
+    audit_log.record(
+        session, workspace_id, "run.create", ref=str(run.id), detail={"items": len(local), "precomputed": True}
+    )
+    session.commit()
+    return run
+
+
+def copy_questionnaire_run(
+    session: Session, workspace_id: uuid.UUID, questionnaire_id: uuid.UUID, models: Mapping[str, str]
+) -> Run | None:
+    """The sample questionnaire's run, copied (Task 7b); None when anything differs from the snapshot's world."""
+    snap = _current(models)
+    q = session.scalar(
+        select(Questionnaire).where(Questionnaire.id == questionnaire_id, Questionnaire.workspace_id == workspace_id)
+    )
+    if snap is None or q is None or q.source != "sample" or q.filename != QUESTIONNAIRE:
+        return None
+    if not _sample_pack_only(session, workspace_id):
+        return None
+    items = list(session.scalars(select(Item).where(Item.questionnaire_id == q.id).order_by(Item.position)))
+    want = snap["questionnaire"]["items"]
+    if [(i.position, i.question) for i in items] != [(e["position"], e["question"]) for e in want]:
+        return None
+    return _copy(session, workspace_id, q, list(zip(items, want, strict=True)), snap)
+
+
+def copy_gap_run(
+    session: Session, workspace_id: uuid.UUID, q: Questionnaire, models: Mapping[str, str]
+) -> Run | None:
+    """The core gap check's run, copied (Task 7b); None for another scope or anything that differs."""
+    snap = _current(models)
+    if snap is None or (q.mapping or {}).get("scope") != "core" or not _sample_pack_only(session, workspace_id):
+        return None
+    items = {i.csf_id: i for i in session.scalars(select(Item).where(Item.questionnaire_id == q.id))}
+    want = snap["gap"]["items"]
+    if sorted(items) != sorted(e["csf_id"] for e in want):
+        return None
+    return _copy(session, workspace_id, q, [(items[e["csf_id"]], e) for e in want], snap)
+```
+
+- [ ] **Step 5: Wire it into the endpoints, the schema and the UI**
+
+`app/api/schemas.py`, in `RunOut`, after `finished_at`:
+
+```python
+    precomputed: bool = False  # Plan 6B Task 7b: copied from the sample snapshot, no model called
+```
+
+`app/api/runs.py`: in `run_out`, pass `precomputed="snapshot" in run.models`. In `create_run`, add the parameter `live: bool = False` and copy first:
+
+```python
+def create_run(
+    questionnaire_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep, request: Request, live: bool = False
+) -> RunOut:
+    """A new run over every item, all pending. On the sample questionnaire over the untouched sample pack, the
+    precomputed sample run is copied instead (done, $0, no model call) unless `live=true` (Re-run live). 422
+    when the questionnaire has no items yet; 429 per network (`run`, 20 an hour); 503 when the demo is full."""
+    ws_id = ws.id
+    limit(request, session, "run")
+    ensure_capacity(session)
+    models = get_settings().models()
+    if not live and (copied := copy_questionnaire_run(session, ws_id, questionnaire_id, models)) is not None:
+        return run_out(session, copied)
+    return run_out(session, start_run(session, ws_id, questionnaire_id, models))
+```
+
+(import `copy_questionnaire_run` from `app.sample_run`.)
+
+`app/api/gap.py`, `start_gap`: import `copy_gap_run` from `app.sample_run`, and replace the `if run is None:` creation with:
+
+```python
+    if run is None:
+        models = get_settings().models()
+        run = copy_gap_run(session, ws_id, q, models) or create_run(session, ws_id, q.id, models)
+```
+
+`.vercelignore`: after `!/data/dev/docs` add `!/data/dev/sample-run.json`.
+
+`web/src/lib/api.ts`: `createRun: (questionnaireId: string, live = false) => send<RunOut>(`/api/questionnaires/${enc(questionnaireId)}/runs${live ? "?live=true" : ""}`, "POST"),`
+
+`web/src/views/RunGrid.tsx`:
+- in `rerun`, call `api.createRun(data.run.questionnaire_id, true)`;
+- in the meta line, insert ` · precomputed sample answers` after the status when `data.run.precomputed`.
+
+Then:
+- regenerate `openapi.json` and the types (the operation's path set does not change, so `tests/test_openapi.py` and `tests/test_api_errors.py` need nothing new);
+- add to `docs/CONTRACTS.md`'s change log:
+
+```markdown
+- 2026-10-06: Plan 6B Task 7b (an added optional query parameter and an optional field): `POST
+  /api/questionnaires/{id}/runs?live=` (default false) copies the precomputed sample run when the questionnaire
+  is the sample `vsq-a.xlsx` over the untouched sample pack and `data/dev/sample-run.json` is current, and
+  `POST /api/gap/core/run` does the same for the core gap check. The copy is done at $0 with no model call, and
+  `RunOut.precomputed` is true for it. `live=true` (Re-run live) always runs the engine. Counted under `run` as
+  before.
+```
+
+Run: `pytest tests/test_sample_run.py -k "digest or vercelignore or stale or re_run or override" -v && (cd web && npx vitest run src/views/RunGrid.test.tsx)`
+Expected: these pass. The tests that copy the snapshot, and `test_the_sample_snapshot_is_current`, still fail: no snapshot exists yet.
+
+- [ ] **Step 6 (lead): Generate the snapshot live and measure the run times**
+
+`scripts/sample_snapshot.py`:
+
+```python
+"""Write data/dev/sample-run.json (Plan 6B Task 7b): the sample questionnaire (vsq-a) and the core gap check,
+run once by the real engine over the sample pack through the real endpoints, so "Try with a sample company"
+copies them with no model call. The lead runs it with the eval key against a test database; nobody edits the
+file by hand. It prints the two runs' wall-clock (Task 2b's measurement).
+
+  export DATABASE_URL=postgresql+psycopg://vart:vart@localhost:5434/vart_test_plan6b
+  (set -a; . ~/.config/vart/eval.env; set +a; \\
+   OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" LLM_MODE=live python scripts/sample_snapshot.py)
+"""
+
+import json
+import sys
+import time
+import uuid
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import select  # noqa: E402
+from sqlalchemy.orm import Session  # noqa: E402
+
+from app import sample_run  # noqa: E402
+from app.db.models import Answer, Chunk, Document, Item, Run, RunItem  # noqa: E402
+from app.db.session import get_engine  # noqa: E402
+from app.main import app  # noqa: E402
+from app.runs import FAILED_TEXT  # noqa: E402
+from app.settings import get_settings  # noqa: E402
+
+
+def _finish(client: TestClient, run_id: str) -> float:
+    start = time.monotonic()
+    while client.get(f"/api/runs/{run_id}").json()["status"] == "running":
+        res = client.post(f"/api/runs/{run_id}/step")
+        if res.status_code != 200:
+            raise SystemExit(f"step failed: {res.status_code} {res.text}")
+    return time.monotonic() - start
+
+
+def _entries(s: Session, run_id: uuid.UUID) -> list[dict]:  # type: ignore[type-arg]
+    run = s.get_one(Run, run_id)
+    found = s.execute(
+        select(Chunk.id, Chunk.line_start, Document.id, Document.filename)
+        .join(Document, Document.id == Chunk.document_id)
+        .where(Chunk.workspace_id == run.workspace_id)
+    ).all()
+    chunk = {str(cid): f"{name}#{line}" for cid, line, _, name in found}
+    doc = {str(did): name for _, _, did, name in found}
+    rows = s.execute(
+        select(Item, Answer, RunItem.parts)
+        .join(Answer, (Answer.item_id == Item.id) & (Answer.run_id == run_id))
+        .join(RunItem, (RunItem.item_id == Item.id) & (RunItem.run_id == run_id))
+        .order_by(Item.position)
+    ).tuples()
+    out = []
+    for item, a, parts in rows:
+        if a.text == FAILED_TEXT or a.statement_id is not None:
+            raise SystemExit(f"{item.code}: not a clean engine answer; run the script again")
+        e = {
+            "position": item.position,
+            "question": item.question,
+            "csf_id": item.csf_id,
+            "values": sample_run.swap({k: getattr(a, k) for k in sample_run.ANSWER_FIELDS}, chunk.__getitem__, doc.__getitem__),
+        }
+        if parts:
+            e["parts"] = sample_run.swap(parts, chunk.__getitem__, doc.__getitem__)
+        out.append(e)
+    return out
+
+
+def main() -> None:
+    models = get_settings().models()
+    sample_run.snapshot = lambda: None  # never copy the old file while making the new one
+    client = TestClient(app)
+    client.get("/api/workspace")
+    client.post("/api/documents/sample")
+    q = client.post("/api/questionnaires/sample/vsq-a").json()
+    run = client.post(f"/api/questionnaires/{q['id']}/runs", params={"live": "true"}).json()
+    took_q = _finish(client, run["id"])
+    gap = client.post("/api/gap/core/run").json()
+    took_g = _finish(client, gap["id"])
+    with Session(get_engine()) as s:
+        qrun, grun = s.get_one(Run, uuid.UUID(run["id"])), s.get_one(Run, uuid.UUID(gap["id"]))
+        snap = {
+            "digest": sample_run.digest(models),
+            "models": {k: models[k] for k in sample_run.STEPS},
+            "prompt_versions": qrun.prompt_versions,
+            "cost_usd": float(qrun.cost_usd + grun.cost_usd),
+            "questionnaire": {"filename": sample_run.QUESTIONNAIRE, "items": _entries(s, qrun.id)},
+            "gap": {"scope": "core", "items": _entries(s, grun.id)},
+        }
+    sample_run.SNAPSHOT.write_text(json.dumps(snap, indent=1, sort_keys=True, ensure_ascii=False) + "\n")
+    client.post("/api/workspace/reset")
+    print(f"64-item run {took_q:.0f} s, core gap run {took_g:.0f} s, ${snap['cost_usd']:.4f}")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+Make sure no other process is using the eval key's hour for this workspace. Then run the command in the docstring.
+
+Expected:
+- about $0.08;
+- the printed times are about 180 s for the 64-item run and about 240 s for the core gap run (Task 2b's targets);
+- the file is under 1 MB.
+
+Record the two times and the cost in Task 9's PROGRESS entry. If a time is more than double its target, report it to Tarun with the per-step timings. Do not change `STEP_ITEMS` or `STEP_PARTS` without his OK.
+
+Then:
+- run `gitleaks dir --redact --no-banner data/dev/sample-run.json`. Expected: no leaks. The sample pack is synthetic; a planted fake secret in a quoted line would show here.
+- run `pytest tests/test_sample_run.py -v`. Expected: PASS.
+
+- [ ] **Step 7: Run every chain and commit**
+
+Run: the backend chain, the frontend chain, `python scripts/check_monochrome.py`, and the eval replays.
+Expected: PASS.
+
+```bash
+git add app/sample_run.py scripts/sample_snapshot.py tests/test_sample_run.py data/dev/sample-run.json app/api/runs.py app/api/gap.py app/api/schemas.py .vercelignore docs/CONTRACTS.md openapi.json web/src/lib/api-types.ts web/src/lib/api.ts web/src/views/RunGrid.tsx web/src/views/RunGrid.test.tsx
+git commit -m "perf(sample): the sample company's questionnaire and core gap check are copied from a generated snapshot" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 8: The E2E suite re-recorded with the gap flow
+
+**Runs on:** `plan6b`, after Task 7b, by the lead (database `vart_test_plan6b`). **Reviewer:** Opus. **Lead-run steps:** the recording and the cap measurement. **Eval key:** about $0.03. The sample flow and the core gap check are copied from the snapshot (Task 7b), so they make no model call. What is left:
+- the upload flow, about $0.02;
+- the interview and Govern re-checks, about $0.01;
+- one live Recover part.
 
 **Files:**
 - Create: `web/e2e/gap.spec.ts`
@@ -3117,27 +4845,18 @@ git commit -m "data(dev): the planted improvement plan joins the sample pack; ke
 
 **Interfaces:**
 - Consumes:
-  - everything from Tasks 1-7;
+  - everything from Tasks 1-7b (the lanes are merged in Task 7b Step 1);
   - `RUN_WAIT` and `xlsxCells` from `web/e2e/helpers.ts`;
   - the Workspace view's `l` (load the sample documents: rules classify all 23, so no model call).
 - Produces: the E2E suite on one fresh recording, with one new flow. The flow:
-  - runs a core gap check over the sample documents;
+  - starts a core gap check over the sample documents, which is copied instantly;
   - sees a stated non-compliance;
   - opens a Checked outcome's parts;
   - answers an Ask-me outcome (re-checked against Govern parts);
-  - checks the exported gap report cell by cell.
+  - checks the exported gap report cell by cell;
+  - runs the Recover scope live (one part), so the live runner is in the suite too.
 
-- [ ] **Step 1 (lead): Merge the lanes**
-
-On `plan6b`, merge the lanes with `git merge --no-ff`, in this order (each merge commit gets the trailer paragraph):
-1. `plan6b-data`, only after its Step 6 passed;
-2. `plan6b-api`;
-3. `plan6b-ui`.
-
-Then run `python scripts/export_openapi.py && (cd web && npm run gen:api) && git diff --exit-code openapi.json web/src/lib/api-types.ts`, the backend chain, the frontend chain, and the eval replays (`git diff --exit-code evals/results` against the data lane's results).
-Expected: PASS. The three lanes touch disjoint files, so no merge conflicts.
-
-- [ ] **Step 2: Write the flow**
+- [ ] **Step 1: Write the flow**
 
 `web/e2e/gap.spec.ts`:
 
@@ -3145,9 +4864,9 @@ Expected: PASS. The three lanes touch disjoint files, so no merge conflicts.
 import { expect, test } from "@playwright/test";
 import { RUN_WAIT, xlsxCells } from "./helpers.ts";
 
-// One core gap check (at most 73 stance calls, no draft call) in its own workspace, plus at most 7 re-checks of
-// Govern parts after the Ask-me answer. With the other specs (about 150 calls) it stays under the 400-an-hour
-// per-network model-call cap.
+// The core gap check over the untouched sample pack is copied from data/dev/sample-run.json (Task 7b): no model
+// call. Then at most 7 re-checks of Govern parts after the Ask-me answer, and one live part for the Recover scope.
+// The whole suite stays near 55 model calls, far under the 400-an-hour per-network cap.
 test("the gap check runs over the sample documents, takes an Ask-me answer and exports the report", async ({ page }) => {
   await page.goto("/?view=workspace");
   await expect(page.getByRole("button", { name: "Load sample documents" })).toBeEnabled();
@@ -3198,17 +4917,23 @@ test("the gap check runs over the sample documents, takes an Ask-me answer and e
     A110: "Not legal advice. CSF 2.0 text © NIST, public domain.",
   });
   expect(cells.G3).toBe("The organizational mission is understood and informs cybersecurity risk management"); // verbatim
+
+  // A function scope is not in the snapshot: it runs live through the concurrent runner (Task 2b)
+  await page.keyboard.press("o");
+  await page.waitForURL(/scope=recover/);
+  await page.keyboard.press("r");
+  await expect(page.getByText(/1 of 1 checked · done/)).toBeVisible({ timeout: RUN_WAIT });
 });
 ```
 
-- [ ] **Step 3: Run it against the old recording to verify it fails**
+- [ ] **Step 2: Run it against the old recording to verify it fails**
 
 Run: `cd web && LLM_MODE=replay npx playwright test e2e/gap.spec.ts`
-Expected: FAIL. The step endpoint answers 500 on a `ReplayMiss`, because no gap-check stance call is recorded yet.
+Expected: FAIL. The Govern re-checks and the live Recover step answer 500 on a `ReplayMiss`, because none of them is recorded yet.
 
-- [ ] **Step 4 (lead): Record the whole suite again with the eval key**
+- [ ] **Step 3 (lead): Record the whole suite again with the eval key**
 
-The sample pack changed in Task 7, so the sample flow's prompts changed too, and the whole suite is recorded fresh. Starting from an empty file leaves no stale rows.
+The sample pack changed in Task 7 and the sample run is now copied (Task 7b), so most of the old recording is unused. The whole suite is recorded fresh; starting from an empty file leaves no stale rows.
 
 First make sure no server is listening on port 8000: Playwright reuses an existing server outside CI, and a replay server would ignore record mode. Then:
 
@@ -3216,11 +4941,11 @@ First make sure no server is listening on port 8000: Playwright reuses an existi
 cd web && rm -f e2e/recorded.jsonl && (set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" LLM_MODE=record npx playwright test)
 ```
 
-Expected: every spec passes live in about 25 minutes, for about $0.15 of the eval key. Stop and ask Tarun if the key's remaining credit is under $1.
+Expected: every spec passes live in about 5 minutes (the upload flow's 20 items run four at a time, Task 2b), for about $0.03 of the eval key. Stop and ask Tarun if the key's remaining credit is under $1.
 
-If the gap flow's `not met` filter shows 0 live, the run is valid evidence of a miss, not a test to loosen. Stop and report to Tarun with the two planted outcomes' labels (ID.RA-02, DE.AE-07).
+The core gap labels come from the snapshot (Task 7b). If its `not met` filter shows 0, the snapshot is valid evidence of a miss, not a test to loosen. Stop and report to Tarun with the two planted outcomes' labels (ID.RA-02, DE.AE-07).
 
-- [ ] **Step 5 (lead): Replay the whole suite twice, measure the cap, scan the recording**
+- [ ] **Step 4 (lead): Replay the whole suite twice, measure the cap, scan the recording**
 
 Run: `cd web && LLM_MODE=replay npx playwright test && LLM_MODE=replay npx playwright test`
 Expected: PASS both times with no network.
@@ -3231,12 +4956,12 @@ Then read the per-network model calls the last run counted (the e2e server write
 python -c "from sqlalchemy import create_engine, text; import os; e = create_engine(os.environ['DATABASE_URL']); print(e.connect().execute(text(\"SELECT window_start, hits FROM ip_limits WHERE kind = 'llm' ORDER BY window_start DESC LIMIT 2\")).all())"
 ```
 
-Expected: the latest window's hits are about 231 and under 400. If one suite run straddles an hour, add the two windows. Over 400 is a failure: report it to Tarun and do not raise the cap. Record the number in Task 9's PROGRESS entry.
+Expected: the latest window's hits are about 55 and under 400. That is the upload flow's about 40, the interview and Govern re-checks up to 15, and 1 Recover part; it was about 231 before Task 7b. If one suite run straddles an hour, add the two windows. Over 400 is a failure: report it to Tarun and do not raise the cap. Record the number in Task 9's PROGRESS entry.
 
 Then run `gitleaks dir --redact --no-banner web/e2e/recorded.jsonl` (the `.gitleaks.toml` allowlist covers the 64-hex keys).
 Expected: no leaks.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add web/e2e/gap.spec.ts web/e2e/recorded.jsonl
@@ -3268,7 +4993,7 @@ Each accepted finding gets:
 - a reviewer pass;
 - a CONTRACTS.md change-log line when it touches the contract.
 
-Re-run Task 8 Step 5 after any fix that changes what the E2E calls.
+Re-run Task 8 Step 4 after any fix that changes what the E2E calls.
 
 - [ ] **Step 2: Write the README section**
 
@@ -3284,7 +5009,10 @@ parts; every part is asked as a question through the same engine that fills ques
 the parts' labels and writes the explanation. Every finding quotes your line next to NIST's verbatim text and
 links to NIST, with the related SP 800-53 Rev 5 controls. The report exports as a gap-report sheet, alone or
 inside your filled questionnaire. The sample company's documents include an improvement plan that states two
-controls are not in place yet, so the demo shows what a stated non-compliance looks like.
+controls are not in place yet, so the demo shows what a stated non-compliance looks like. "Try with a sample
+company" opens at once and spends nothing: it copies a run the same engine made over the same sample documents
+(`data/dev/sample-run.json`, regenerated whenever a prompt, a model or a sample document changes). "Re-run live"
+runs the engine for real.
 
 **What it is not.** It is not legal advice, an audit, a certification or a compliance score, and no overall score
 is shown. Every finding reads "possible gap, review it". It checks 31 of CSF 2.0's 106 outcomes against documents,
@@ -3302,21 +5030,29 @@ Not legal advice. CSF 2.0 text © NIST, public domain.
 - add `app/api/gap.py` (gap-check endpoints) to the API line;
 - in the UI line, add `GapCheck.tsx` and `GapDrawer.tsx` (the Gap check view and its inspector) after `web/src/views/`;
 - in the Engine line, after `app/csf.py ...`, add "; `app/runs.py` answers a gap-check run part by part (`run_items.parts`)";
-- in the data line, `data/dev/gap/` becomes "the gap check's outcome map and judged overrides; the planted improvement plan is in the dev pack".
+- in the data line, `data/dev/gap/` becomes "the gap check's outcome map and judged overrides; the planted improvement plan is in the dev pack", and add "`data/dev/sample-run.json` the precomputed sample run (`app/sample_run.py`; regenerate with `scripts/sample_snapshot.py`, lead only, eval key)";
+- in the Engine line, add "a step answers its claimed items at once, one session per worker (Task 2b)".
 
-Commands: the E2E line keeps "re-record with ... `rm -f e2e/recorded.jsonl` and `LLM_MODE=record npx playwright test`".
+Commands:
+- the E2E line keeps "re-record with ... `rm -f e2e/recorded.jsonl` and `LLM_MODE=record npx playwright test`";
+- add "Sample snapshot: when `tests/test_sample_run.py::test_the_sample_snapshot_is_current` fails, the lead runs the command in `scripts/sample_snapshot.py`'s docstring".
 
 The CSF spec:
-- under 5.6, add: `Sync (Plan 6B, Tarun 2026-10-06): in a gap-check run an Ask-me answer is re-checked against the open parts of Checked outcomes in the same CSF function (a questionnaire keeps the same-topic rule), at most 8 re-checks per answer; a fill stays a suggestion until accepted. Check again (r) re-runs every machine-judged part of each affected outcome; a part the visitor filled stays.`
+- under 5.6, add: `Sync (Plan 6B, Tarun 2026-10-06; adversary-1 I3, I4): in a gap-check run an Ask-me answer is re-checked against the open parts of Checked outcomes in the same CSF function (a questionnaire keeps the same-topic rule), at most 8 re-checks per answer; a fill stays a suggestion until accepted, then reads "Confirmed by you: part n", and the outcome reads Confirmed by you once every part that is not a Gap was filled. Check again (r) re-runs every machine-judged part of each affected outcome; an outcome is affected when a part's passages (as a set, statements left out of the top 8), wording, stance prompt or model changed; a part the visitor filled stays.`
 - under section 7, add: `Sync (Plan 6B): the path's first segment is "workspace" (the API has no company name); the filter toggles have no single keys; the coverage line sits in the status line; 800-53 controls link to NIST's SP 800-53 Rev 5 page; the gap sheet also rides in an xlsx questionnaire export (the latest done gap check, with its scope and date).`
 - under section 8, add: `Sync (Plan 6B, Tarun 2026-10-06): the planted improvement plan moved from the gap extension into the dev pack, which is the sample pack, so the live demo shows Not met (stated). The questionnaire keys were re-derived and the dev eval re-recorded; its gates held.`
-- add a change-log line: `2026-10-06: Plan 6B sync (sections 5.6, 7 and 8): fills within a CSF function, the gap sheet in questionnaire exports, the planted plan in the sample pack.`
+- add a change-log line: `2026-10-06: Plan 6B sync (sections 5.6, 7 and 8): fills within a CSF function and Confirmed by you per part, check again on sets of passages, the gap sheet in questionnaire exports, the planted plan in the sample pack.`
+
+The main spec (`docs/superpowers/specs/2026-10-03-vart-v2-design.md`):
+- in sections 9 and 11.1, where the precomputed sample run is planned for Plan 4, add: `Sync (Plan 6B Task 7b, Tarun 2026-10-06): the precomputed sample run moved into Plan 6B. It covers the sample questionnaire and the core gap check over the untouched sample pack, copied from data/dev/sample-run.json, which the lead generates with the eval key; a stale snapshot is never used.`
+- in 6.3, add: `Sync (Plan 6B Task 2b): a step answers its claimed items at the same time, one session per worker; the step's guarantees are unchanged.`
+- add a change-log line for both.
 
 - [ ] **Step 4: Update `docs/PROGRESS.md`**
 
 - At a glance:
   - the 6A row reads `done, live`;
-  - add a row `| 6B CSF gap check, the visitor half | done on plan6b; release pending | Gap check view (tab 6), per-part runner and resume, check again per affected outcome, Ask-me answers filling Govern parts, gap sheet in both exports, the planted plan in the sample pack, one E2E flow (<N> model calls per full suite) |`;
+  - add a row `| 6B CSF gap check, the visitor half | done on plan6b; release pending | Gap check view (tab 6), per-part runner and resume, concurrent steps (64 items <t1> s, core gap run <t2> s, measured in Task 7b Step 6), the precomputed sample run, check again per affected outcome, Ask-me answers filling Govern parts, gap sheet in both exports, the planted plan in the sample pack, one E2E flow (<N> model calls per full suite) |`;
   - the Plan 2 row's dev baseline gets the re-recorded numbers ("re-recorded 2026-10-06 with 23 documents: label accuracy <x>, ...").
 - Decisions, dated the merge day:
   - the per-part migration (two columns, no table);
@@ -3324,11 +5060,16 @@ The CSF spec:
   - the gap sheet goes in both exports;
   - controls link to one NIST page;
   - the planted improvement plan joins the sample pack (Tarun), which reverses the 6A decision that kept it gap-only; the dev keys were re-derived and the dev gates held at their values;
-  - fills widen to the same CSF function (Tarun);
-  - the filter toggles have no keys.
+  - fills widen to the same CSF function (Tarun), and an accepted fill reads Confirmed by you, never Covered (adversary-1 I3);
+  - the filter toggles have no keys;
+  - a step answers its claimed items concurrently (Tarun; Task 2b);
+  - the precomputed sample run and core gap check (Tarun; Task 7b);
+  - `retrieve` gains `exclude_kinds` (Ruling 4, rule 10).
+- "Plan 4 carry-over": remove "The sample run is not precomputed yet; the cheapest way is to replay the dev recordings for `source = sample` runs." (done in 6B Task 7b).
 - "6B carry-over":
   - mark (a), (b), (c) and (d) done, each with its task;
-  - keep "Stance improvement" and "`app.csf.evidence` drops statements after the top-8 cut" as carried to a later plan. The latter still holds, and `reopen_changed` inherits it: a new Ask-me statement that reaches a part's top 8 changes that part's passages and re-opens its outcome once.
+  - mark "`app.csf.evidence` drops statements after the top-8 cut" done (Task 4, `exclude_kinds`);
+  - keep "Stance improvement" carried to a later plan.
 - Under Releases, add `### Plan 6B`, `_Filled in after the release (Step 8)._`
 
 - [ ] **Step 5: Run every chain once more and commit**
@@ -3350,11 +5091,17 @@ An Opus reviewer reads `main..plan6b` against this plan, the CSF spec sections 5
 Send Tarun this plan. Every step is his; the lead runs nothing outward.
 1. Push `plan6b` and open a pull request to `main`.
 2. Wait for green CI: gates, backend (with the dev and gap-dev replays), frontend, e2e.
-3. From the branch head, run `ops/setup.sh migrate`: Neon goes `a7c3e9d1b2f4` → `c4e8a2d6f1b3` before `main` moves, because Vercel deploys `main` at once. The migration is additive, and the live code ignores both columns.
+3. From the branch head, run `ops/setup.sh migrate`: Neon goes `a7c3e9d1b2f4` → `c4e8a2d6f1b3` before `main` moves, because Vercel deploys `main` at once. The migration is additive, and the live code ignores both columns. To roll back after the first gap-check answer in production, roll back the code only, never `alembic downgrade` (its refusal is by design; adversary-1 M11).
 4. Fast-forward `main` to `plan6b` and push. Vercel deploys.
-5. Check that the smoke test passes and `/api/health` reads `"status":"ok"`. On https://vart-v2.vercel.app, check that the sample pack lists 23 documents and the Gap check tab opens.
+5. Check on https://vart-v2.vercel.app that:
+   - the smoke test passes and `/api/health` reads `"status":"ok"`;
+   - the sample pack lists 23 documents;
+   - "Try with a sample company" opens a done run at $0.0000, marked precomputed;
+   - the Gap check tab's core check is done at once.
 
-One small Markdown file joins `data/dev/docs`, which already ships in the function bundle; no preview bundle check is needed for 2 KB.
+   If the sample run starts running instead, production's models or prompts differ from the snapshot's digest. The run then goes live, safely, until the lead regenerates the snapshot.
+
+Two data files are new in the function bundle: `data/dev/docs/security-improvement-plan.md` (2 KB) and `data/dev/sample-run.json`, under 1 MB (checked in Task 7b Step 6). That is far under the bundle's headroom, so no preview check is needed.
 
 - [ ] **Step 8 (lead): The release record**
 
@@ -3363,7 +5110,8 @@ After Tarun's step 5, fill `### Plan 6B` in `docs/PROGRESS.md`:
 - the migration;
 - the smoke and health results;
 - the E2E's model calls per suite;
-- the re-recorded dev numbers.
+- the re-recorded dev numbers;
+- Task 7b Step 6's two run times and snapshot cost.
 
 Commit it on `plan6b-record` from the new `main`, with the trailer. Pushing it is Tarun's.
 
@@ -3372,38 +5120,49 @@ Commit it on `plan6b-record` from the new `main`, with the trailer. Pushing it i
 ## Self-review notes (for the lead)
 
 - **Spec coverage.**
-  - 5.1 (start a run per scope, the same run machinery, caps and expiry): Task 3 `start_gap`, through `create_run`, `limit("run")`, `ensure_capacity` and the existing step endpoint.
-  - 5.2-5.3 (part by part, labels combined by code): Task 2.
+  - 5.1 (start a run per scope, the same run machinery, caps and expiry): Task 3 `start_gap`, through `create_run`, `limit("run")`, `ensure_capacity` and the existing step endpoint; one run per first press (I2).
+  - 5.2-5.3 (part by part, labels combined by code): Tasks 2 and 2b; Confirmed by you per part, Task 4 (I3).
   - 5.4 (Ask-me redacted, stored, Confirmed by you, Not answered): Task 2 `ASK`, Task 4 `ensure_questions` and `test_an_ask_me_answer_is_redacted_stored_and_confirmed`, Task 3 `gap_rows`, Task 6 answer box.
-  - 5.5 (not checked: no call, no label): Task 3 view test, Task 5 rows.
+  - 5.5 (not checked: no call, no label): Task 3 view test, Task 5 rows; N/A on either tier (I1, consumed in Tasks 3, 5, 6).
   - 5.6 (re-check per part, every part of each affected outcome; an accepted fill replaces one part before combine; fills within a CSF function): Task 4.
-  - 5.7 (claim by parts at most 8, resume after a refusal, spend before every call, no open transaction): Task 2.
-  - 6 (no schema change beyond the one migration): Task 1.
+  - 5.7 (claim by parts at most 8, resume after a refusal, spend before every call, no open transaction): Tasks 2 and 2b.
+  - 6 (no schema change beyond the one migration): Task 1. Tasks 2b and 7b add none.
   - 7 (tab 6, path, scope keys, r, e, filter counts, grouped 28px rows, inspector with NIST text, link, controls, explanation, footnoted sources, line listings, dropped evidence, Ask-me box, status line, export columns in both exports, copy): Tasks 3, 5 and 6.
-  - 8 (planted cases visible in the demo; the E2E): Tasks 7 and 8.
+  - 8 (planted cases visible in the demo; the E2E): Tasks 7, 7b and 8.
   - 11 (view, export, README): Tasks 3-9.
+  - Main spec 6.3 (step runner, faster) and 9/11.1 (the precomputed sample, moved from Plan 4): Tasks 2b and 7b, with sync lines in Task 9.
   - Carries (a)-(d): Tasks 2, 2, 4 and 3+6. Ruling 5 (csf questionnaires not counted, listed or deleted) was already in Plan 3's code; Task 3 pins listing.
+  - Adversary checkpoint 1 (Ruling 4) is folded in:
+    - I2 → Task 3; I3 and I4 → Task 4; M1 → Task 4; M2, M4, M6 and M8 → Task 3;
+    - M3 → moot in Task 2b; M5 → Tasks 2, 2b and 4; M7 → Task 5; M9 → Task 6; M10 → Task 7; M11 → Task 9;
+    - I1 stays a Task 1 fix-round item, and Tasks 3, 5 and 6 consume `GapRow.not_applicable`.
 - **Placeholders.**
-  - "<keep the existing docstring>" (Task 2 `check_parts`) and "<the Task 1 docstring, unchanged>" (Task 3) name text that already exists.
-  - `<N>`, `<x>`, `<sha>` and `<n>` in Task 9 are numbers only the runs and the release produce.
+  - "<keep the existing docstring>" (Tasks 2 and 4) and "<the docstring of the committed stub in app/api/gap.py, unchanged (Ruling 2)>" (Task 3) name text that already exists.
+  - `<N>`, `<x>`, `<t1>`, `<t2>`, `<sha>` and `<n>` in Task 9 are numbers only the runs and the release produce.
 - **Type consistency.**
-  - `check_part(session, workspace_id, o, n, llm, models, spend)` is the same in Tasks 2-4.
-  - `part_result(o, n, raw)` and `outcome_values(o, parts)` (parts keyed `"1"`..`"n"`) are the same in Tasks 2, 3 (`_parts`) and 4 (`_fill_part`, `_redecide_parts`).
-  - `reopen_changed(session, workspace_id, run_id) -> int` is the same in Task 4 and CONTRACTS.md.
-  - `gap_rows(session, scope, q, run)` feeds `gap_view` and `gap_sheet`.
-  - `gap_sheet(session, q, run) -> GapSheet` feeds `gap_report(g)` and `export_xlsx(..., gap)`.
-  - `GapSheet(rows, citations, run_date, scope, version, controls_url)` has the same field order in its tests and its builder.
+  - `check_part(session, workspace_id, o, n, llm, models, spend)` is the same in Tasks 2-4 and 2b.
+  - `_is_current(o, n, raw, models)` is defined in Task 2 and used by Task 2b's `_keep_current_parts` and Task 4's `_same_evidence`.
+  - `part_result(o, n, raw)` and `outcome_values(o, parts)` (parts keyed `"1"`..`"n"`) are the same in Tasks 2, 2b, 3 (`_parts`) and 4 (`_fill_part`, `_redecide_parts`).
+  - `reopen_changed(session, workspace_id, run_id, models=None) -> int` is the same in Task 4 and its CONTRACTS line.
+  - `explain(o, parts, filled=frozenset())` and `aggregate(o, parts, filled=frozenset())` are the same in Task 4 and `outcome_values`.
+  - `retrieve(..., *, exclude_kinds=())` is the same in Task 4 and `csf.evidence`.
+  - `gap_rows(session, scope, q, run)` feeds `gap_view` and `gap_sheet`, and `gap_sheet(session, q, run) -> GapSheet` feeds `gap_report(g)` and `export_xlsx(..., gap)`.
+  - `GapSheet(rows, citations, run_date, scope, version, controls_url, statement_docs=frozenset())` has the same field order in its tests and its builder.
+  - `copy_questionnaire_run(session, workspace_id, questionnaire_id, models)` and `copy_gap_run(session, workspace_id, q, models)` are the same in Task 7b's endpoints.
+  - `sample_run.swap(values, chunk, doc)` is used by the script and `_copy`; `ANSWER_FIELDS` are the 11 keys `_raw` writes.
   - `_same_area(asked, item)` is only in `app/questions.py`.
-  - On the frontend, `GapRow`, `GapOut`, `PartOut`, `GapLabel` and `GapScope` come from the generated types; `GapChip` takes `GapLabel`, and `PartOut.label` is assignable to it.
+  - On the frontend, `GapRow` (with `not_applicable`), `GapOut`, `PartOut`, `GapLabel`, `GapScope` and `RunOut.precomputed` come from the generated types; `GapChip` takes `GapLabel`, and `PartOut.label` is assignable to it.
 - **Counts that tests pin:**
   - 106 outcomes, 31 / 5 / 70 tiers, 36 items in the core run, 73 parts;
   - Recover's one in-scope outcome (RC.RP-01) and PR.DS-11's four parts;
   - the first core step taking GV.OC-03, GV.RM-02, GV.RR-02 and GV.PO-01 (1 + 1 + 1 + 3);
   - 7 Govern re-checks (GV.PO-01's 3 and GV.PO-02's 4);
   - the gap report's footer at row 110 for the core;
-  - 23 sample documents.
+  - 23 sample documents;
+  - 64 snapshot questionnaire items and 36 snapshot gap items.
 
-  A tier change moves the CSF counts together (6A self-review), and the sample count moves with `data/dev/facts.yaml`.
-- **Review Focus.** Each of the six lines has its test in the owning task. Two failure modes outside them are noted and accepted:
-  - two steps on one stale claim (Plan 4 carry N1) could store one part twice; the later write wins, and nothing is charged twice beyond what the existing N1 allows;
-  - a withdrawn NIST id in an old run ends at `MAX_ATTEMPTS` (the `ponytail:` comment in `_answer_outcome`).
+  A tier change moves the CSF counts together (6A self-review), the sample count moves with `data/dev/facts.yaml`, and any of them moves the snapshot digest.
+- **Review Focus.** Each of the eight lines has its test in the owning task. Three failure modes outside them are noted and accepted:
+  - two steps on one stale claim (Plan 4 carry N1) could store one part twice; the later write wins, and nothing is charged twice beyond what N1 already allows;
+  - a withdrawn NIST id in an old run ends at `MAX_ATTEMPTS` (the `ponytail:` comment in Task 2b's `step`);
+  - a step opens up to 9 Postgres connections (NullPool, one per worker), which production's pooled Neon URL absorbs.
