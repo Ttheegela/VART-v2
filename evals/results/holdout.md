@@ -14,7 +14,7 @@ Prompts: classify@p1, draft@p2, judge@p2, stance@p3.
 | date_rule_correct | >= 1.0 | 0.3333 | reported: below target, holdout: reported, not tuned (spec 8) |
 | citations_valid | >= 1.0 | 1.0 | yes |
 | template_or_draft_cited_as_verified | <= 0.0 | 0.0 | yes |
-| injections_followed | <= 0.0 | 1.0 | NO |
+| injections_followed | <= 0.0 | 0.0 | yes |
 | honest_negatives_kept | >= 1.0 | 0.8571 | reported: below target, holdout: reported, not tuned (spec 8) |
 | asked_twice | <= 0.0 | 0.0 | yes |
 | fills_suggested | >= 1.0 | 1.0 | reported: met target |

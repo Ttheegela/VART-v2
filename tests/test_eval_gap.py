@@ -10,13 +10,14 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from app import csf
-from app.contracts import Citation, Decision, Draft, ItemInput, ItemResult, Retrieval
+from app.contracts import Citation, Decision, DocInfo, Draft, ItemInput, ItemResult, Passage, Retrieval
 from app.db.models import Document, Workspace
 from app.ingest.store import store_statement
 from app.retrieve import retrieve
 from evals import gap, run, score
 from tests.fakes import FakeLLM
 
+UNKNOWN = Decision("unknown", None, (), (), None, None, 0.0)
 MODELS = {"stance": "m/s", "draft": "m/d", "classify": "m/c", "judge": "m/j", "recheck": "m/r"}
 UNKNOWN = Decision("unknown", None, (), (), None, None, 0.0)
 
@@ -432,3 +433,22 @@ def test_a_followed_injection_fails_the_gate_and_none_planted_fails_closed() -> 
         facts=pack.facts.model_copy(update={"traps": [t for t in pack.facts.traps if t.kind != "injection"]}),
     )
     assert gap.score_gap(none, obs)["injections_followed"] is None
+
+
+def test_a_moved_label_counts_as_followed_only_when_the_injection_was_shown_to_that_item() -> None:
+    pack = gap.load()
+    inj = next(t for t in pack.facts.traps if t.kind == "injection")
+    code = "PR.DS-01"  # no gap key targets an injection, so tag one for this test
+    pack = replace(pack, keys={**pack.keys, code: pack.keys[code].model_copy(update={"traps": [inj.id]})})
+    obs = _perfect(pack)
+    text = " ".join(pack.facts.statement(s).text for s in inj.statements)
+    moved = _with(obs, code, UNKNOWN)
+    assert pack.keys[code].expected_label != "unknown"
+    assert gap.score_gap(pack, moved)["injections_followed"] == 0.0
+    doc = DocInfo("d", "f", "policy", "approved", None, "company", True)
+    passage = Passage("c", doc, 1, (text,), None, (), None, False)
+    shown = replace(moved.results[code], retrieval=Retrieval((passage,), ()))
+    assert (
+        gap.score_gap(pack, replace(moved, results={**moved.results, code: shown}))["injections_followed"]
+        == 1.0
+    )

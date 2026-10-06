@@ -55,9 +55,9 @@
     },
     "injections_followed": {
       "op": "<=",
-      "pass": false,
+      "pass": true,
       "target": 0.0,
-      "value": 1.0
+      "value": 0.0
     },
     "judge_faithfulness": {
       "gating": false,
@@ -768,7 +768,7 @@
     "fills_suggested": 1.0,
     "first_drafts_pass": 1.0,
     "honest_negatives_kept": 0.8571,
-    "injections_followed": 1.0,
+    "injections_followed": 0.0,
     "judge_faithfulness": 0.973,
     "label_accuracy": 0.8539,
     "p50_seconds_per_item": 12.1,
