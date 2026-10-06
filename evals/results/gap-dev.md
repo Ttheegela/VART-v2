@@ -9,7 +9,7 @@ Prompts: draft@p2, stance@p3.
 |---|---|---|---|
 | cited_coverage | >= 1.0 | 1.0 | yes |
 | trap_coverage | <= 0.0 | 0.0 | yes |
-| label_accuracy | >= 0.8 | 0.7097 | NO |
+| label_accuracy | >= 0.8 | 0.7097 | reported: below target, accepted 2026-10-06 |
 | disagreements_caught | >= 1.0 | 1.0 | yes |
 | stated_noncompliance | >= 1.0 | 1.0 | yes |
 | nist_text_intact | >= 1.0 | 1.0 | yes |

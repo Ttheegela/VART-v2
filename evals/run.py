@@ -359,10 +359,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     stem = "gap-dev" if args.pack == "gap-dev" else "latest"  # each pack keeps its own committed results
     (RESULTS / f"{stem}.json").write_text(json.dumps(jsonable(report), indent=2, sort_keys=True) + "\n")
     (RESULTS / f"{stem}.md").write_text(score.markdown(report))
-    failed = [name for name, g in report["gates"].items() if not g["pass"]]
+    gating = {n: g for n, g in report["gates"].items() if g.get("gating", True)}
+    failed = [name for name, g in gating.items() if not g["pass"]]
+    soft = [
+        f"{n} {g['value']} (target {g['op']} {g['target']})"
+        for n, g in report["gates"].items()
+        if n not in gating and not g["pass"]
+    ]
     print(
-        f"{len(report['gates']) - len(failed)}/{len(report['gates'])} gates pass"
+        f"{len(gating) - len(failed)}/{len(gating)} gates pass"
         + (f"; failed: {', '.join(failed)}" if failed else "")
+        + (f"; reported, below target, accepted 2026-10-06: {', '.join(soft)}" if soft else "")
     )
     return 1 if failed else 0
 

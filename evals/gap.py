@@ -58,6 +58,11 @@ GATES: dict[str, tuple[str, float]] = {
 }
 
 
+# Reported, not gating (Tarun, 2026-10-06): the per-part baseline is 0.7097 against the spec's 0.80, accepted
+# and reported until a later plan improves stance. The target stays in the table. Every other gate gates.
+REPORTED = frozenset({"label_accuracy"})
+
+
 @dataclass(frozen=True)
 class GapPack:
     dev: packs.Pack
@@ -228,7 +233,7 @@ def run(llm: LLMClient, models: dict[str, str]) -> dict[str, Any]:
         "models": {k: models[k] for k in sorted(steps)},
         "prompts": [STANCE_PROMPT, DRAFT_PROMPT],
         "metrics": metrics,
-        "gates": score.gates(metrics, GATES),
+        "gates": score.gates(metrics, GATES, REPORTED),
         "label_misses": misses(pack, obs),
         "items": {
             code: {

@@ -370,3 +370,43 @@ def test_main_writes_the_gap_pack_to_its_own_results_files(
     assert json.loads((tmp_path / "gap-dev.json").read_text())["pack"] == "gap-dev"
     assert (tmp_path / "gap-dev.md").read_text().startswith("# Eval results: gap-dev pack")
     assert not (tmp_path / "latest.json").exists()
+
+
+def test_label_accuracy_is_reported_with_its_target_and_cannot_fail_the_run(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Tarun, 2026-10-06: below target, accepted. The target stays 0.80, the verdict says so, every other gate gates."""
+    assert gap.GATES["label_accuracy"] == (">=", 0.80) and gap.REPORTED == {"label_accuracy"}
+    metrics: dict[str, float | None] = {n: 1.0 if op == ">=" else 0.0 for n, (op, _) in gap.GATES.items()}
+    metrics["label_accuracy"] = 0.7097
+    table = score.gates(metrics, gap.GATES, gap.REPORTED)
+    assert table["label_accuracy"]["pass"] is False and table["label_accuracy"]["gating"] is False
+    assert table["label_accuracy"]["target"] == 0.80
+    assert "reported: below target, accepted 2026-10-06" in score.markdown(
+        {
+            "pack": "gap-dev",
+            "models": {},
+            "prompts": [],
+            "metrics": metrics,
+            "gates": table,
+            "label_misses": [],
+        }
+    )
+    assert all("gating" not in g for n, g in table.items() if n != "label_accuracy")
+    monkeypatch.setattr(run, "RESULTS", tmp_path)
+    monkeypatch.setattr(run, "RECORDED", tmp_path)
+    report = {
+        "pack": "gap-dev",
+        "models": {},
+        "prompts": [],
+        "metrics": metrics,
+        "gates": table,
+        "label_misses": [],
+    }
+    monkeypatch.setattr(gap, "run", lambda llm, models: report)
+    assert run.main(["--pack", "gap-dev"]) == 0
+    assert "8/8 gates pass; reported, below target" in capsys.readouterr().out
+    metrics["trap_coverage"] = 1.0  # any other gate still fails the run
+    bad = {**report, "gates": score.gates(metrics, gap.GATES, gap.REPORTED)}
+    monkeypatch.setattr(gap, "run", lambda llm, models: bad)
+    assert run.main(["--pack", "gap-dev"]) == 1

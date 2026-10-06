@@ -19,6 +19,7 @@
       "value": 1.0
     },
     "label_accuracy": {
+      "gating": false,
       "op": ">=",
       "pass": false,
       "target": 0.8,
