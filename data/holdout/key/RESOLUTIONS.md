@@ -36,7 +36,7 @@ VSQ-49 and MVSP-3.3 still show the first verifier's answers to the old text.
   was not supported by the text. Fix the source.
 - Fix: supplier-risk-policy.docx (src/vrm.md) now says "Marrowgate assesses the security risk of each vendor at least
   once a year." Statement vrm-vendor-assessment in facts.yaml has the same text. Key stays verified / Yes with the new
-  quote. Not re-verified.
+  quote. Re-verified by a fresh blind reader.
 
 ## VSQ-56 (inventory of information assets)
 
@@ -71,4 +71,4 @@ VSQ-49 and MVSP-3.3 still show the first verifier's answers to the old text.
 - Decision: the document was ambiguous. The question lists five classes and the sentence covered three. Fix the source.
 - Fix: people-security-policy.docx (src/hrp.md) now says "...training every year that covers authorization bypass,
   session management, injection, cross-site scripting and cross-site request forgery." Same text in the
-  hrp-developer-training statement. Key stays verified / Yes. Not re-verified.
+  hrp-developer-training statement. Key stays verified / Yes. Re-verified by a fresh blind reader.
