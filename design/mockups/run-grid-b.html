@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VART — Run grid, direction B (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Self-hosted in the app: @fontsource/source-serif-4 · @fontsource/source-sans-3 · @fontsource/source-code-pro -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500&family=Source+Sans+3:wght@400;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+/* Hallmark · direction B "paper" · genre: editorial · macrostructure: Long Document (run as a paper, evidence as footnotes)
+ * nav: N6 masthead + section rail · footer: Ft1 colophon line · enrichment: none · context: user-provided
+ * theme: custom · vibe: "a questionnaire read like a cited paper" · axes: light / high-contrast-serif / neutral
+ * display + reading: Source Serif 4 400/600 · UI: Source Sans 3 400/600 · outlier (IDs, file names, quoted lines): Source Code Pro
+ * pre-emit critique: P5 H5 E4 S5 R4 V5 · contrast: pass (40–41) · slop: pass (42–45) · mobile: pass (34, 49, 50–57)
+ * Same sample data as run-grid.html (direction A). Colour values are only the Tailwind neutral scale, as in A.
+ */
+:root {
+  --n-50: #fafafa; --n-100: #f5f5f5; --n-200: #e5e5e5; --n-300: #d4d4d4;
+  --n-500: #737373; --n-600: #525252; --n-700: #404040; --n-800: #262626; --n-950: #0a0a0a; --white: #ffffff;
+  --color-paper: var(--white); --color-desk: var(--n-50); --color-sunken: var(--n-100); --color-mark: var(--n-200);
+  --color-rule: var(--n-200); --color-rule-strong: var(--n-300);
+  --color-ink: var(--n-950); --color-ink-2: var(--n-700); --color-ink-3: var(--n-600); --color-on-ink: var(--white);
+  --font-serif: "Source Serif 4", Georgia, serif;
+  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Source Code Pro", ui-monospace, Menlo, monospace;
+  --text-xs: 0.8125rem; --text-sm: 0.9375rem; --text-base: 1.0625rem; --text-lg: 1.25rem; --text-xl: 1.75rem;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px; --space-8: 32px; --space-12: 48px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --mast-h: 56px; --drawer-w: 36rem; --rail-w: 13rem;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { overflow-x: clip; }
+body { margin: 0; background: var(--color-desk); color: var(--color-ink); font: 400 var(--text-sm)/1.5 var(--font-sans); -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); }
+.sc { font-variant-caps: all-small-caps; letter-spacing: 0.04em; }
+.muted { color: var(--color-ink-3); }
+
+/* N6 masthead: wordmark set like a running head, views as plain links */
+.mast { display: flex; align-items: center; gap: var(--space-8); height: var(--mast-h); padding: 0 var(--space-4); background: var(--color-paper); border-bottom: 1px solid var(--color-rule-strong); }
+.wordmark { font: 600 var(--text-lg)/1 var(--font-serif); font-variant-caps: all-small-caps; letter-spacing: 0.08em; color: var(--color-ink); text-decoration: none; }
+.views { display: flex; align-items: center; gap: var(--space-6); margin: 0; padding: 0; list-style: none; min-width: 0; flex: 1; overflow-x: auto; scrollbar-width: none; }
+.views a { color: var(--color-ink-2); text-decoration: none; white-space: nowrap; line-height: 1; padding: var(--space-2) 0; }
+.views a:hover { color: var(--color-ink); text-decoration: underline; text-underline-offset: 4px; }
+.views a[aria-current="page"] { color: var(--color-ink); font-weight: 600; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 6px; }
+.views .n { font-family: var(--font-mono); font-size: var(--text-xs); margin-left: var(--space-1); }
+.expiry { white-space: nowrap; font-size: var(--text-xs); }
+
+/* Layout: section rail · the paper · the evidence page */
+.layout { display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--drawer-w); min-height: calc(100dvh - var(--mast-h)); }
+.rail { position: sticky; top: 0; align-self: start; padding: var(--space-8) var(--space-4); }
+.rail h2 { margin: 0 0 var(--space-2); font: 600 var(--text-xs)/1.4 var(--font-sans); color: var(--color-ink-2); }
+.rail ol { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-1); }
+.rail a { display: flex; justify-content: space-between; gap: var(--space-2); color: var(--color-ink-2); text-decoration: none; padding: 2px 0; }
+.rail a:hover { color: var(--color-ink); text-decoration: underline; }
+.rail .c { font-family: var(--font-mono); font-size: var(--text-xs); }
+
+.paper { min-width: 0; padding: var(--space-8) var(--space-6) var(--space-12); background: var(--color-paper); border-inline: 1px solid var(--color-rule); }
+.doc { max-width: 42rem; margin: 0 auto; }
+.title h1 { margin: 0; font: 600 var(--text-xl)/1.15 var(--font-serif); overflow-wrap: anywhere; min-width: 0; }
+.title .byline { margin: var(--space-2) 0 0; color: var(--color-ink-3); font-size: var(--text-xs); }
+.title .byline .mono { color: var(--color-ink-2); }
+.abstract { margin: var(--space-6) 0 0; font: 400 var(--text-base)/1.6 var(--font-serif); max-width: 65ch; }
+.abstract button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-decoration-color: var(--color-rule-strong); text-underline-offset: 4px; white-space: nowrap; }
+.abstract button:hover, .abstract button[aria-pressed="true"] { text-decoration-color: var(--color-ink); text-decoration-thickness: 2px; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin: var(--space-6) 0 0; padding: var(--space-3) 0; border-block: 1px solid var(--color-rule); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* Buttons: sans, one primary */
+.btn { display: inline-flex; align-items: center; gap: var(--space-2); height: 36px; padding: 0 var(--space-4); font: 600 var(--text-sm)/1 var(--font-sans); white-space: nowrap; border: 1px solid var(--color-ink); background: var(--color-paper); color: var(--color-ink); cursor: pointer; transition: background-color 100ms var(--ease-out); }
+.btn:hover { background: var(--color-sunken); }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--color-ink); color: var(--color-on-ink); }
+.btn-primary:hover { background: var(--n-800); }
+.btn:disabled { border-color: var(--color-rule-strong); color: var(--color-ink-3); background: var(--color-paper); cursor: not-allowed; transform: none; }
+.btn-quiet { border-color: transparent; background: transparent; font-weight: 400; padding: 0 var(--space-1); }
+.btn-quiet:hover { background: transparent; text-decoration: underline; }
+kbd { font: 400 var(--text-xs)/1 var(--font-mono); border: 1px solid var(--color-rule-strong); padding: 2px var(--space-1); color: var(--color-ink-3); }
+.search { display: flex; align-items: center; gap: var(--space-2); }
+.input { height: 36px; width: 15rem; max-width: 100%; padding: 0 var(--space-2); border: 1px solid var(--color-rule-strong); border-radius: 0; background: var(--color-paper); font: 400 var(--text-sm) var(--font-sans); color: var(--color-ink); }
+.input::placeholder { color: var(--color-ink-3); }
+.input:hover { border-color: var(--n-500); }
+.input:disabled { background: var(--color-sunken); cursor: not-allowed; }
+
+/* Status: a word in small caps, led by a shape (the word is the label; the shape is the second cue) */
+.st { white-space: nowrap; font: 600 var(--text-xs)/1 var(--font-sans); font-variant-caps: all-small-caps; letter-spacing: 0.05em; font-size: var(--text-sm); }
+.st::before { display: inline-block; width: 1.1em; font-variant-caps: normal; }
+.st-verified::before { content: "\25A0"; }       /* filled square */
+.st-confirmed::before { content: "\25A3"; }      /* square in square */
+.st-partial::before { content: "\25E7"; }        /* half square */
+.st-conflict { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.st-conflict::before { content: "\25C6"; }       /* diamond */
+.st-unknown { font-weight: 400; color: var(--color-ink-2); }
+.st-unknown::before { content: "\25CB"; }        /* open circle */
+.st-na { font-weight: 400; color: var(--color-ink-3); }
+.st-na::before { content: "\2013"; }             /* en dash */
+
+/* The body: sections as chapters, items as numbered paragraphs */
+.part { margin-top: var(--space-12); }
+.part > h2 { margin: 0 0 var(--space-2); padding-top: var(--space-3); border-top: 2px solid var(--color-ink); font: 600 var(--text-lg)/1.3 var(--font-serif); }
+.items { margin: 0; padding: 0; list-style: none; }
+.item { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr); gap: 0 var(--space-4); padding: var(--space-4) var(--space-3) var(--space-4) 0; border-bottom: 1px solid var(--color-rule); cursor: pointer; transition: background-color 100ms var(--ease-out); }
+.item:hover { background: var(--color-desk); }
+.item:focus-visible { outline: 2px solid var(--color-ink); outline-offset: -2px; }
+.item[aria-selected="true"] { background: var(--color-sunken); outline: 2px solid var(--color-ink); outline-offset: -2px; }
+.item .id { font: 500 var(--text-xs)/1.9 var(--font-mono); text-align: right; color: var(--color-ink-2); }
+.item .q { margin: 0; font: 600 var(--text-base)/1.4 var(--font-serif); }
+.item .a { margin: var(--space-1) 0 0; font: 400 var(--text-base)/1.55 var(--font-serif); color: var(--color-ink-2); max-width: 65ch; }
+.item .a sup { font: 500 0.7em/0 var(--font-mono); margin-left: 1px; }
+.item .meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-4); margin-top: var(--space-2); font-size: var(--text-xs); color: var(--color-ink-3); }
+.item .meta .mono { font-variant-numeric: tabular-nums; }
+.item .meta .ok { color: var(--color-ink); }
+.item[aria-selected="true"] .meta, .item:hover .meta { color: var(--color-ink-2); }
+.item.pending .q, .item.pending .a { color: var(--color-ink-3); }
+
+/* Evidence: a facing page */
+.drawer { position: sticky; top: 0; height: calc(100dvh - var(--mast-h)); overflow-y: auto; background: var(--color-paper); border-left: 1px solid var(--color-rule-strong); animation: drawer-in 200ms var(--ease-out); }
+@keyframes drawer-in { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+.d-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); height: 48px; padding: 0 var(--space-6); background: var(--color-paper); border-bottom: 1px solid var(--color-rule); }
+.d-head .id { font: 500 var(--text-xs)/1 var(--font-mono); }
+.d-body { padding: var(--space-8) var(--space-6) var(--space-12); }
+.d-body h2 { margin: 0; font: 600 var(--text-lg)/1.35 var(--font-serif); overflow-wrap: anywhere; min-width: 0; }
+.d-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-4); margin: var(--space-3) 0 0; font-size: var(--text-xs); color: var(--color-ink-3); }
+.d-answer { margin: var(--space-6) 0 0; font: 400 var(--text-base)/1.65 var(--font-serif); max-width: 62ch; }
+.d-answer sup a { font: 500 0.7em/0 var(--font-mono); color: var(--color-ink); text-decoration: none; padding: 0 1px; }
+.d-answer sup a:hover { text-decoration: underline; }
+.rule-note { margin: var(--space-4) 0 0; font-size: var(--text-xs); color: var(--color-ink-2); }
+
+.notes-h { margin: var(--space-8) 0 0; padding-top: var(--space-3); border-top: 1px solid var(--color-ink); font: 600 var(--text-sm)/1.4 var(--font-sans); }
+.notes { margin: 0; padding: 0; list-style: none; counter-reset: note; }
+.note { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr); gap: var(--space-2); padding: var(--space-4) 0; border-bottom: 1px solid var(--color-rule); }
+.note .num { font: 500 var(--text-xs)/1.6 var(--font-mono); }
+.note .src { margin: 0; font-size: var(--text-xs); color: var(--color-ink-3); }
+.note .src .file { display: block; font: 500 var(--text-xs)/1.6 var(--font-mono); color: var(--color-ink); overflow-wrap: anywhere; }
+.note .src span:not(.file) + span::before { content: " · "; }
+.passage { margin: var(--space-3) 0 0; padding: 0; list-style: none; font: 400 var(--text-xs)/1.7 var(--font-mono); }
+.passage li { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr); gap: var(--space-3); color: var(--color-ink-3); }
+.passage .ln { text-align: right; user-select: none; }
+.passage .tx { overflow-wrap: anywhere; }
+.passage li.hit { color: var(--color-ink); }
+.passage li.hit .ln { font-weight: 500; color: var(--color-ink); }
+mark { color: var(--color-ink); background: linear-gradient(180deg, transparent 30%, var(--color-mark) 30%, var(--color-mark) 92%, transparent 92%); }
+
+.aside-h { margin: var(--space-8) 0 var(--space-2); font: 600 var(--text-sm)/1.4 var(--font-sans); }
+.set-aside { margin: 0; padding: 0; list-style: none; font-size: var(--text-xs); color: var(--color-ink-2); }
+.set-aside li { padding: var(--space-2) 0; border-top: 1px solid var(--color-rule); }
+.set-aside .why { font-weight: 600; color: var(--color-ink); }
+.set-aside .mono { overflow-wrap: anywhere; }
+.d-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-8); }
+
+footer { padding: var(--space-4); font-size: var(--text-xs); color: var(--color-ink-3); text-align: center; border-top: 1px solid var(--color-rule); }
+
+@media (max-width: 1199px) {
+  .layout { grid-template-columns: minmax(0, 1fr) var(--drawer-w); }
+  .rail { display: none; }
+}
+@media (max-width: 899px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .drawer { position: fixed; inset: 0; z-index: 10; height: 100dvh; border-left: 0; }
+  .expiry { display: none; }
+  .paper { padding-inline: var(--space-4); border-inline: 0; }
+}
+@media (max-width: 480px) {
+  .mast { gap: var(--space-4); }
+  .item { grid-template-columns: minmax(0, 1fr); }
+  .item .id { text-align: left; line-height: 1.4; }
+  .search, .input { width: 100%; }
+  .d-head, .d-body { padding-inline: var(--space-4); }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 120ms !important; transition-property: opacity !important; }
+  .drawer { animation: fade 120ms linear; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+}
+</style>
+</head>
+<body>
+<header class="mast">
+  <a class="wordmark" href="home.html">Vart</a>
+  <nav aria-label="Workspace views" style="display:flex;min-width:0;flex:1">
+    <ul class="views">
+      <li><a href="#">Workspace</a></li>
+      <li><a href="#" aria-current="page">Run</a></li>
+      <li><a href="#">Questions for you<span class="n">7</span></a></li>
+      <li><a href="#">Export</a></li>
+      <li><a href="#">Audit log</a></li>
+    </ul>
+  </nav>
+  <span class="expiry muted">Workspace expires in 23 h 41 m</span>
+</header>
+
+<div class="layout">
+  <nav class="rail" aria-labelledby="rail-h">
+    <h2 id="rail-h">Sections</h2>
+    <ol>
+      <li><a href="#s-ac"><span>Access control</span><span class="c">5</span></a></li>
+      <li><a href="#s-ds"><span>Data security</span><span class="c">4</span></a></li>
+      <li><a href="#s-vm"><span>Vulnerability management</span><span class="c">3</span></a></li>
+    </ol>
+  </nav>
+
+  <main class="paper">
+    <div class="doc">
+      <header class="title">
+        <h1>Vendor Security Questionnaire, answered for Kestrelyn</h1>
+        <p class="byline"><span class="mono">vsq-a.xlsx</span>, sheet Questionnaire · run 3, precomputed · 2026-10-05 14:02 UTC</p>
+      </header>
+
+      <p class="abstract">Of 60 items,
+        <button type="button" aria-pressed="false">31 verified</button>,
+        <button type="button" aria-pressed="false">12 partial</button>,
+        <button type="button" aria-pressed="false">3 in conflict</button>,
+        <button type="button" aria-pressed="false">8 unknown</button>,
+        <button type="button" aria-pressed="false">4 confirmed by you</button> and
+        <button type="button" aria-pressed="false">2 not applicable</button>.
+        Every verified or partial answer cites a line from your documents; choose a count to show only those items.</p>
+
+      <div class="controls">
+        <div class="actions">
+          <button class="btn btn-primary" type="button">Approve all verified (31)</button>
+          <button class="btn" type="button">Export xlsx</button>
+          <button class="btn btn-quiet" type="button">Re-run live</button>
+        </div>
+        <label class="search"><span class="sc muted">Find</span>
+          <input class="input" type="search" placeholder="Question text or ID"></label>
+      </div>
+
+      <section class="part" id="s-ac" aria-labelledby="h-ac">
+        <h2 id="h-ac">Access control</h2>
+        <ol class="items">
+          <li class="item" tabindex="-1"><span class="id">AC-01</span><div>
+            <p class="q">Is multi-factor authentication enforced for all workforce access to production systems?</p>
+            <p class="a">Partial. The access control policy requires MFA,<sup>1</sup> but notes it is not yet enforced for the legacy VPN.<sup>2</sup></p>
+            <div class="meta"><span class="st st-partial">Partial</span><span>Confidence <span class="mono">0.60</span></span><span>2 sources</span><span>Draft, not approved</span></div></div></li>
+          <li class="item" tabindex="-1"><span class="id">AC-02</span><div>
+            <p class="q">Is single sign-on used for internal applications?</p>
+            <p class="a">Yes. The access control policy names Okta as the identity provider for all internal applications.<sup>1</sup></p>
+            <div class="meta"><span class="st st-verified">Verified</span><span>Confidence <span class="mono">0.90</span></span><span>1 source</span><span class="ok">Approved</span></div></div></li>
+          <li class="item" tabindex="-1"><span class="id">AC-03</span><div>
+            <p class="q">Are employee accounts disabled within one business day of termination?</p>
+            <p class="a">Yes. The HR security policy<sup>1</sup> and the access control policy<sup>2</sup> both set a one business day limit.</p>
+            <div class="meta"><span class="st st-verified">Verified</span><span>Confidence <span class="mono">0.90</span></span><span>2 sources</span><span class="ok">Approved</span></div></div></li>
+          <li class="item" tabindex="0" aria-selected="true"><span class="id">AC-04</span><div>
+            <p class="q">Is user access to systems reviewed at least quarterly?</p>
+            <p class="a">The policy says quarterly;<sup>2</sup> the access review log shows every system overdue.<sup>1</sup> Which is current?</p>
+            <div class="meta"><span class="st st-conflict">Conflict</span><span>Confidence <span class="mono">0.30</span></span><span>3 sources</span><span>Draft, not approved</span></div></div></li>
+          <li class="item" tabindex="-1"><span class="id">AC-05</span><div>
+            <p class="q">Are privileged accounts separate from day-to-day user accounts?</p>
+            <p class="a">Yes, confirmed by Dana Ortiz on 2026-10-05.</p>
+            <div class="meta"><span class="st st-confirmed">Confirmed by you</span><span>Confidence <span class="mono">—</span></span><span>1 source</span><span class="ok">Approved</span></div></div></li>
+        </ol>
+      </section>
+
+      <section class="part" id="s-ds" aria-labelledby="h-ds">
+        <h2 id="h-ds">Data security</h2>
+        <ol class="items">
+          <li class="item" tabindex="-1"><span class="id">DS-01</span><div>
+            <p class="q">Is customer data encrypted at rest?</p>
+            <p class="a">Yes. The cryptography policy requires AES-256 for all customer data at rest.<sup>1</sup></p>
+            <div class="meta"><span class="st st-verified">Verified</span><span>Confidence <span class="mono">0.90</span></span><span>2 sources</span><span>Draft, not approved</span></div></div></li>
+          <li class="item" tabindex="-1"><span class="id">DS-02</span><div>
+            <p class="q">Is all customer data stored in a single named region?</p>
+            <p class="a">The classification policy says AWS us-east-1;<sup>1</sup> the asset inventory dated 2026-09-15 lists an office file server.<sup>2</sup> Which is current?</p>
+            <div class="meta"><span class="st st-conflict">Conflict</span><span>Confidence <span class="mono">0.30</span></span><span>2 sources</span><span>Draft, not approved</span></div></div></li>
+          <li class="item" tabindex="-1"><span class="id">DS-03</span><div>
+            <p class="q">Do customers manage their own encryption keys?</p>
+            <p class="a">No evidence found. Asked in Questions for you.</p>
+            <div class="meta"><span class="st st-unknown">Unknown</span><span>Confidence <span class="mono">0.00</span></span><span>0 sources</span><span>Draft, not approved</span></div></div></li>
+          <li class="item" tabindex="-1"><span class="id">DS-04</span><div>
+            <p class="q">Is cardholder data stored or processed?</p>
+            <p class="a">Not applicable: Kestrelyn takes no card payments (reason in the audit log).</p>
+            <div class="meta"><span class="st st-na">Not applicable</span><span>Confidence <span class="mono">—</span></span><span>0 sources</span><span class="ok">Approved</span></div></div></li>
+        </ol>
+      </section>
+
+      <section class="part" id="s-vm" aria-labelledby="h-vm">
+        <h2 id="h-vm">Vulnerability management</h2>
+        <ol class="items">
+          <li class="item" tabindex="-1"><span class="id">VM-01</span><div>
+            <p class="q">Is an external penetration test performed at least annually?</p>
+            <p class="a">Yes. The 2026 penetration test report covers the customer product.<sup>1</sup></p>
+            <div class="meta"><span class="st st-verified">Verified</span><span>Confidence <span class="mono">0.90</span></span><span>1 source</span><span>Draft, not approved</span></div></div></li>
+          <li class="item" tabindex="-1"><span class="id">VM-02</span><div>
+            <p class="q">Are critical vulnerabilities remediated within 15 days?</p>
+            <p class="a">Partial. The policy covers internal systems;<sup>1</sup> the pentest covers the customer product.<sup>2</sup></p>
+            <div class="meta"><span class="st st-partial">Partial</span><span>Confidence <span class="mono">0.60</span></span><span>2 sources</span><span>Draft, not approved</span></div></div></li>
+          <li class="item pending" tabindex="-1"><span class="id">VM-03</span><div>
+            <p class="q">Is dependency scanning run on every build?</p>
+            <p class="a">Answering…</p></div></li>
+        </ol>
+      </section>
+    </div>
+  </main>
+
+  <aside class="drawer" aria-labelledby="d-title">
+    <div class="d-head">
+      <span class="id">AC-04 · Evidence</span>
+      <button class="btn btn-quiet" type="button">Close <kbd>Esc</kbd></button>
+    </div>
+    <div class="d-body">
+      <h2 id="d-title">Is user access to systems reviewed at least quarterly?</h2>
+      <div class="d-meta"><span class="st st-conflict">Conflict</span><span>Value —</span><span>Confidence <span class="mono">0.30</span></span><span>Draft, not approved</span></div>
+
+      <p class="d-answer">The access control policy says user access to internal systems is reviewed quarterly.<sup><a href="#n2">2</a></sup>
+        The access review log dated 2026-09-15 shows every system overdue since the review on 2026-01-10.<sup><a href="#n1">1</a></sup>
+        Which is current?</p>
+      <p class="rule-note">Conflict. Date rule: the newer record is cited first.</p>
+
+      <h3 class="notes-h">Sources</h3>
+      <ol class="notes">
+        <li class="note" id="n1"><span class="num">1</span><div>
+          <p class="src"><span class="file">access-review-records.xlsx</span><span>Record</span><span>Final</span><span>As of 2026-09-15</span><span>Stance No</span></p>
+          <ol class="passage">
+            <li><span class="ln">1</span><span class="tx">System; Owner; Last review completed; Next review due; Status</span></li>
+            <li class="hit"><span class="ln">2</span><span class="tx"><mark>System: Okta; Owner: Marcus Lee; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status: Overdue</mark></span></li>
+            <li class="hit"><span class="ln">3</span><span class="tx"><mark>System: AWS; Owner: Marcus Lee; Last review completed: 2026-01-10; Next review due: 2026-04-10; Status: Overdue</mark></span></li>
+            <li><span class="ln">4</span><span class="tx">System: GitHub; Owner: Priya Raman; Last review completed: 2026-01-10; Next review due: …</span></li>
+          </ol></div></li>
+        <li class="note" id="n2"><span class="num">2</span><div>
+          <p class="src"><span class="file">access-control-policy.docx</span><span>Policy</span><span>Final</span><span>Effective 2026-02-01</span><span>Scope internal systems</span><span>Stance Yes</span></p>
+          <ol class="passage">
+            <li><span class="ln">37</span><span class="tx">## Access reviews</span></li>
+            <li><span class="ln">38</span><span class="tx"></span></li>
+            <li class="hit"><span class="ln">39</span><span class="tx"><mark>User access to internal systems is reviewed quarterly.</mark> System owners</span></li>
+            <li><span class="ln">40</span><span class="tx">confirm each account and remove access that is no longer needed.</span></li>
+          </ol></div></li>
+      </ol>
+
+      <h3 class="aside-h">Dropped evidence (2)</h3>
+      <ul class="set-aside">
+        <li><span class="why">Placeholder.</span> <span class="mono">security-policy-template.md, L14</span>. Template passage with unfilled fields; never cited.</li>
+        <li><span class="why">Not evidence.</span> <span class="mono">master-services-agreement-template.docx, L212</span>. Contracts are not evidence of a control.</li>
+      </ul>
+
+      <div class="d-actions">
+        <button class="btn btn-primary" type="button">Answer this question</button>
+        <button class="btn" type="button" disabled>Approve</button>
+        <button class="btn btn-quiet" type="button">Mark not applicable</button>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<footer>VART · labels decided by code · synthetic demo data · MIT</footer>
+</body>
+</html>
