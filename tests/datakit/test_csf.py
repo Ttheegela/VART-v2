@@ -47,7 +47,7 @@ def test_all_106_outcomes_are_kept_in_nists_order_with_the_proposed_tiers() -> N
         "Respond",
         "Recover",
     }
-    assert Counter(o["tier"] for o in built["outcomes"]) == {"checked": 29, "ask": 5, "not_checked": 72}
+    assert Counter(o["tier"] for o in built["outcomes"]) == {"checked": 31, "ask": 5, "not_checked": 70}
     assert built["csf_version"] == "2.0" and built["source"] == csf.DOWNLOAD_URL
 
 

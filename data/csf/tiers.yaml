@@ -7,6 +7,7 @@
 #
 # Change log (one line per NIST refresh or tier change):
 #   2026-10-05  first version: CSF 2.0 Reference Tool export, 106 outcomes, SP 800-53 Rev 5.2.0 references.
+#   2026-10-05  Tarun's review: RS.AN-03 and RS.MI-01 added to checked (31 checked, 5 ask, 70 not checked).
 checked:
   GV.PO-01: "Is there a documented cybersecurity policy, based on the organization's context and strategy, that is communicated and enforced?"
   GV.PO-02: "Are cybersecurity policies reviewed, updated, communicated and enforced on a regular schedule?"
@@ -35,6 +36,8 @@ checked:
   DE.AE-06: "Is information about security events provided to the staff and tools that need it, for example through alerts?"
   DE.AE-07: "Is cyber threat intelligence integrated into the analysis of security events?"
   RS.MA-01: "Is there an incident response plan that is executed once an incident is declared?"
+  RS.AN-03: "Is analysis performed after an incident to establish what happened and its root cause?"
+  RS.MI-01: "Are incidents contained, and is there a process for doing so?"
   RS.CO-02: "Are customers and other stakeholders notified of security incidents?"
   RC.RP-01: "Is the recovery part of the incident response or disaster recovery plan in place and exercised?"
 ask:

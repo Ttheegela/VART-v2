@@ -1697,8 +1697,8 @@
         "SI-02(07)"
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
-      "tier": "not_checked",
-      "question": null
+      "tier": "checked",
+      "question": "Is analysis performed after an incident to establish what happened and its root cause?"
     },
     {
       "id": "RS.AN-06",
@@ -1784,8 +1784,8 @@
         "IR-04"
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
-      "tier": "not_checked",
-      "question": null
+      "tier": "checked",
+      "question": "Are incidents contained, and is there a process for doing so?"
     },
     {
       "id": "RS.MI-02",
