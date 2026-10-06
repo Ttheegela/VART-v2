@@ -78,6 +78,7 @@ test("an answer in Questions for you fills its item", async () => {
   }
   // an accepted answer re-checks up to 8 open items, one model call each (~10 s live, 90 s cap)
   await expect(page.getByText("confirmed by you").first()).toBeVisible({ timeout: RUN_WAIT });
-  await page.keyboard.press("2");
+  // the nav link, not "2": answering moves focus to the next open card's textarea, where keys are typed
+  await page.getByRole("navigation", { name: "views" }).getByRole("link", { name: "run" }).click();
   await expect(page.getByRole("row", { name: new RegExp(`^${code} `) })).toContainText("confirmed by you");
 });
