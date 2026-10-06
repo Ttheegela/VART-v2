@@ -2,7 +2,8 @@ import io
 import json
 import threading
 import uuid
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import openpyxl
 import pytest
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app import csf, runs
 from app.api.deps import get_llm
-from app.db.models import Answer, DocumentLine, Item, Questionnaire, Run, Workspace
+from app.db.models import Answer, DocumentLine, Item, Questionnaire, Run, RunItem, Workspace
 from app.export import FOOTER
 from app.main import app
 from app.services.ip_limits import LIMITS
@@ -193,6 +194,7 @@ def test_not_applicable_and_failed_outcomes_carry_no_gap_label(db: Engine) -> No
     assert (
         rows["PR.AA-01"]["explanation"] == "Not checked: the model call failed twice. Press r to check again."
     )
+    assert client.get(f"/api/answers/{na_checked}").json()["parts"] == []  # no stale parts for N/A (M2)
     sheet = openpyxl.load_workbook(io.BytesIO(client.get(f"/api/runs/{run['id']}/export").content))[
         "Gap report"
     ]
@@ -200,24 +202,93 @@ def test_not_applicable_and_failed_outcomes_carry_no_gap_label(db: Engine) -> No
     assert (words["PR.DS-11"], words["GV.RM-02"], words["PR.AA-01"]) == (
         "Not applicable",
         "Not applicable",
-        "Not run yet",
+        "Failed",
     )
+    failed_row = next(n for n in range(3, 109) if sheet.cell(n, 1).value == "PR.AA-01")
+    assert sheet.cell(failed_row, 5).value == "Not checked: the model call failed twice."  # no UI hint
 
 
-def test_a_stale_part_citation_never_breaks_the_inspector_and_approve_all_skips_not_met(db: Engine) -> None:
+def test_a_failed_outcome_shows_no_parts_and_an_incomplete_one_neither(db: Engine) -> None:
     client, _ = visitor(db)
-    run = client.post("/api/gap/recover/run").json()
+    run = client.post("/api/gap/protect/run").json()
     _finish(client, run["id"], ByStepLLM({}))
-    aid = _answer(db, "RC.RP-01")
+    aid = _answer(db, "PR.DS-11")
+    assert client.get(f"/api/answers/{aid}").json()["parts"] != []
+    with Session(db) as s:  # a part missing from the stored parts (adversary-1 M2)
+        key = (RunItem.run_id == uuid.UUID(run["id"]), RunItem.item_id == s.get_one(Answer, aid).item_id)
+        parts = s.scalars(select(RunItem.parts).where(*key)).one()
+        parts.pop(next(iter(parts)))
+        s.execute(update(RunItem).where(*key).values(parts=parts))
+        s.commit()
+    assert client.get(f"/api/answers/{aid}").json()["parts"] == []
     with Session(db) as s:  # a failed outcome keeps parts, but its answer is not a result of them
         s.execute(update(Answer).where(Answer.id == aid).values(label="unknown", text=runs.FAILED_TEXT))
         s.commit()
     assert client.get(f"/api/answers/{aid}").json()["parts"] == []
+
+
+def test_bulk_approve_skips_a_gap_checks_not_met_outcomes_only(db: Engine) -> None:
+    client, ws_id = visitor(db)
+    run = client.post("/api/gap/recover/run").json()
+    _finish(client, run["id"], ByStepLLM({}))
+    aid = _answer(db, "RC.RP-01")
     with Session(db) as s:  # N3: a Not met outcome (verified, No) is not approved in bulk
         s.execute(
             update(Answer)
             .where(Answer.id == aid)
-            .values(label="verified", value="No", text="x", citations=[{"quote": "q"}])
+            .values(label="verified", value="No", text="x", citations=[f.CITATION])
         )
         s.commit()
     assert client.post(f"/api/runs/{run['id']}/approve-verified").json()["approved"] == 0
+    with Session(db) as s:
+        s.execute(update(Answer).where(Answer.id == aid).values(value="Yes"))
+        s.commit()
+    assert client.post(f"/api/runs/{run['id']}/approve-verified").json()["approved"] == 1
+    q = client.post(
+        "/api/questionnaires/sample/vsq-a"
+    ).json()  # a questionnaire's verified No is still approved
+    qrun = client.post(f"/api/questionnaires/{q['id']}/runs").json()
+    with Session(db) as s:
+        item = s.scalars(select(Item).where(Item.questionnaire_id == uuid.UUID(q["id"]))).first()
+        assert item is not None
+        f.answer(
+            s,
+            s.get_one(Run, uuid.UUID(qrun["id"])),
+            item,
+            label="verified",
+            value="No",
+            text="x",
+            citations=[f.CITATION],
+        )
+        s.commit()
+    assert client.post(f"/api/runs/{qrun['id']}/approve-verified").json()["approved"] == 1
+
+
+def _gap_run_id(client: TestClient, scope: str) -> str:
+    return str(client.post(f"/api/gap/{scope}/run").json()["id"])
+
+
+def test_the_questionnaire_export_carries_the_latest_finished_gap_check(db: Engine) -> None:
+    client, _ = visitor(db)
+    q = client.post("/api/questionnaires/sample/vsq-a").json()
+    qrun = client.post(f"/api/questionnaires/{q['id']}/runs").json()
+
+    def sheet() -> Any:
+        body = client.get(f"/api/runs/{qrun['id']}/export").content
+        return openpyxl.load_workbook(io.BytesIO(body))["Gap report"]
+
+    recover = _gap_run_id(client, "recover")
+    _finish(client, recover, ByStepLLM({}))
+    govern = _gap_run_id(client, "govern")  # left running: skipped
+    assert sheet()["B1"].value == "Scope: recover"
+    _finish(client, govern, ByStepLLM({}))
+    assert sheet()["B1"].value == "Scope: govern"  # the latest finished wins over the older one
+    with Session(db) as s:
+        s.execute(
+            update(Run)
+            .where(Run.id == uuid.UUID(recover))
+            .values(finished_at=datetime(2030, 1, 2, tzinfo=UTC))
+        )
+        s.commit()
+    ws = sheet()
+    assert (ws["B1"].value, ws["C1"].value) == ("Scope: recover", "Run date: 2030-01-02")

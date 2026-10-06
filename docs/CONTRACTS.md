@@ -206,4 +206,5 @@ change-log line; changing or removing a path, a field or a status needs the lead
 - 2026-10-06: Plan 6B Task 3 (an added sheet, no path, field or status changed): an xlsx questionnaire export
   carries the workspace's latest done gap check as a `Gap report` sheet (a free name when the file has one,
   compared case-insensitively), every cell inert; with no done gap check, or for a csv, the export is unchanged
-  (Tarun, 2026-10-06). Bulk approve (`approve-verified`) skips a gap check's Not met outcomes.
+  (Tarun, 2026-10-06).
+  Bulk approve (`approve-verified`) skips a gap check's Not met outcomes (adversary-1 N3, Ruling 4; the lead).

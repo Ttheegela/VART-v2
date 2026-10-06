@@ -286,7 +286,8 @@ def test_the_gap_report_lists_every_outcome_in_scope_with_inert_cells() -> None:
         "Not checked in this version",
         "Not run yet",
     ]
-    assert [ws.cell(n, 4).value for n in (6, 7, 8)] == ["Not applicable", "Not applicable", "Not run yet"]
+    assert [ws.cell(n, 4).value for n in (6, 7, 8)] == ["Not applicable", "Not applicable", "Failed"]
+    assert ws["E8"].value == "Not checked: the model call failed twice."  # the view's UI hint stays out
     assert (ws["E3"].value, ws["E3"].data_type) == ("=SUM(A1)", "s")
     assert (ws["F3"].value, ws["F3"].data_type) == ("\"=cmd|' /C calc'!A0\" (backup-policy.docx line 2)", "s")
     assert (ws["G3"].value, ws["I3"].value, ws["J3"].value, ws["K3"].value) == (

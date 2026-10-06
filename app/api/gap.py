@@ -14,13 +14,13 @@ from app.api.runs import run_out, summary
 from app.api.schemas import ERRORS, GapOut, GapRow, GapScope, RunOut
 from app.contracts import ItemLabel, Value
 from app.db.models import Answer, Item, Questionnaire, Run
-from app.export import GapSheet
+from app.export import FAILED_SENTENCE, GapSheet
 from app.runs import FAILED_TEXT, create_run
 from app.services.capacity import ensure_capacity
 from app.settings import get_settings
 
 router = APIRouter(tags=["gap"], responses=ERRORS)
-FAILED_SENTENCE = "Not checked: the model call failed twice. Press r to check again."  # adversary-1 M4
+FAILED_VIEW = f"{FAILED_SENTENCE} Press r to check again."  # adversary-1 M4
 
 
 def latest_run(session: Session, questionnaire_id: uuid.UUID) -> Run | None:
@@ -72,7 +72,7 @@ def gap_rows(session: Session, scope: str, q: Questionnaire | None, run: Run | N
                 item_id=item.id if item is not None else None,
                 answer_id=a.id if a else None,
                 label=label,
-                explanation=FAILED_SENTENCE if failed else (a.text or None) if a and (label or na) else None,
+                explanation=FAILED_VIEW if failed else (a.text or None) if a and (label or na) else None,
                 sources=summary(a).sources if a and label else 0,
                 not_applicable=na,
             )

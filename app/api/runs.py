@@ -141,7 +141,9 @@ def approve_verified(run_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -
         # a gap check's Not met outcome (verified, No) is a finding to look at, not a bulk approval (adv-1 N3)
         or_(
             Answer.value.is_distinct_from("No"),
-            Answer.item_id.not_in(select(Item.id).where(Item.csf_id.is_not(None))),
+            Answer.item_id.not_in(
+                select(Item.id).where(Item.questionnaire_id == run.questionnaire_id, Item.csf_id.is_not(None))
+            ),
         ),
     )
     # lock in id order first, as redecide does, so the two bulk lockers cannot deadlock (task-6 review M2)

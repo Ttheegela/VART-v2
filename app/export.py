@@ -136,6 +136,8 @@ GAP_HEAD = (
 REVIEW = "Possible gap — review it"
 FOOTER = "Not legal advice. CSF 2.0 text © NIST, public domain."
 NOT_RUN = "Not run yet"
+FAILED_WORD = "Failed"
+FAILED_SENTENCE = "Not checked: the model call failed twice."  # the view adds its UI hint
 
 
 @dataclass(frozen=True)
@@ -155,7 +157,13 @@ def _gap_word(r: GapRow) -> str:
         return LABEL_WORDS["na"]
     if r.tier == "not_checked":
         return csf.NOT_CHECKED[0].upper() + csf.NOT_CHECKED[1:]  # "Not checked in this version"
-    return csf.GAP_WORDS[r.label] if r.label else NOT_RUN
+    if r.label:
+        return csf.GAP_WORDS[r.label]
+    return FAILED_WORD if _failed(r) else NOT_RUN
+
+
+def _failed(r: GapRow) -> bool:
+    return r.explanation is not None and r.explanation.startswith(FAILED_SENTENCE)
 
 
 def _write_gap(ws: Any, g: GapSheet) -> None:
@@ -175,7 +183,7 @@ def _write_gap(ws: Any, g: GapSheet) -> None:
             r.function,
             r.category,
             _gap_word(r),
-            r.explanation,
+            FAILED_SENTENCE if _failed(r) else r.explanation,
             quotes or None,
             r.outcome,
             f"{r.source_url} {g.controls_url}",
