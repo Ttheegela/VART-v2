@@ -131,6 +131,10 @@ leaves). Letters are case sensitive. Every key below is shown as a hint on the c
 | `i` | answer this question | the cursor item or open drawer |
 | `a` | approve | the cursor item or open drawer; disabled while unanswered or in conflict |
 | `n` | mark not applicable (asks for a reason) | the cursor item or open drawer |
+| `r` | start a run on the confirmed questionnaire | Workspace |
+| `l` / `q` / `w` | load the sample documents / sample questionnaire A / sample questionnaire B | Workspace |
+| `R` (shift+r) | reset the workspace: delete everything now, after a confirm | Workspace |
+| `ctrl+enter` | send an answer (in its text field) | Questions for you |
 | `?` | show all keys (a sheet listing this table; esc closes) | everywhere |
 
 ## Accessibility
@@ -139,7 +143,8 @@ leaves). Letters are case sensitive. Every key below is shown as a hint on the c
   neutral-950. On a filled row it is an inset outline (offset -2px) so the row's neighbours do not clip it.
 - Contrast: every text pair passes 4.5:1, and the resting pairs in the token table reach 7:1. The lowest is a
   kbd hint on the hovered primary button (on-chrome-2 on neutral-800, 6.0:1). Labels never rely on fill alone;
-  the word is always present.
+  the word is always present. Exemption: a disabled view tab in the top bar (no run yet) is on-chrome-2 at 60%
+  opacity, about 3.4:1; it is an inactive control (WCAG 1.4.3 exempts it) and carries `aria-disabled="true"`.
 - Key hints and screen readers: the control gets `aria-keyshortcuts` (`r`, `Shift+A`, `1`, …) and the `<kbd>`
   inside it is `aria-hidden="true"`, so the accessible name is the label alone ("Re-run live"), not "r Re-run
   live". The search field's `/` hint is likewise hidden and the field has a visible-to-SR label "search".
@@ -171,3 +176,6 @@ leaves). Letters are case sensitive. Every key below is shown as a hint on the c
 - 2026-10-05 · System locked (design branch): direction A, tokens, type, components, two mockups.
 - 2026-10-05 · Relocked to direction C "console": JetBrains Mono self-hosted, C tokens (paper white, chrome
   scale), keyboard map, Home redone in C. "Draft" approval wording replaced by "Draft, not approved".
+- 2026-10-06 · Workspace keys: l, q, w for the sample buttons, R resets the workspace after a confirm, r starts a
+  run from the workspace; `ctrl+enter` (send an answer, Questions for you) added to the table to match the key
+  sheet. Exemption recorded for the disabled view tabs' contrast (60% opacity, inactive controls).
