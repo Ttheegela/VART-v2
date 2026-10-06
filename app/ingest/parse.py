@@ -47,10 +47,12 @@ _TEXT_FORMATS = ("csv", "md", "txt")
 _OLE2 = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"  # legacy .doc/.xls, and every password-protected Office file
 # Runs a reader cannot see are never evidence (Plan 3 adversary-3 M4): hidden (w:vanish, unless switched off
 # with val 0/false/off) or under 1 pt (w:sz is in half-points). ponytail: run properties only; text hidden
-# by a character style, and white or background-coloured text, are known gaps (docs/SECURITY.md).
+# or shrunk by a style or document default, and white or background-coloured text, are known gaps
+# (docs/SECURITY.md).
 _HIDDEN_RUNS = (
     './/w:r[w:rPr/w:vanish[not(@w:val) or not(@w:val="0" or @w:val="false" or @w:val="off")]'
-    " or w:rPr/w:sz[number(@w:val) < 2]]"
+    " or w:rPr/w:sz[number(@w:val) < 2] or w:rPr/w:szCs[number(@w:val) < 2]"
+    ' or w:rPr/w:sz[@w:val and string(number(@w:val))="NaN"]]'
 )
 _SHEET_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 
@@ -69,7 +71,7 @@ def hidden_rows(ws: Any) -> set[int]:
                 data = el
             elif event == "end" and el.tag == _SHEET_NS + "row":
                 n = int(float(el.get("r") or n + 1))
-                if el.get("hidden") in ("1", "true"):
+                if el.get("hidden") in ("1", "true") or float(el.get("ht") or 1) == 0:  # ht 0: zero height
                     hidden.add(n)
                 if data is not None:
                     data.clear()

@@ -48,8 +48,12 @@ def _visual_lines(pdf: pdfium.PdfDocument) -> list[Visual]:
                     i = start + len(part) - len(part.lstrip())
                     size = round(pdfium_c.FPDFText_GetFontSize(textpage.raw, i), 1) if exact else 0.0
                     bottom = textpage.get_charbox(i, loose=True)[1] if exact else 0.0
+                    # the size on the page: the font size times the text matrix and CTM scale (Tf is not it)
+                    m = pdfium_c.FS_MATRIX()
+                    pdfium_c.FPDFText_GetMatrix(textpage.raw, i, m)
+                    shown = pdfium_c.FPDFText_GetFontSize(textpage.raw, i) * abs(m.a * m.d - m.b * m.c) ** 0.5
                     # ponytail: the line's first character only; a tiny phrase inside a readable line is a gap
-                    if not (exact and size < MIN_SIZE):
+                    if not (exact and shown < MIN_SIZE):
                         out.append(Visual(part.strip(), size, bottom, number))
                 start += len(part) + 2
         finally:

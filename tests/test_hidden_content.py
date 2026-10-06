@@ -70,6 +70,46 @@ def test_pdf_text_under_one_point_is_never_read() -> None:
     assert SEEN in text and HIDDEN not in text
 
 
+def _pdf_stream(stream: str) -> bytes:
+    objs = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
+        "/Resources << /Font << /F1 5 0 R >> >> >>",
+        f"<< /Length {len(stream)} >>\nstream\n{stream}\nendstream",
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out = b"%PDF-1.4\n"
+    offsets = []
+    for n, o in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += f"{n} 0 obj\n{o}\nendobj\n".encode()
+    xref = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
+    out += b"".join(f"{o:010d} 00000 n \n".encode() for o in offsets)
+    return out + f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF".encode()
+
+
+@pytest.mark.parametrize(
+    ("op", "kept"),
+    [
+        ("/F1 12 Tf 0.05 0 0 0.05 20 700 Tm", False),  # 0.6 pt on the page though Tf says 12
+        ("/F1 0.5 Tf 40 0 0 40 20 700 Tm", True),  # 20 pt on the page though Tf says 0.5
+        ("/F1 12 Tf 3 Tr 20 700 Td", True),  # invisible render mode: an OCR'd scan's text layer
+    ],
+)
+def test_pdf_size_is_what_the_page_shows(op: str, kept: bool) -> None:
+    stream = f"BT /F1 12 Tf 20 600 Td ({SEEN}) Tj ET BT {op} ({HIDDEN}) Tj ET"
+    text = _text("report.pdf", _pdf_stream(stream))
+    assert SEEN in text and (HIDDEN in text) is kept
+
+
+def test_openpyxl_still_has_the_private_reader_hidden_rows_uses() -> None:
+    from openpyxl.worksheet._read_only import ReadOnlyWorksheet
+
+    assert hasattr(ReadOnlyWorksheet, "_get_source")
+
+
 def _workbook() -> bytes:
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -82,19 +122,30 @@ def _workbook() -> bytes:
     ]:
         ws.append(row)
     ws.row_dimensions[3].hidden = True
+    ws.append(["zero-height-system", "y", "2026-09-04"])
+    ws.row_dimensions[5].height = 1  # openpyxl omits ht="0"; patched into the XML below
     secret = wb.create_sheet("Notes")
     secret.append(["Note", "Text"])
     secret.append(["n1", "hidden-sheet-text"])
     secret.sheet_state = "hidden"
     out = io.BytesIO()
     wb.save(out)
-    return out.getvalue()
+    patched = io.BytesIO()
+    with zipfile.ZipFile(out) as zin, zipfile.ZipFile(patched, "w") as zout:
+        for info in zin.infolist():
+            body = zin.read(info.filename)
+            zout.writestr(
+                info, body.replace(b'ht="1"', b'ht="0"') if info.filename.endswith("sheet1.xml") else body
+            )
+    return patched.getvalue()
 
 
 def test_hidden_rows_and_sheets_of_an_evidence_workbook_are_never_read() -> None:
     text = _text("access-review.xlsx", _workbook())
     assert "System: billing" in text and "System: crm" in text
-    assert "hidden-system" not in text and "hidden-sheet-text" not in text
+    assert (
+        "hidden-system" not in text and "zero-height-system" not in text and "hidden-sheet-text" not in text
+    )
 
 
 def test_a_hidden_questionnaire_row_is_not_a_question() -> None:
