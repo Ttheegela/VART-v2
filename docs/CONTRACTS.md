@@ -266,3 +266,7 @@ change-log line; changing or removing a path, a field or a status needs the lead
   model budget (429) sets `stepped_at` to the end of its Retry-After, so a run waiting on it is not closed
   (preflight I5); a step never writes into a run closed since it read it; `reopen_changed` (Check again) sets
   `stepped_at`. The UI says why a closed run stopped. No prompt or label rule changes.
+- 2026-10-07: Plan 4 Task 6 (ingest behaviour; no signature, path, field or status changed): text a reader cannot
+  see is never a line: docx runs marked hidden (w:vanish) or under 1 pt, PDF lines whose first character is under
+  1 pt, hidden sheets and hidden rows of an uploaded workbook. Hidden rows of a questionnaire are blanked, so they
+  are never items. The bundled sample data has none, so no stored line, prompt or label moves.
