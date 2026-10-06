@@ -279,3 +279,124 @@ def test_another_workspaces_run_is_not_found(s: Session) -> None:
     s.commit()
     with pytest.raises(NotFound):
         runs.step(s, other.id, run.id, _llm(), MODELS)
+
+
+def _attempts(s: Session) -> list[int]:
+    s.expire_all()
+    return list(s.scalars(select(RunItem.attempts)))
+
+
+def test_refused_steps_do_not_burn_attempts(s: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Review C1: a released claim used to keep its attempt, so 3 refusals condemned the items untried.
+    ws, q = _questionnaire(s, n=4)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    monkeypatch.setitem(llm_budget.CAPS, "stance", 0)
+    for _ in range(runs.MAX_ATTEMPTS + 1):
+        with pytest.raises(BudgetExhausted):
+            runs.step(s, ws.id, run.id, _llm(), MODELS)
+    assert _attempts(s) == [0, 0, 0, 0]
+    monkeypatch.setitem(llm_budget.CAPS, "stance", 150)
+    llm = _llm()
+    assert len(runs.step(s, ws.id, run.id, llm, MODELS)) == 4
+    assert len(llm.requests) == 8 and set(s.scalars(select(Answer.label))) == {"verified"}
+
+
+def test_deadline_releases_do_not_burn_attempts(s: Session) -> None:
+    ws, q = _questionnaire(s, n=1)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    for _ in range(runs.MAX_ATTEMPTS + 1):
+        ticks = iter([0.0, runs.DEADLINE_S + 1])
+        assert runs.step(s, ws.id, run.id, _llm(), MODELS, clock=ticks.__next__) == []
+    assert _attempts(s) == [0]
+    assert s.scalars(select(RunItem.state)).one() == "pending"
+    llm = _llm()
+    runs.step(s, ws.id, run.id, llm, MODELS)
+    assert len(llm.requests) == 2 and s.scalars(select(Answer.label)).one() == "verified"
+
+
+def test_the_cost_of_a_missing_recording_is_still_written(s: Session) -> None:
+    ws, q = _questionnaire(s, n=1)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    replies = iter([STANCE])
+
+    class Miss(ByStepLLM):
+        def complete(self, req: LLMRequest) -> LLMResult:
+            if req.step == "stance":
+                return LLMResult(next(replies), 10, 5, 0.02)
+            raise ReplayMiss("draft: no recording")
+
+    with pytest.raises(ReplayMiss):
+        runs.step(s, ws.id, run.id, Miss({}), MODELS)
+    s.refresh(run)
+    assert run.cost_usd == Decimal("0.0200")
+
+
+def test_the_cost_of_a_refused_step_is_still_written(s: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    ws, q = _questionnaire(s, n=2)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    monkeypatch.setitem(llm_budget.CAPS, "stance", 1)
+    with pytest.raises(BudgetExhausted):
+        runs.step(s, ws.id, run.id, _llm(cost=0.01), MODELS)
+    s.refresh(run)
+    assert run.cost_usd == Decimal("0.0200")  # item 1: stance and draft; item 2 refused
+
+
+class _Status(Exception):
+    status_code = 401
+
+
+def test_a_client_error_is_not_retried(s: Session) -> None:
+    ws, q = _questionnaire(s, n=1)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    err = LLMError("stance: AuthenticationError")
+    err.__cause__ = _Status()
+    llm = ByStepLLM({"stance": err})
+    runs.step(s, ws.id, run.id, llm, MODELS)
+    assert len(llm.requests) == 1 and s.scalars(select(Answer.text)).one() == runs.FAILED_TEXT
+
+
+def test_a_server_error_is_retried(s: Session) -> None:
+    ws, q = _questionnaire(s, n=1)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    err = LLMError("stance: InternalServerError")
+    cause = _Status()
+    cause.status_code = 503
+    err.__cause__ = cause
+    llm = ByStepLLM({"stance": err})
+    runs.step(s, ws.id, run.id, llm, MODELS)
+    assert len(llm.requests) == 2
+
+
+def test_an_unexpected_error_keeps_the_cost_already_spent(s: Session) -> None:
+    ws, q = _questionnaire(s, n=1)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+
+    class Boom(ByStepLLM):
+        def complete(self, req: LLMRequest) -> LLMResult:
+            if req.step == "draft":
+                raise RuntimeError("boom")
+            return LLMResult(STANCE, 10, 5, 0.02)
+
+    with pytest.raises(RuntimeError):
+        runs.step(s, ws.id, run.id, Boom({}), MODELS)
+    s.refresh(run)
+    assert run.cost_usd == Decimal("0.0200")
+    assert s.scalars(select(RunItem.state)).one() == "claimed"  # its attempt stays counted
+
+
+def test_a_failed_answer_write_keeps_the_cost_already_spent(
+    s: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws, q = _questionnaire(s, n=1)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    real = runs._write
+
+    def bad(session, ws_id, run_id, item_id, values, cost):  # type: ignore[no-untyped-def]
+        session.execute(text("select 1/0"))
+
+    monkeypatch.setattr(runs, "_write", bad)
+    with pytest.raises(Exception, match="division by zero"):
+        runs.step(s, ws.id, run.id, _llm(cost=0.01), MODELS)
+    monkeypatch.setattr(runs, "_write", real)
+    s.refresh(run)
+    assert run.cost_usd == Decimal("0.0200")

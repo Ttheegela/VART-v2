@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -124,9 +124,17 @@ def _release(session: Session, run_id: uuid.UUID, item_ids: list[uuid.UUID]) -> 
         session.execute(
             update(RunItem)
             .where(RunItem.run_id == run_id, RunItem.item_id.in_(item_ids), RunItem.state == "claimed")
-            .values(state="pending", claimed_at=None)
+            # the claim counted an attempt, but a released item was never tried: give it back (review C1)
+            .values(state="pending", claimed_at=None, attempts=func.greatest(RunItem.attempts - 1, 0))
         )
     session.commit()
+
+
+def _retryable(exc: LLMError) -> bool:
+    """Transport errors, 5xx and a reply that fails the schema repeat rarely; a 4xx (bad key, no credit, bad
+    request) repeats every time and would spend a second unit of budget for nothing."""
+    status = getattr(exc.__cause__, "status_code", None)
+    return not (isinstance(status, int) and 400 <= status < 500)
 
 
 def _answer(
@@ -143,7 +151,9 @@ def _answer(
         return answer_item(session, workspace_id, item, llm, models, spend)
     except (ReplayMiss, BudgetExhausted):
         raise
-    except LLMError:
+    except LLMError as exc:
+        if not _retryable(exc):
+            raise
         session.rollback()
         return answer_item(session, workspace_id, item, llm, models, spend)
 
@@ -193,6 +203,16 @@ def _write(
     )
     _add_cost(session, run_id, cost)
     session.commit()
+
+
+def _keep_cost(
+    session: Session, run_id: uuid.UUID, cost: float, unstarted: list[tuple[uuid.UUID, int]]
+) -> None:
+    """An unexpected error: the calls already paid for still count. The item that failed stays claimed with
+    its attempt counted (a crash loop ends at MAX_ATTEMPTS); the items not yet started go back."""
+    session.rollback()
+    _add_cost(session, run_id, cost)
+    _release(session, run_id, [i for i, _ in unstarted])  # commits
 
 
 def _finish_if_done(session: Session, run: Run) -> None:
@@ -269,7 +289,15 @@ def step(
             session.rollback()  # triage row 24: a failed transaction must not swallow the next write
             log.exception("run %s item %s: database error; answered as failed", run_id, item_id)
             values = FAILED
-        _write(session, workspace_id, run_id, item_id, values, meter.take())
+        except Exception:
+            _keep_cost(session, run_id, meter.take(), claimed[n + 1 :])
+            raise
+        cost = meter.take()
+        try:
+            _write(session, workspace_id, run_id, item_id, values, cost)
+        except Exception:
+            _keep_cost(session, run_id, cost, claimed[n + 1 :])
+            raise
         answered.append(item_id)
     _finish_if_done(session, run)
     return answered
