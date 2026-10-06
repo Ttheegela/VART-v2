@@ -1,5 +1,8 @@
+import json
 import uuid
 from collections import Counter
+from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 
@@ -84,3 +87,38 @@ def test_an_outcome_is_asked_as_its_question_with_its_category_as_topic() -> Non
     assert csf.item_input(o) == ItemInput("PR.DS-01", o.question, "Data Security")
     with pytest.raises(ValueError, match="no question"):
         csf.item_input(_one("not_checked"))
+
+
+def _load_edited(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, edit: Callable[[list[dict]], None]) -> None:
+    raw = json.loads(csf.DATA.read_text(encoding="utf-8"))
+    edit(raw["outcomes"])
+    bad = tmp_path / "csf.json"
+    bad.write_text(json.dumps(raw), encoding="utf-8")
+    monkeypatch.setattr(csf, "DATA", bad)
+    csf.framework.cache_clear()
+
+
+@pytest.mark.parametrize(
+    ("edit", "msg"),
+    [
+        (lambda os: os[0].update(tier="chekced"), "GV.OC-01: unknown tier"),
+        (
+            lambda os: os[0].update(tier="checked", question=None),
+            "GV.OC-01: a checked outcome needs a question",
+        ),
+        (lambda os: os[0].update(tier="ask", question="  "), "GV.OC-01: a ask outcome needs a question"),
+        (lambda os: os[1].update(id=os[0]["id"]), "GV.OC-01: duplicate id"),
+        (lambda os: os[0].update(id="GV.OC-1"), "not a CSF outcome id"),
+        (lambda os: os[0].update(function="Govren"), "GV.OC-01: unknown function"),
+    ],
+)
+def test_the_loader_rejects_a_bad_data_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, edit: Callable[[list[dict]], None], msg: str
+) -> None:
+    try:
+        _load_edited(monkeypatch, tmp_path, edit)
+        with pytest.raises(ValueError, match=msg):
+            csf.framework()
+    finally:
+        monkeypatch.undo()
+        csf.framework.cache_clear()

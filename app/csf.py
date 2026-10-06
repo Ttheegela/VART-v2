@@ -3,6 +3,7 @@ mapping over decide's output (decide itself does not change).
 data/csf/csf-2.0.json is built and drift-tested by datakit/csf.py; the app only reads it."""
 
 import json
+import re
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
@@ -27,6 +28,8 @@ GAP_WORDS: dict[str, str] = {
     "not_answered": "Not answered",
 }
 NOT_CHECKED = "not checked in this version"
+FUNCTIONS = ("Govern", "Identify", "Protect", "Detect", "Respond", "Recover")
+_ID = re.compile(r"[A-Z]{2}\.[A-Z]{2}-\d{2}")
 _CHECKED: dict[tuple[str, str | None], GapLabel] = {  # CSF spec 5.3
     ("verified", "Yes"): "covered",
     ("partial", "Partial"): "partly_covered",
@@ -58,6 +61,23 @@ class Framework:
         return {o.id: o for o in self.outcomes}[csf_id]
 
 
+def _validate(outcomes: tuple[Outcome, ...]) -> None:
+    """Fail loudly on a hand-edited data file: the cached loader is trusted all process long."""
+    seen: set[str] = set()
+    for o in outcomes:
+        if not _ID.fullmatch(o.id):
+            raise ValueError(f"{o.id!r}: not a CSF outcome id")
+        if o.id in seen:
+            raise ValueError(f"{o.id}: duplicate id")
+        seen.add(o.id)
+        if o.function not in FUNCTIONS:
+            raise ValueError(f"{o.id}: unknown function {o.function!r}")
+        if o.tier not in get_args(Tier):
+            raise ValueError(f"{o.id}: unknown tier {o.tier!r}")
+        if o.tier != "not_checked" and not (o.question and o.question.strip()):
+            raise ValueError(f"{o.id}: a {o.tier} outcome needs a question")
+
+
 @cache
 def framework() -> Framework:
     raw = json.loads(DATA.read_text(encoding="utf-8"))
@@ -74,6 +94,7 @@ def framework() -> Framework:
         )
         for o in raw["outcomes"]
     )
+    _validate(outcomes)
     return Framework(raw["csf_version"], raw["retrieved"], outcomes)
 
 
