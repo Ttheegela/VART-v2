@@ -3,12 +3,13 @@ import json
 import uuid
 from collections.abc import Iterator
 from dataclasses import replace
+from datetime import date
 
 import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from app import csf
+from app import csf, runs
 from app.contracts import (
     BudgetExhausted,
     Citation,
@@ -229,3 +230,38 @@ def test_a_refused_stance_budget_stops_the_outcome_after_the_parts_it_paid_for(
     with pytest.raises(BudgetExhausted):
         csf.check_outcome(s, ws, _two_parts(), llm, MODELS, spender(s, ws))
     assert [q.step for q in llm.requests] == ["stance"]
+
+
+def test_a_stored_part_rebuilds_to_the_same_decision_and_explanation() -> None:
+    o = _outcome(4)
+    parts = [_part(1, "covered"), _part(2, "documents_disagree"), _part(3, "not_met"), _part(4, "gap")]
+    d = parts[1].decision
+    assert d.conflict is not None  # a dated side survives the JSON round trip
+    side = replace(d.conflict.sides[0], date=date(2026, 9, 15))
+    parts[1] = replace(
+        parts[1], decision=replace(d, conflict=replace(d.conflict, sides=(side, d.conflict.sides[1])))
+    )
+    stored = [
+        json.loads(json.dumps({"question": q, **runs._raw(r)})) for q, r in zip(o.parts, parts, strict=True)
+    ]
+    rebuilt = [csf.part_result(o, n, raw) for n, raw in enumerate(stored, 1)]
+    assert [r.decision for r in rebuilt] == [r.decision for r in parts]
+    assert [r.item for r in rebuilt] == list(csf.part_inputs(o))
+    assert csf.aggregate(o, rebuilt).decision == csf.aggregate(o, parts).decision
+    assert csf.aggregate(o, rebuilt).draft.text == csf.aggregate(o, parts).draft.text
+
+
+def test_check_part_runs_one_part_alone(s: Session) -> None:
+    ws = _incident_policy(s)
+    llm = FakeLLM([_stance("yes")])
+    r = csf.check_part(s, ws, _two_parts(), 2, llm, MODELS, spender(s, ws))
+    assert [(q.step, q.item_id) for q in llm.requests] == [("stance", "RS.AN-03#2")]
+    assert csf.part_label(r) == "covered"
+
+
+def test_the_current_mapping_names_the_scope_and_its_data() -> None:
+    m = csf.current_mapping("recover")
+    assert (m["csf_version"], m["retrieved"], m["scope"]) == ("2.0", "2026-10-05", "recover")
+    assert m["digest"] != csf.current_mapping("core")["digest"]
+    with pytest.raises(ValueError, match="unknown scope"):
+        csf.current_mapping("everything")
