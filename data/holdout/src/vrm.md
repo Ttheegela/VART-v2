@@ -6,7 +6,7 @@ Scope: this policy applies to vendors and contractors who supply services to Mar
 
 ## Supplier Assessment
 
-Every vendor with access to customer data is assessed for security risk at least once a year.
+Marrowgate assesses the security risk of each vendor at least once a year.
 
 Marrowgate publishes its subprocessor list and gives customers 45 days' notice before adding a subprocessor.
 

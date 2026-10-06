@@ -110,7 +110,7 @@ controls:
   - {id: central-logging, topic: Logging, truth: "Grafana Loki"}
   - {id: alerting, topic: Logging, truth: "PagerDuty on-call alerting"}
   # Assets
-  - {id: asset-inventory, topic: Assets, truth: "Inventory (draft asset policy only)"}
+  - {id: asset-inventory, topic: Assets, truth: "Inventory kept in the infrastructure register (and named in the draft asset policy)"}
   - {id: cloud-only, topic: Assets, truth: "SOC 2 says all production in AWS; a Dublin office NAS was added in August"}
   # Engagement: nothing here is answered by a document
   - {id: cyber-insurance, topic: Engagement, truth: "(not in any document)"}
@@ -217,7 +217,7 @@ statements:
     doc: acp
     control: password-standard
     stance: yes
-    text: "Passwords for workforce accounts must be at least 16 characters long."
+    text: "Every account that signs in with a password, for staff and for customers, must use a password of at least 16 characters."
   - id: faq-customer-sso
     doc: faq
     control: customer-sso
@@ -407,7 +407,7 @@ statements:
     doc: hrp
     control: developer-training
     stance: yes
-    text: "Developers complete secure coding training every year that covers injection, cross-site scripting and authorization flaws."
+    text: "Developers complete secure coding training every year that covers authorization bypass, session management, injection, cross-site scripting and cross-site request forgery."
   # Incident response
   - id: irp-plan
     doc: irp
@@ -439,7 +439,7 @@ statements:
     doc: vrm
     control: vendor-assessment
     stance: yes
-    text: "Every vendor with access to customer data is assessed for security risk at least once a year."
+    text: "Marrowgate assesses the security risk of each vendor at least once a year."
   - id: tmpl-vendor-assessment
     doc: tmpl
     control: vendor-assessment
@@ -499,6 +499,11 @@ statements:
     control: cloud-only
     stance: yes
     text: "All production infrastructure is hosted in Amazon Web Services."
+  - id: ainv-inventory
+    doc: ainv
+    control: asset-inventory
+    stance: yes
+    text: "Asset: marrowgate-prod; Type: AWS account; Location: AWS eu-west-1; Owner: Tobias Achterberg; Data: Production workloads; Added: 2025-02-10"
   - id: ainv-nas-cloud
     doc: ainv
     control: cloud-only

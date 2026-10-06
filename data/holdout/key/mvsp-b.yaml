@@ -166,7 +166,7 @@ items:
   must_ask: false
   evidence:
   - doc: acp
-    quote: Passwords for workforce accounts must be at least 16 characters long.
+    quote: Every account that signs in with a password, for staff and for customers, must use a password of at least 16 characters.
     stance: 'yes'
   conflict_trap: null
   scope_note_expected: false
@@ -260,8 +260,8 @@ items:
   must_ask: false
   evidence:
   - doc: hrp
-    quote: Developers complete secure coding training every year that covers injection, cross-site scripting and authorization
-      flaws.
+    quote: Developers complete secure coding training every year that covers authorization bypass, session management, injection,
+      cross-site scripting and cross-site request forgery.
     stance: 'yes'
   conflict_trap: null
   scope_note_expected: false

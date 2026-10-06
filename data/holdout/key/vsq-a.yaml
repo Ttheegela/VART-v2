@@ -179,7 +179,7 @@ items:
   must_ask: false
   evidence:
   - doc: acp
-    quote: Passwords for workforce accounts must be at least 16 characters long.
+    quote: Every account that signs in with a password, for staff and for customers, must use a password of at least 16 characters.
     stance: 'yes'
   conflict_trap: null
   scope_note_expected: false
@@ -684,8 +684,8 @@ items:
   must_ask: false
   evidence:
   - doc: hrp
-    quote: Developers complete secure coding training every year that covers injection, cross-site scripting and authorization
-      flaws.
+    quote: Developers complete secure coding training every year that covers authorization bypass, session management, injection,
+      cross-site scripting and cross-site request forgery.
     stance: 'yes'
   conflict_trap: null
   scope_note_expected: false
@@ -741,7 +741,7 @@ items:
   must_ask: false
   evidence:
   - doc: vrm
-    quote: Every vendor with access to customer data is assessed for security risk at least once a year.
+    quote: Marrowgate assesses the security risk of each vendor at least once a year.
     stance: 'yes'
   conflict_trap: null
   scope_note_expected: false
@@ -836,12 +836,16 @@ items:
   traps: []
   fills: []
 - code: VSQ-56
-  expected_label: partial
-  expected_value: Partial
+  expected_label: verified
+  expected_value: 'Yes'
   must_ask: false
   evidence:
   - doc: amp
     quote: Marrowgate maintains an inventory of its information assets.
+    stance: 'yes'
+  - doc: ainv
+    quote: 'Asset: marrowgate-prod; Type: AWS account; Location: AWS eu-west-1; Owner: Tobias Achterberg; Data: Production
+      workloads; Added: 2025-02-10'
     stance: 'yes'
   conflict_trap: null
   scope_note_expected: false

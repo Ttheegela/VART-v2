@@ -12,7 +12,7 @@ All employees complete security awareness training when they join and every year
 
 ## Engineering Staff
 
-Developers complete secure coding training every year that covers injection, cross-site scripting and authorization flaws.
+Developers complete secure coding training every year that covers authorization bypass, session management, injection, cross-site scripting and cross-site request forgery.
 
 ## Leaving
 

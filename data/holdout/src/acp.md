@@ -22,7 +22,7 @@ Every internal system is accessed through Microsoft Entra ID single sign-on (SSO
 
 Multi-factor authentication (MFA) is required for every internal system.
 
-Passwords for workforce accounts must be at least 16 characters long.
+Every account that signs in with a password, for staff and for customers, must use a password of at least 16 characters.
 
 ### Authorization and Leavers
 
