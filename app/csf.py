@@ -15,11 +15,22 @@ from typing import Literal, get_args
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.contracts import ItemInput, ItemLabel, ItemResult, OpenItem, QueueEntry, Spend, Value
+from app.contracts import (
+    Dropped,
+    ItemInput,
+    ItemLabel,
+    ItemResult,
+    OpenItem,
+    QueueEntry,
+    Retrieval,
+    Spend,
+    Value,
+)
 from app.db.models import Item, Questionnaire, Workspace
 from app.interview import plan_queue
 from app.llm.client import LLMClient
-from app.pipeline import answer_item
+from app.pipeline import answer_retrieved
+from app.retrieve import retrieve
 
 DATA = Path(__file__).resolve().parent.parent / "data" / "csf" / "csf-2.0.json"
 Tier = Literal["checked", "ask", "not_checked"]
@@ -190,6 +201,19 @@ def questionnaire_for(session: Session, workspace_id: uuid.UUID, scope: str) -> 
     return q
 
 
+def evidence(session: Session, workspace_id: uuid.UUID, o: Outcome) -> Retrieval:
+    """What a Checked outcome is judged on (Ruling 9, spec 5.3 "checked against documents"): its retrieval
+    without the visitor's stored answers, each dropped with reason 'statement' before any model sees it. An
+    answer reaches a Checked outcome only as a suggestion the visitor accepts (Plan 6B)."""
+    item = item_input(o)
+    r = retrieve(session, workspace_id, item.question, item.topic)
+    said = [p for p in r.passages if p.doc.kind == "statement"]
+    return Retrieval(
+        tuple(p for p in r.passages if p.doc.kind != "statement"),
+        r.dropped + tuple(Dropped(p.chunk_id, p.doc.id, p.doc.filename, "statement") for p in said),
+    )
+
+
 def check_outcome(
     session: Session,
     workspace_id: uuid.UUID,
@@ -198,11 +222,15 @@ def check_outcome(
     models: Mapping[str, str],
     spend: Spend,
 ) -> ItemResult | None:
-    """One outcome of a gap-check run (CSF spec 5.2-5.5). Checked: answer_item unchanged (it spends before
-    each model call and holds no transaction across one). Ask me: None, with no retrieval and no model call;
-    the visitor answers it through ask_queue and store_statement. Not checked: never part of a run."""
+    """One outcome of a gap-check run (CSF spec 5.2-5.5). Checked: the ordinary pipeline (it spends before
+    each model call and holds no transaction across one) on documents only (`evidence`). Ask me: None, with
+    no retrieval and no model call; the visitor answers it through ask_queue and store_statement. Not checked:
+    never part of a run."""
     if o.tier == "checked":
-        return answer_item(session, workspace_id, item_input(o), llm, models, spend)
+        item = item_input(o)
+        return answer_retrieved(
+            session, workspace_id, item, evidence(session, workspace_id, o), llm, models, spend
+        )
     if o.tier == "ask":
         return None
     raise ValueError(f"{o.id} is {NOT_CHECKED}")

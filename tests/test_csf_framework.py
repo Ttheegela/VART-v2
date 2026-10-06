@@ -257,3 +257,26 @@ def test_ask_me_outcomes_are_queued_once_and_an_answer_confirms_them(s: Session)
     lines = s.scalars(select(DocumentLine.text).where(DocumentLine.document_id == doc.id)).all()
     assert doc.kind == "statement" and "Dana Ortiz" not in " ".join(lines)  # redacted before storage
     assert csf.gap_label(o, "user_confirmed", None, doc.id) == "confirmed_by_you"
+
+
+def test_a_checked_outcome_is_judged_on_documents_never_on_a_stored_answer(s: Session) -> None:
+    """Ruling 9: a visitor's Ask-me answer about the same topic is no evidence for a Checked outcome; its
+    passage is dropped before stance, reason 'statement'. (It reaches Checked outcomes only as a 6B
+    suggestion.)"""
+    ws = f.workspace(s)
+    s.commit()
+    statement = store_statement(
+        s,
+        ws.id,
+        "All customer data at rest is encrypted with AES-256 in our vendor portal.",
+        filename="answer-GV.SC-01.txt",
+        today=date(2026, 10, 5),
+    )
+    quote = "All customer data at rest is encrypted with AES-256 in our vendor portal."
+    stance = json.dumps({"passages": [{"passage": 1, "stance": "yes", "quote": quote, "note": "states it"}]})
+    llm = FakeLLM([stance, json.dumps({"text": f'Yes. "{quote}"'})])
+    o = csf.framework().get("PR.DS-01")
+    r = csf.check_outcome(s, ws.id, o, llm, MODELS, spender(s, ws.id))
+    assert r is not None and r.decision.citations == () and r.retrieval.passages == ()
+    assert [(d.document_id, d.reason) for d in r.decision.dropped] == [(str(statement.id), "statement")]
+    assert csf.gap_label(o, r.decision.label, r.decision.value) == "gap" and llm.requests == []

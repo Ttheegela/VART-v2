@@ -1,6 +1,7 @@
 import io
 import time
 from datetime import date
+from typing import Any
 
 import docx
 import openpyxl
@@ -253,3 +254,12 @@ def test_a_keyed_secret_of_any_shape_is_redacted(text: str) -> None:
 def test_a_key_body_right_after_an_equals_sign_is_redacted(text: str) -> None:
     # adversary-3 re-review N2: the PEM-row lookbehind excluded '='
     assert redact_text(text).endswith("=<SECRET>")
+
+
+@pytest.mark.parametrize("redact", [redact_text, lambda t: redact_lines([Line(t)])[0].text])
+def test_a_name_found_once_is_redacted_again_on_its_own_in_the_same_text(redact: Any) -> None:
+    text = "Dana Ortiz owns the program; Ortiz signs off and you can reach Dana by phone."
+    assert (
+        redact(text) == "<PERSON> owns the program; <PERSON> signs off and you can reach <PERSON> by phone."
+    )
+    assert redact("You can reach Dana by phone.") == "You can reach Dana by phone."  # alone: a known gap

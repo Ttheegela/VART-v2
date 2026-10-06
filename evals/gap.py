@@ -6,6 +6,7 @@ unanswered), scored against data/dev/key/csf-core.yaml. `python -m evals.run --p
 Every gate fails closed (None) when it has nothing to measure, like the questionnaire gates."""
 
 import json
+import re
 import statistics
 import uuid
 from dataclasses import dataclass
@@ -26,6 +27,7 @@ from app.llm.client import LLMClient
 from app.stance import PROMPT_VERSION as STANCE_PROMPT
 from datakit import csf as csf_data
 from datakit import gap as gap_data
+from datakit.extract import text_of
 from datakit.schemas import Facts, GapFacts, Key, KeyItem, load_yaml
 from evals import pack as packs
 from evals import score
@@ -37,7 +39,11 @@ ANSWERS = ROOT / "evals" / "fixtures" / "gap-dev-answers.json"
 # Fixed, so stored statements never change with the clock; separate from evals.run's on purpose, so the dev
 # pack's recordings and this pack's never depend on each other.
 STATEMENT_DATE = date(2026, 10, 5)
-SECRETS = ("sk9Kestrel2026xQ",)  # the fake API key planted in the fixture's supply-chain answer
+# The fake API key planted in the fixture's supply-chain answer, built from parts so the literal lives only in
+# the files the scoped gitleaks allowlist names.
+SECRETS = ("sk9Kestrel" + "2026xQ",)
+VISITOR = ("Tomas Brandt",)  # a person only the answers name: in no dev document, so no request may hold it
+PHONE = re.compile(r"\+\d[\d ]{8,}\d")
 GATES: dict[str, tuple[str, float]] = {
     "cited_coverage": (">=", 1.0),
     "trap_coverage": ("<=", 0.0),
@@ -47,6 +53,7 @@ GATES: dict[str, tuple[str, float]] = {
     "nist_text_intact": (">=", 1.0),
     "honest_tiers": (">=", 1.0),
     "redaction_private_leaks": ("<=", 0.0),
+    "statements_as_evidence": ("<=", 0.0),  # Ruling 9: a Checked outcome is judged on documents only
 }
 
 
@@ -59,6 +66,9 @@ class GapPack:
     keys: dict[str, KeyItem]  # Checked CSF id -> key entry
     nist: dict[str, dict[str, Any]]  # CSF id -> NIST's fields, from the committed extract of NIST's export
     tiers: dict[str, str]  # CSF id -> tier (data/csf/tiers.yaml through the built file)
+    answers: dict[str, str]  # Ask-me CSF id -> the visitor's answer (the fixture); the rest stay unanswered
+    private: tuple[str, ...]  # private strings of the answers: names, name words, emails, phones, secrets
+    unseen: frozenset[str]  # those no dev document holds: no model request may ever contain one
 
 
 @dataclass
@@ -70,22 +80,39 @@ class GapObserved:
     kinds: dict[str, str]  # statement documents.id -> kind as stored
     doc_ids: dict[str, str]  # fact-sheet document id -> documents.id
     stored: dict[str, list[str]]  # documents.id -> stored lines
-    leaks: int  # private strings found in stored statements or in model requests
-    private: int  # private strings planted in the Ask-me answers
     nist: dict[str, dict[str, Any]]  # CSF id -> NIST's fields as the app loaded and showed them
+    requests: list[str]  # the user text of every model request the run made
+    probe_kept: int  # after the answers were stored: statement passages a Checked outcome would be judged on
+    probe_seen: int  # ... and statement passages its retrieval found at all (kept or dropped)
 
 
 def load() -> GapPack:
     facts, gap = gap_data.load("dev")
     key = load_yaml(ROOT / "data" / "dev" / "key" / f"{gap_data.NAME}.yaml", Key)
+    dev = packs.load("dev")
+    merged = gap_data.merged(facts, gap)
+    tiers: dict[str, str] = {o.id: o.tier for o in csf.framework().outcomes}
+    answers: dict[str, str] = json.loads(ANSWERS.read_text(encoding="utf-8"))
+    if bad := sorted(set(answers) - {i for i, t in tiers.items() if t == "ask"}):  # a typo drops a plant
+        raise ValueError(f"{ANSWERS.name}: not an Ask-me outcome: {', '.join(bad)}")
+    text = " ".join(answers.values())
+    if lost := [s for s in (*VISITOR, *SECRETS) if s not in text]:
+        raise ValueError(f"{ANSWERS.name}: planted strings missing: {len(lost)}")
+    names = [n for n in (*(p.name for p in dev.facts.people), *VISITOR) if n in text]
+    private = {*names, *(w for n in names for w in n.split()), *PHONE.findall(text), *SECRETS}
+    private |= {s for s in dev.private_strings() if "@" in s and s in text}
+    documents = [text_of(gap_data.doc_path("dev", gap, d)) for d in merged.documents]
     return GapPack(
-        packs.load("dev"),
+        dev,
         gap,
-        gap_data.merged(facts, gap),
+        merged,
         {m.csf_id: m.control for m in gap.outcomes},
         {k.code: k for k in key.items},
         {o["id"]: o for o in csf_data.load()[0]["outcomes"]},
-        {o.id: o.tier for o in csf.framework().outcomes},
+        tiers,
+        answers,
+        tuple(sorted(private)),
+        frozenset(s for s in private if not any(s in d for d in documents)),
     )
 
 
@@ -103,7 +130,7 @@ def shown(o: csf.Outcome) -> dict[str, Any]:
 def run(llm: LLMClient, models: dict[str, str]) -> dict[str, Any]:
     pack = load()
     fw = csf.framework()
-    answers: dict[str, str] = json.loads(ANSWERS.read_text(encoding="utf-8"))
+    answers = pack.answers
     log = Log(llm)
     with Session(get_engine()) as session:
         ws = Workspace()
@@ -147,9 +174,19 @@ def run(llm: LLMClient, models: dict[str, str]) -> dict[str, Any]:
                         session, ws.id, answers[o.id], filename=f"answer-{o.id}.txt", today=STATEMENT_DATE
                     )
                     statements[o.id] = str(doc.id)
+            # Ruling 9 probe, no model call: what each Checked outcome would now be judged on
+            said = set(statements.values())
+            probe_kept = probe_seen = 0
+            for o in outcomes:
+                if o.tier == "checked":
+                    found = csf.evidence(session, ws.id, o)
+                    kept = sum(p.doc.id in said for p in found.passages)
+                    probe_kept += kept
+                    probe_seen += kept + sum(d.document_id in said for d in found.dropped)
             stored = _stored(session, ws.id)
             kinds = {sid: session.get_one(Document, uuid.UUID(sid)).kind for sid in statements.values()}
         finally:
+            session.rollback()  # a failed flush must not hide its cause behind PendingRollbackError
             session.execute(delete(Workspace).where(Workspace.id == ws.id))
             session.commit()
     labels: dict[str, str | None] = {}
@@ -161,12 +198,11 @@ def run(llm: LLMClient, models: dict[str, str]) -> dict[str, Any]:
             labels[o.id] = csf.gap_label(o, "user_confirmed", None, statements[o.id])
         else:
             labels[o.id] = csf.gap_label(o, None)
-    # sample documents name people legitimately; the visitor's answers must reach neither storage nor a model
-    private = [s for s in (*pack.dev.private_strings(), *SECRETS) if any(s in a for a in answers.values())]
-    leaks = _leaks(private, [x for sid in statements.values() for x in stored.get(sid, [])])
-    leaks += _leaks(SECRETS, [r.user for r in log.requests])
     nist = {o.id: shown(o) for o in fw.outcomes}
-    obs = GapObserved(results, labels, items, statements, kinds, doc_ids, stored, leaks, len(private), nist)
+    requests = [r.user for r in log.requests]
+    obs = GapObserved(
+        results, labels, items, statements, kinds, doc_ids, stored, nist, requests, probe_kept, probe_seen
+    )
     metrics = score_gap(pack, obs)
     steps = {"stance", "draft"} | {r.step for r in log.requests}  # an unexpected step (classify) shows here
     return {
@@ -220,19 +256,21 @@ def score_gap(pack: GapPack, obs: GapObserved) -> dict[str, float | None]:
         *score._citation_counts([obs.results[c].decision for c in shown_codes], obs.stored)
     )
 
-    # Trap coverage, counted per trap outcome. Judged by the fact sheet's truth, not the classifier's
-    # (decide drops what the classifier marked not evidence and caps an all-draft answer, so a misclassified
-    # template or draft gets past it): a shown citation of a template or of a document outside the fact sheet
-    # (an Ask-me statement, Ruling 1), and a Covered answer resting only on drafts, count too.
+    # Trap coverage: a count of bad events (not a ratio) over the trap outcomes and the expected Gaps, failing
+    # closed when there are none. Bad: a trap outcome shown Covered; an expected Gap shown Covered or Partly
+    # (a line the documents never meant for it); a Covered answer resting only on drafts; and any shown
+    # citation of a template. Judged by the fact sheet's truth, not the classifier's: decide drops what the
+    # classifier marked not evidence and caps an all-draft answer, so a misclassified document gets past it.
     specs = {obs.doc_ids[d.id]: d for d in pack.facts.documents if d.id in obs.doc_ids}
     traps = trap_outcomes(pack)
+    gaps = [c for c in pack.keys if want[c] == "gap"]
     bad = 0
     for c in shown_codes:
         cited = [specs.get(x.document_id) for x in obs.results[c].decision.citations]
-        bad += sum(s is None or not s.evidence_allowed for s in cited)
+        bad += sum(s is not None and not s.evidence_allowed for s in cited)
         drafts_only = bool(cited) and all(s is not None and s.status == "draft" for s in cited)
-        bad += got[c] == "covered" and (c in traps or drafts_only)
-    m["trap_coverage"] = score._count(bad, len(traps))
+        bad += (got[c] == "covered" and (c in traps or drafts_only)) or c in gaps
+    m["trap_coverage"] = score._count(bad, len({*traps, *gaps}))
 
     m["label_accuracy"] = score._gated(sum(got[c] == want[c] for c in pack.keys), len(pack.keys))
     for name, label in (("disagreements_caught", "documents_disagree"), ("stated_noncompliance", "not_met")):
@@ -245,8 +283,9 @@ def score_gap(pack: GapPack, obs: GapObserved) -> dict[str, float | None]:
     same = sum(i in pack.nist and obs.nist.get(i) == pack.nist[i] for i in ids)
     m["nist_text_intact"] = (0.0 if csf_data.check() else score._gated(same, len(ids))) if pack.nist else None
 
-    # Honest tiers: a not-checked outcome is no item, no result and no label; an Ask-me outcome is never sent
-    # through the engine and shows Confirmed by you only with a stored statement that holds lines
+    # Honest tiers: a not-checked outcome is no item, no result and no label. An Ask-me outcome is an item,
+    # never sent through the engine; the fixture says what it must show: Confirmed by you, backed by a stored
+    # statement that holds lines, when answered, else Not answered with no statement
     honest = cases = 0
     for oid, tier in pack.tiers.items():
         if tier == "not_checked":
@@ -254,12 +293,31 @@ def score_gap(pack: GapPack, obs: GapObserved) -> dict[str, float | None]:
             honest += oid not in obs.items and oid not in obs.results and obs.labels.get(oid) is None
         elif tier == "ask":
             cases += 1
-            sid = obs.statements.get(oid)
-            backed = sid is None or (obs.kinds.get(sid) == "statement" and bool(obs.stored.get(sid)))
-            shows = "confirmed_by_you" if sid is not None else "not_answered"
-            honest += obs.labels.get(oid) == shows and oid not in obs.results and backed
+            answered, sid = oid in pack.answers, obs.statements.get(oid)
+            backed = (
+                obs.kinds.get(sid) == "statement" and bool(obs.stored.get(sid))
+                if sid is not None
+                else not answered
+            )
+            shows = "confirmed_by_you" if answered else "not_answered"
+            honest += oid in obs.items and oid not in obs.results and obs.labels.get(oid) == shows and backed
     m["honest_tiers"] = score._gated(honest, cases)
-    m["redaction_private_leaks"] = score._count(obs.leaks, obs.private)
+
+    # Redaction: every private string of the stored answers (names, each word of a name, emails, phones, the
+    # key) is scanned in the stored statements; the ones no dev document holds are scanned in every model
+    # request too (sample documents name the dev pack's people legitimately). Nothing stored: None.
+    private = [
+        s for s in pack.private if any(s in pack.answers[o] for o in obs.statements if o in pack.answers)
+    ]
+    lines = [x for sid in obs.statements.values() for x in obs.stored.get(sid, [])]
+    leaks = _leaks(private, lines) + _leaks(sorted(pack.unseen), obs.requests)
+    m["redaction_private_leaks"] = score._count(leaks, len(private))
+
+    # Statements as evidence (Ruling 9): with the answers stored, no Checked outcome is judged on one (the
+    # probe) and no Checked answer cites one
+    said = set(obs.statements.values())
+    as_evidence = sum(x.document_id in said for r in obs.results.values() for x in r.decision.citations)
+    m["statements_as_evidence"] = score._count(obs.probe_kept + as_evidence, obs.probe_seen)
 
     recalls = [
         sum(score._found(obs.results[c], obs.doc_ids[e.doc], e.quote) is not None for e in k.evidence)

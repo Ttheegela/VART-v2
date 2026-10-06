@@ -205,9 +205,16 @@ def _person_results(texts: list[str]) -> list[list[Any]]:
 def _spans(text: str, people: list[Any]) -> list[tuple[int, int, str]]:
     found = [(m.start(), m.end(), label) for label, rx in _PATTERNS for m in rx.finditer(text)]
     # Presidio's EmailRecognizer would fetch the Public Suffix List over HTTP; emails are the regex above.
-    for r in people:
-        if _looks_like_a_name(text[r.start : r.end]):
-            found.append((r.start, r.end, "PERSON"))
+    names = [(r.start, r.end) for r in people if _looks_like_a_name(text[r.start : r.end])]
+    found += [(start, end, "PERSON") for start, end in names]
+    # a word of a name found in this text also names that person on its own ("Reach Dana at ...")
+    words = {
+        w for start, end in names for w in (x.strip(",.") for x in text[start:end].split()) if len(w) > 1
+    }
+    for w in words:
+        found += [
+            (m.start(), m.end(), "PERSON") for m in re.finditer(rf"(?<![\w-]){re.escape(w)}(?![\w-])", text)
+        ]
     kept: list[tuple[int, int, str]] = []
     for start, end, label in sorted(found, key=lambda s: (s[0], -s[1])):
         if not kept or start >= kept[-1][1]:

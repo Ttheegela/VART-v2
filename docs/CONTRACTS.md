@@ -17,7 +17,7 @@ the change log at the end, and a re-recording of the evals when a prompt or a la
 | stance | `app/stance.py` (2A) | `PROMPT_VERSION = "stance@p3"`; `user_prompt(item, passages) -> str`; `stance(llm, item, passages, model, step="stance") -> tuple[Stance, ...]` | yes |
 | decide | `app/decide.py` (2A) | `decide(passages, stances, dropped=()) -> Decision` | no |
 | draft | `app/draft.py` (2A) | `PROMPT_VERSION = "draft@p2"`; `plain_name(filename: str) -> str`; `user_prompt(item: ItemInput, decision: Decision) -> str`; `check(text, decision, documents) -> list[str]`; `template_answer(decision) -> str`; `write_draft(llm, item, decision, model, spend, documents) -> Draft` | yes |
-| pipeline | `app/pipeline.py` (2A) | `answer_item(session, workspace_id, item, llm, models, spend) -> ItemResult`; raises `BudgetExhausted` when `spend("stance")` is refused | via stance, draft |
+| pipeline | `app/pipeline.py` (2A) | `answer_item(session, workspace_id, item, llm, models, spend) -> ItemResult`; `answer_retrieved(session, workspace_id, item, retrieval, llm, models, spend) -> ItemResult` (answer_item after its retrieval); raises `BudgetExhausted` when `spend("stance")` is refused | via stance, draft |
 | interview | `app/interview.py` (2A) | `high_weight(topic) -> bool`; `plan_queue(items) -> list[QueueEntry]`; `follow_up(question, answer) -> str or None`; `recheck(session, workspace_id, statement_id, topic, items, llm, model, spend) -> list[Suggestion]` | recheck only |
 | budget | `app/services/llm_budget.py` | `spender(session, workspace_id) -> Spend` | no |
 
@@ -67,3 +67,7 @@ example `stances jsonb`); the passages are rebuilt from those chunks with the do
   quotation marks, no comment on a document's status. `check` now ignores trailing `,;:` inside quotation marks
   (round 2, Ruling 10: revised before acceptance from `,;:.`; still `draft@p2`).
   Signatures unchanged; re-record.
+- 2026-10-05: Plan 6A Task 6 fix round 1, lead Ruling 9 (CSF Checked outcomes are judged on documents only):
+  `DropReason` gains `"statement"`; `app.pipeline.answer_retrieved` is added (`answer_item` is now retrieve plus
+  `answer_retrieved`, behaviour and signature unchanged); `app.csf.check_outcome` drops statement passages before
+  stance. No prompt changes; no questionnaire label can change, so no re-recording.
