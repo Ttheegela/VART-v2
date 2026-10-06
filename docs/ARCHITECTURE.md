@@ -69,8 +69,8 @@ again. It is browser code over the sample run's stored answers, so it makes no r
 3. **Work at the same time.** Every claimed item (every not-yet-stored part of a claimed outcome) is one job, run by
    a pool of at most 8 workers. Each worker has its own database session and budget counter. A worker spends the
    budget before every model call and never holds a transaction open while a model runs. The budget counters are
-   single atomic statements, so concurrent workers cannot spend past a cap. The speed-up is measured in Task 9:
-   expected about 3 to 4 times faster than one item at a time (a 64-item run in about 3.5 minutes against about 11;
+   single atomic statements, so concurrent workers cannot spend past a cap. The speed-up is expected to be about 3 to 4 times
+   faster than one item at a time (a 64-item run in about 3.5 minutes against about 11;
    to be measured in Task 9).
 4. **Time limits.** `DEADLINE_S` (240 s) decides whether a job or a retry may start; `HARD_S` (270 s) bounds the whole
    step. A job still running at `HARD_S` is abandoned and its item goes back with its attempt counted, so a step always

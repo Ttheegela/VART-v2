@@ -12,3 +12,4 @@ def test_a_bare_openrouter_key_is_a_finding() -> None:
     assert rule.search(f'OPENROUTER_API_KEY="{fake}"')
     assert rule.search(f"key {fake} in a log line")
     assert not rule.search("sk-or-v1-tooshort")
+    assert not rule.search('"key": "' + "0123456789abcdef" * 4 + '"')  # a record/replay key is not a finding

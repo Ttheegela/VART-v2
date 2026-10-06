@@ -25,12 +25,12 @@ recordings feed the evals, the end-to-end tests and the precomputed sample run.
 **Tighten gates from a baseline.** A gate is the larger of the spec's value and the baseline minus 0.02, set after
 the first real run, not guessed beforehand.
 
-**Cut CSF outcomes into parts.** A NIST outcome usually asks for several separate things. Asking each as its own
+**Cut NIST outcomes into parts.** An outcome of NIST's Cybersecurity Framework (the US standards body's list of security outcomes) usually asks for several separate things. Asking each as its own
 question and combining the answers in code makes each label explainable, and shows which part retrieval or stance
-misses (the 6A baseline lists every miss with its cause).
+misses (the first gap-check baseline lists every miss with its cause).
 
-**Keep a step's concurrency within the budget's atomic counters.** Answering items at the same time made a run
-several times faster, and it is safe because each budget spend is one atomic statement and no transaction is open
+**Keep a step's concurrency within the budget's atomic counters.** Answering items at the same time is expected to
+make a run about 3 to 4 times faster (to be measured in Task 9), and it is safe because each budget spend is one atomic statement and no transaction is open
 while a model runs.
 
 **Replay the sample run from the recordings the evals score.** The instant demo shows exactly what the evals measured,

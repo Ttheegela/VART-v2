@@ -4,8 +4,9 @@ VART is a public demo on synthetic data. Do not upload confidential documents: u
 you would be happy to see on a public website.
 
 ## Reporting a problem
-Report it privately with GitHub's private vulnerability reporting on Ttheegela/VART-v2 (Security tab, "Report a
-vulnerability"). Please do not open a public issue.
+Use GitHub private vulnerability reporting on Ttheegela/VART-v2 (Security tab, "Report a vulnerability"); it is
+enabled at release. Until it is on, open a public issue on the repository that only asks for a private contact, with
+no details of the problem, and the maintainer will reply with one.
 
 ## What is stored, and for how long
 - A workspace: its id, when it was made, and a salted hash of the visitor's IP address (`app/db/models.py` Workspace,
@@ -33,11 +34,12 @@ vulnerability"). Please do not open a public issue.
 Applied to uploads and to the visitor's own answers before storage and before any model call (`app/redact.py`).
 - Found: personal names (Presidio with spaCy's small English model, kept as a name only when it has two or more
   capitalised words and no organisation or product word; once a name is found, its words are redacted elsewhere in
-  the same line), email addresses, phone numbers, street addresses, and secrets (API keys, private keys, tokens,
+  the same line), email addresses, phone numbers in common formats, US-style street addresses, and secrets (API keys, private keys, tokens,
   JSON web tokens, connection strings with a password, and keyed values such as `password=`).
 - Kept on purpose: place names and cloud regions, because data-residency answers need them.
 - A file whose redaction would take over 120 seconds is refused (`app/redact.py` DEADLINE_S).
-- Known gaps: a name written "Last, First"; an all-capitals name with accented letters; a single first name
+- Known gaps: a "Last, First" name inside a list of names, where a comma or "and" joins the pairs ("Kim, Ortiz,
+  Dana"; "Nguyen, Linh and Ortiz, Dana"; a lone "Patel, Priya" is caught); an all-capitals name with accented letters; a single first name
   ("ask Priya"); a name written in lower case. A capitalised word that is also part of a found name is redacted
   even where it is an ordinary word (over-redaction, accepted).
 
@@ -77,8 +79,8 @@ another workspace's ids answer 404. Cross-site writes are refused with 403 befor
 written as inert text, so a formula in an answer never runs in the buyer's spreadsheet (`app/export.py`).
 
 ## Secrets
-No secret is in the repository or its history: gitleaks scans every commit in CI, with an added rule for bare
-OpenRouter keys. Production secrets live only in Vercel's environment variables; the eval key lives in a mode-600
+gitleaks finds no secret in the repository or its history: it scans every commit in CI, with an added rule for
+bare OpenRouter keys. Production secrets live only in Vercel's environment variables; the eval key lives in a mode-600
 file outside the repository with a $5 credit limit.
 
 ## Accepted risks of a demo

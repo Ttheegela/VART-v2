@@ -44,7 +44,7 @@ data.
 ## Re-recording the evals and the end-to-end tests
 The commands are in `CLAUDE.md`; they use the eval key from `~/.config/vart/eval.env` (mode 600, $5 credit limit),
 never the production key, and never print it. After a re-recording, regenerate the sample snapshot and run
-`python -m evals.run --pack dev` (and `--pack gap-dev`) with no network to confirm the results file does not drift.
+`python -m evals.run --pack dev` (and `--pack gap-dev` and `--pack holdout`) with no network to confirm the results file does not drift.
 
 ## Rotating a secret
 `ops/setup.sh accounts --replace NAME` (for example `OPENROUTER_API_KEY`), in Tarun's terminal, then redeploy so the
@@ -52,11 +52,11 @@ function sees it.
 
 ## Size check on a CLI preview
 `npx vercel deploy` (without `--prod`) makes a preview; the build output shows the Python function's size (it was
-70.91 MB at the Plan 2 release). The preview sits behind Vercel Authentication, which is fine
+about 72 MB at the last check). The preview sits behind Vercel Authentication, which is fine
 for reading the build output. CLI previews have no database (Decision 14), so only `/` and the size are checked there.
 
 ## Costs to watch
-Neon compute hours (the monitors wake it about 24 times a day, about 15 hours a month of the 100 free), Neon storage,
+Neon compute hours (the monitors wake it about 24 times a day, estimated at about 15 hours a month of the 100 free; confirm on Neon's usage page after launch), Neon storage,
 Vercel function usage and the OpenRouter balance. The default sample path spends no model credit.
 
 ## Which browsers are tested
