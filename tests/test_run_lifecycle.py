@@ -21,6 +21,7 @@ from tests.apiclient import visitor
 from tests.fakes import ByStepLLM
 from tests.test_runs import STANCE
 from tests.test_runs_csf import _done
+from tests.test_sample_run import _sample
 
 MODELS = {"stance": "m/stance", "draft": "m/draft", "classify": "m/c", "recheck": "m/stance", "judge": "m/j"}
 IDLE = timedelta(minutes=11)
@@ -207,7 +208,10 @@ def test_a_new_run_and_a_document_delete_at_once_never_deadlock(
     db: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # adversary-1 I1: the create holds the questionnaire and the abandoned run, then its insert wants the
-    # workspace row; the delete must not hold that row while it waits for the run.
+    # workspace row; the delete must not hold that row while it waits for the run. Two guards each prevent
+    # this (task-4 review m1): close_abandoned takes the workspace KEY SHARE before any run row, and
+    # delete_document closes and commits before its workspace lock. The test pins the pair: it fails only with
+    # both reverted.
     client, ws_id = visitor(db)
     with Session(db) as s:
         ws = s.get_one(Workspace, ws_id)
@@ -289,6 +293,18 @@ def test_closing_abandoned_runs_and_a_workspace_reset_at_once_never_deadlock(
     assert waited and errors == []
     with Session(db) as s:
         assert s.get(Workspace, ws_id) is None
+
+
+def test_a_copied_sample_run_is_never_refused_while_a_live_run_is_going(db: Engine) -> None:
+    # task-4 review m4: the copy spends nothing, so the 409 is for live runs only
+    client, _ = visitor(db)
+    q_id = _sample(client)["q"]["id"]
+    live = client.post(f"/api/questionnaires/{q_id}/runs", params={"live": "true"})
+    assert (live.status_code, live.json()["status"]) == (201, "running")
+    copy = client.post(f"/api/questionnaires/{q_id}/runs")
+    assert (copy.status_code, copy.json()["precomputed"]) == (201, True)
+    again = client.post(f"/api/questionnaires/{q_id}/runs", params={"live": "true"})
+    assert (again.status_code, again.json()["detail"]) == (409, runs.RUN_IN_PROGRESS)
 
 
 def test_the_runs_endpoint_answers_409_with_a_sentence(db: Engine) -> None:

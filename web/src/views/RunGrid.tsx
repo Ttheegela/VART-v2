@@ -17,8 +17,9 @@ const IDLE_FIRST_MS = 2000;
 const IDLE_MAX_MS = 10_000;
 
 /** Calls step while the run is running. A step with no answers while still running (another tab holds the
- * claims) waits 2 s, doubling to 10 s, until answers arrive. A 429 with Retry-After waits as told and shows the
- * scope sentence meanwhile; a 404 calls `onGone` when given; any other error stops the loop and is shown in words.
+ * claims) waits 2 s, doubling to 10 s, until answers arrive. A 429 with Retry-After, or a 503 (Retry-After, else
+ * 60 s: the server backs off on an outage, Ruling 12), waits as told and shows the sentence meanwhile; a 404 calls
+ * `onGone` when given; any other error stops the loop and is shown in words. `resume` restarts a stopped loop.
  * A step that returns is always merged, even after a cleanup (the server has claimed those items), and a remount
  * (StrictMode, or a status flip) awaits the call already in flight instead of sending a second one. */
 export function useStepLoop(
@@ -26,6 +27,7 @@ export function useStepLoop(
 ) {
   const [failure, setFailure] = useState<{ runId: string; message: string } | null>(null);
   const [stopped, setStopped] = useState<string | null>(null); // the run whose loop an error ended
+  const [restarts, setRestarts] = useState(0); // bumped by `resume`: the effect runs the loop again
   const latest = useRef(data);
   const sink = useRef(onData);
   const gone = useRef(onGone);
@@ -74,6 +76,7 @@ export function useStepLoop(
           }
           setFailure({ runId, message: messageOf(e) });
           if (e instanceof ApiError && e.status === 429 && e.retryAfter) await wait(e.retryAfter * 1000);
+          else if (e instanceof ApiError && e.status === 503) await wait((e.retryAfter ?? 60) * 1000);
           else return setStopped(runId);
         }
       }
@@ -82,10 +85,11 @@ export function useStepLoop(
       alive = false;
       clearTimeout(timer);
     };
-  }, [runId, status]);
+  }, [runId, status, restarts]);
   return {
     error: failure?.runId === runId ? failure.message : null,
     running: status === "running" && stopped !== runId,
+    resume: () => { setFailure(null); setStopped(null); setRestarts((n) => n + 1); },
   };
 }
 
@@ -151,7 +155,7 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
     if (!questionnaireId) return;
     api.questionnaires().then((qs) => setName(qs.find((q) => q.id === questionnaireId)?.filename ?? null), () => {});
   }, [questionnaireId]);
-  const { error: loopError, running } = useStepLoop(runId, data, setData, onGone);
+  const { error: loopError, running, resume } = useStepLoop(runId, data, setData, onGone);
 
   const rows = data?.rows;
   const counts = useMemo(() => {
@@ -187,7 +191,11 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
     if (!data || running || busy) return;
     setBusy("rerun");
     setActionError(null);
-    try { const run = await api.createRun(data.run.questionnaire_id, true); go({ view: "run", run: run.id }); } catch (e) { setActionError(messageOf(e)); }
+    try { const run = await api.createRun(data.run.questionnaire_id, true); go({ view: "run", run: run.id }); } catch (e) {
+      // this run is still going (its loop had stopped on an error): pick it up again instead of a dead end (Ruling 12)
+      if (e instanceof ApiError && e.status === 409 && data.run.status === "running") resume();
+      else setActionError(messageOf(e));
+    }
     setBusy(null);
   };
   const approveAll = async () => {

@@ -138,6 +138,25 @@ describe("RunGrid", () => {
     await waitFor(() => expect(onGone).toHaveBeenCalled());
   });
 
+  it("Re-run live answered 409 on this still-running run resumes its loop and shows no error (Ruling 12)", async () => {
+    const running = { ...fixtures.run, status: "running" as const, done: 2 };
+    let n = 0;
+    const calls = mockApi({
+      "GET /api/runs/r1/answers": { run: running, rows: fixtures.rows },
+      "POST /api/runs/r1/step": () =>
+        ++n === 1 ? new Response("{}", { status: 500 }) : { run: fixtures.run, answered: [] },
+      "POST /api/questionnaires/q1/runs": new Response(JSON.stringify({ detail: "A run of this questionnaire is still going; wait for it to finish first." }), { status: 409 }),
+    });
+    render(<RunGrid {...props} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Request failed (500)");
+    await userEvent.click(screen.getByRole("button", { name: /Re-run live/ }));
+    await waitFor(() => expect(calls.filter((c) => c === "POST /api/runs/r1/step")).toHaveLength(2));
+    expect(calls).toContain("POST /api/questionnaires/q1/runs");
+    expect(await screen.findByRole("status")).toHaveTextContent("Run done: 3 of 3 answered.");
+    expect(screen.queryByText(/still going/)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("a 429 stops the loop and says why", async () => {
     mockApi({
       "GET /api/runs/r1/answers": { run: { ...fixtures.run, status: "running" }, rows: fixtures.rows },
@@ -281,17 +300,49 @@ describe("useStepLoop", () => {
     expect(result.current.running).toBe(false);
   });
 
-  it("a 503 from step stops the loop and shows the sentence, even with Retry-After (no auto-retry)", async () => {
+  // Ruling 12 (Plan 4 Task 4 fix round 1): this replaces Plan 3's "a 503 stops the loop". The server now backs
+  // off on an outage (Ruling 5), and a stopped loop left a running run that Re-run live refused (409). The test
+  // still pins the sentence, the Retry-After wait and that no call is made early; only the stop became a resume.
+  it("a 503 waits for Retry-After, shows the sentence, then resumes", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    const down = "The model provider is not answering right now; try the run again in a minute.";
+    const down = "Model calls are failing right now; the run resumes when they return.";
+    let n = 0;
     const calls = mockApi({
-      "POST /api/runs/r1/step": new Response(JSON.stringify({ detail: down }), { status: 503, headers: { "Retry-After": "60" } }),
+      "POST /api/runs/r1/step": () =>
+        ++n === 1
+          ? new Response(JSON.stringify({ detail: down }), { status: 503, headers: { "Retry-After": "60" } })
+          : { run: fixtures.run, answered },
     });
-    const { result } = renderHook(() => useStepLoop("r1", start, () => {}));
-    await act(() => vi.advanceTimersByTimeAsync(180_000));
+    const { result } = renderHook(() => {
+      const [d, setD] = useState<RunRowsOut | null>(start);
+      return useStepLoop("r1", d, setD);
+    });
+    await act(() => vi.advanceTimersByTimeAsync(59_000));
     expect(calls).toHaveLength(1);
     expect(result.current.error).toBe(down);
+    expect(result.current.running).toBe(true);
+    await act(() => vi.advanceTimersByTimeAsync(1_000));
+    expect(calls).toHaveLength(2);
+    expect(result.current.error).toBeNull();
     expect(result.current.running).toBe(false);
+  });
+
+  it("a 503 without Retry-After waits 60 s, then resumes", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    let n = 0;
+    const calls = mockApi({
+      "POST /api/runs/r1/step": () =>
+        ++n === 1 ? new Response(JSON.stringify({ detail: "Model calls are off right now." }), { status: 503 }) : { run: fixtures.run, answered },
+    });
+    const { result } = renderHook(() => {
+      const [d, setD] = useState<RunRowsOut | null>(start);
+      return useStepLoop("r1", d, setD);
+    });
+    await act(() => vi.advanceTimersByTimeAsync(59_000));
+    expect(calls).toHaveLength(1);
+    expect(result.current.running).toBe(true);
+    await act(() => vi.advanceTimersByTimeAsync(1_000));
+    expect(calls).toHaveLength(2);
   });
 
   it("any other error stops the loop", async () => {

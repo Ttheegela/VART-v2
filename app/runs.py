@@ -865,8 +865,9 @@ def reopen_changed(
             .values(status="dismissed")
         )
     if reopened:
-        # touched now, so it does not read as abandoned before its next step (adversary-1 M5)
-        run.status, run.finished_at, run.stepped_at = "running", None, datetime.now(UTC)
+        # touched now (the DB clock, as close_abandoned), so it does not read as abandoned before its next
+        # step (adversary-1 M5)
+        run.status, run.finished_at, run.stepped_at = "running", None, func.now()
         audit_log.record(
             session, workspace_id, "run.recheck", ref=str(run_id), detail={"outcomes": len(reopened)}
         )
