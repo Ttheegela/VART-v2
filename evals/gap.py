@@ -1,7 +1,8 @@
 """The CSF 2.0 gap-check eval (CSF spec 8), pack gap-dev: the dev company's 22 documents plus the gap
 extension's (data/dev/gap), the workspace's built-in CSF questionnaire for the core, every Checked outcome
-through answer_item, then the Ask-me outcomes answered from evals/fixtures/gap-dev-answers.json (one left
-unanswered), scored against data/dev/key/csf-core.yaml. `python -m evals.run --pack gap-dev` lands here.
+part by part through answer_retrieved (app.csf.check_parts), combined by app.csf.aggregate, then the Ask-me
+outcomes answered from evals/fixtures/gap-dev-answers.json (one left unanswered), scored against
+data/dev/key/csf-core.yaml. `python -m evals.run --pack gap-dev` lands here.
 
 Every gate fails closed (None) when it has nothing to measure, like the questionnaire gates."""
 
@@ -9,7 +10,7 @@ import json
 import re
 import statistics
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -69,6 +70,8 @@ class GapPack:
     answers: dict[str, str]  # Ask-me CSF id -> the visitor's answer (the fixture); the rest stay unanswered
     private: tuple[str, ...]  # private strings of the answers: names, name words, emails, phones, secrets
     unseen: frozenset[str]  # those no dev document holds: no model request may ever contain one
+    # Checked id -> the parts the key says lack evidence
+    missing_parts: dict[str, tuple[int, ...]] = field(default_factory=dict)
 
 
 @dataclass
@@ -84,6 +87,7 @@ class GapObserved:
     requests: list[str]  # the user text of every model request the run made
     probe_kept: int  # after the answers were stored: statement passages a Checked outcome would be judged on
     probe_seen: int  # ... and statement passages its retrieval found at all (kept or dropped)
+    parts: dict[str, list[ItemResult]] = field(default_factory=dict)  # Checked id -> its parts' own results
 
 
 def load() -> GapPack:
@@ -113,6 +117,7 @@ def load() -> GapPack:
         answers,
         tuple(sorted(private)),
         frozenset(s for s in private if not any(s in d for d in documents)),
+        {m.csf_id: m.missing_parts for m in gap.outcomes if m.missing_parts},
     )
 
 
@@ -161,10 +166,12 @@ def run(llm: LLMClient, models: dict[str, str]) -> dict[str, Any]:
             session.commit()
             outcomes = [fw.get(x) for x in items]
             results: dict[str, ItemResult] = {}
+            parts: dict[str, list[ItemResult]] = {}
             for o in outcomes:
-                result = csf.check_outcome(session, ws.id, o, log, models, always)
-                if result is not None:
-                    results[o.id] = result
+                answered = csf.check_parts(session, ws.id, o, log, models, always)
+                if answered:  # Ask me: [] (no parts, no model call)
+                    parts[o.id] = answered
+                    results[o.id] = csf.aggregate(o, answered)
             # Ruling 1: the Ask-me answers are stored only after every Checked outcome is answered, so none is
             # retrievable evidence for a Checked outcome (spec 5.4: an answer re-checks outcomes later)
             statements: dict[str, str] = {}
@@ -178,8 +185,8 @@ def run(llm: LLMClient, models: dict[str, str]) -> dict[str, Any]:
             said = set(statements.values())
             probe_kept = probe_seen = 0
             for o in outcomes:
-                if o.tier == "checked":
-                    found = csf.evidence(session, ws.id, o)
+                for item in csf.part_inputs(o):
+                    found = csf.evidence(session, ws.id, item)
                     kept = sum(p.doc.id in said for p in found.passages)
                     probe_kept += kept
                     probe_seen += kept + sum(d.document_id in said for d in found.dropped)
@@ -201,7 +208,18 @@ def run(llm: LLMClient, models: dict[str, str]) -> dict[str, Any]:
     nist = {o.id: shown(o) for o in fw.outcomes}
     requests = [r.user for r in log.requests]
     obs = GapObserved(
-        results, labels, items, statements, kinds, doc_ids, stored, nist, requests, probe_kept, probe_seen
+        results,
+        labels,
+        items,
+        statements,
+        kinds,
+        doc_ids,
+        stored,
+        nist,
+        requests,
+        probe_kept,
+        probe_seen,
+        parts,
     )
     metrics = score_gap(pack, obs)
     steps = {"stance", "draft"} | {r.step for r in log.requests}  # an unexpected step (classify) shows here
@@ -220,9 +238,23 @@ def run(llm: LLMClient, models: dict[str, str]) -> dict[str, Any]:
                 "citations": len(r.decision.citations),
                 "dropped": sorted(d.reason for d in r.decision.dropped),
                 "draft": r.draft.source,
+                "explanation": r.draft.text,
+                "parts": [_part_report(p) for p in obs.parts.get(code, [])],
             }
             for code, r in sorted(results.items())
         },
+    }
+
+
+def _part_report(r: ItemResult) -> dict[str, Any]:
+    """One part as gap-dev.json shows it: file names and lines, never database ids, so a replay is
+    identical."""
+    return {
+        "key": r.item.key,
+        "label": csf.part_label(r),
+        "citations": [f"{c.filename}:{c.line_start}:{c.stance}" for c in r.decision.citations],
+        "dropped": sorted(f"{d.filename}:{d.reason}" for d in r.decision.dropped),
+        "passages": [f"{p.doc.filename}:{p.line_start}" for p in r.retrieval.passages],
     }
 
 
@@ -318,6 +350,20 @@ def score_gap(pack: GapPack, obs: GapObserved) -> dict[str, float | None]:
     said = set(obs.statements.values())
     as_evidence = sum(x.document_id in said for r in obs.results.values() for x in r.decision.citations)
     m["statements_as_evidence"] = score._count(obs.probe_kept + as_evidence, obs.probe_seen)
+
+    # Part agreement (I4; reported, never a gate): over the outcomes whose key names missing parts, the engine
+    # left every missing part Gap or Partly and did not leave all the other parts Gap
+    agree = named = 0
+    for c, lacking in pack.missing_parts.items():
+        labels = [csf.part_label(r) for r in obs.parts.get(c, [])]
+        if not labels:
+            continue
+        named += 1
+        others = [x for n, x in enumerate(labels, 1) if n not in lacking]
+        agree += all(labels[n - 1] in ("gap", "partly_covered") for n in lacking) and (
+            not others or any(x != "gap" for x in others)
+        )
+    m["part_agreement"] = score._gated(agree, named)
 
     recalls = [
         sum(score._found(obs.results[c], obs.doc_ids[e.doc], e.quote) is not None for e in k.evidence)

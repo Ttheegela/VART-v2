@@ -165,6 +165,9 @@ class GapOutcome(_Strict):
     # the control's own stance says; `missing` names the NIST parts with no evidence (required with it).
     label: Literal["partly_covered"] | None = None
     missing: str | None = None
+    # The parts (1-based, data/csf/tiers.yaml) the override's `missing` names; required with `label`
+    # (adversary I4).
+    missing_parts: tuple[int, ...] = ()
 
 
 class GapFacts(_Strict):

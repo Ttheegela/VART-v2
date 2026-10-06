@@ -37,13 +37,18 @@ def test_the_key_plants_what_the_spec_asks() -> None:
         "PR.AA-03",
         "RS.MA-01",
         "RS.CO-02",
+        "PR.DS-02",
         "PR.DS-11",
         "PR.IR-03",
         "ID.AM-05",
         "ID.AM-08",
+        "GV.PO-02",
+        "PR.AA-01",
+        "PR.PS-02",
+        "PR.PS-06",
     }
     assert {"RS.AN-03", "RS.MI-01"} <= by_label["covered"]
-    assert Counter(labels.values())["covered"] == 17
+    assert Counter(labels.values())["covered"] == 12
 
 
 def test_trap_outcomes_are_never_expected_covered() -> None:
@@ -117,7 +122,17 @@ def test_a_label_override_changes_the_derived_label() -> None:
     before = {k.code: k.expected_label for k in gap.derive_gap(facts, plain).items}
     after = {k.code: k.expected_label for k in gap.derive_gap(facts, g).items}
     changed = {c for c in after if after[c] != before[c]}
-    assert changed == {"PR.DS-11", "PR.IR-03", "ID.AM-05", "ID.AM-08"}
+    assert changed == {
+        "PR.DS-02",
+        "PR.DS-11",
+        "PR.IR-03",
+        "ID.AM-05",
+        "ID.AM-08",
+        "GV.PO-02",
+        "PR.AA-01",
+        "PR.PS-02",
+        "PR.PS-06",
+    }
     assert all(before[c] == "verified" and after[c] == "partial" for c in changed)
 
 
@@ -131,3 +146,51 @@ def test_a_label_override_without_its_missing_parts_fails_validation(
     )
     monkeypatch.setattr(gap, "load", lambda pack: (facts, g.model_copy(update={"outcomes": outcomes})))
     assert "outcome PR.DS-11: a label override needs missing" in gap.check("dev")
+
+
+def test_the_per_part_rejudge_is_in_the_key() -> None:
+    """Ruling 19: PR.DS-01 stays Covered with its integrity line as key evidence (and, Ruling 20, its
+    availability line); PR.DS-02 is Partly covered, availability in transit missing, with its integrity line
+    as key evidence."""
+    facts, g = gap.load("dev")
+    keys = {k.code: k for k in gap.derive_gap(facts, g).items}
+    evidence = {c: {(e.doc, e.quote) for e in keys[c].evidence} for c in ("PR.DS-01", "PR.DS-02")}
+    assert ("lmp", "Improper alteration or loss of sensitive information.") in evidence["PR.DS-01"]
+    assert ("bcpol", "Kestrelyn performs daily backups of all production databases.") in evidence["PR.DS-01"]
+    scope = (
+        "This policy applies to all Kestrelyn systems that store, transmit, or process sensitive information."
+    )
+    assert ("lmp", scope) in evidence["PR.DS-02"]
+    assert (keys["PR.DS-01"].expected_label, keys["PR.DS-02"].expected_label) == ("verified", "partial")
+
+
+@pytest.mark.parametrize(
+    ("update", "problem"),
+    [
+        ({"missing_parts": ()}, "outcome PR.DS-11: a label override needs missing_parts"),
+        ({"missing_parts": (9,)}, "outcome PR.DS-11: no part 9"),
+        ({"label": None, "missing": None}, "outcome PR.DS-11: missing_parts without a label override"),
+    ],
+)
+def test_an_override_names_the_parts_it_misses(
+    monkeypatch: pytest.MonkeyPatch, update: dict[str, object], problem: str
+) -> None:
+    facts, g = gap.load("dev")
+    outcomes = tuple(o.model_copy(update=update) if o.csf_id == "PR.DS-11" else o for o in g.outcomes)
+    monkeypatch.setattr(gap, "load", lambda pack: (facts, g.model_copy(update={"outcomes": outcomes})))
+    assert problem in gap.check("dev")
+
+
+def test_a_planted_conflict_must_be_visible_to_a_part_without_a_threshold(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Adversary C1: 'performed annually' is a no only against a question that says quarterly; a CSF part
+    states no interval, so trap X1 cannot be a CSF disagreement. The two real ones pass: DE.AE-06's no side is
+    negated, PR.AA-05's is an overdue record row."""
+    facts, g = gap.load("dev")
+    remap = {"control": "backup-restore-test", "label": None, "missing": None, "missing_parts": ()}
+    outcomes = tuple(o.model_copy(update=remap) if o.csf_id == "PR.DS-11" else o for o in g.outcomes)
+    monkeypatch.setattr(gap, "load", lambda pack: (facts, g.model_copy(update={"outcomes": outcomes})))
+    found = gap.check("dev")
+    assert "PR.DS-11: conflict X1 rests on a thresholded no the CSF part cannot see" in found
+    assert not [p for p in found if p.startswith(("PR.AA-05:", "DE.AE-06:"))]

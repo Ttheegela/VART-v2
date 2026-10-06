@@ -21,8 +21,8 @@ items:
   traps: []
   fills: []
 - code: GV.PO-02
-  expected_label: verified
-  expected_value: 'Yes'
+  expected_label: partial
+  expected_value: Partial
   must_ask: false
   evidence:
   - doc: isp
@@ -151,8 +151,8 @@ items:
   traps: []
   fills: []
 - code: PR.AA-01
-  expected_label: verified
-  expected_value: 'Yes'
+  expected_label: partial
+  expected_value: Partial
   must_ask: false
   evidence:
   - doc: acp
@@ -231,14 +231,20 @@ items:
   - doc: crypto
     quote: Customer data at rest is encrypted with AES-256 using AWS KMS.
     stance: 'yes'
+  - doc: lmp
+    quote: Improper alteration or loss of sensitive information.
+    stance: 'yes'
+  - doc: bcpol
+    quote: Kestrelyn performs daily backups of all production databases.
+    stance: 'yes'
   conflict_trap: null
   scope_note_expected: false
   honest_negative: false
   traps: []
   fills: []
 - code: PR.DS-02
-  expected_label: verified
-  expected_value: 'Yes'
+  expected_label: partial
+  expected_value: Partial
   must_ask: false
   evidence:
   - doc: crypto
@@ -246,6 +252,9 @@ items:
     stance: 'yes'
   - doc: crypto
     quote: The Kestrelyn application is served only over HTTPS, and HTTP requests are redirected to HTTPS.
+    stance: 'yes'
+  - doc: lmp
+    quote: This policy applies to all Kestrelyn systems that store, transmit, or process sensitive information.
     stance: 'yes'
   conflict_trap: null
   scope_note_expected: false
@@ -279,8 +288,8 @@ items:
   traps: []
   fills: []
 - code: PR.PS-02
-  expected_label: verified
-  expected_value: 'Yes'
+  expected_label: partial
+  expected_value: Partial
   must_ask: false
   evidence:
   - doc: vmp
@@ -308,8 +317,8 @@ items:
   traps: []
   fills: []
 - code: PR.PS-06
-  expected_label: verified
-  expected_value: 'Yes'
+  expected_label: partial
+  expected_value: Partial
   must_ask: false
   evidence:
   - doc: sdp

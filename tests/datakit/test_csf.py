@@ -1,5 +1,6 @@
 import json
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -150,3 +151,82 @@ def test_extract_refuses_an_export_without_sp_800_53_references(tmp_path: Path) 
     )
     with pytest.raises(ValueError, match="SP 800-53 Rev 5.2.0"):
         csf.extract(path)
+
+
+def test_inflections_of_nists_words_are_nist_words() -> None:
+    nist = "Inventories of hardware managed by the organization are maintained; processes are established"
+    assert csf.added_words("Is an inventory of hardware maintained, and are processes managed?", nist) == []
+    assert csf.added_words("Is hardware encrypted by the vendor?", nist) == ["encrypted", "vendor"]
+
+
+def test_every_checked_outcome_has_parts_and_no_other_outcome_does() -> None:
+    _, tiers, built = _committed()
+    parts = {o["id"]: o["parts"] for o in built["outcomes"]}
+    assert all(parts[i] for i in tiers["checked"]) and sum(map(len, parts.values())) == 73
+    assert all(parts[o["id"]] == [] for o in built["outcomes"] if o["tier"] != "checked")
+    assert all(len(m) <= csf.MAX_PARAPHRASE for m in tiers["paraphrase_words"].values())
+
+
+@pytest.mark.parametrize(
+    ("edit", "problem"),
+    [
+        (lambda t: t["parts"].update({"PR.DS-11": []}), "checked PR.DS-11: no parts"),
+        (lambda t: t["parts"].update({"GV.OC-01": ["Is it done?"]}), "parts GV.OC-01: not a checked outcome"),
+        (
+            lambda t: t["parts"].update({"RS.MI-01": ["Are incidents contained by the security team?"]}),
+            "RS.MI-01 part 1: adds 'security', not in NIST's text",
+        ),
+        (  # a document name is an added word
+            lambda t: t["parts"]["GV.PO-01"].append("Is the policy enforced, as the HR handbook says?"),
+            "GV.PO-01 part 4: adds 'hr', not in NIST's text",
+        ),
+        (
+            lambda t: t["parts"].update({"RS.MI-01": ['Are incidents "contained"?']}),
+            "RS.MI-01 part 1: must be ASCII, quote nothing and end with '?'",
+        ),
+        (  # Ruling 11b: separation of duties may not be dropped
+            lambda t: t["parts"].update(
+                {"PR.AA-05": [q.replace(" and separation of duties", "") for q in t["parts"]["PR.AA-05"]]}
+            ),
+            "PR.AA-05: NIST's 'separation' is in no part",
+        ),
+        (
+            lambda t: t["paraphrase_words"].pop("ID.AM-08"),
+            "ID.AM-08 part 1: adds 'acquisition', not in NIST's text",
+        ),
+        (
+            lambda t: t["paraphrase_words"].update({"RS.MI-01": {"isolation": "contained"}}),
+            "RS.MI-01: paraphrase word 'isolation' is in no part",
+        ),
+        (  # I3: a paraphrase word names an instance of a NIST word of its own outcome
+            lambda t: t["paraphrase_words"]["RC.RP-01"].update({"failover": "bcp"}),
+            "RC.RP-01: paraphrase word 'failover' must map to a word of NIST's text, not 'bcp'",
+        ),
+        (
+            lambda t: t["paraphrase_words"]["PR.PS-06"].update({"sast": "practices"}),
+            "PR.PS-06: 4 paraphrase words, at most 3",
+        ),
+        (  # an added word enters only through an example clause
+            lambda t: t["parts"]["PR.PS-04"].__setitem__(
+                1, "Are log records made available centrally for continuous monitoring?"
+            ),
+            "PR.PS-04 part 2: 'centrally' stands outside an example clause",
+        ),
+        (  # R3: the clause ends at the next comma
+            lambda t: t["parts"]["PR.PS-01"].__setitem__(
+                0,
+                "Are configuration management practices, such as baseline configurations,"
+                " established with change control?",
+            ),
+            "PR.PS-01 part 1: 'change' stands outside an example clause",
+        ),
+        (  # R4: the revision-1 list form is named, not a crash
+            lambda t: t["paraphrase_words"].update({"PR.DS-01": ["encryption"]}),
+            "paraphrase_words PR.DS-01: must map each word to a NIST word",
+        ),
+    ],
+)
+def test_a_bad_part_is_named(edit: Callable[[dict[str, Any]], object], problem: str) -> None:
+    nist, tiers, _ = _committed()
+    edit(tiers)
+    assert problem in csf.problems(nist, tiers, csf.build(nist, tiers))

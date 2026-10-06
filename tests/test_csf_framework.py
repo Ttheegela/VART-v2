@@ -11,8 +11,9 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from app import csf
-from app.contracts import ItemInput
+from app.contracts import Draft, ItemInput
 from app.db.models import DocumentLine, Item, Questionnaire
+from app.draft import check
 from app.ingest.store import store_statement
 from app.services.llm_budget import spender
 from tests import factories as f
@@ -128,6 +129,11 @@ def _load_edited(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, edit: Callable
         (lambda os: os[1].update(id=os[0]["id"]), "GV.OC-01: duplicate id"),
         (lambda os: os[0].update(id="GV.OC-1"), "not a CSF outcome id"),
         (lambda os: os[0].update(function="Govren"), "GV.OC-01: unknown function"),
+        (
+            lambda os: next(o for o in os if o["tier"] == "checked").update(parts=["  "]),
+            "a checked outcome needs parts",
+        ),
+        (lambda os: os[0].update(parts=["Is it done?"]), "GV.OC-01: only a checked outcome has parts"),
     ],
 )
 def test_the_loader_rejects_a_bad_data_file(
@@ -198,6 +204,18 @@ def test_a_changed_tier_list_gives_a_new_questionnaire(s: Session, monkeypatch: 
     assert q.id != first
     asked = s.scalar(select(Item.question).where(Item.questionnaire_id == q.id, Item.csf_id == "GV.PO-01"))
     assert asked == "Is the policy approved?"
+    first = q.id
+    recut = replace(
+        reworded,
+        outcomes=tuple(
+            replace(o, parts=("Is the policy approved?",)) if o.id == "GV.PO-01" else o
+            for o in reworded.outcomes
+        ),
+    )
+    monkeypatch.setattr(csf, "framework", lambda: recut)
+    assert (
+        csf.questionnaire_for(s, ws.id, "govern").id != first
+    )  # a changed part alone gives a new questionnaire
 
 
 def test_an_unknown_scope_creates_nothing(s: Session) -> None:
@@ -213,14 +231,18 @@ def test_a_checked_outcome_runs_the_ordinary_pipeline(s: Session) -> None:
     doc = f.document(s, ws, filename="crypto-policy.docx")
     f.chunk(s, doc, line_start=4, line_end=4, text=QUOTE)
     s.commit()
-    stance = json.dumps({"passages": [{"passage": 1, "stance": "yes", "quote": QUOTE, "note": "states it"}]})
-    draft = json.dumps({"text": f'Yes. The crypto policy says "{QUOTE}"'})
-    llm = FakeLLM([stance, draft])
+    yes = json.dumps({"passages": [{"passage": 1, "stance": "yes", "quote": QUOTE, "note": "states it"}]})
+    nothing = json.dumps({"passages": [{"passage": 1, "stance": "irrelevant", "quote": "", "note": "other"}]})
+    llm = FakeLLM([yes, nothing, nothing])  # confidentiality, integrity, availability
     o = csf.framework().get("PR.DS-01")
     r = csf.check_outcome(s, ws.id, o, llm, MODELS, spender(s, ws.id))
     assert r is not None and r.item == csf.item_input(o)
-    assert csf.gap_label(o, r.decision.label, r.decision.value) == "covered"
-    assert [req.step for req in llm.requests] == ["stance", "draft"]
+    assert csf.gap_label(o, r.decision.label, r.decision.value) == "partly_covered"
+    assert [req.step for req in llm.requests] == ["stance"] * 3
+    text = f'Evidenced: part 1. No evidence: parts 2, 3. {o.parts[0]} Yes. The crypto policy says: "{QUOTE}"'
+    assert r.draft == Draft(text, "template")
+    # M4: every quote in the explanation is a cited line (the part numbers are code's, not evidence)
+    assert [p for p in check(r.draft.text, r.decision, ["crypto-policy.docx"]) if p.startswith("quote")] == []
 
 
 def test_ask_me_and_not_checked_outcomes_never_reach_a_model(s: Session) -> None:

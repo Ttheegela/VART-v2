@@ -13,7 +13,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.OC-02",
@@ -31,7 +32,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.OC-03",
@@ -64,7 +66,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "ask",
-      "question": "Which legal, regulatory and contractual cybersecurity requirements apply to your organization, and how are they managed?"
+      "question": "Which legal, regulatory and contractual cybersecurity requirements apply to your organization, and how are they managed?",
+      "parts": []
     },
     {
       "id": "GV.OC-04",
@@ -80,7 +83,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.OC-05",
@@ -96,7 +100,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.RM-01",
@@ -110,7 +115,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.RM-02",
@@ -122,7 +128,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "ask",
-      "question": "Has your organization set risk appetite and risk tolerance statements for cybersecurity, and how are they communicated?"
+      "question": "Has your organization set risk appetite and risk tolerance statements for cybersecurity, and how are they communicated?",
+      "parts": []
     },
     {
       "id": "GV.RM-03",
@@ -139,7 +146,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.RM-04",
@@ -154,7 +162,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.RM-05",
@@ -167,7 +176,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.RM-06",
@@ -183,7 +193,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.RM-07",
@@ -199,7 +210,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.RR-01",
@@ -215,7 +227,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.RR-02",
@@ -232,7 +245,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "ask",
-      "question": "Who holds cybersecurity roles and responsibilities in your organization, and how are they communicated and enforced?"
+      "question": "Who holds cybersecurity roles and responsibilities in your organization, and how are they communicated and enforced?",
+      "parts": []
     },
     {
       "id": "GV.RR-03",
@@ -244,7 +258,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.RR-04",
@@ -259,7 +274,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.PO-01",
@@ -290,7 +306,12 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Is there a documented cybersecurity policy, based on the organization's context and strategy, that is communicated and enforced?"
+      "question": "Is there a documented cybersecurity policy, based on the organization's context and strategy, that is communicated and enforced?",
+      "parts": [
+        "Is the policy for managing cybersecurity risks established based on organizational context, cybersecurity strategy and priorities?",
+        "Is the policy for managing cybersecurity risks communicated?",
+        "Is the policy for managing cybersecurity risks enforced?"
+      ]
     },
     {
       "id": "GV.PO-02",
@@ -321,7 +342,13 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are cybersecurity policies reviewed, updated, communicated and enforced on a regular schedule?"
+      "question": "Are cybersecurity policies reviewed, updated, communicated and enforced on a regular schedule?",
+      "parts": [
+        "Is the policy for managing cybersecurity risks reviewed?",
+        "Is the policy for managing cybersecurity risks updated?",
+        "Is the policy for managing cybersecurity risks communicated?",
+        "Is the policy for managing cybersecurity risks enforced to reflect changes in requirements, threats, technology and organizational mission?"
+      ]
     },
     {
       "id": "GV.OV-01",
@@ -358,7 +385,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "ask",
-      "question": "How does leadership review the results of the cybersecurity risk strategy and adjust it?"
+      "question": "How does leadership review the results of the cybersecurity risk strategy and adjust it?",
+      "parts": []
     },
     {
       "id": "GV.OV-02",
@@ -375,7 +403,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.OV-03",
@@ -390,7 +419,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.SC-01",
@@ -404,7 +434,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "ask",
-      "question": "Does your organization have a cybersecurity supply chain risk management program, and who agreed to it?"
+      "question": "Does your organization have a cybersecurity supply chain risk management program, and who agreed to it?",
+      "parts": []
     },
     {
       "id": "GV.SC-02",
@@ -418,7 +449,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.SC-03",
@@ -457,7 +489,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.SC-04",
@@ -471,7 +504,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.SC-05",
@@ -488,7 +522,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.SC-06",
@@ -503,7 +538,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.SC-07",
@@ -519,7 +555,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.SC-08",
@@ -537,7 +574,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.SC-09",
@@ -561,7 +599,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "GV.SC-10",
@@ -582,7 +621,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "ID.AM-01",
@@ -595,7 +635,10 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Is an inventory of the organization's hardware assets maintained?"
+      "question": "Is an inventory of the organization's hardware assets maintained?",
+      "parts": [
+        "Are inventories of hardware managed by the organization maintained?"
+      ]
     },
     {
       "id": "ID.AM-02",
@@ -611,7 +654,12 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Is an inventory of the organization's software, services and systems maintained?"
+      "question": "Is an inventory of the organization's software, services and systems maintained?",
+      "parts": [
+        "Are inventories of software managed by the organization maintained?",
+        "Are inventories of services managed by the organization maintained?",
+        "Are inventories of systems managed by the organization maintained?"
+      ]
     },
     {
       "id": "ID.AM-03",
@@ -628,7 +676,10 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are diagrams or other representations of the organization's network communication and data flows maintained?"
+      "question": "Are diagrams or other representations of the organization's network communication and data flows maintained?",
+      "parts": [
+        "Are representations of the organization's authorized network communication and internal and external network data flows maintained?"
+      ]
     },
     {
       "id": "ID.AM-04",
@@ -642,7 +693,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "ID.AM-05",
@@ -656,7 +708,13 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are assets and data prioritized by classification, criticality and impact?"
+      "question": "Are assets and data prioritized by classification, criticality and impact?",
+      "parts": [
+        "Are assets prioritized based on classification?",
+        "Are assets prioritized based on criticality?",
+        "Are assets prioritized based on resources?",
+        "Are assets prioritized based on impact on the mission?"
+      ]
     },
     {
       "id": "ID.AM-07",
@@ -670,7 +728,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "ID.AM-08",
@@ -696,7 +755,14 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are systems, hardware, software and data managed through their whole life cycle, including secure disposal?"
+      "question": "Are systems, hardware, software, services and data managed throughout their life cycles, from acquisition to retirement?",
+      "parts": [
+        "Are systems managed throughout their life cycles, for example from acquisition to retirement?",
+        "Is hardware managed throughout its life cycle, for example from acquisition to retirement?",
+        "Is software managed throughout its life cycle, for example from acquisition to retirement?",
+        "Are services managed throughout their life cycles, for example from acquisition to retirement?",
+        "Is data managed throughout its life cycle, for example from acquisition to retirement?"
+      ]
     },
     {
       "id": "ID.RA-01",
@@ -717,7 +783,12 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are vulnerabilities in the organization's assets identified, validated and recorded, for example through scans or penetration tests?"
+      "question": "Are vulnerabilities in the organization's assets identified, validated and recorded, for example through scans or penetration tests?",
+      "parts": [
+        "Are vulnerabilities in assets identified?",
+        "Are vulnerabilities in assets validated?",
+        "Are vulnerabilities in assets recorded?"
+      ]
     },
     {
       "id": "ID.RA-02",
@@ -731,7 +802,10 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Does the organization receive cyber threat intelligence from information sharing forums or other sources?"
+      "question": "Does the organization receive cyber threat intelligence from information sharing forums or other sources?",
+      "parts": [
+        "Is cyber threat intelligence received from information sharing forums and sources?"
+      ]
     },
     {
       "id": "ID.RA-03",
@@ -746,7 +820,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "ID.RA-04",
@@ -763,7 +838,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "ID.RA-05",
@@ -778,7 +854,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "ID.RA-06",
@@ -793,7 +870,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "ID.RA-07",
@@ -807,7 +885,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "ID.RA-08",
@@ -819,7 +898,12 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Is there a process for receiving, analyzing and responding to vulnerability reports from outside the organization?"
+      "question": "Is there a process for receiving, analyzing and responding to vulnerability reports from outside the organization?",
+      "parts": [
+        "Are processes for receiving vulnerability disclosures established?",
+        "Are processes for analyzing vulnerability disclosures established?",
+        "Are processes for responding to vulnerability disclosures established?"
+      ]
     },
     {
       "id": "ID.RA-09",
@@ -841,7 +925,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "ID.RA-10",
@@ -853,7 +938,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "ID.IM-01",
@@ -901,7 +987,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "ID.IM-02",
@@ -952,7 +1039,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "ID.IM-03",
@@ -1002,7 +1090,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "ID.IM-04",
@@ -1017,7 +1106,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "PR.AA-01",
@@ -1042,7 +1132,12 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are identities and credentials for users, services and hardware managed by the organization?"
+      "question": "Are identities and credentials for users, services and hardware managed by the organization?",
+      "parts": [
+        "Are identities and credentials for authorized users managed by the organization?",
+        "Are identities and credentials for services managed by the organization?",
+        "Are identities and credentials for hardware managed by the organization?"
+      ]
     },
     {
       "id": "PR.AA-02",
@@ -1054,7 +1149,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "PR.AA-03",
@@ -1075,7 +1171,12 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are users, services and hardware authenticated, including with multi-factor authentication?"
+      "question": "Are users, services and hardware authenticated, including with multi-factor authentication?",
+      "parts": [
+        "Are users authenticated?",
+        "Are services authenticated?",
+        "Is hardware authenticated?"
+      ]
     },
     {
       "id": "PR.AA-04",
@@ -1087,7 +1188,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "PR.AA-05",
@@ -1110,7 +1212,14 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are access permissions defined in a policy, managed, enforced and reviewed, following least privilege and separation of duties?"
+      "question": "Are access permissions defined in a policy, managed, enforced and reviewed, following least privilege and separation of duties?",
+      "parts": [
+        "Are access permissions, entitlements and authorizations defined in a policy?",
+        "Are access permissions, entitlements and authorizations managed?",
+        "Are access permissions, entitlements and authorizations enforced?",
+        "Are access permissions, entitlements and authorizations reviewed?",
+        "Do access permissions, entitlements and authorizations incorporate the principles of least privilege and separation of duties?"
+      ]
     },
     {
       "id": "PR.AA-06",
@@ -1130,7 +1239,12 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Is physical access to offices, facilities and other assets managed, monitored and enforced?"
+      "question": "Is physical access to offices, facilities and other assets managed, monitored and enforced?",
+      "parts": [
+        "Is physical access to assets managed?",
+        "Is physical access to assets monitored?",
+        "Is physical access to assets enforced commensurate with risk?"
+      ]
     },
     {
       "id": "PR.AT-01",
@@ -1143,7 +1257,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "PR.AT-02",
@@ -1155,7 +1270,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "PR.DS-01",
@@ -1180,7 +1296,12 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Is data at rest protected, for example by encryption?"
+      "question": "Is data at rest protected, for example by encryption?",
+      "parts": [
+        "Is the confidentiality of data at rest protected, for example by encryption?",
+        "Is the integrity of data at rest protected?",
+        "Is the availability of data at rest protected?"
+      ]
     },
     {
       "id": "PR.DS-02",
@@ -1205,7 +1326,12 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Is data in transit protected, for example by encryption?"
+      "question": "Is data in transit protected, for example by encryption?",
+      "parts": [
+        "Is the confidentiality of data in transit protected, for example by encryption?",
+        "Is the integrity of data in transit protected?",
+        "Is the availability of data in transit protected?"
+      ]
     },
     {
       "id": "PR.DS-10",
@@ -1238,7 +1364,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "PR.DS-11",
@@ -1251,7 +1378,13 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are backups of data created, protected, maintained and tested?"
+      "question": "Are backups of data created, protected, maintained and tested?",
+      "parts": [
+        "Are backups of data created?",
+        "Are backups of data protected?",
+        "Are backups of data maintained?",
+        "Are backups of data tested?"
+      ]
     },
     {
       "id": "PR.PS-01",
@@ -1273,7 +1406,11 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are configuration management and change control practices, such as baseline configurations and controlled release of changes to production, established and applied?"
+      "question": "Are configuration management and change control practices, such as baseline configurations and controlled release of changes to production, established and applied?",
+      "parts": [
+        "Are configuration management practices, such as baseline configurations and change control, established?",
+        "Are configuration management practices, such as baseline configurations and change control, applied?"
+      ]
     },
     {
       "id": "PR.PS-02",
@@ -1289,7 +1426,12 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Is software maintained, patched and replaced according to risk?"
+      "question": "Is software maintained, patched and replaced according to risk?",
+      "parts": [
+        "Is software maintained?",
+        "Is software replaced?",
+        "Is software removed commensurate with risk?"
+      ]
     },
     {
       "id": "PR.PS-03",
@@ -1306,7 +1448,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "PR.PS-04",
@@ -1324,7 +1467,11 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are log records generated and made available, for example in a central logging system, for continuous monitoring?"
+      "question": "Are log records generated and made available, for example in a central logging system, for continuous monitoring?",
+      "parts": [
+        "Are log records generated?",
+        "Are log records made available for continuous monitoring, for example centrally?"
+      ]
     },
     {
       "id": "PR.PS-05",
@@ -1339,7 +1486,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "PR.PS-06",
@@ -1358,7 +1506,11 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are secure software development practices, such as security testing and code review, part of the software development life cycle?"
+      "question": "Are secure software development practices, such as security testing and code review, part of the software development life cycle?",
+      "parts": [
+        "Are secure software development practices, such as security testing and code review, integrated?",
+        "Is the performance of secure software development practices monitored throughout the software development life cycle?"
+      ]
     },
     {
       "id": "PR.IR-01",
@@ -1374,7 +1526,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "PR.IR-02",
@@ -1395,7 +1548,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "PR.IR-03",
@@ -1415,7 +1569,10 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are resilience requirements, such as recovery objectives, defined and met in normal and adverse situations?"
+      "question": "Are resilience requirements, such as recovery objectives, defined and met in normal and adverse situations?",
+      "parts": [
+        "Are mechanisms implemented to achieve resilience requirements, such as recovery objectives, in normal and adverse situations?"
+      ]
     },
     {
       "id": "PR.IR-04",
@@ -1431,7 +1588,10 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Is enough resource capacity maintained to keep the service available?"
+      "question": "Is enough resource capacity maintained to keep the service available?",
+      "parts": [
+        "Is adequate resource capacity to ensure availability maintained?"
+      ]
     },
     {
       "id": "DE.CM-01",
@@ -1449,7 +1609,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "DE.CM-02",
@@ -1464,7 +1625,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "DE.CM-03",
@@ -1481,7 +1643,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "DE.CM-06",
@@ -1497,7 +1660,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "DE.CM-09",
@@ -1520,7 +1684,12 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are computing hardware, software, runtime environments and their data monitored to find potentially adverse events?"
+      "question": "Are computing hardware, software, runtime environments and their data monitored to find potentially adverse events?",
+      "parts": [
+        "Are computing hardware and software monitored to find potentially adverse events?",
+        "Are runtime environments monitored to find potentially adverse events?",
+        "Is the data of computing hardware, software and runtime environments monitored to find potentially adverse events?"
+      ]
     },
     {
       "id": "DE.AE-02",
@@ -1535,7 +1704,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "DE.AE-03",
@@ -1553,7 +1723,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "DE.AE-04",
@@ -1569,7 +1740,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "DE.AE-06",
@@ -1585,7 +1757,10 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Is information about security events provided to the staff and tools that need it, for example through alerts?"
+      "question": "Is information about security events provided to the staff and tools that need it, for example through alerts?",
+      "parts": [
+        "Is information on adverse events provided to authorized staff and tools, for example through alerts?"
+      ]
     },
     {
       "id": "DE.AE-07",
@@ -1599,7 +1774,10 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Is cyber threat intelligence integrated into the analysis of security events?"
+      "question": "Is cyber threat intelligence integrated into the analysis of security events?",
+      "parts": [
+        "Are cyber threat intelligence and other contextual information integrated into the analysis of adverse events?"
+      ]
     },
     {
       "id": "DE.AE-08",
@@ -1612,7 +1790,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RS.MA-01",
@@ -1628,7 +1807,10 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Is there an incident response plan that is executed once an incident is declared?"
+      "question": "Is there an incident response plan that is executed once an incident is declared?",
+      "parts": [
+        "Is the incident response plan executed in coordination with relevant third parties once an incident is declared?"
+      ]
     },
     {
       "id": "RS.MA-02",
@@ -1642,7 +1824,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RS.MA-03",
@@ -1656,7 +1839,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RS.MA-04",
@@ -1671,7 +1855,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RS.MA-05",
@@ -1684,7 +1869,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RS.AN-03",
@@ -1698,7 +1884,10 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Is analysis performed after an incident to establish what happened and its root cause?"
+      "question": "Is analysis performed after an incident to establish what happened and its root cause?",
+      "parts": [
+        "Is analysis performed to establish what has taken place during an incident and the root cause of the incident?"
+      ]
     },
     {
       "id": "RS.AN-06",
@@ -1712,7 +1901,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RS.AN-07",
@@ -1726,7 +1916,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RS.AN-08",
@@ -1741,7 +1932,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RS.CO-02",
@@ -1757,7 +1949,10 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are customers and other stakeholders notified of security incidents?"
+      "question": "Are customers and other stakeholders notified of security incidents?",
+      "parts": [
+        "Are internal and external stakeholders, such as customers, notified of incidents?"
+      ]
     },
     {
       "id": "RS.CO-03",
@@ -1773,7 +1968,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RS.MI-01",
@@ -1785,7 +1981,10 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Are incidents contained, and is there a process for doing so?"
+      "question": "Are incidents contained, and is there a process for doing so?",
+      "parts": [
+        "Are incidents contained?"
+      ]
     },
     {
       "id": "RS.MI-02",
@@ -1797,7 +1996,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RC.RP-01",
@@ -1811,7 +2011,10 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Is the recovery portion of the incident response plan, such as disaster recovery failover and restore, executed once initiated from the incident response process?"
+      "question": "Is the recovery portion of the incident response plan, such as disaster recovery failover and restore, executed once initiated from the incident response process?",
+      "parts": [
+        "Is the recovery portion of the incident response plan, such as disaster recovery failover and restore, executed once initiated from the incident response process?"
+      ]
     },
     {
       "id": "RC.RP-02",
@@ -1825,7 +2028,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RC.RP-03",
@@ -1839,7 +2043,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RC.RP-04",
@@ -1855,7 +2060,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RC.RP-05",
@@ -1867,7 +2073,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RC.RP-06",
@@ -1880,7 +2087,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RC.CO-03",
@@ -1894,7 +2102,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     },
     {
       "id": "RC.CO-04",
@@ -1907,7 +2116,8 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "not_checked",
-      "question": null
+      "question": null,
+      "parts": []
     }
   ]
 }

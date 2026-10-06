@@ -10,7 +10,7 @@ from pathlib import Path
 
 from app.csf import Outcome, framework, gap_label
 from app.text import contains
-from datakit.derive_key import derive
+from datakit.derive_key import derive, is_usable_evidence
 from datakit.extract import lines_of
 from datakit.schemas import DocSpec, Facts, GapFacts, Key, Selection, SelectionItem, dump_yaml, load_yaml
 
@@ -115,6 +115,23 @@ def check(pack: str) -> list[str]:
         for m in gap.outcomes
         if m.label and not (m.missing or "").strip()
     ]
+    count = {o.id: len(o.parts) for o in checked()}
+    p += [
+        f"outcome {m.csf_id}: a label override needs missing_parts"
+        for m in gap.outcomes
+        if m.label and not m.missing_parts
+    ]
+    p += [
+        f"outcome {m.csf_id}: missing_parts without a label override"
+        for m in gap.outcomes
+        if m.missing_parts and not m.label
+    ]
+    p += [
+        f"outcome {m.csf_id}: no part {n}"
+        for m in gap.outcomes
+        for n in m.missing_parts
+        if not 1 <= n <= count.get(m.csf_id, 0)
+    ]
     p += [f"Checked outcome {i} has no control" for i in sorted(want - set(ids))]
     p += [f"outcome {i} is not a Checked CSF outcome" for i in sorted(set(ids) - want)]
     p += [
@@ -149,6 +166,18 @@ def check(pack: str) -> list[str]:
         if k.expected_label == "conflict" and k.conflict_trap is None
     ]
     control = {m.csf_id: m.control for m in gap.outcomes}
+    # A CSF part states no threshold (spec 4), so a planted disagreement must rest on a no the part can see: a
+    # negated sentence or a record row's status, not a longer interval (spec 10, adversary C1).
+    p += [
+        f"{k.code}: conflict {k.conflict_trap} rests on a thresholded no the CSF part cannot see"
+        for k in key.items
+        if k.expected_label == "conflict"
+        and not all(
+            "negation" in s.flags or "Status: " in s.text
+            for s in f.statements_for(control[k.code])
+            if s.stance == "no" and is_usable_evidence(f, s)
+        )
+    ]
     labels = {
         k.code: gap_label(framework().get(k.code), k.expected_label, k.expected_value) for k in key.items
     }

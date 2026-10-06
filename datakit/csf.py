@@ -1,7 +1,7 @@
 """NIST CSF 2.0 reference data for the gap check (CSF spec 4). NIST's part (ids, function and category
 names, outcome text, SP 800-53 Rev 5.2.0 references) comes only from the committed extract of NIST's CSF 2.0
-Reference Tool export; VART's part (tier, question) only from data/csf/tiers.yaml. The app reads the built
-file and never fetches anything.
+Reference Tool export; VART's part (tier, question, parts) only from data/csf/tiers.yaml. The app reads the
+built file and never fetches anything.
 
     python -m datakit.csf extract DOWNLOAD.xlsx --retrieved YYYY-MM-DD   # the lead, once per NIST refresh
     python -m datakit.csf build                                         # writes data/csf/csf-2.0.json
@@ -35,6 +35,71 @@ CONTROL = re.compile(r"[A-Z]{2}(?:-\d{2}(?:\(\d{2}\))?)?")
 _CODE = re.compile(r"\(([A-Z]{2}(?:\.[A-Z]{2})?)\)")
 _OUTCOME = re.compile(r"([A-Z]{2}\.[A-Z]{2}-\d{2}): (.+)", re.DOTALL)
 NIST_FIELDS = ("id", "function", "category", "outcome", "related_controls", "source_url")
+# Question words a part may use besides NIST's own (CSF spec 4, amended): none names a thing or a requirement.
+_FRAME_WORDS = (
+    "a an the is are do does its their of and or to for in on at by with from once as such example through"
+)
+FRAME = frozenset(_FRAME_WORDS.split())
+MAX_PARAPHRASE = 3  # words per outcome (adversary checkpoint 2, I3)
+_WORD = re.compile(r"[a-z]+")
+_EXAMPLE = re.compile(r"\b(?:such as|for example)\b")
+
+
+def _stem(word: str) -> str:
+    """Enough to match NIST's inflections: inventories/inventory, managed/manage, processes/process."""
+    for suffix in ("ies", "ing", "ed", "es", "s"):
+        if word.endswith(suffix) and not word.endswith("ss") and len(word) - len(suffix) >= 3:
+            word = word[: -len(suffix)] + ("y" if suffix == "ies" else "")
+            break
+    return word.removesuffix("e")
+
+
+def words(text: str) -> list[str]:
+    return _WORD.findall(text.lower().replace("'s", ""))
+
+
+def added_words(part: str, nist: str) -> list[str]:
+    """The words of a part that are neither question words nor NIST's (compared by stem), in order."""
+    have = {_stem(w) for w in words(nist)}
+    return [w for w in words(part) if w not in FRAME and _stem(w) not in have]
+
+
+def _part_problems(i: str, listed: list[Any], mapping: dict[str, Any], outcome: str, nist: str) -> list[str]:
+    """Each part is a question in NIST's words for this outcome. Any other word stands in an example clause
+    ("such as" or "for example", up to the next comma or the question mark) and is on the outcome's
+    paraphrase_words, mapped to the NIST word it is an instance of (at most MAX_PARAPHRASE). Together the
+    parts carry every word of NIST's outcome."""
+    if not listed:
+        return [f"checked {i}: no parts"]
+    have = {_stem(w) for w in words(nist)}
+    p = [
+        f"{i}: paraphrase word {w!r} must map to a word of NIST's text, not {t!r}"
+        for w, t in mapping.items()
+        if not (isinstance(t, str) and _stem(t.lower()) in have)
+    ]
+    if len(mapping) > MAX_PARAPHRASE:
+        p.append(f"{i}: {len(mapping)} paraphrase words, at most {MAX_PARAPHRASE}")
+    for n, q in enumerate(listed, 1):
+        if not (isinstance(q, str) and q.isascii() and q.rstrip().endswith("?") and '"' not in q):
+            p.append(f"{i} part {n}: must be ASCII, quote nothing and end with '?'")
+            continue
+        # The example clause runs from "such as" / "for example" to the next comma or the question mark.
+        m = _EXAMPLE.search(q.lower())
+        in_example = set(words(re.split(r"[,?]", q.lower()[m.end() :])[0])) if m else set()
+        for w in added_words(q, nist):
+            if w not in mapping:
+                p.append(f"{i} part {n}: adds {w!r}, not in NIST's text")
+            elif w not in in_example:
+                p.append(f"{i} part {n}: {w!r} stands outside an example clause")
+    used = [w for q in listed if isinstance(q, str) for w in words(q)]
+    stems = {_stem(w) for w in used}
+    p += [
+        f"{i}: NIST's {w!r} is in no part"
+        for w in dict.fromkeys(words(outcome))
+        if w not in FRAME and _stem(w) not in stems
+    ]
+    p += [f"{i}: paraphrase word {w!r} is in no part" for w in sorted(set(mapping) - set(used))]
+    return p
 
 
 def extract(path: Path) -> list[dict[str, Any]]:
@@ -88,10 +153,13 @@ def _tier(tiers: dict[str, Any], csf_id: str) -> str:
 
 
 def build(nist: dict[str, Any], tiers: dict[str, Any]) -> dict[str, Any]:
+    parts = tiers.get("parts") or {}
+
     def entry(o: dict[str, Any]) -> dict[str, Any]:
         tier = _tier(tiers, o["id"])
         question = (tiers.get(tier) or {}).get(o["id"]) if tier != "not_checked" else None
-        return {**o, "source_url": TOOL_URL, "tier": tier, "question": question}
+        listed = list(parts.get(o["id"]) or []) if tier == "checked" else []
+        return {**o, "source_url": TOOL_URL, "tier": tier, "question": question, "parts": listed}
 
     return {
         "csf_version": nist["csf_version"],
@@ -124,6 +192,16 @@ def problems(nist: dict[str, Any], tiers: dict[str, Any], built: dict[str, Any])
             if not (isinstance(q, str) and q.isascii() and q.rstrip().endswith("?"))
         ]
     p += [f"{i}: in both checked and ask" for i in sorted(set(checked) & set(ask))]
+    parts, extra = tiers.get("parts") or {}, tiers.get("paraphrase_words") or {}
+    text = {o["id"]: (o["outcome"], f"{o['outcome']} {o['category']}") for o in nist["outcomes"]}
+    p += [f"parts {i}: not a checked outcome" for i in parts if i not in checked]
+    p += [f"paraphrase_words {i}: not a checked outcome" for i in extra if i not in checked]
+    for i in (i for i in checked if i in text):
+        mapping = extra.get(i) or {}
+        if not isinstance(mapping, dict):
+            p.append(f"paraphrase_words {i}: must map each word to a NIST word")
+            mapping = {}
+        p += _part_problems(i, parts.get(i) or [], mapping, *text[i])
     want = build(nist, tiers)
     have = {o["id"]: o for o in built.get("outcomes", [])}
     for o in want["outcomes"]:

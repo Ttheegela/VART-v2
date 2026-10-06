@@ -263,12 +263,12 @@ def test_run_answers_checked_outcomes_stores_ask_answers_and_deletes_its_workspa
         session.commit()
         return d
 
-    def check(session: Any, ws: Any, o: csf.Outcome, llm: Any, models: Any, spend: Any) -> ItemResult | None:
+    def check(session: Any, ws: Any, o: csf.Outcome, llm: Any, models: Any, spend: Any) -> list[ItemResult]:
         assert spend is gap.always
-        return None if o.tier == "ask" else _result(o.id, UNKNOWN)
+        return [_result(i.key, UNKNOWN) for i in csf.part_inputs(o)]  # Ask me: no parts
 
     monkeypatch.setattr(gap, "ingest_document", ingest)
-    monkeypatch.setattr(csf, "check_outcome", check)
+    monkeypatch.setattr(csf, "check_parts", check)
     llm = FakeLLM([])
     report = gap.run(llm, MODELS)
 
@@ -277,6 +277,11 @@ def test_run_answers_checked_outcomes_stores_ask_answers_and_deletes_its_workspa
     m = report["metrics"]
     assert (m["honest_tiers"], m["redaction_private_leaks"], m["nist_text_intact"]) == (1.0, 0.0, 1.0)
     assert m["label_accuracy"] == round(3 / 31, 4)  # only the three planted gaps are right
+    assert report["items"]["PR.DS-11"]["parts"] == [
+        {"key": f"PR.DS-11#{n}", "label": "gap", "citations": [], "dropped": [], "passages": []}
+        for n in (1, 2, 3, 4)
+    ]
+    assert "part_agreement" in m and "part_agreement" not in gap.GATES
     assert set(report["gates"]) == set(gap.GATES) and set(report["models"]) == {"stance", "draft"}
     with Session(db) as s:
         assert s.scalars(select(Workspace.id)).all() == [bystander]
@@ -289,17 +294,19 @@ def test_the_real_loop_answers_every_checked_outcome_before_storing_an_ask_me_an
     outcomes' model steps are stubbed."""
     events: list[tuple[str, str]] = []
 
-    def check(session: Session, ws: uuid.UUID, o: csf.Outcome, llm: Any, models: Any, spend: Any) -> Any:
+    def check(
+        session: Session, ws: uuid.UUID, o: csf.Outcome, llm: Any, models: Any, spend: Any
+    ) -> list[ItemResult]:
         if o.tier == "ask":
-            return None
+            return []
         events.append(("check", o.id))
-        return _result(o.id, UNKNOWN)
+        return [_result(i.key, UNKNOWN) for i in csf.part_inputs(o)]
 
     def store(session: Session, ws: uuid.UUID, text: str, *, filename: str, today: date) -> Document:
         events.append(("store", filename))
         return store_statement(session, ws, text, filename=filename, today=today)
 
-    monkeypatch.setattr(csf, "check_outcome", check)
+    monkeypatch.setattr(csf, "check_parts", check)
     monkeypatch.setattr(gap, "store_statement", store)
     report = gap.run(FakeLLM([]), MODELS)  # every dev document classifies by rules: no model call
 
@@ -313,14 +320,34 @@ def test_the_real_loop_answers_every_checked_outcome_before_storing_an_ask_me_an
 def test_the_statements_gate_fires_on_the_real_loop_when_answers_are_not_kept_out(
     db: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def check(session: Session, ws: uuid.UUID, o: csf.Outcome, llm: Any, models: Any, spend: Any) -> Any:
-        return None if o.tier == "ask" else _result(o.id, UNKNOWN)
+    def check(
+        session: Session, ws: uuid.UUID, o: csf.Outcome, llm: Any, models: Any, spend: Any
+    ) -> list[ItemResult]:
+        return [_result(i.key, UNKNOWN) for i in csf.part_inputs(o)]  # Ask me: no parts
 
-    monkeypatch.setattr(csf, "check_outcome", check)
-    monkeypatch.setattr(csf, "evidence", lambda s, ws, o: retrieve(s, ws, o.question or "", o.category))
+    monkeypatch.setattr(csf, "check_parts", check)
+    monkeypatch.setattr(csf, "evidence", lambda s, ws, item: retrieve(s, ws, item.question, item.topic))
     report = gap.run(FakeLLM([]), MODELS)
     assert report["metrics"]["statements_as_evidence"] >= 1
     assert not report["gates"]["statements_as_evidence"]["pass"]
+
+
+def test_part_agreement_is_reported_and_never_gated() -> None:
+    pack = gap.load()
+    obs = _perfect(pack)
+    yes = Decision("verified", "Yes", (), (), None, None, 0.9)
+    assert pack.missing_parts["PR.AA-01"] == (3,)  # users, services, hardware: the key lacks hardware
+    obs.parts = {
+        "PR.AA-01": [_result("PR.AA-01#1", yes), _result("PR.AA-01#2", yes), _result("PR.AA-01#3", UNKNOWN)]
+    }
+    assert gap.score_gap(pack, obs)["part_agreement"] == 1.0
+    obs.parts["PR.AA-01"] = [
+        _result("PR.AA-01#1", UNKNOWN),
+        _result("PR.AA-01#2", yes),
+        _result("PR.AA-01#3", yes),
+    ]
+    assert gap.score_gap(pack, obs)["part_agreement"] == 0.0  # right label, wrong parts
+    assert "part_agreement" not in gap.GATES
 
 
 @pytest.mark.parametrize(("passing", "code"), [(True, 0), (False, 1)])
