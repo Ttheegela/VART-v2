@@ -137,6 +137,10 @@ leaves). Letters are case sensitive. Every key below is shown as a hint on the c
 | `ctrl+enter` | send an answer (in its text field) | Questions for you |
 | `?` | show all keys (a sheet listing this table; esc closes) | everywhere |
 
+Row actions in the Workspace tables (`edit` a document, `open` or `delete` a questionnaire) are text buttons named
+for their row ("Delete vsq-a.xlsx"), reached with Tab and pressed with Enter or Space; they have no single key, since
+a single key cannot say which row. Enter in a form submits it from any field, a focused select included.
+
 ## Accessibility
 - Focus ring: 2px, instant, never animated. On paper it is `ink`, offset 1px. Inside chrome (top bar, drawer
   header, status line; mark the region `data-chrome`) it switches to `on-chrome` so it reads at 19:1 against
@@ -179,3 +183,6 @@ leaves). Letters are case sensitive. Every key below is shown as a hint on the c
 - 2026-10-06 · Workspace keys: l, q, w for the sample buttons, R resets the workspace after a confirm, r starts a
   run from the workspace; `ctrl+enter` (send an answer, Questions for you) added to the table to match the key
   sheet. Exemption recorded for the disabled view tabs' contrast (60% opacity, inactive controls).
+- 2026-10-06 · Workspace row actions (edit, open, delete) are Tab-reached text buttons with row-named labels, no
+  single key; Enter submits a form from a select too. The upload notices split: one for documents (redaction and
+  its known gaps), one for questionnaires (stored and sent as written).
