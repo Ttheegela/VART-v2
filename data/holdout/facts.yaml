@@ -217,7 +217,7 @@ statements:
     doc: acp
     control: password-standard
     stance: yes
-    text: "Every account that signs in with a password, for staff and for customers, must use a password of at least 16 characters."
+    text: "Passwords for workforce accounts must be at least 16 characters long."
   - id: faq-customer-sso
     doc: faq
     control: customer-sso

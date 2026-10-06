@@ -179,7 +179,7 @@ items:
   must_ask: false
   evidence:
   - doc: acp
-    quote: Every account that signs in with a password, for staff and for customers, must use a password of at least 16 characters.
+    quote: Passwords for workforce accounts must be at least 16 characters long.
     stance: 'yes'
   conflict_trap: null
   scope_note_expected: false

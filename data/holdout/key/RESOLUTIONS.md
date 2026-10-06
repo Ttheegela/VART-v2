@@ -3,10 +3,9 @@
 The answer keys next to this file (vsq-a.yaml, mvsp-b.yaml) are derived from the fact sheet by code
 (`python -m datakit.derive_key holdout`). A fresh blind reader answered all 89 questions (64 in VSQ-A, 25 in MVSP-B)
 from the documents alone, without the fact sheet, the keys or the trap rules. `python -m datakit.compare diff` listed
-where its label or value differed from the key: 83 of 89 agreed. The six disagreements are decided below. Four
-fixes changed the sources; the verifier was not re-run on them (it runs once, before the engine freeze), so the
-`compare diff` lines for VSQ-49, MVSP-2.4 and MVSP-3.3 still show the verifier's answers to the old text. VSQ-56
-agrees after its fix.
+where its label or value differed from the key: 83 of 89 agreed. The six disagreements are decided below. Three
+source fixes (VSQ-49, VSQ-56, MVSP-3.3) were re-verified by a fresh blind reader; the `compare diff` lines for
+VSQ-49 and MVSP-3.3 still show the first verifier's answers to the old text.
 
 ## VSQ-10 (leaver access removed within 24 hours)
 
@@ -29,6 +28,8 @@ agrees after its fix.
 
 ## VSQ-49 (each vendor assessed at least annually)
 
+- Re-verified by a fresh blind reader.
+
 - Key: verified / Yes. Its evidence said "Every vendor with access to customer data is assessed...".
 - Verifier: partial. "Only vendors with customer data access."
 - Decision: the document was ambiguous. The question asks about each vendor and the sentence covers a subset, so Yes
@@ -38,6 +39,8 @@ agrees after its fix.
   quote. Not re-verified.
 
 ## VSQ-56 (inventory of information assets)
+
+- Re-verified by a fresh blind reader.
 
 - Key: partial / Partial. Its only evidence was the draft asset lifecycle policy (draft ceiling).
 - Verifier: verified / Yes. "Infrastructure register kept."
@@ -50,15 +53,18 @@ agrees after its fix.
 
 ## MVSP-2.4 (password policy such as a minimum length)
 
-- Key: verified / Yes. Its evidence said "Passwords for workforce accounts must be at least 16 characters long."
+- Key: verified / Yes. Evidence: "Passwords for workforce accounts must be at least 16 characters long."
 - Verifier: partial. "Length rule for workforce accounts only."
-- Decision: the document was ambiguous. The question covers all accounts that sign in with a password; the sentence
-  covered only staff. Fix the source.
-- Fix: access-control-standard.docx (src/acp.md) now says "Every account that signs in with a password, for staff and
-  for customers, must use a password of at least 16 characters." Same text in the password-standard statement. Key
-  stays verified / Yes. Not re-verified.
+- Decision: key stands by derivation; known limit. password-standard is shared with VSQ-12 (employee accounts, which
+  the same sentence fully answers), and the only password rule is workforce-only, so a correct engine "partial" on
+  MVSP-2.4 counts as a miss. The holdout score is pessimistic here, never flattering.
+- Fix: none. An attempt to widen the sentence to customer accounts was reverted: it contradicted the standard's own
+  internal-systems scope (a fresh blind reader caught it). An attempt to derive partial was dropped because it
+  flipped VSQ-12 too. Source and facts are as in the first commit minus any customer claim.
 
 ## MVSP-3.3 (developer training on five vulnerability classes)
+
+- Re-verified by a fresh blind reader.
 
 - Key: verified / Yes. Its evidence named injection, cross-site scripting and authorization flaws.
 - Verifier: partial. "Covers injection, XSS, authorization; not CSRF or sessions."
