@@ -5,6 +5,7 @@ import { api, messageOf, type GapLabel, type GapOut, type GapRow, type GapScope,
 import { useKeys } from "../lib/keys";
 import { GAP_FOOTER, GAP_LABELS, GAP_REVIEW, SCOPES, SCOPE_KEY } from "../lib/labels";
 import { go } from "../lib/route";
+import GapDrawer from "./GapDrawer";
 import { useStepLoop } from "./RunGrid";
 
 const NOT_CHECKED = "not checked in this version"; // CSF spec 5.5
@@ -104,7 +105,15 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
     [visible],
   );
   const cur = Math.max(0, Math.min(cursor, visible.length - 1));
-  useEffect(() => { body.current?.querySelector<HTMLElement>(`tr[data-i="${cur}"]`)?.focus(); }, [cur]);
+  const open = outcome ? data?.rows.find((r) => r.csf_id === outcome) : undefined;
+  const drawerOpen = open !== undefined;
+  // not while the inspector is open: a full-screen one has taken focus, and the row gets it back on close
+  useEffect(() => { if (!drawerOpen) body.current?.querySelector<HTMLElement>(`tr[data-i="${cur}"]`)?.focus(); }, [cur, drawerOpen]);
+  const close = () => { // the effect above gives focus back to the outcome's row once the inspector is gone
+    const i = visible.findIndex((r) => r.csf_id === outcome);
+    if (i >= 0) setCursor(i);
+    go({ view: "gap", scope: current });
+  };
 
   const toggle = (l: Filter) => setFilters((f) => { const n = new Set(f); if (n.has(l)) n.delete(l); else n.add(l); return n; });
   const openRow = (i: number) => { const r = visible[i]; if (r) go({ view: "gap", scope: current, item: r.csf_id }); };
@@ -136,7 +145,7 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
     ArrowUp: up,
     r: () => void start(),
     e: exportFile,
-  });
+  }, !open);
 
   const said = notice?.scope === current ? notice.text : null;
   const status = running ? "Checking." : run?.status === "done" ? `Gap check done: ${run.done} of ${run.total} checked.` : "";
@@ -148,7 +157,7 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
       hints={[["r", "run"], ["e", "export"], ["?", "all keys"]]}
       expiresAt={workspace.expires_at}
     >
-      <div className="grid h-full min-h-0">
+      <div className={`grid h-full min-h-0 ${open ? "min-[900px]:grid-cols-[minmax(0,1fr)_34rem]" : ""}`}>
         <div className="flex min-h-0 min-w-0 flex-col">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-rule-strong px-4 py-2">
             <div className="min-w-0">
@@ -218,6 +227,9 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
           </div>
           <p className="border-t border-rule-strong px-4 py-1 text-xs text-ink-3">{GAP_FOOTER}</p>
         </div>
+        {open && data && (
+          <GapDrawer row={open} runId={data.run?.id ?? null} controlsUrl={data.controls_url} onClose={close} onChanged={reload} />
+        )}
       </div>
     </Shell>
   );

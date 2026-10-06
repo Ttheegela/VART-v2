@@ -163,4 +163,15 @@ describe("GapCheck", () => {
     await userEvent.click(await screen.findByRole("row", { name: /^PR\.DS-11 / }));
     expect(window.location.search).toBe("?view=gap&item=PR.DS-11&scope=core");
   });
+
+  it("the outcome in the route opens its inspector and esc goes back to the list", async () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+    mockApi({ "GET /api/gap/core": fixtures.gap, "GET /api/answers/a-PR.DS-11": fixtures.gapDetail });
+    render(<GapCheck {...props} outcome="PR.DS-11" />);
+    expect(await screen.findByRole("complementary")).toHaveTextContent("PR.DS-11 · gap check");
+    await userEvent.keyboard("p"); // list keys are off while the inspector is open
+    expect(window.location.search).toBe("?view=gap");
+    await userEvent.keyboard("{Escape}");
+    expect(window.location.search).toBe("?view=gap&scope=core");
+  });
 });

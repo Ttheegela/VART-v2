@@ -25,6 +25,7 @@ export type Label = AnswerSummary["label"];
 export type GapOut = S["GapOut"];
 export type GapRow = S["GapRow"];
 export type PartOut = S["PartOut"];
+export type DroppedOut = S["DroppedOut"];
 export type GapLabel = NonNullable<GapRow["label"]>;
 export type GapScope = GapOut["scope"];
 

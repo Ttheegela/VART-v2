@@ -101,4 +101,19 @@ const gap: GapOut = {
   ],
 };
 
-export const fixtures = { workspace, health, run, rows, detail, documents, questionnaire, questions, audit, gap };
+const gapCite = {
+  ...detail.citations[0], filename: "backup-policy.docx", status: "draft" as const, line: 2,
+  quote: "Backups of data are created daily.", context: [{ n: 2, text: "Backups of data are created daily.", cited: true }],
+};
+const gapDetail: AnswerDetail = {
+  ...detail, id: "a-PR.DS-11", item_id: "i-PR.DS-11", label: "partial", value: "Partial",
+  text: "Evidenced: part 1. No evidence: part 2.",
+  item: { ...detail.item, id: "i-PR.DS-11", code: "PR.DS-11", csf_id: "PR.DS-11", question: "Are backups of data created and tested?" },
+  citations: [gapCite],
+  parts: [
+    { n: 1, question: "Are backups of data created?", label: "covered", citations: [gapCite], dropped: [], from_statement: false },
+    { n: 2, question: "Are backups of data tested?", label: "gap", citations: [], dropped: [], from_statement: false },
+  ],
+};
+
+export const fixtures = { workspace, health, run, rows, detail, documents, questionnaire, questions, audit, gap, gapDetail };
