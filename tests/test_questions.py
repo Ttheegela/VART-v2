@@ -25,6 +25,7 @@ from app.db.models import (
 )
 from app.llm.client import LLMRequest, LLMResult
 from app.main import app
+from app.retrieve import retrieve
 from app.services import ip_limits, llm_budget
 from tests import factories as f
 from tests.apiclient import visitor
@@ -583,16 +584,140 @@ def test_an_answer_and_a_workspace_reset_at_once_never_deadlock(
     assert inside.wait(10)
     b = threading.Thread(target=reset)
     b.start()
+    waited = False
     for _ in range(100):  # until the reset waits on a lock
         if _lock_waiters(db):
+            waited = True
             break
         time.sleep(0.05)
     go_on.set()
     a.join(20)
     b.join(20)
+    assert waited
     assert not [e for e in errors if "deadlock" in str(e).lower()], errors
     with Session(db) as s:
         assert s.get(Workspace, ws_id) is None  # the reset still happened
+
+
+def test_two_answers_in_one_workspace_at_once_both_store_without_a_deadlock(
+    db: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Plan 4 Task 5 review I1: the workspace lock is FOR NO KEY UPDATE, so two statement writers take turns.
+    # A FOR KEY SHARE lock lets both in, and then both ask `_store` for FOR UPDATE: a deadlock.
+    with Session(db) as s:
+        ws, r = _done_run(s, ["Data Security", "Data Security"])
+        qa, qb = qs.ensure_questions(s, ws.id, r.id)
+        ws_id, ids = ws.id, [qa.id, qb.id]
+    real = qs.store_statement
+
+    def slow(*a, **k):  # type: ignore[no-untyped-def]
+        time.sleep(0.5)
+        return real(*a, **k)
+
+    monkeypatch.setattr(qs, "store_statement", slow)
+    errors: list[BaseException] = []
+
+    def answer(qid: uuid.UUID) -> None:
+        with Session(db) as t:
+            try:
+                qs.answer_question(t, ws_id, qid, TEXT, None, MODELS, TODAY)
+            except BaseException as exc:
+                errors.append(exc)
+
+    threads = [threading.Thread(target=answer, args=(i,)) for i in ids]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join(30)
+    assert errors == []
+    with Session(db) as s:
+        assert s.scalar(select(func.count()).select_from(Answer).where(Answer.label == "user_confirmed")) == 2
+
+
+def test_a_skip_and_a_workspace_reset_at_once_never_deadlock(
+    db: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Plan 4 Task 5 review I2: skip locked its question, then its audit insert waited for the workspace row
+    # the reset held, while the reset's cascade waited for that question.
+    with Session(db) as s:
+        ws, r = _done_run(s, ["Data Security"])
+        (q,) = qs.ensure_questions(s, ws.id, r.id)
+        ws_id, q_id = ws.id, q.id
+    inside, go_on = threading.Event(), threading.Event()
+    real = qs.audit_log.record
+
+    def slow(*a, **k):  # type: ignore[no-untyped-def]
+        inside.set()
+        go_on.wait(10)
+        return real(*a, **k)
+
+    monkeypatch.setattr(qs.audit_log, "record", slow)
+    errors: list[BaseException] = []
+
+    def skip() -> None:
+        with Session(db) as t:
+            try:
+                qs.skip(t, ws_id, q_id)
+            except BaseException as exc:
+                errors.append(exc)
+
+    def reset() -> None:
+        with Session(db) as t:
+            try:
+                t.execute(delete(Workspace).where(Workspace.id == ws_id))
+                t.commit()
+            except BaseException as exc:
+                errors.append(exc)
+
+    a = threading.Thread(target=skip)
+    a.start()
+    assert inside.wait(10)
+    b = threading.Thread(target=reset)
+    b.start()
+    waited = False
+    for _ in range(100):  # until the reset waits on a lock
+        if _lock_waiters(db):
+            waited = True
+            break
+        time.sleep(0.05)
+    go_on.set()
+    a.join(20)
+    b.join(20)
+    assert waited
+    assert errors == []  # no deadlock, no 500: the skip finished first
+    with Session(db) as s:
+        assert s.get(Workspace, ws_id) is None
+
+
+def _edited_after_a_fill(db: Engine) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID, TestClient]:
+    """A confirmed answer whose statement made an open fill for the other item; then the answer is edited.
+    Returns (workspace, old statement, fill, client)."""
+    client, ws_id = visitor(db)
+    with Session(db) as s:
+        r = _fill(s, s.get_one(Workspace, ws_id), ["Data Security", "Data Security"])
+        first, _ = qs.ensure_questions(s, ws_id, r.id)
+        _, a, fills = qs.answer_question(s, ws_id, first.id, TEXT, _recheck_llm(), MODELS, TODAY)
+        assert a is not None and a.statement_id is not None and len(fills) == 1
+        old, fill, a_id = a.statement_id, fills[0].id, a.id
+    edit = client.patch(f"/api/answers/{a_id}", json={"text": "Backups are not encrypted."})
+    assert edit.status_code == 200
+    return ws_id, old, fill, client
+
+
+def test_an_edited_confirmed_answers_old_statement_is_no_longer_evidence(db: Engine) -> None:
+    ws_id, old, _, _ = _edited_after_a_fill(db)
+    with Session(db) as s:
+        assert s.get_one(Document, old).evidence_allowed is False
+        found = retrieve(s, ws_id, "Do you encrypt backups and rotate the key?", None)
+        mine = [p for p in found.passages if p.doc.id == str(old)]
+        assert mine and not any(p.doc.evidence_allowed for p in mine)  # a later run's gate drops them
+
+
+def test_an_edited_confirmed_answers_open_fills_cannot_be_accepted(db: Engine) -> None:
+    _, _, fill, client = _edited_after_a_fill(db)
+    with Session(db) as s:
+        assert s.get_one(SuggestedFill, fill).status == "dismissed"
+    assert client.post(f"/api/suggestions/{fill}/accept").status_code == 409
 
 
 def test_editing_a_confirmed_answer_stores_the_edit_as_a_new_statement(db: Engine) -> None:

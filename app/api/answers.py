@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app import csf
 from app.api.deps import SessionDep, WorkspaceDep
@@ -26,7 +26,7 @@ from app.api.schemas import (
     NotApplicableIn,
     PartOut,
 )
-from app.db.models import Answer, Chunk, Document, DocumentLine, Item, RunItem
+from app.db.models import Answer, Chunk, Document, DocumentLine, Item, RunItem, SuggestedFill
 from app.ingest.store import store_statement
 from app.questions import lock_workspace, statement_filename
 from app.redact import redact_text
@@ -183,15 +183,25 @@ def edit_answer(
 ) -> AnswerSummary:
     """Edit the text; the answer becomes unapproved and `edited`. On a Confirmed-by-you answer the edit is the
     visitor's new answer: it is stored as a new dated, redacted statement and the answer points to it
-    (Plan 3 M6), counted under the network's `interview` cap (each pays for redaction, adversary-1 N2).
+    (Plan 3 M6; the old statement stops being evidence and its open fills are dismissed), counted under the
+    network's `interview` cap (each pays for redaction, adversary-1 N2).
     409 for a gap check's outcome; 422 when the redacted answer is empty or too long."""
     ws_id = ws.id
-    label = session.scalar(select(Answer.label).where(Answer.id == answer_id, Answer.workspace_id == ws_id))
-    if label == "user_confirmed":
+    row = session.execute(
+        select(Answer.label, Item.csf_id)
+        .join(Item, Item.id == Answer.item_id)
+        .where(Answer.id == answer_id, Answer.workspace_id == ws_id)
+    ).one_or_none()
+    # a gap check's outcome is refused below, so it pays nothing (review M3)
+    charged = row is not None and row.label == "user_confirmed" and row.csf_id is None
+    if charged:
         limit(request, session, "interview")  # commits: before any lock
     lock_workspace(session, ws_id)  # first, as every write that stores a statement (Plan 4 Task 5)
     a = _own(session, ws, answer_id, lock=True)
     _not_gap(session, a)
+    if a.label == "user_confirmed" and not charged:  # answered since the read above (review M2)
+        session.rollback()
+        raise Conflict("This answer changed since you opened it; reload and try again.")
     text = edit.text
     if a.label == "user_confirmed":
         position = session.scalar(select(Item.position).where(Item.id == a.item_id)) or 0
@@ -206,6 +216,16 @@ def edit_answer(
         lines = session.scalars(
             select(DocumentLine.text).where(DocumentLine.document_id == said.id).order_by(DocumentLine.n)
         )
+        # The edit withdraws the old claim (review I3): it stops being evidence for later runs, and the open
+        # fills that cite it are dismissed. Accepted fills keep their citations (the document stays).
+        old = a.statement_id
+        if old is not None:
+            session.execute(update(Document).where(Document.id == old).values(evidence_allowed=False))
+            session.execute(
+                update(SuggestedFill)
+                .where(SuggestedFill.statement_id == old, SuggestedFill.status == "open")
+                .values(status="dismissed")
+            )
         a.statement_id, text = said.id, " ".join(lines)
     a.text, a.edited, a.approved_at = text, True, None
     audit_log.record(session, ws_id, "answer.edit", ref=str(a.id))

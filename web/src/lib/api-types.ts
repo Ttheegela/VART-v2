@@ -16,7 +16,8 @@ export interface paths {
      * Edit Answer
      * @description Edit the text; the answer becomes unapproved and `edited`. On a Confirmed-by-you answer the edit is the
      * visitor's new answer: it is stored as a new dated, redacted statement and the answer points to it
-     * (Plan 3 M6), counted under the network's `interview` cap (each pays for redaction, adversary-1 N2).
+     * (Plan 3 M6; the old statement stops being evidence and its open fills are dismissed), counted under the
+     * network's `interview` cap (each pays for redaction, adversary-1 N2).
      * 409 for a gap check's outcome; 422 when the redacted answer is empty or too long.
      */
     patch: operations["edit_answer_api_answers__answer_id__patch"];
@@ -1103,7 +1104,8 @@ export interface operations {
    * Edit Answer
    * @description Edit the text; the answer becomes unapproved and `edited`. On a Confirmed-by-you answer the edit is the
    * visitor's new answer: it is stored as a new dated, redacted statement and the answer points to it
-   * (Plan 3 M6), counted under the network's `interview` cap (each pays for redaction, adversary-1 N2).
+   * (Plan 3 M6; the old statement stops being evidence and its open fills are dismissed), counted under the
+   * network's `interview` cap (each pays for redaction, adversary-1 N2).
    * 409 for a gap check's outcome; 422 when the redacted answer is empty or too long.
    */
   edit_answer_api_answers__answer_id__patch: {

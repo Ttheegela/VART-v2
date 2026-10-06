@@ -60,10 +60,13 @@ def statement_filename(position: int) -> str:
 
 
 def lock_workspace(session: Session, workspace_id: uuid.UUID) -> None:
-    """Take the workspace row FOR KEY SHARE before any other lock. A reset deletes that row and cascades to
-    everything in the workspace; a write that locked an answer and then inserted a statement (a row pointing
-    at the workspace) waited for the reset while the reset waited for that answer: a deadlock (Plan 3
-    carry-over). Locking the workspace first puts both in one order. A reset that won: the GONE 404."""
+    """Take the workspace row FOR NO KEY UPDATE (`key_share=True` renders that; read=True would be FOR KEY
+    SHARE) before any other lock. A reset deletes that row and cascades to everything in the workspace; a
+    write that locked an answer and then inserted a statement (a row pointing at the workspace) waited for the
+    reset while the reset waited for that answer: a deadlock (Plan 3 carry-over). Locking the workspace first
+    puts both in one order. NO KEY UPDATE, not KEY SHARE: two statement writers in one workspace take
+    turns, where KEY SHARE lets both in and both then ask `_store` for FOR UPDATE: a deadlock. A reset that
+    won: the GONE 404."""
     found = session.scalar(
         select(Workspace.id).where(Workspace.id == workspace_id).with_for_update(key_share=True)
     )
@@ -219,7 +222,7 @@ def answer_question(
     today: date,
     network: str | None = None,
 ) -> tuple[InterviewQuestion, Answer | None, list[SuggestedFill]]:
-    # Lock order everywhere: the workspace (FOR KEY SHARE), the run (Check again only), answer, question,
+    # Lock order everywhere: the workspace (FOR NO KEY UPDATE), the run (Check again only), answer, question,
     # suggestion, run item (preflight I1; Plan 4 Task 5), so accept, answer, Check again and a reset cannot
     # deadlock.
     lock_workspace(session, workspace_id)
@@ -370,6 +373,7 @@ def _suggest(
 
 
 def skip(session: Session, workspace_id: uuid.UUID, question_id: uuid.UUID) -> InterviewQuestion:
+    lock_workspace(session, workspace_id)  # first: the audit insert points at the workspace (review I2)
     q = _question(session, workspace_id, question_id, lock=True)
     if q.status in ASKABLE:
         q.status = "skipped"

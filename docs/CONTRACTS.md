@@ -236,6 +236,8 @@ change-log line; changing or removing a path, a field or a status needs the lead
 - 2026-10-06: Plan 6B final review fix (Ruling 14; copy and mapping only, the label id `confirmed_by_you` and the OpenAPI schema are unchanged): an Ask-me outcome the visitor answered reads "Answered by you" (view chip, drawer, sheet via `csf.gap_word`) and stays in the review set; "Confirmed by you" is only for a Checked outcome made Covered by accepted fills (Ruling 6). The failed sheet word is "Failed" (stale "Not run yet" fixed). No prompt or label rule changes, so nothing is re-recorded.
 - 2026-10-07: Plan 4 Task 5 (behaviour inside existing statuses; the PATCH declares the sentence 422): `PATCH
   /api/answers/{id}` on a Confirmed-by-you answer stores the edit as a new dated, redacted statement and points the
-  answer at it (Plan 3 M6), counted under the per-network `interview` cap (429); the earlier statement stays. Answering
-  a question, accepting a fill and editing a confirmed answer take the workspace row FOR KEY SHARE first, so none can
-  deadlock against a workspace reset (a reset that wins is the GONE 404).
+  answer at it (Plan 3 M6), counted under the per-network `interview` cap (429); the earlier statement stays as a
+  citation target but stops being evidence (`evidence_allowed` false) and its open fills are dismissed. Answering a
+  question, skipping one, accepting a fill and editing a confirmed answer take the workspace row FOR NO KEY UPDATE
+  first (two statement writers take turns; FOR KEY SHARE would deadlock them), so none can deadlock against a
+  workspace reset (a reset that wins is the GONE 404).
