@@ -200,12 +200,13 @@ def _finish_if_done(session: Session, run: Run) -> None:
         select(RunItem.item_id).where(RunItem.run_id == run.id, RunItem.state != "done").limit(1)
     )
     if left is None:
-        closed = session.execute(
+        closed = session.scalar(
             update(Run)
             .where(Run.id == run.id, Run.status == "running")
             .values(status="done", finished_at=datetime.now(UTC))
+            .returning(Run.id)
         )
-        if closed.rowcount:  # only the step that closes the run records it
+        if closed:  # only the step that closes the run records it
             audit_log.record(session, run.workspace_id, "run.done", ref=str(run.id))
     session.commit()
     session.refresh(run)
