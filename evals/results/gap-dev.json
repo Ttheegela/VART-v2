@@ -1,0 +1,356 @@
+{
+  "gates": {
+    "cited_coverage": {
+      "op": ">=",
+      "pass": true,
+      "target": 1.0,
+      "value": 1.0
+    },
+    "disagreements_caught": {
+      "op": ">=",
+      "pass": false,
+      "target": 1.0,
+      "value": 0.5
+    },
+    "honest_tiers": {
+      "op": ">=",
+      "pass": true,
+      "target": 1.0,
+      "value": 1.0
+    },
+    "label_accuracy": {
+      "op": ">=",
+      "pass": false,
+      "target": 0.8,
+      "value": 0.6129
+    },
+    "nist_text_intact": {
+      "op": ">=",
+      "pass": true,
+      "target": 1.0,
+      "value": 1.0
+    },
+    "redaction_private_leaks": {
+      "op": "<=",
+      "pass": true,
+      "target": 0.0,
+      "value": 0.0
+    },
+    "stated_noncompliance": {
+      "op": ">=",
+      "pass": true,
+      "target": 1.0,
+      "value": 1.0
+    },
+    "statements_as_evidence": {
+      "op": "<=",
+      "pass": true,
+      "target": 0.0,
+      "value": 0.0
+    },
+    "trap_coverage": {
+      "op": "<=",
+      "pass": false,
+      "target": 0.0,
+      "value": 1.0
+    }
+  },
+  "items": {
+    "DE.AE-06": {
+      "citations": 2,
+      "decide": "conflict",
+      "draft": "model",
+      "dropped": [],
+      "label": "documents_disagree",
+      "value": null
+    },
+    "DE.AE-07": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "model",
+      "dropped": [],
+      "label": "not_met",
+      "value": "No"
+    },
+    "DE.CM-09": {
+      "citations": 1,
+      "decide": "partial",
+      "draft": "model",
+      "dropped": [],
+      "label": "partly_covered",
+      "value": "Partial"
+    },
+    "GV.PO-01": {
+      "citations": 1,
+      "decide": "partial",
+      "draft": "model",
+      "dropped": [],
+      "label": "partly_covered",
+      "value": "Partial"
+    },
+    "GV.PO-02": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "model",
+      "dropped": [
+        "not-evidence",
+        "not-evidence",
+        "placeholder"
+      ],
+      "label": "covered",
+      "value": "Yes"
+    },
+    "ID.AM-01": {
+      "citations": 3,
+      "decide": "verified",
+      "draft": "model",
+      "dropped": [],
+      "label": "covered",
+      "value": "Yes"
+    },
+    "ID.AM-02": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "model",
+      "dropped": [],
+      "label": "covered",
+      "value": "Yes"
+    },
+    "ID.AM-03": {
+      "citations": 0,
+      "decide": "unknown",
+      "draft": "none",
+      "dropped": [],
+      "label": "gap",
+      "value": null
+    },
+    "ID.AM-05": {
+      "citations": 0,
+      "decide": "unknown",
+      "draft": "none",
+      "dropped": [],
+      "label": "gap",
+      "value": null
+    },
+    "ID.AM-08": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "model",
+      "dropped": [],
+      "label": "covered",
+      "value": "Yes"
+    },
+    "ID.RA-01": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "model",
+      "dropped": [],
+      "label": "covered",
+      "value": "Yes"
+    },
+    "ID.RA-02": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "model",
+      "dropped": [],
+      "label": "not_met",
+      "value": "No"
+    },
+    "ID.RA-08": {
+      "citations": 0,
+      "decide": "unknown",
+      "draft": "none",
+      "dropped": [],
+      "label": "gap",
+      "value": null
+    },
+    "PR.AA-01": {
+      "citations": 3,
+      "decide": "conflict",
+      "draft": "model",
+      "dropped": [],
+      "label": "documents_disagree",
+      "value": null
+    },
+    "PR.AA-03": {
+      "citations": 2,
+      "decide": "partial",
+      "draft": "model",
+      "dropped": [],
+      "label": "partly_covered",
+      "value": "Partial"
+    },
+    "PR.AA-05": {
+      "citations": 4,
+      "decide": "partial",
+      "draft": "model",
+      "dropped": [],
+      "label": "partly_covered",
+      "value": "Partial"
+    },
+    "PR.AA-06": {
+      "citations": 0,
+      "decide": "unknown",
+      "draft": "none",
+      "dropped": [],
+      "label": "gap",
+      "value": null
+    },
+    "PR.DS-01": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "model",
+      "dropped": [],
+      "label": "covered",
+      "value": "Yes"
+    },
+    "PR.DS-02": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "model",
+      "dropped": [],
+      "label": "covered",
+      "value": "Yes"
+    },
+    "PR.DS-11": {
+      "citations": 2,
+      "decide": "partial",
+      "draft": "model",
+      "dropped": [],
+      "label": "partly_covered",
+      "value": "Partial"
+    },
+    "PR.IR-03": {
+      "citations": 1,
+      "decide": "partial",
+      "draft": "model",
+      "dropped": [],
+      "label": "partly_covered",
+      "value": "Partial"
+    },
+    "PR.IR-04": {
+      "citations": 0,
+      "decide": "unknown",
+      "draft": "none",
+      "dropped": [
+        "not-evidence"
+      ],
+      "label": "gap",
+      "value": null
+    },
+    "PR.PS-01": {
+      "citations": 0,
+      "decide": "unknown",
+      "draft": "none",
+      "dropped": [],
+      "label": "gap",
+      "value": null
+    },
+    "PR.PS-02": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "model",
+      "dropped": [],
+      "label": "covered",
+      "value": "Yes"
+    },
+    "PR.PS-04": {
+      "citations": 2,
+      "decide": "partial",
+      "draft": "model",
+      "dropped": [],
+      "label": "partly_covered",
+      "value": "Partial"
+    },
+    "PR.PS-06": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "model",
+      "dropped": [],
+      "label": "covered",
+      "value": "Yes"
+    },
+    "RC.RP-01": {
+      "citations": 1,
+      "decide": "partial",
+      "draft": "model",
+      "dropped": [],
+      "label": "partly_covered",
+      "value": "Partial"
+    },
+    "RS.AN-03": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "model",
+      "dropped": [],
+      "label": "covered",
+      "value": "Yes"
+    },
+    "RS.CO-02": {
+      "citations": 2,
+      "decide": "verified",
+      "draft": "model",
+      "dropped": [
+        "not-evidence",
+        "quote-length"
+      ],
+      "label": "covered",
+      "value": "Yes"
+    },
+    "RS.MA-01": {
+      "citations": 2,
+      "decide": "partial",
+      "draft": "model",
+      "dropped": [],
+      "label": "partly_covered",
+      "value": "Partial"
+    },
+    "RS.MI-01": {
+      "citations": 1,
+      "decide": "verified",
+      "draft": "model",
+      "dropped": [
+        "quote-length"
+      ],
+      "label": "covered",
+      "value": "Yes"
+    }
+  },
+  "label_misses": [
+    "DE.CM-09: expected covered, got partly_covered",
+    "GV.PO-01: expected covered, got partly_covered",
+    "ID.AM-05: expected covered, got gap",
+    "ID.RA-08: expected covered, got gap",
+    "PR.AA-01: expected covered, got documents_disagree",
+    "PR.AA-05: expected documents_disagree, got partly_covered",
+    "PR.DS-11: expected covered, got partly_covered",
+    "PR.IR-03: expected covered, got partly_covered",
+    "PR.PS-01: expected covered, got gap",
+    "PR.PS-04: expected covered, got partly_covered",
+    "RC.RP-01: expected covered, got partly_covered",
+    "RS.CO-02: expected partly_covered, got covered"
+  ],
+  "metrics": {
+    "cited_coverage": 1.0,
+    "cost_usd_per_core_run": 0.0279,
+    "disagreements_caught": 0.5,
+    "honest_tiers": 1.0,
+    "label_accuracy": 0.6129,
+    "nist_text_intact": 1.0,
+    "redaction_private_leaks": 0.0,
+    "retrieval_recall_at_8": 0.7262,
+    "seconds_per_core_run": 372.94,
+    "stated_noncompliance": 1.0,
+    "statements_as_evidence": 0.0,
+    "trap_coverage": 1.0
+  },
+  "models": {
+    "draft": "z-ai/glm-5.3-flash",
+    "stance": "deepseek/deepseek-v4-pro"
+  },
+  "pack": "gap-dev",
+  "prompts": [
+    "stance@p3",
+    "draft@p2"
+  ]
+}
