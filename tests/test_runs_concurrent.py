@@ -270,6 +270,32 @@ def test_an_ask_me_outcome_beside_a_checked_one_does_not_hide_an_outage(s: Sessi
     assert s.scalars(select(Answer.text)).all() == [""]  # the Ask-me row is written; no Failed answer
 
 
+def test_a_full_outage_on_the_real_core_scope_is_a_503_whenever_a_call_was_made(s: Session) -> None:
+    # Task 2 re-review I1: Checked outcomes whose parts retrieve no passage, and Ask-me ones, are answered
+    # with no model call, so they show nothing about the provider. Every step that called it is a 503 that
+    # keeps at most one attempt; a step that made no call cannot have met the outage, and keeps none.
+    ws = f.workspace(s)
+    f.chunk(s, f.document(s, ws, filename="backup-policy.docx"), line_start=2, line_end=2, text=LINE)
+    s.commit()
+    q = csf.questionnaire_for(s, ws.id, "core")
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    llm = ByStepLLM({"stance": _outage()})
+    outages = 0
+    for n in range(12):
+        before, made = _attempts(s), len(llm.requests)
+        try:
+            runs.step(s, ws.id, run.id, llm, MODELS)
+            met = False
+        except ModelsUnavailable:
+            met = True
+        after = _attempts(s)
+        assert met == (len(llm.requests) > made), f"step {n + 1}: a 503 exactly when the provider was called"
+        kept = [p for p, (st, at) in after.items() if st == "pending" and at > before[p][1]]
+        assert len(kept) <= (1 if met else 0), f"step {n + 1}: {kept}"
+        outages += met
+    assert outages >= 6  # the probe's sequence: most steps meet the provider
+
+
 def test_a_clock_that_raises_in_a_worker_is_settled_not_lost(s: Session) -> None:
     # Review M1: an exception from the clock as a job starts comes back as that job's error; the other job's
     # answer is still written before it is raised
@@ -377,8 +403,8 @@ def test_a_late_part_lands_on_no_row_once_its_outcome_was_released(
                 release.wait(10)
             return super().complete(req)
 
-    with pytest.raises(ModelsUnavailable):
-        runs.step(s, ws.id, run.id, FourthIsStuck({"stance": YES}), MODELS)
+    # parts 1-3 came back, so the provider answers: not a 503 (re-review I1); the outcome goes back unanswered
+    assert runs.step(s, ws.id, run.id, FourthIsStuck({"stance": YES}), MODELS) == []
     release.set()
     assert finished.wait(10)
     s.expire_all()
