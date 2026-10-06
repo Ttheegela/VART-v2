@@ -172,7 +172,7 @@ export function Shell({ mode, cursor, hints, runId, expiresAt, children }: Shell
         </nav>
         {left && <span className="hidden text-xs min-[900px]:inline">{left}</span>}
       </header>
-      <main className={`min-h-0 overflow-auto ${tour ? "pb-80" : ""}`}>{/* room under the tour card for the last rows */}{children}</main>
+      <main className={`min-h-0 overflow-auto ${tour ? "pb-80 min-[900px]:pb-0" : ""}`}>{/* room under the tour card for the last rows */}{children}</main>
       <footer data-chrome className="flex h-7 items-center gap-3 overflow-hidden bg-chrome px-4 text-xs text-on-chrome-2">
         <span className="shrink-0 whitespace-nowrap bg-on-chrome px-1 font-bold text-ink">{mode}</span>
         {cursor && <span className="min-w-0 truncate">{cursor}</span>}
