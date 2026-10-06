@@ -128,6 +128,8 @@ jobs:
       DATABASE_URL: postgresql+psycopg://vart:vart@localhost:5434/vart_test
       SESSION_SECRET: ci-session-secret
       CRON_SECRET: ci-cron-secret
+      LLM_MODE: replay
+      LLM_RECORDING: ${{ github.workspace }}/web/e2e/recorded.jsonl
     steps:
       - uses: actions/checkout@v4
         with:

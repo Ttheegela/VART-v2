@@ -1,6 +1,7 @@
 import os
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, Response
@@ -11,6 +12,7 @@ from app.api.errors import GONE
 from app.db.models import Workspace
 from app.db.session import get_session
 from app.llm.client import LLMClient, default_client
+from app.llm.recorder import RecordingClient, ReplayClient
 from app.services.capacity import ensure_capacity
 from app.services.ip_limits import client_ip, hit, ip_hash, retry_after
 from app.services.workspaces import WORKSPACE_TTL
@@ -96,7 +98,16 @@ WorkspaceDep = Annotated[Workspace, Depends(require_workspace)]
 
 
 def get_llm() -> LLMClient | None:
-    return default_client()
+    settings = get_settings()
+    if settings.llm_mode == "live":
+        return default_client()
+    if os.environ.get("VERCEL") == "1":
+        raise RuntimeError("LLM_MODE must be live on Vercel")
+    path = Path(settings.llm_recording)
+    if settings.llm_mode == "replay":
+        return ReplayClient(path)
+    live = default_client()
+    return RecordingClient(live, path) if live is not None else None
 
 
 LLMDep = Annotated[LLMClient | None, Depends(get_llm)]

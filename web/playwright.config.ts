@@ -1,10 +1,11 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 
 const remote = process.env.PLAYWRIGHT_BASE_URL;
 
 export default defineConfig({
   testDir: "e2e",
-  timeout: 60_000,
+  timeout: 180_000,
   retries: process.env.CI ? 1 : 0,
   use: { baseURL: remote ?? "http://127.0.0.1:8000", trace: "retain-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
@@ -16,5 +17,9 @@ export default defineConfig({
         url: "http://127.0.0.1:8000/api/health",
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
+        env: {
+          LLM_MODE: process.env.LLM_MODE ?? "replay",
+          LLM_RECORDING: process.env.LLM_RECORDING ?? fileURLToPath(new URL("./e2e/recorded.jsonl", import.meta.url)),
+        },
       },
 });
