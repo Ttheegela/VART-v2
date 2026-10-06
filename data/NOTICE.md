@@ -9,3 +9,8 @@
   item or MVSP control, which for some topics is only adjacent.
 - **MVSP** (https://github.com/vendorsec/mvsp, commit 2428bd529bdedec72d47cb3068a174cbfa4ced1a), CC0 1.0.
 - **NIST CSF 2.0** subcategory identifiers (public domain, U.S. Government work).
+- **NIST CSF 2.0 Reference Tool export** (https://csrc.nist.gov/extensions/nudp/services/json/csf/download?olirids=all,
+  retrieved on the date in `data/csf/source/csf-2.0-extract.json`), public domain (U.S. Government work). The extract
+  keeps NIST's outcome identifiers, function and category names, outcome text and SP 800-53 Rev 5.2.0 references,
+  verbatim; the export's other informative references (ISO/IEC, PCI, CCM and others) are not kept. `tier` and
+  `question` in `data/csf/csf-2.0.json` are this project's.

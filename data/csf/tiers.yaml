@@ -1,0 +1,45 @@
+# VART's part of data/csf/csf-2.0.json (CSF spec 4): the outcomes v1 checks against a company's documents
+# (checked), the ones it asks the visitor about (ask), and the fixed question for each. Every other outcome is
+# not_checked: stored with NIST's text and links, no question, no model call, no label. Moving an outcome into
+# checked is a data change plus a control in data/dev/gap/facts.yaml; python -m datakit.csf build, then
+# python -m datakit.gap dev, then re-record the gap-dev eval.
+# Questions are generic paraphrases of NIST's outcome, never tuned to one document (CSF spec 10).
+#
+# Change log (one line per NIST refresh or tier change):
+#   2026-10-05  first version: CSF 2.0 Reference Tool export, 106 outcomes, SP 800-53 Rev 5.2.0 references.
+checked:
+  GV.PO-01: "Is there a documented cybersecurity policy, based on the organization's context and strategy, that is communicated and enforced?"
+  GV.PO-02: "Are cybersecurity policies reviewed, updated, communicated and enforced on a regular schedule?"
+  ID.AM-01: "Is an inventory of the organization's hardware assets maintained?"
+  ID.AM-02: "Is an inventory of the organization's software, services and systems maintained?"
+  ID.AM-03: "Are diagrams or other representations of the organization's network communication and data flows maintained?"
+  ID.AM-05: "Are assets and data prioritized by classification, criticality and impact?"
+  ID.AM-08: "Are systems, hardware, software and data managed through their whole life cycle, including secure disposal?"
+  ID.RA-01: "Are vulnerabilities in the organization's assets identified, validated and recorded, for example through scans or penetration tests?"
+  ID.RA-02: "Does the organization receive cyber threat intelligence from information sharing forums or other sources?"
+  ID.RA-08: "Is there a process for receiving, analyzing and responding to vulnerability reports from outside the organization?"
+  PR.AA-01: "Are identities and credentials for users, services and hardware managed by the organization?"
+  PR.AA-03: "Are users, services and hardware authenticated, including with multi-factor authentication?"
+  PR.AA-05: "Are access permissions defined in a policy, managed, enforced and reviewed, following least privilege and separation of duties?"
+  PR.AA-06: "Is physical access to offices, facilities and other assets managed, monitored and enforced?"
+  PR.DS-01: "Is data at rest protected, for example by encryption?"
+  PR.DS-02: "Is data in transit protected, for example by encryption?"
+  PR.DS-11: "Are backups of data created, protected, maintained and tested?"
+  PR.PS-01: "Are configuration and change management practices established and applied to production systems?"
+  PR.PS-02: "Is software maintained, patched and replaced according to risk?"
+  PR.PS-04: "Are log records generated and made available for continuous monitoring?"
+  PR.PS-06: "Are secure software development practices, such as security testing and code review, part of the software development life cycle?"
+  PR.IR-03: "Are resilience requirements, such as recovery objectives, defined and met in normal and adverse situations?"
+  PR.IR-04: "Is enough resource capacity maintained to keep the service available?"
+  DE.CM-09: "Are computing hardware, software and runtime environments monitored to find vulnerabilities and potentially adverse events?"
+  DE.AE-06: "Is information about security events provided to the staff and tools that need it, for example through alerts?"
+  DE.AE-07: "Is cyber threat intelligence integrated into the analysis of security events?"
+  RS.MA-01: "Is there an incident response plan that is executed once an incident is declared?"
+  RS.CO-02: "Are customers and other stakeholders notified of security incidents?"
+  RC.RP-01: "Is the recovery part of the incident response or disaster recovery plan in place and exercised?"
+ask:
+  GV.OC-03: "Which legal, regulatory and contractual cybersecurity requirements apply to your organization, and how are they managed?"
+  GV.RM-02: "Has your organization set risk appetite and risk tolerance statements for cybersecurity, and how are they communicated?"
+  GV.RR-02: "Who holds cybersecurity roles and responsibilities in your organization, and how are they communicated and enforced?"
+  GV.OV-01: "How does leadership review the results of the cybersecurity risk strategy and adjust it?"
+  GV.SC-01: "Does your organization have a cybersecurity supply chain risk management program, and who agreed to it?"

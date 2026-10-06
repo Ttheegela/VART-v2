@@ -12,6 +12,7 @@ from datetime import date
 from pathlib import Path
 
 from app.text import contains
+from datakit import csf
 from datakit.derive_key import derive, is_usable_evidence
 from datakit.extract import lines_of
 from datakit.mapper_variants import build_all
@@ -336,6 +337,11 @@ def _mapper_stage(pack: str) -> list[str]:
         if stale("expected.json"):
             p.append("mapper/expected.json is stale")
     return p
+
+
+@stage("csf")
+def _csf_stage(pack: str) -> list[str]:
+    return csf.check()  # the CSF data is shared by every pack
 
 
 def main(argv: list[str] | None = None) -> int:

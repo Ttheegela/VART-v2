@@ -1,0 +1,1913 @@
+{
+  "csf_version": "2.0",
+  "retrieved": "2026-10-05",
+  "source": "https://csrc.nist.gov/extensions/nudp/services/json/csf/download?olirids=all",
+  "outcomes": [
+    {
+      "id": "GV.OC-01",
+      "function": "Govern",
+      "category": "Organizational Context",
+      "outcome": "The organizational mission is understood and informs cybersecurity risk management",
+      "related_controls": [
+        "PM-11"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.OC-02",
+      "function": "Govern",
+      "category": "Organizational Context",
+      "outcome": "Internal and external stakeholders are understood, and their needs and expectations regarding cybersecurity risk management are understood and considered",
+      "related_controls": [
+        "PM-09",
+        "PM-18",
+        "PM-30",
+        "SR-03",
+        "SR-05",
+        "SR-06",
+        "SR-08"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.OC-03",
+      "function": "Govern",
+      "category": "Organizational Context",
+      "outcome": "Legal, regulatory, and contractual requirements regarding cybersecurity - including privacy and civil liberties obligations - are understood and managed",
+      "related_controls": [
+        "AC-01",
+        "AT-01",
+        "AU-01",
+        "CA-01",
+        "CM-01",
+        "CP-01",
+        "IA-01",
+        "IR-01",
+        "MA-01",
+        "MP-01",
+        "PE-01",
+        "PL-01",
+        "PM-01",
+        "PS-01",
+        "PT-01",
+        "RA-01",
+        "SA-01",
+        "SC-01",
+        "SI-01",
+        "SR-01",
+        "PM-28",
+        "PT"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "ask",
+      "question": "Which legal, regulatory and contractual cybersecurity requirements apply to your organization, and how are they managed?"
+    },
+    {
+      "id": "GV.OC-04",
+      "function": "Govern",
+      "category": "Organizational Context",
+      "outcome": "Critical objectives, capabilities, and services that external stakeholders depend on or expect from the organization are understood and communicated",
+      "related_controls": [
+        "PM-08",
+        "PM-11",
+        "CP-02(08)",
+        "PM-30(01)",
+        "RA-09"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.OC-05",
+      "function": "Govern",
+      "category": "Organizational Context",
+      "outcome": "Outcomes, capabilities, and services that the organization depends on are understood and communicated",
+      "related_controls": [
+        "PM-11",
+        "PM-30",
+        "RA-07",
+        "SA-09",
+        "SR-05"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.RM-01",
+      "function": "Govern",
+      "category": "Risk Management Strategy",
+      "outcome": "Risk management objectives are established and agreed to by organizational stakeholders",
+      "related_controls": [
+        "PM-09",
+        "RA-07",
+        "SR-02"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.RM-02",
+      "function": "Govern",
+      "category": "Risk Management Strategy",
+      "outcome": "Risk appetite and risk tolerance statements are established, communicated, and maintained",
+      "related_controls": [
+        "PM-09"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "ask",
+      "question": "Has your organization set risk appetite and risk tolerance statements for cybersecurity, and how are they communicated?"
+    },
+    {
+      "id": "GV.RM-03",
+      "function": "Govern",
+      "category": "Risk Management Strategy",
+      "outcome": "Cybersecurity risk management activities and outcomes are included in enterprise risk management processes",
+      "related_controls": [
+        "PM-03",
+        "PM-09",
+        "PM-30",
+        "RA-07",
+        "SA-24",
+        "SR-02"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.RM-04",
+      "function": "Govern",
+      "category": "Risk Management Strategy",
+      "outcome": "Strategic direction that describes appropriate risk response options is established and communicated",
+      "related_controls": [
+        "PM-09",
+        "PM-28",
+        "PM-30",
+        "SR-02"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.RM-05",
+      "function": "Govern",
+      "category": "Risk Management Strategy",
+      "outcome": "Lines of communication across the organization are established for cybersecurity risks, including risks from suppliers and other third parties",
+      "related_controls": [
+        "PM-09",
+        "PM-30"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.RM-06",
+      "function": "Govern",
+      "category": "Risk Management Strategy",
+      "outcome": "A standardized method for calculating, documenting, categorizing, and prioritizing cybersecurity risks is established and communicated",
+      "related_controls": [
+        "PM-09",
+        "PM-18",
+        "PM-28",
+        "PM-30",
+        "RA-03"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.RM-07",
+      "function": "Govern",
+      "category": "Risk Management Strategy",
+      "outcome": "Strategic opportunities (i.e., positive risks) are characterized and are included in organizational cybersecurity risk discussions",
+      "related_controls": [
+        "PM-09",
+        "PM-18",
+        "PM-28",
+        "PM-30",
+        "RA-03"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.RR-01",
+      "function": "Govern",
+      "category": "Roles, Responsibilities, and Authorities",
+      "outcome": "Organizational leadership is responsible and accountable for cybersecurity risk and fosters a culture that is risk-aware, ethical, and continually improving",
+      "related_controls": [
+        "PM-02",
+        "PM-19",
+        "PM-23",
+        "PM-24",
+        "PM-29"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.RR-02",
+      "function": "Govern",
+      "category": "Roles, Responsibilities, and Authorities",
+      "outcome": "Roles, responsibilities, and authorities related to cybersecurity risk management are established, communicated, understood, and enforced",
+      "related_controls": [
+        "PM-02",
+        "PM-13",
+        "PM-19",
+        "PM-23",
+        "PM-24",
+        "PM-29"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "ask",
+      "question": "Who holds cybersecurity roles and responsibilities in your organization, and how are they communicated and enforced?"
+    },
+    {
+      "id": "GV.RR-03",
+      "function": "Govern",
+      "category": "Roles, Responsibilities, and Authorities",
+      "outcome": "Adequate resources are allocated commensurate with the cybersecurity risk strategy, roles, responsibilities, and policies",
+      "related_controls": [
+        "PM-03"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.RR-04",
+      "function": "Govern",
+      "category": "Roles, Responsibilities, and Authorities",
+      "outcome": "Cybersecurity is included in human resources practices",
+      "related_controls": [
+        "PM-13",
+        "PS-01",
+        "PS-07",
+        "PS-09"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.PO-01",
+      "function": "Govern",
+      "category": "Policy",
+      "outcome": "Policy for managing cybersecurity risks is established based on organizational context, cybersecurity strategy, and priorities and is communicated and enforced",
+      "related_controls": [
+        "AC-01",
+        "AT-01",
+        "AU-01",
+        "CA-01",
+        "CM-01",
+        "CP-01",
+        "IA-01",
+        "IR-01",
+        "MA-01",
+        "MP-01",
+        "PE-01",
+        "PL-01",
+        "PM-01",
+        "PS-01",
+        "PT-01",
+        "RA-01",
+        "SA-01",
+        "SC-01",
+        "SI-01",
+        "SR-01"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Is there a documented cybersecurity policy, based on the organization's context and strategy, that is communicated and enforced?"
+    },
+    {
+      "id": "GV.PO-02",
+      "function": "Govern",
+      "category": "Policy",
+      "outcome": "Policy for managing cybersecurity risks is reviewed, updated, communicated, and enforced to reflect changes in requirements, threats, technology, and organizational mission",
+      "related_controls": [
+        "AC-01",
+        "AT-01",
+        "AU-01",
+        "CA-01",
+        "CM-01",
+        "CP-01",
+        "IA-01",
+        "IR-01",
+        "MA-01",
+        "MP-01",
+        "PE-01",
+        "PL-01",
+        "PM-01",
+        "PS-01",
+        "PT-01",
+        "RA-01",
+        "SA-01",
+        "SC-01",
+        "SI-01",
+        "SR-01"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Are cybersecurity policies reviewed, updated, communicated and enforced on a regular schedule?"
+    },
+    {
+      "id": "GV.OV-01",
+      "function": "Govern",
+      "category": "Oversight",
+      "outcome": "Cybersecurity risk management strategy outcomes are reviewed to inform and adjust strategy and direction",
+      "related_controls": [
+        "AC-01",
+        "AT-01",
+        "AU-01",
+        "CA-01",
+        "CM-01",
+        "CP-01",
+        "IA-01",
+        "IR-01",
+        "MA-01",
+        "MP-01",
+        "PE-01",
+        "PL-01",
+        "PM-01",
+        "PS-01",
+        "PT-01",
+        "RA-01",
+        "SA-01",
+        "SC-01",
+        "SI-01",
+        "SR-01",
+        "PM-09",
+        "PM-18",
+        "PM-30",
+        "PM-31",
+        "RA-07",
+        "SR-06"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "ask",
+      "question": "How does leadership review the results of the cybersecurity risk strategy and adjust it?"
+    },
+    {
+      "id": "GV.OV-02",
+      "function": "Govern",
+      "category": "Oversight",
+      "outcome": "The cybersecurity risk management strategy is reviewed and adjusted to ensure coverage of organizational requirements and risks",
+      "related_controls": [
+        "PM-09",
+        "PM-19",
+        "PM-30",
+        "PM-31",
+        "RA-07",
+        "SR-06"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.OV-03",
+      "function": "Govern",
+      "category": "Oversight",
+      "outcome": "Organizational cybersecurity risk management performance is evaluated and reviewed for adjustments needed",
+      "related_controls": [
+        "PM-04",
+        "PM-06",
+        "RA-07",
+        "SR-06"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.SC-01",
+      "function": "Govern",
+      "category": "Cybersecurity Supply Chain Risk Management",
+      "outcome": "A cybersecurity supply chain risk management program, strategy, objectives, policies, and processes are established and agreed to by organizational stakeholders",
+      "related_controls": [
+        "PM-30",
+        "SR-02",
+        "SR-03"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "ask",
+      "question": "Does your organization have a cybersecurity supply chain risk management program, and who agreed to it?"
+    },
+    {
+      "id": "GV.SC-02",
+      "function": "Govern",
+      "category": "Cybersecurity Supply Chain Risk Management",
+      "outcome": "Cybersecurity roles and responsibilities for suppliers, customers, and partners are established, communicated, and coordinated internally and externally",
+      "related_controls": [
+        "SR-02",
+        "SR-03",
+        "SR-05"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.SC-03",
+      "function": "Govern",
+      "category": "Cybersecurity Supply Chain Risk Management",
+      "outcome": "Cybersecurity supply chain risk management is integrated into cybersecurity and enterprise risk management, risk assessment, and improvement processes",
+      "related_controls": [
+        "AC-01",
+        "AT-01",
+        "AU-01",
+        "CA-01",
+        "CM-01",
+        "CP-01",
+        "IA-01",
+        "IR-01",
+        "MA-01",
+        "MP-01",
+        "PE-01",
+        "PL-01",
+        "PM-01",
+        "PS-01",
+        "PT-01",
+        "RA-01",
+        "SA-01",
+        "SC-01",
+        "SI-01",
+        "SR-01",
+        "PM-09",
+        "PM-18",
+        "PM-30",
+        "PM-31",
+        "SR-02",
+        "SR-03",
+        "RA-03",
+        "RA-07"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.SC-04",
+      "function": "Govern",
+      "category": "Cybersecurity Supply Chain Risk Management",
+      "outcome": "Suppliers are known and prioritized by criticality",
+      "related_controls": [
+        "RA-09",
+        "SA-09",
+        "SR-06"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.SC-05",
+      "function": "Govern",
+      "category": "Cybersecurity Supply Chain Risk Management",
+      "outcome": "Requirements to address cybersecurity risks in supply chains are established, prioritized, and integrated into contracts and other types of agreements with suppliers and other relevant third parties",
+      "related_controls": [
+        "SA-04",
+        "SA-09",
+        "SR-03",
+        "SR-05",
+        "SR-06",
+        "SR-10"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.SC-06",
+      "function": "Govern",
+      "category": "Cybersecurity Supply Chain Risk Management",
+      "outcome": "Planning and due diligence are performed to reduce risks before entering into formal supplier or other third-party relationships",
+      "related_controls": [
+        "SA-04",
+        "SA-09",
+        "SR-05",
+        "SR-06"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.SC-07",
+      "function": "Govern",
+      "category": "Cybersecurity Supply Chain Risk Management",
+      "outcome": "The risks posed by a supplier, their products and services, and other third parties are understood, recorded, prioritized, assessed, responded to, and monitored over the course of the relationship",
+      "related_controls": [
+        "RA-09",
+        "SA-04",
+        "SA-09",
+        "SR-03",
+        "SR-06"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.SC-08",
+      "function": "Govern",
+      "category": "Cybersecurity Supply Chain Risk Management",
+      "outcome": "Relevant suppliers and other third parties are included in incident planning, response, and recovery activities",
+      "related_controls": [
+        "SA-04",
+        "SA-09",
+        "SR-02",
+        "SR-03",
+        "SR-08",
+        "CP-01",
+        "IR-01"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.SC-09",
+      "function": "Govern",
+      "category": "Cybersecurity Supply Chain Risk Management",
+      "outcome": "Supply chain security practices are integrated into cybersecurity and enterprise risk management programs, and their performance is monitored throughout the technology product and service life cycle",
+      "related_controls": [
+        "PM-09",
+        "PM-19",
+        "PM-28",
+        "PM-30",
+        "PM-31",
+        "RA-03",
+        "RA-07",
+        "SA-04",
+        "SA-09",
+        "SR-02",
+        "SR-03",
+        "SR-05",
+        "SR-06"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "GV.SC-10",
+      "function": "Govern",
+      "category": "Cybersecurity Supply Chain Risk Management",
+      "outcome": "Cybersecurity supply chain risk management plans include provisions for activities that occur after the conclusion of a partnership or service agreement",
+      "related_controls": [
+        "PM-31",
+        "RA-03",
+        "RA-05",
+        "RA-07",
+        "SA-04",
+        "SA-09",
+        "SR-02",
+        "SR-03",
+        "SR-05",
+        "SR-06"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "ID.AM-01",
+      "function": "Identify",
+      "category": "Asset Management",
+      "outcome": "Inventories of hardware managed by the organization are maintained",
+      "related_controls": [
+        "CM-08",
+        "PM-05"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Is an inventory of the organization's hardware assets maintained?"
+    },
+    {
+      "id": "ID.AM-02",
+      "function": "Identify",
+      "category": "Asset Management",
+      "outcome": "Inventories of software, services, and systems managed by the organization are maintained",
+      "related_controls": [
+        "AC-20",
+        "CM-08",
+        "PM-05",
+        "SA-05",
+        "SA-09"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Is an inventory of the organization's software, services and systems maintained?"
+    },
+    {
+      "id": "ID.AM-03",
+      "function": "Identify",
+      "category": "Asset Management",
+      "outcome": "Representations of the organization's authorized network communication and internal and external network data flows are maintained",
+      "related_controls": [
+        "AC-04",
+        "CA-03",
+        "CA-09",
+        "PL-02",
+        "PL-08",
+        "PM-07"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Are diagrams or other representations of the organization's network communication and data flows maintained?"
+    },
+    {
+      "id": "ID.AM-04",
+      "function": "Identify",
+      "category": "Asset Management",
+      "outcome": "Inventories of services provided by suppliers are maintained",
+      "related_controls": [
+        "AC-20",
+        "SA-09",
+        "SR-02"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "ID.AM-05",
+      "function": "Identify",
+      "category": "Asset Management",
+      "outcome": "Assets are prioritized based on classification, criticality, resources, and impact on the mission",
+      "related_controls": [
+        "RA-03",
+        "RA-09",
+        "RA-02"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Are assets and data prioritized by classification, criticality and impact?"
+    },
+    {
+      "id": "ID.AM-07",
+      "function": "Identify",
+      "category": "Asset Management",
+      "outcome": "Inventories of data and corresponding metadata for designated data types are maintained",
+      "related_controls": [
+        "CM-12",
+        "CM-13",
+        "SI-12"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "ID.AM-08",
+      "function": "Identify",
+      "category": "Asset Management",
+      "outcome": "Systems, hardware, software, services, and data are managed throughout their life cycles",
+      "related_controls": [
+        "CM-09",
+        "CM-13",
+        "MA-02",
+        "MA-06",
+        "PL-02",
+        "PM-22",
+        "PM-23",
+        "SA-03",
+        "SA-04",
+        "SA-08",
+        "SA-22",
+        "SI-12",
+        "SI-18",
+        "SR-05",
+        "SR-12"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Are systems, hardware, software and data managed through their whole life cycle, including secure disposal?"
+    },
+    {
+      "id": "ID.RA-01",
+      "function": "Identify",
+      "category": "Risk Assessment",
+      "outcome": "Vulnerabilities in assets are identified, validated, and recorded",
+      "related_controls": [
+        "CA-02",
+        "CA-07",
+        "CA-08",
+        "RA-03",
+        "RA-05",
+        "SA-11(02)",
+        "SA-15(07)",
+        "SA-15(08)",
+        "SI-04",
+        "SI-05"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Are vulnerabilities in the organization's assets identified, validated and recorded, for example through scans or penetration tests?"
+    },
+    {
+      "id": "ID.RA-02",
+      "function": "Identify",
+      "category": "Risk Assessment",
+      "outcome": "Cyber threat intelligence is received from information sharing forums and sources",
+      "related_controls": [
+        "SI-05",
+        "PM-15",
+        "PM-16"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Does the organization receive cyber threat intelligence from information sharing forums or other sources?"
+    },
+    {
+      "id": "ID.RA-03",
+      "function": "Identify",
+      "category": "Risk Assessment",
+      "outcome": "Internal and external threats to the organization are identified and recorded",
+      "related_controls": [
+        "PM-12",
+        "PM-16",
+        "RA-03",
+        "SI-05"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "ID.RA-04",
+      "function": "Identify",
+      "category": "Risk Assessment",
+      "outcome": "Potential impacts and likelihoods of threats exploiting vulnerabilities are identified and recorded",
+      "related_controls": [
+        "PM-09",
+        "PM-11",
+        "RA-02",
+        "RA-03",
+        "RA-08",
+        "RA-09"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "ID.RA-05",
+      "function": "Identify",
+      "category": "Risk Assessment",
+      "outcome": "Threats, vulnerabilities, likelihoods, and impacts are used to understand inherent risk and inform risk response prioritization",
+      "related_controls": [
+        "PM-16",
+        "RA-02",
+        "RA-03",
+        "RA-07"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "ID.RA-06",
+      "function": "Identify",
+      "category": "Risk Assessment",
+      "outcome": "Risk responses are chosen, prioritized, planned, tracked, and communicated",
+      "related_controls": [
+        "PM-09",
+        "PM-18",
+        "PM-30",
+        "RA-07"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "ID.RA-07",
+      "function": "Identify",
+      "category": "Risk Assessment",
+      "outcome": "Changes and exceptions are managed, assessed for risk impact, recorded, and tracked",
+      "related_controls": [
+        "CA-07",
+        "CM-03",
+        "CM-04"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "ID.RA-08",
+      "function": "Identify",
+      "category": "Risk Assessment",
+      "outcome": "Processes for receiving, analyzing, and responding to vulnerability disclosures are established",
+      "related_controls": [
+        "RA-05"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Is there a process for receiving, analyzing and responding to vulnerability reports from outside the organization?"
+    },
+    {
+      "id": "ID.RA-09",
+      "function": "Identify",
+      "category": "Risk Assessment",
+      "outcome": "The authenticity and integrity of hardware and software are assessed prior to acquisition and use",
+      "related_controls": [
+        "SA-04",
+        "SA-05",
+        "SA-10",
+        "SA-11",
+        "SA-15",
+        "SA-17",
+        "SI-07",
+        "SR-05",
+        "SR-06",
+        "SR-10",
+        "SR-11"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "ID.RA-10",
+      "function": "Identify",
+      "category": "Risk Assessment",
+      "outcome": "Critical suppliers are assessed prior to acquisition",
+      "related_controls": [
+        "SR-06"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "ID.IM-01",
+      "function": "Identify",
+      "category": "Improvement",
+      "outcome": "Improvements are identified from evaluations",
+      "related_controls": [
+        "AC-01",
+        "AT-01",
+        "AU-01",
+        "CA-01",
+        "CM-01",
+        "CP-01",
+        "IA-01",
+        "IR-01",
+        "MA-01",
+        "MP-01",
+        "PE-01",
+        "PL-01",
+        "PM-01",
+        "PS-01",
+        "PT-01",
+        "RA-01",
+        "SA-01",
+        "SC-01",
+        "SI-01",
+        "SR-01",
+        "CA-02",
+        "CA-05",
+        "CA-07",
+        "CA-08",
+        "CP-02",
+        "IR-04",
+        "IR-08",
+        "PL-02",
+        "RA-03",
+        "RA-05",
+        "RA-07",
+        "SA-08",
+        "SA-11",
+        "SA-17(06)",
+        "SI-02",
+        "SI-04",
+        "SR-05"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "ID.IM-02",
+      "function": "Identify",
+      "category": "Improvement",
+      "outcome": "Improvements are identified from security tests and exercises, including those done in coordination with suppliers and relevant third parties",
+      "related_controls": [
+        "AC-01",
+        "AT-01",
+        "AU-01",
+        "CA-01",
+        "CM-01",
+        "CP-01",
+        "IA-01",
+        "IR-01",
+        "MA-01",
+        "MP-01",
+        "PE-01",
+        "PL-01",
+        "PM-01",
+        "PS-01",
+        "PT-01",
+        "RA-01",
+        "SA-01",
+        "SC-01",
+        "SI-01",
+        "SR-01",
+        "CA-02",
+        "CA-05",
+        "CA-07",
+        "CA-08",
+        "CP-02",
+        "CP-04",
+        "IR-03",
+        "IR-04",
+        "IR-08",
+        "PL-02",
+        "PM-04",
+        "PM-31",
+        "RA-03",
+        "RA-05",
+        "RA-07",
+        "SA-08",
+        "SA-11",
+        "SI-02",
+        "SI-04",
+        "SR-05"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "ID.IM-03",
+      "function": "Identify",
+      "category": "Improvement",
+      "outcome": "Improvements are identified from execution of operational processes, procedures, and activities",
+      "related_controls": [
+        "AC-01",
+        "AT-01",
+        "AU-01",
+        "CA-01",
+        "CM-01",
+        "CP-01",
+        "IA-01",
+        "IR-01",
+        "MA-01",
+        "MP-01",
+        "PE-01",
+        "PL-01",
+        "PM-01",
+        "PS-01",
+        "PT-01",
+        "RA-01",
+        "SA-01",
+        "SC-01",
+        "SI-01",
+        "SR-01",
+        "CA-02",
+        "CA-05",
+        "CA-07",
+        "CA-08",
+        "CP-02",
+        "IR-04",
+        "IR-08",
+        "PL-02",
+        "PM-04",
+        "PM-31",
+        "RA-03",
+        "RA-05",
+        "RA-07",
+        "SA-04",
+        "SA-08",
+        "SA-11",
+        "SI-02",
+        "SI-04",
+        "SR-05"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "ID.IM-04",
+      "function": "Identify",
+      "category": "Improvement",
+      "outcome": "Incident response plans and other cybersecurity plans that affect operations are established, communicated, maintained, and improved",
+      "related_controls": [
+        "CP-02",
+        "IR-08",
+        "PL-02",
+        "SR-02"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "PR.AA-01",
+      "function": "Protect",
+      "category": "Identity Management, Authentication, and Access Control",
+      "outcome": "Identities and credentials for authorized users, services, and hardware are managed by the organization",
+      "related_controls": [
+        "AC-01",
+        "AC-02",
+        "AC-14",
+        "IA-01",
+        "IA-02",
+        "IA-03",
+        "IA-04",
+        "IA-05",
+        "IA-06",
+        "IA-07",
+        "IA-08",
+        "IA-09",
+        "IA-10",
+        "IA-11"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Are identities and credentials for users, services and hardware managed by the organization?"
+    },
+    {
+      "id": "PR.AA-02",
+      "function": "Protect",
+      "category": "Identity Management, Authentication, and Access Control",
+      "outcome": "Identities are proofed and bound to credentials based on the context of interactions",
+      "related_controls": [
+        "IA-12"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "PR.AA-03",
+      "function": "Protect",
+      "category": "Identity Management, Authentication, and Access Control",
+      "outcome": "Users, services, and hardware are authenticated",
+      "related_controls": [
+        "AC-07",
+        "AC-12",
+        "IA-02",
+        "IA-03",
+        "IA-05",
+        "IA-07",
+        "IA-08",
+        "IA-09",
+        "IA-10",
+        "IA-11"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Are users, services and hardware authenticated, including with multi-factor authentication?"
+    },
+    {
+      "id": "PR.AA-04",
+      "function": "Protect",
+      "category": "Identity Management, Authentication, and Access Control",
+      "outcome": "Identity assertions are protected, conveyed, and verified",
+      "related_controls": [
+        "IA-13"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "PR.AA-05",
+      "function": "Protect",
+      "category": "Identity Management, Authentication, and Access Control",
+      "outcome": "Access permissions, entitlements, and authorizations are defined in a policy, managed, enforced, and reviewed, and incorporate the principles of least privilege and separation of duties",
+      "related_controls": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-05",
+        "AC-06",
+        "AC-10",
+        "AC-16",
+        "AC-17",
+        "AC-18",
+        "AC-19",
+        "AC-24",
+        "IA-13"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Are access permissions defined in a policy, managed, enforced and reviewed, following least privilege and separation of duties?"
+    },
+    {
+      "id": "PR.AA-06",
+      "function": "Protect",
+      "category": "Identity Management, Authentication, and Access Control",
+      "outcome": "Physical access to assets is managed, monitored, and enforced commensurate with risk",
+      "related_controls": [
+        "PE-02",
+        "PE-03",
+        "PE-04",
+        "PE-05",
+        "PE-06",
+        "PE-08",
+        "PE-18",
+        "PE-19",
+        "PE-20"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Is physical access to offices, facilities and other assets managed, monitored and enforced?"
+    },
+    {
+      "id": "PR.AT-01",
+      "function": "Protect",
+      "category": "Awareness and Training",
+      "outcome": "Personnel are provided with awareness and training so that they possess the knowledge and skills to perform general tasks with cybersecurity risks in mind",
+      "related_controls": [
+        "AT-02",
+        "AT-03"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "PR.AT-02",
+      "function": "Protect",
+      "category": "Awareness and Training",
+      "outcome": "Individuals in specialized roles are provided with awareness and training so that they possess the knowledge and skills to perform relevant tasks with cybersecurity risks in mind",
+      "related_controls": [
+        "AT-03"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "PR.DS-01",
+      "function": "Protect",
+      "category": "Data Security",
+      "outcome": "The confidentiality, integrity, and availability of data-at-rest are protected",
+      "related_controls": [
+        "CA-03",
+        "CP-09",
+        "MP-08",
+        "SC-04",
+        "SC-07",
+        "SC-12",
+        "SC-13",
+        "SC-28",
+        "SC-32",
+        "SC-39",
+        "SC-43",
+        "SI-03",
+        "SI-04",
+        "SI-07"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Is data at rest protected, for example by encryption?"
+    },
+    {
+      "id": "PR.DS-02",
+      "function": "Protect",
+      "category": "Data Security",
+      "outcome": "The confidentiality, integrity, and availability of data-in-transit are protected",
+      "related_controls": [
+        "AU-16",
+        "CA-03",
+        "SC-04",
+        "SC-07",
+        "SC-08",
+        "SC-11",
+        "SC-12",
+        "SC-13",
+        "SC-16",
+        "SC-40",
+        "SC-43",
+        "SI-03",
+        "SI-04",
+        "SI-07"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Is data in transit protected, for example by encryption?"
+    },
+    {
+      "id": "PR.DS-10",
+      "function": "Protect",
+      "category": "Data Security",
+      "outcome": "The confidentiality, integrity, and availability of data-in-use are protected",
+      "related_controls": [
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AU-09",
+        "AU-13",
+        "CA-03",
+        "CP-09",
+        "SA-08",
+        "SC-04",
+        "SC-07",
+        "SC-11",
+        "SC-13",
+        "SC-24",
+        "SC-32",
+        "SC-39",
+        "SC-40",
+        "SC-43",
+        "SI-03",
+        "SI-04",
+        "SI-07",
+        "SI-10",
+        "SI-16"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "PR.DS-11",
+      "function": "Protect",
+      "category": "Data Security",
+      "outcome": "Backups of data are created, protected, maintained, and tested",
+      "related_controls": [
+        "CP-06",
+        "CP-09"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Are backups of data created, protected, maintained and tested?"
+    },
+    {
+      "id": "PR.PS-01",
+      "function": "Protect",
+      "category": "Platform Security",
+      "outcome": "Configuration management practices are established and applied",
+      "related_controls": [
+        "CM-01",
+        "CM-02",
+        "CM-03",
+        "CM-04",
+        "CM-05",
+        "CM-06",
+        "CM-07",
+        "CM-08",
+        "CM-09",
+        "CM-10",
+        "CM-11"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Are configuration and change management practices established and applied to production systems?"
+    },
+    {
+      "id": "PR.PS-02",
+      "function": "Protect",
+      "category": "Platform Security",
+      "outcome": "Software is maintained, replaced, and removed commensurate with risk",
+      "related_controls": [
+        "CM-11",
+        "MA-03(06)",
+        "SA-10(01)",
+        "SI-02",
+        "SI-07"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Is software maintained, patched and replaced according to risk?"
+    },
+    {
+      "id": "PR.PS-03",
+      "function": "Protect",
+      "category": "Platform Security",
+      "outcome": "Hardware is maintained, replaced, and removed commensurate with risk",
+      "related_controls": [
+        "CM-07(09)",
+        "SA-10(03)",
+        "SC-03(01)",
+        "SC-39(01)",
+        "SC-49",
+        "SC-51"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "PR.PS-04",
+      "function": "Protect",
+      "category": "Platform Security",
+      "outcome": "Log records are generated and made available for continuous monitoring",
+      "related_controls": [
+        "AU-02",
+        "AU-03",
+        "AU-06",
+        "AU-07",
+        "AU-11",
+        "AU-12",
+        "SA-15(13)"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Are log records generated and made available for continuous monitoring?"
+    },
+    {
+      "id": "PR.PS-05",
+      "function": "Protect",
+      "category": "Platform Security",
+      "outcome": "Installation and execution of unauthorized software are prevented",
+      "related_controls": [
+        "CM-07(02)",
+        "CM-07(04)",
+        "CM-07(05)",
+        "SC-34"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "PR.PS-06",
+      "function": "Protect",
+      "category": "Platform Security",
+      "outcome": "Secure software development practices are integrated, and their performance is monitored throughout the software development life cycle",
+      "related_controls": [
+        "SA-03",
+        "SA-08",
+        "SA-10",
+        "SA-11",
+        "SA-15",
+        "SA-15(13)",
+        "SA-17",
+        "SA-24"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Are secure software development practices, such as security testing and code review, part of the software development life cycle?"
+    },
+    {
+      "id": "PR.IR-01",
+      "function": "Protect",
+      "category": "Technology Infrastructure Resilience",
+      "outcome": "Networks and environments are protected from unauthorized logical access and usage",
+      "related_controls": [
+        "AC-03",
+        "AC-04",
+        "SC-04",
+        "SC-05",
+        "SC-07"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "PR.IR-02",
+      "function": "Protect",
+      "category": "Technology Infrastructure Resilience",
+      "outcome": "The organization's technology assets are protected from environmental threats",
+      "related_controls": [
+        "CP-02",
+        "PE-09",
+        "PE-10",
+        "PE-11",
+        "PE-12",
+        "PE-13",
+        "PE-14",
+        "PE-15",
+        "PE-18",
+        "PE-23"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "PR.IR-03",
+      "function": "Protect",
+      "category": "Technology Infrastructure Resilience",
+      "outcome": "Mechanisms are implemented to achieve resilience requirements in normal and adverse situations",
+      "related_controls": [
+        "CP",
+        "IR",
+        "SA-08",
+        "SA-24",
+        "SC-06",
+        "SC-24",
+        "SC-36",
+        "SC-39",
+        "SI-13"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Are resilience requirements, such as recovery objectives, defined and met in normal and adverse situations?"
+    },
+    {
+      "id": "PR.IR-04",
+      "function": "Protect",
+      "category": "Technology Infrastructure Resilience",
+      "outcome": "Adequate resource capacity to ensure availability is maintained",
+      "related_controls": [
+        "CP-06",
+        "CP-07",
+        "CP-08",
+        "PM-03",
+        "PM-09"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Is enough resource capacity maintained to keep the service available?"
+    },
+    {
+      "id": "DE.CM-01",
+      "function": "Detect",
+      "category": "Continuous Monitoring",
+      "outcome": "Networks and network services are monitored to find potentially adverse events",
+      "related_controls": [
+        "AC-02",
+        "AU-12",
+        "CA-07",
+        "CM-03",
+        "SC-05",
+        "SC-07",
+        "SI-04"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "DE.CM-02",
+      "function": "Detect",
+      "category": "Continuous Monitoring",
+      "outcome": "The physical environment is monitored to find potentially adverse events",
+      "related_controls": [
+        "CA-07",
+        "PE-03",
+        "PE-06",
+        "PE-20"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "DE.CM-03",
+      "function": "Detect",
+      "category": "Continuous Monitoring",
+      "outcome": "Personnel activity and technology usage are monitored to find potentially adverse events",
+      "related_controls": [
+        "AC-02",
+        "AU-12",
+        "AU-13",
+        "CA-07",
+        "CM-10",
+        "CM-11"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "DE.CM-06",
+      "function": "Detect",
+      "category": "Continuous Monitoring",
+      "outcome": "External service provider activities and services are monitored to find potentially adverse events",
+      "related_controls": [
+        "CA-07",
+        "PS-07",
+        "SA-04",
+        "SA-09",
+        "SI-04"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "DE.CM-09",
+      "function": "Detect",
+      "category": "Continuous Monitoring",
+      "outcome": "Computing hardware and software, runtime environments, and their data are monitored to find potentially adverse events",
+      "related_controls": [
+        "AC-04",
+        "AC-09",
+        "AU-12",
+        "CA-07",
+        "CM-03",
+        "CM-06",
+        "CM-10",
+        "CM-11",
+        "SC-34",
+        "SC-35",
+        "SI-04",
+        "SI-07"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Are computing hardware, software and runtime environments monitored to find vulnerabilities and potentially adverse events?"
+    },
+    {
+      "id": "DE.AE-02",
+      "function": "Detect",
+      "category": "Adverse Event Analysis",
+      "outcome": "Potentially adverse events are analyzed to better understand associated activities",
+      "related_controls": [
+        "AU-06",
+        "CA-07",
+        "IR-04",
+        "SI-04"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "DE.AE-03",
+      "function": "Detect",
+      "category": "Adverse Event Analysis",
+      "outcome": "Information is correlated from multiple sources",
+      "related_controls": [
+        "AU-06",
+        "CA-07",
+        "PM-16",
+        "IR-04",
+        "IR-05",
+        "IR-08",
+        "SI-04"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "DE.AE-04",
+      "function": "Detect",
+      "category": "Adverse Event Analysis",
+      "outcome": "The estimated impact and scope of adverse events are understood",
+      "related_controls": [
+        "PM-09",
+        "PM-11",
+        "PM-18",
+        "PM-28",
+        "PM-30"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "DE.AE-06",
+      "function": "Detect",
+      "category": "Adverse Event Analysis",
+      "outcome": "Information on adverse events is provided to authorized staff and tools",
+      "related_controls": [
+        "IR-04",
+        "PM-15",
+        "PM-16",
+        "RA-04",
+        "RA-10"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Is information about security events provided to the staff and tools that need it, for example through alerts?"
+    },
+    {
+      "id": "DE.AE-07",
+      "function": "Detect",
+      "category": "Adverse Event Analysis",
+      "outcome": "Cyber threat intelligence and other contextual information are integrated into the analysis",
+      "related_controls": [
+        "PM-16",
+        "RA-03",
+        "RA-10"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Is cyber threat intelligence integrated into the analysis of security events?"
+    },
+    {
+      "id": "DE.AE-08",
+      "function": "Detect",
+      "category": "Adverse Event Analysis",
+      "outcome": "Incidents are declared when adverse events meet the defined incident criteria",
+      "related_controls": [
+        "IR-04",
+        "IR-08"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RS.MA-01",
+      "function": "Respond",
+      "category": "Incident Management",
+      "outcome": "The incident response plan is executed in coordination with relevant third parties once an incident is declared",
+      "related_controls": [
+        "IR-06",
+        "IR-07",
+        "IR-08",
+        "SR-03",
+        "SR-08"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Is there an incident response plan that is executed once an incident is declared?"
+    },
+    {
+      "id": "RS.MA-02",
+      "function": "Respond",
+      "category": "Incident Management",
+      "outcome": "Incident reports are triaged and validated",
+      "related_controls": [
+        "IR-04",
+        "IR-05",
+        "IR-06"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RS.MA-03",
+      "function": "Respond",
+      "category": "Incident Management",
+      "outcome": "Incidents are categorized and prioritized",
+      "related_controls": [
+        "IR-04",
+        "IR-05",
+        "IR-06"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RS.MA-04",
+      "function": "Respond",
+      "category": "Incident Management",
+      "outcome": "Incidents are escalated or elevated as needed",
+      "related_controls": [
+        "IR-04",
+        "IR-05",
+        "IR-06",
+        "IR-07"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RS.MA-05",
+      "function": "Respond",
+      "category": "Incident Management",
+      "outcome": "The criteria for initiating incident recovery are applied",
+      "related_controls": [
+        "IR-04",
+        "IR-08"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RS.AN-03",
+      "function": "Respond",
+      "category": "Incident Analysis",
+      "outcome": "Analysis is performed to establish what has taken place during an incident and the root cause of the incident",
+      "related_controls": [
+        "AU-07",
+        "IR-04",
+        "SI-02(07)"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RS.AN-06",
+      "function": "Respond",
+      "category": "Incident Analysis",
+      "outcome": "Actions performed during an investigation are recorded, and the records' integrity and provenance are preserved",
+      "related_controls": [
+        "AU-07",
+        "IR-04",
+        "IR-06"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RS.AN-07",
+      "function": "Respond",
+      "category": "Incident Analysis",
+      "outcome": "Incident data and metadata are collected, and their integrity and provenance are preserved",
+      "related_controls": [
+        "AU-07",
+        "IR-04",
+        "IR-06"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RS.AN-08",
+      "function": "Respond",
+      "category": "Incident Analysis",
+      "outcome": "An incident's magnitude is estimated and validated",
+      "related_controls": [
+        "IR-04",
+        "IR-08",
+        "RA-03",
+        "RA-07"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RS.CO-02",
+      "function": "Respond",
+      "category": "Incident Response Reporting and Communication",
+      "outcome": "Internal and external stakeholders are notified of incidents",
+      "related_controls": [
+        "IR-04",
+        "IR-06",
+        "IR-07",
+        "SR-03",
+        "SR-08"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Are customers and other stakeholders notified of security incidents?"
+    },
+    {
+      "id": "RS.CO-03",
+      "function": "Respond",
+      "category": "Incident Response Reporting and Communication",
+      "outcome": "Information is shared with designated internal and external stakeholders",
+      "related_controls": [
+        "IR-04",
+        "IR-06",
+        "IR-07",
+        "SR-03",
+        "SR-08"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RS.MI-01",
+      "function": "Respond",
+      "category": "Incident Mitigation",
+      "outcome": "Incidents are contained",
+      "related_controls": [
+        "IR-04"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RS.MI-02",
+      "function": "Respond",
+      "category": "Incident Mitigation",
+      "outcome": "Incidents are eradicated",
+      "related_controls": [
+        "IR-04"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RC.RP-01",
+      "function": "Recover",
+      "category": "Incident Recovery Plan Execution",
+      "outcome": "The recovery portion of the incident response plan is executed once initiated from the incident response process",
+      "related_controls": [
+        "CP-10",
+        "IR-04",
+        "IR-08"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "checked",
+      "question": "Is the recovery part of the incident response or disaster recovery plan in place and exercised?"
+    },
+    {
+      "id": "RC.RP-02",
+      "function": "Recover",
+      "category": "Incident Recovery Plan Execution",
+      "outcome": "Recovery actions are selected, scoped, prioritized, and performed",
+      "related_controls": [
+        "CP-10",
+        "IR-04",
+        "IR-08"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RC.RP-03",
+      "function": "Recover",
+      "category": "Incident Recovery Plan Execution",
+      "outcome": "The integrity of backups and other restoration assets is verified before using them for restoration",
+      "related_controls": [
+        "CP-02",
+        "CP-04",
+        "CP-09"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RC.RP-04",
+      "function": "Recover",
+      "category": "Incident Recovery Plan Execution",
+      "outcome": "Critical mission functions and cybersecurity risk management are considered to establish post-incident operational norms",
+      "related_controls": [
+        "PM-08",
+        "PM-09",
+        "PM-11",
+        "IR-01",
+        "IR-08"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RC.RP-05",
+      "function": "Recover",
+      "category": "Incident Recovery Plan Execution",
+      "outcome": "The integrity of restored assets is verified, systems and services are restored, and normal operating status is confirmed",
+      "related_controls": [
+        "CP-10"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RC.RP-06",
+      "function": "Recover",
+      "category": "Incident Recovery Plan Execution",
+      "outcome": "The end of incident recovery is declared based on criteria, and incident-related documentation is completed",
+      "related_controls": [
+        "IR-04",
+        "IR-08"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RC.CO-03",
+      "function": "Recover",
+      "category": "Incident Recovery Communication",
+      "outcome": "Recovery activities and progress in restoring operational capabilities are communicated to designated internal and external stakeholders",
+      "related_controls": [
+        "IR-04",
+        "IR-06",
+        "SR-08"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    },
+    {
+      "id": "RC.CO-04",
+      "function": "Recover",
+      "category": "Incident Recovery Communication",
+      "outcome": "Public updates on incident recovery are shared using approved methods and messaging",
+      "related_controls": [
+        "CP-02",
+        "IR-04"
+      ],
+      "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+      "tier": "not_checked",
+      "question": null
+    }
+  ]
+}
