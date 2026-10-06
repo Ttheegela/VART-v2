@@ -130,7 +130,7 @@ class Questionnaire(Base):
     mapping: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
     created_at: Mapped[datetime] = _created_at()
     __table_args__ = (
-        CheckConstraint(_in("source", ("sample", "upload", "drive")), name="ck_questionnaires_source"),
+        CheckConstraint(_in("source", ("sample", "upload", "drive", "csf")), name="ck_questionnaires_source"),
     )
 
 
