@@ -151,6 +151,18 @@ def test_the_record_hop_never_adds_an_injection_flagged_row(s: Session) -> None:
     assert [p.lines[0] for p in r.passages if p.record] == ["Asset: Okta; Owner: IT"]
 
 
+def test_excluded_kinds_are_neither_candidates_nor_hopped_to(s: Session) -> None:
+    ws = f.workspace(s)
+    _doc(s, ws, "acp.docx", "Quarterly reviews cover Okta.")
+    _doc(s, ws, "answer-001.txt", "Asset: Okta; Owner: IT", record=True, kind="statement")
+    _doc(s, ws, "answer-002.txt", "Reviews are quarterly.", kind="statement")
+    s.commit()
+    files = lambda r: sorted(p.doc.filename for p in r.passages)  # noqa: E731
+    question = "Are reviews quarterly?"
+    assert files(retrieve(s, ws.id, question, None)) == ["acp.docx", "answer-001.txt", "answer-002.txt"]
+    assert files(retrieve(s, ws.id, question, None, exclude_kinds=("statement",))) == ["acp.docx"]
+
+
 def test_a_common_identifier_does_not_hop(s: Session) -> None:
     ws = f.workspace(s)
     _doc(

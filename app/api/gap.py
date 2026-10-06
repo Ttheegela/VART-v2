@@ -166,6 +166,7 @@ def start_gap(scope: GapScope, ws: WorkspaceDep, session: SessionDep, request: R
     if run is None:
         run = create_run(session, ws_id, q.id, get_settings().models())
     elif run.status == "done":
-        reopen_changed(session, ws_id, run.id)  # commits; nothing changed: it stays done
+        # commits; nothing changed: it stays done. Judged against the deployed models (review I1)
+        reopen_changed(session, ws_id, run.id, get_settings().models())
         session.refresh(run)
     return run_out(session, run)

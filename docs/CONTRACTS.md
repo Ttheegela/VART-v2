@@ -20,7 +20,7 @@ the change log at the end, and a re-recording of the evals when a prompt or a la
 | pipeline | `app/pipeline.py` (2A) | `answer_item(session, workspace_id, item, llm, models, spend) -> ItemResult`; `answer_retrieved(session, workspace_id, item, retrieval, llm, models, spend) -> ItemResult` (answer_item after its retrieval); raises `BudgetExhausted` when `spend("stance")` is refused | via stance, draft |
 | interview | `app/interview.py` (2A) | `high_weight(topic) -> bool`; `plan_queue(items) -> list[QueueEntry]`; `follow_up(question, answer) -> str or None`; `recheck(session, workspace_id, statement_id, topic, items, llm, model, spend) -> list[Suggestion]` | recheck only |
 | csf | `app/csf.py` (6A) | `framework() -> Framework`; `in_scope(scope) -> tuple[Outcome, ...]`; `item_input(o) -> ItemInput`; `gap_label(o, label, value=None, statement_id=None) -> GapLabel or None`; `questionnaire_for(session, workspace_id, scope) -> Questionnaire`; `part_inputs(o) -> tuple[ItemInput, ...]`; `evidence(session, workspace_id, item) -> Retrieval`; `check_parts(session, workspace_id, o, llm, models, spend) -> list[ItemResult]`; `part_label(r) -> PartLabel`; `combine(labels) -> PartLabel`; `explain(o, parts, filled=()) -> str`; `aggregate(o, parts) -> ItemResult`; `check_outcome(session, workspace_id, o, llm, models, spend) -> ItemResult or None`; `ask_queue(outcomes, asked) -> list[QueueEntry]`; `current_mapping(scope) -> dict[str, str]`; `check_part(session, workspace_id, o, n, llm, models, spend) -> ItemResult`; `part_result(o, n, raw) -> ItemResult`; `CONTROLS_URL` | via answer_retrieved (stance only; a part's draft is never written) |
-| runs | `app/runs.py` (6B; only these names) | `STEP_PARTS = 8`; `outcome_values(o, parts) -> dict[str, Any]`; `reopen_changed(session, workspace_id, run_id) -> int` | no |
+| runs | `app/runs.py` (6B; only these names) | `STEP_PARTS = 8`; `outcome_values(o, parts) -> dict[str, Any]`; `reopen_changed(session, workspace_id, run_id, models=None) -> int` | no |
 | budget | `app/services/llm_budget.py` | `spender(session, workspace_id) -> Spend` | no |
 
 ## Rules every unit keeps
@@ -215,3 +215,9 @@ change-log line; changing or removing a path, a field or a status needs the lead
   `csf.evidence` passes `("statement",)`, so a statement is no longer a `statement` drop but never a candidate
   (the questionnaire path is unchanged). The gap bullet's Confirmed-by-you sentence follows Ruling 6 (Task 1
   re-review R1). No prompt or label rule changes, so nothing is re-recorded.
+- 2026-10-06: Plan 6B Task 4 fix round 1 (an added optional argument; lead's OK, Ruling 11, under rule 10 for
+  `runs`): `reopen_changed` gains `models=None` (the deployed models a part's judge is compared with;
+  `POST /api/gap/{scope}/run` passes the settings' models, the default is the run's own), so a model change
+  re-opens an outcome once, not on every press. Check again and re-decide also take a Checked outcome that reads
+  Confirmed by you through a part fill: its document-judged parts are checked and decided again, its filled parts
+  kept. `retrieve`'s `exclude_kinds` also applies to the record hop. No prompt or label rule changes.

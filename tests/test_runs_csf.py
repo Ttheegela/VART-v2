@@ -7,10 +7,12 @@ from sqlalchemy import Engine, delete, select, update
 from sqlalchemy.orm import Session
 
 from app import csf, runs
+from app import questions as qs
 from app.contracts import BudgetExhausted
-from app.db.models import Answer, Item, Run, RunItem, SuggestedFill
+from app.db.models import Answer, Chunk, Document, Item, Run, RunItem, SuggestedFill
 from app.ingest.store import store_statement
 from app.llm.client import LLMError, LLMRequest, LLMResult
+from app.redecide import redecide
 from app.services import llm_budget
 from tests import factories as f
 from tests.fakes import ByStepLLM
@@ -227,6 +229,53 @@ def test_check_again_reopens_a_failed_outcome_and_a_part_judged_by_another_model
     assert runs.reopen_changed(s, ws.id, run.id) == 1
 
 
+class _NoOnPart3(ByStepLLM):
+    """Says yes for every part but part 3, which its passage does not answer (a Gap)."""
+
+    def complete(self, req: LLMRequest) -> LLMResult:
+        if req.item_id.endswith("#3"):
+            self.requests.append(req)
+            irrelevant = {"passage": 1, "stance": "irrelevant", "quote": "", "note": "x"}
+            return LLMResult(text=json.dumps({"passages": [irrelevant]}), input_tokens=1, output_tokens=1)
+        return super().complete(req)
+
+
+def _confirmed(s: Session):  # type: ignore[no-untyped-def]
+    """PR.DS-11 with parts 1, 2 and 4 Covered by the policy and part 3 a Gap, then part 3 filled through the
+    real accept path: the outcome reads Confirmed by you (Ruling 6)."""
+    ws, it, run = _backups(s)
+    runs.step(s, ws.id, run.id, _NoOnPart3({"stance": YES}), MODELS)
+    said = store_statement(s, ws.id, LINE, filename="answer-002.txt", today=date(2026, 10, 6))
+    chunk = s.scalars(select(Chunk).where(Chunk.document_id == said.id)).one()
+    cite = {
+        "chunk_id": str(chunk.id),
+        "document_id": str(said.id),
+        "filename": said.filename,
+        "line_start": chunk.line_start,
+        "line_end": chunk.line_end,
+        "quote": LINE,
+        "stance": "yes",
+        "note": "",
+    }
+    sg = SuggestedFill(
+        workspace_id=ws.id,
+        run_id=run.id,
+        item_id=it.id,
+        statement_id=said.id,
+        label="verified",
+        value="Yes",
+        text=f'Yes. "{LINE}"',
+        citations=[cite],
+        confidence=0.9,
+        part=3,
+    )
+    s.add(sg)
+    s.commit()
+    a = qs.accept_suggestion(s, ws.id, sg.id)
+    assert (a.label, a.statement_id) == ("user_confirmed", said.id)
+    return ws, it, run, said
+
+
 def test_check_again_keeps_the_visitors_outcomes_and_accepted_parts(s: Session) -> None:
     ws, it, run = _done(s)
     _stale(s, run.id, "3")
@@ -234,25 +283,55 @@ def test_check_again_keeps_the_visitors_outcomes_and_accepted_parts(s: Session) 
     a.approved_at = datetime.now(UTC)
     s.commit()
     assert runs.reopen_changed(s, ws.id, run.id) == 0  # approved: the visitor's
-    a.approved_at = None
-    s.commit()
-    ri = _parts_of(s, run.id)
-    said = store_statement(s, ws.id, LINE, filename="answer-002.txt", today=date(2026, 10, 6))
-    ri.parts = {**ri.parts, "3": {**ri.parts["3"], "statement_id": str(said.id)}}  # filled from an answer
-    s.commit()
-    assert runs.reopen_changed(s, ws.id, run.id) == 0
+
+
+def test_check_again_reruns_the_document_parts_of_an_outcome_confirmed_by_a_fill(s: Session) -> None:
+    ws, it, run, said = _confirmed(s)
+    assert runs.reopen_changed(s, ws.id, run.id) == 0  # nothing changed
     filled = _parts_of(s, run.id).parts["3"]
-    _stale(s, run.id, "1")  # preflight I2: an outcome holding an accepted part is re-opened
+    assert filled["statement_id"] == str(said.id)
+    _stale(s, run.id, "1")  # preflight I2 and review I2: the documents behind part 1 changed
     assert runs.reopen_changed(s, ws.id, run.id) == 1
     assert _parts_of(s, run.id).parts == {"3": filled}  # only the accepted part is kept
     llm = ByStepLLM({"stance": YES})
     assert runs.step(s, ws.id, run.id, llm, MODELS) == [it.id]
     assert [q.item_id for q in llm.requests] == [f"PR.DS-11#{n}" for n in (1, 2, 4)]
     a = s.scalars(select(Answer).where(Answer.run_id == run.id)).one()
-    assert (a.label, a.statement_id) == (
-        "user_confirmed",
-        said.id,
-    )  # Covered with a part of theirs (Ruling 6)
+    assert (a.label, a.statement_id) == ("user_confirmed", said.id)  # Covered with a part of theirs
+
+
+def test_a_draft_override_redecides_an_outcome_confirmed_by_a_fill(s: Session) -> None:
+    ws, it, run, said = _confirmed(s)
+    doc = s.scalars(select(Document).where(Document.filename == "backup-policy.docx")).one()
+    doc.status = "draft"
+    s.commit()
+    assert redecide(s, ws.id, doc.id) == 1  # review I2: the document-judged parts are decided again
+    a = s.scalars(select(Answer).where(Answer.run_id == run.id)).one()
+    assert (a.label, a.value, a.statement_id) == ("partial", "Partial", None)
+    parts = _parts_of(s, run.id).parts
+    assert [parts[k]["label"] for k in "1234"] == ["partial", "partial", "verified", "partial"]
+
+
+def test_check_again_after_a_model_change_reopens_once(s: Session) -> None:
+    ws, it, run = _done(s)
+    new = {**MODELS, "stance": "m/new-stance"}
+    _stale(s, run.id, "1")
+    assert runs.reopen_changed(s, ws.id, run.id, new) == 1
+    runs.step(s, ws.id, run.id, ByStepLLM({"stance": YES}), new)
+    assert runs.reopen_changed(s, ws.id, run.id, new) == 0  # review I1: judged by the deployed model
+
+
+def test_check_again_compares_passages_as_a_set(s: Session) -> None:
+    ws, it, run = _backups(s)
+    doc = s.scalars(select(Document).where(Document.workspace_id == ws.id)).one()
+    f.chunk(s, doc, line_start=4, line_end=4, text="Data backups are kept off site.")
+    s.commit()
+    runs.step(s, ws.id, run.id, ByStepLLM({"stance": YES}), MODELS)
+    ri = _parts_of(s, run.id)
+    assert len(ri.parts["1"]["chunk_ids"]) == 2
+    ri.parts = {**ri.parts, "1": {**ri.parts["1"], "chunk_ids": ri.parts["1"]["chunk_ids"][::-1]}}
+    s.commit()
+    assert runs.reopen_changed(s, ws.id, run.id) == 0  # review M1
 
 
 def test_a_reopen_keeps_open_per_part_fills_and_dismisses_whole_item_ones(s: Session) -> None:

@@ -177,3 +177,15 @@ def test_an_answer_never_fills_another_functions_parts(s: Session) -> None:
     _, answer, found = qs.answer_question(s, ws.id, question.id, SAID, llm, MODELS, TODAY)
     assert answer is not None and answer.label == "user_confirmed"
     assert (llm.requests, found) == ([], [])  # no Protect, Detect, Identify, Respond or Recover part is asked
+
+
+def test_the_recheck_cap_holds_across_outcomes_of_one_function(
+    s: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(qs, "MAX_RECHECKS", 5)  # review M3: GV.PO-01's 3 parts and 2 of GV.PO-02's 4
+    ws, q, run, llm, found = _govern_fills(s)
+    po1, po2 = _item(s, q.id, "GV.PO-01"), _item(s, q.id, "GV.PO-02")
+    assert [r.item_id for r in llm.requests] == [f"{po1.id}#{n}" for n in (1, 2, 3)] + [
+        f"{po2.id}#{n}" for n in (1, 2)
+    ]
+    assert len(found) == 5

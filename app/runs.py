@@ -501,6 +501,18 @@ def step(
 REOPEN = ("verified", "partial", "conflict", "unknown")  # machine labels; the visitor's own labels stay
 
 
+def machine_judged(labels: tuple[str, ...]) -> Any:
+    """Answers with a machine label, or a Checked CSF outcome that reads Confirmed by you through a part fill:
+    its other parts are still judged on the documents (review I2). An Ask-me confirmation has no parts.
+    Used by Check again and by re-decide."""
+    with_parts = (
+        select(RunItem.item_id)
+        .where(RunItem.run_id == Answer.run_id, RunItem.item_id == Answer.item_id, RunItem.parts != {})
+        .exists()
+    )
+    return or_(Answer.label.in_(labels), and_(Answer.label == "user_confirmed", with_parts))
+
+
 def _same_evidence(
     session: Session,
     workspace_id: uuid.UUID,
@@ -518,16 +530,25 @@ def _same_evidence(
     return {p.chunk_id for p in found.passages} == set(raw["chunk_ids"])
 
 
-def reopen_changed(session: Session, workspace_id: uuid.UUID, run_id: uuid.UUID) -> int:
+def reopen_changed(
+    session: Session,
+    workspace_id: uuid.UUID,
+    run_id: uuid.UUID,
+    models: Mapping[str, str] | None = None,
+) -> int:
     """Check again after an upload (CSF spec 5.6; plan 6B decision 3), with no model call. A Checked outcome
     is affected when a stored part is missing, its wording, judge or evidence changed, or its answer failed.
     Every machine-judged part of an affected outcome is dropped, and the outcome goes back to pending with its
     answer removed and its whole-item fills dismissed, so the step loop runs all of its parts again. A part
     filled by a fill the visitor accepted stays, and so do the open per-part fills (a fill is the visitor's
     answer judged against the part's wording, not the documents), and an outcome the visitor edited,
-    approved, confirmed or marked not applicable. Lock order: the run (two presses re-open once), the
-    answers by id, then their run items, read under those locks so an accept in flight is waited out and its
-    part kept (preflight I1), then the fills. Returns the outcomes re-opened; with any, the run is running."""
+    approved, confirmed (Ask me) or marked not applicable. A part's judge is compared with `models`, the
+    deployed ones the next step uses (review I1; default: the run's own). Lock order: the run (two presses
+    re-open once), the answers by id, then their run items, read under those locks so an accept in flight is
+    waited out and its part kept (preflight I1), then the fills. ponytail: the evidence scan (one retrieval
+    per stored part) runs under those locks, so a press blocks accepts and edits for it; fine at demo scale,
+    scan first and re-verify under the locks if it is not. Returns the outcomes re-opened; with any, the run
+    is running."""
     run = session.scalar(
         select(Run).where(Run.id == run_id, Run.workspace_id == workspace_id).with_for_update()
     )
@@ -540,13 +561,14 @@ def reopen_changed(session: Session, workspace_id: uuid.UUID, run_id: uuid.UUID)
         .where(
             Answer.run_id == run_id,
             Item.csf_id.is_not(None),
-            Answer.label.in_(REOPEN),
+            machine_judged(REOPEN),
             Answer.edited.is_(False),
             Answer.approved_at.is_(None),
         )
         .order_by(Answer.id)
         .with_for_update(of=Answer)
     ).all()
+    judge = models or run.models
     failed = {a.item_id for a in answers if a.text == FAILED_TEXT}
     rows = session.execute(
         select(RunItem.item_id, RunItem.parts, Item.csf_id)
@@ -565,7 +587,7 @@ def reopen_changed(session: Session, workspace_id: uuid.UUID, run_id: uuid.UUID)
             or any(str(n) not in stored for n in range(1, len(o.parts) + 1))
             or any(
                 not raw.get("statement_id")
-                and not _same_evidence(session, workspace_id, o, int(k), raw, run.models)
+                and not _same_evidence(session, workspace_id, o, int(k), raw, judge)
                 for k, raw in stored.items()
             )
         )

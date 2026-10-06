@@ -14,9 +14,9 @@ from app.contracts import DocInfo, Dropped, Passage, Stance, jsonable
 from app.db.models import Answer, Chunk, Document, Item, RunItem
 from app.decide import decide
 from app.draft import template_answer
-from app.runs import outcome_values
+from app.runs import machine_judged, outcome_values
 
-REDECIDED = ("verified", "partial", "conflict", "unknown")  # never the visitor's own labels
+REDECIDED = ("verified", "partial", "conflict", "unknown")  # plus machine_judged: never the visitor's own
 
 
 def passages_for(
@@ -64,7 +64,7 @@ def redecide(session: Session, workspace_id: uuid.UUID, document_id: uuid.UUID) 
         select(Answer)
         .where(
             Answer.workspace_id == workspace_id,
-            Answer.label.in_(REDECIDED),
+            machine_judged(REDECIDED),
             Answer.edited.is_(False),
             Answer.chunk_ids.has_any(array(chunk_ids)),
         )
