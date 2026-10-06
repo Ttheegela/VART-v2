@@ -2,7 +2,9 @@
 
 import hashlib
 import json
+import math
 import re
+import time
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
@@ -11,9 +13,11 @@ from openai import APIError, OpenAI
 from pydantic import BaseModel, ValidationError
 
 from app.observability import Step, trace_llm
-from app.settings import get_settings
+from app.settings import get_settings, reasoning_for
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+# A provider that downgrades json_schema to json_object (Alibaba) refuses messages without the word "json".
+JSON_LINE = "\n\nReply with JSON only."
 
 
 class LLMError(Exception):
@@ -30,11 +34,21 @@ class LLMRequest:
     schema_name: str
     schema: dict[str, Any]
     max_tokens: int = 1200
+    reasoning: dict[str, bool | str] | None = None  # OpenRouter `reasoning`; None sends nothing
     item_id: str | None = None  # trace metadata only: deliberately not part of key()
 
     def key(self) -> str:
         payload = json.dumps(
-            [self.model, self.prompt_version, self.system, self.user, self.schema_name, self.schema],
+            [
+                self.model,
+                self.prompt_version,
+                self.system,
+                self.user,
+                self.schema_name,
+                self.schema,
+                self.max_tokens,
+                self.reasoning,
+            ],
             sort_keys=True,
             ensure_ascii=False,
         )
@@ -49,6 +63,7 @@ class LLMResult:
     input_tokens: int = 0
     output_tokens: int = 0
     cost_usd: float | None = None
+    latency_ms: int | None = None  # wall time of the call; recordings keep it so replayed evals report speed
 
 
 class LLMClient(Protocol):
@@ -100,7 +115,20 @@ def build_request(
         )
     schema = out.model_json_schema()
     _assert_strict(schema)
-    return LLMRequest(step, model, prompt_version, system, user, out.__name__, schema, max_tokens, item_id)
+    # Added here, not in complete(), so key() covers what is actually sent.
+    system += JSON_LINE
+    return LLMRequest(
+        step,
+        model,
+        prompt_version,
+        system,
+        user,
+        out.__name__,
+        schema,
+        max_tokens,
+        reasoning_for(step, model),
+        item_id,
+    )
 
 
 def complete_model[M: BaseModel](client: LLMClient, req: LLMRequest, out: type[M]) -> M:
@@ -111,12 +139,26 @@ def complete_model[M: BaseModel](client: LLMClient, req: LLMRequest, out: type[M
         raise LLMError(f"{req.step}: output did not match {req.schema_name}") from exc
 
 
+def _cost(raw: Any) -> float | None:
+    """usage.cost, or None when it is missing, negative or not finite: an infinite cost would poison every sum
+    it joins (runs.cost_usd, the eval's cost per run). A cost that is not a number raises ValueError, which
+    makes the response unusable."""
+    if raw is None:
+        return None
+    cost = float(raw)
+    return cost if math.isfinite(cost) and cost >= 0 else None
+
+
 def _usage(response: Any) -> tuple[int, int, float | None]:
     u = getattr(response, "usage", None)
     if u is None:
         return 0, 0, None
-    cost = getattr(u, "cost", None)
-    return int(u.prompt_tokens or 0), int(u.completion_tokens or 0), float(cost) if cost is not None else None
+    return int(u.prompt_tokens or 0), int(u.completion_tokens or 0), _cost(getattr(u, "cost", None))
+
+
+def _plain(value: object) -> str:
+    """A provider-controlled value made safe for an error message and a log line."""
+    return re.sub(r"[^a-z_]", "", str(value).lower())[:20] or "unknown"
 
 
 class OpenRouterClient:
@@ -139,6 +181,7 @@ class OpenRouterClient:
         if req.item_id is not None:
             meta["item_id"] = req.item_id
         with trace_llm(req.step, model=req.model, kind=req.step, metadata=meta) as span:
+            started = time.monotonic()
             try:
                 response = self._client.chat.completions.create(
                     model=req.model,
@@ -152,7 +195,12 @@ class OpenRouterClient:
                         "type": "json_schema",
                         "json_schema": {"name": req.schema_name, "strict": True, "schema": req.schema},
                     },
-                    extra_body={"usage": {"include": True}},
+                    # require_parameters: route only to providers that support every parameter sent here
+                    extra_body={
+                        "usage": {"include": True},
+                        "provider": {"require_parameters": True},
+                        **({} if req.reasoning is None else {"reasoning": req.reasoning}),
+                    },
                 )
                 choice = response.choices[0]
                 tokens_in, tokens_out, cost = _usage(response)
@@ -172,16 +220,18 @@ class OpenRouterClient:
             ) as exc:
                 # A 200 whose body is unusable (error object, no choices, HTML, garbled or infinite usage,
                 # absurdly nested JSON) or a prompt the SDK cannot encode. ValueError already covers the JSON
-                # and Unicode errors. Nothing raw may leave this method: callers catch only LLMError.
+                # and Unicode errors. Nothing raw from a response may leave this method: callers catch only
+                # LLMError.
                 span.end({"ok": False, "error_type": type(exc).__name__})
                 raise LLMError(f"{req.step}: unusable response ({type(exc).__name__})") from exc
             span.end(
                 {"ok": finish == "stop", "finish_reason": str(finish)},
                 {"input": tokens_in, "output": tokens_out},
             )
+            # raw compare on purpose: only exactly "stop" passes; _plain shapes the message, the trace is raw
             if finish != "stop":  # truncated or filtered
-                raise LLMError(f"{req.step}: finish_reason={finish}")
-            return LLMResult(text, tokens_in, tokens_out, cost)
+                raise LLMError(f"{req.step}: finish_reason={_plain(finish)}")
+            return LLMResult(text, tokens_in, tokens_out, cost, int((time.monotonic() - started) * 1000))
 
 
 def default_client() -> LLMClient | None:

@@ -1,7 +1,10 @@
 """Record and replay model outputs so tests, evals and CI run without keys or network.
 
 A recording is JSONL: one line per model call, keyed by LLMRequest.key(). Replay never calls a model; a
-missing key raises ReplayMiss, so a changed prompt fails loudly instead of silently going live."""
+missing key raises ReplayMiss, so a changed prompt fails loudly instead of silently going live.
+
+Rows may hold lone surrogates (written with errors="surrogatepass"), so any reader must open the file with
+errors="surrogatepass"."""
 
 import json
 import threading
@@ -20,7 +23,8 @@ def _load(path: Path) -> dict[str, dict[str, Any]]:
     if path.exists():
         # Not splitlines(): it also splits on U+2028, U+2029 and U+0085, which json.dumps(ensure_ascii=False)
         # writes raw, so a row containing one would be cut in half.
-        for line in path.read_text(encoding="utf-8").split("\n"):
+        # surrogatepass: a reply holding a lone surrogate (a model can emit one as a JSON escape) round-trips.
+        for line in path.read_text(encoding="utf-8", errors="surrogatepass").split("\n"):
             if line.strip():
                 row = json.loads(line)
                 rows[row["key"]] = row
@@ -28,7 +32,9 @@ def _load(path: Path) -> dict[str, dict[str, Any]]:
 
 
 def _result(row: dict[str, Any]) -> LLMResult:
-    return LLMResult(row["text"], row["input_tokens"], row["output_tokens"], row["cost_usd"])
+    return LLMResult(
+        row["text"], row["input_tokens"], row["output_tokens"], row["cost_usd"], row.get("latency_ms")
+    )
 
 
 class ReplayClient:
@@ -64,10 +70,11 @@ class RecordingClient:
             "input_tokens": result.input_tokens,
             "output_tokens": result.output_tokens,
             "cost_usd": result.cost_usd,
+            "latency_ms": result.latency_ms,
         }
         with self._lock:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            with self._path.open("a", encoding="utf-8") as f:
+            with self._path.open("a", encoding="utf-8", errors="surrogatepass") as f:
                 f.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
             self._rows[key] = row
         return result

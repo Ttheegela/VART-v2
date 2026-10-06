@@ -222,3 +222,12 @@ def test_migrated_check_constraints_match_the_models(migrated_db: Engine) -> Non
         migrated = set(conn.execute(_CHECKS, {"schema": "public"}).all())
     assert migrated, "no CHECK constraints found in the migrated schema"
     assert migrated == from_models, sorted(migrated ^ from_models)
+
+
+def test_a_chunk_is_not_a_record_row_unless_marked(s: Session) -> None:
+    ws = f.workspace(s)
+    doc = f.document(s, ws)
+    plain = f.chunk(s, doc)
+    row = f.chunk(s, doc, line_start=2, line_end=2, text="System: Okta; Status: Overdue", record=True)
+    s.commit()
+    assert (plain.record, row.record) == (False, True)

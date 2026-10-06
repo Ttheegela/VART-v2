@@ -1,11 +1,14 @@
 import json
+from dataclasses import replace
+from types import SimpleNamespace
 from typing import Annotated, Any, Literal
 
 import httpx
 import pytest
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
-from app.llm.client import LLMError, OpenRouterClient, build_request, complete_model
+from app.llm.client import LLMError, OpenRouterClient, _plain, build_request, complete_model
+from app.settings import REASONING
 from tests.fakes import FakeLLM
 
 
@@ -52,8 +55,52 @@ def test_sends_a_strict_json_schema_request() -> None:
     assert fmt["type"] == "json_schema" and fmt["json_schema"]["strict"] is True
     assert fmt["json_schema"]["name"] == "Out"
     assert seen["usage"] == {"include": True}
+    # only providers that honour every parameter we send (strict json_schema among them)
+    assert seen["provider"] == {"require_parameters": True}
     assert result.text == '{"ok": true, "note": null}'
     assert (result.input_tokens, result.output_tokens, result.cost_usd) == (12, 3, 0.0001)
+
+
+def test_every_structured_request_says_json() -> None:
+    # A provider that downgrades json_schema to json_object (Alibaba) refuses messages without "json".
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.update(json.loads(request.content))
+        return httpx.Response(200, json=_reply('{"ok": true, "note": null}'))
+
+    _client(handler).complete(_req())
+    assert "response_format" in seen
+    assert "json" in " ".join(m["content"] for m in seen["messages"]).lower()
+
+
+def test_sends_the_step_reasoning_setting() -> None:
+    # Reasoning tokens on short JSON answers overflowed max_tokens (judge) and drove latency (Ruling 7).
+    sent: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return httpx.Response(200, json=_reply('{"ok": true, "note": null}'))
+
+    client = _client(handler)
+    for step in ("stance", "classify", "recheck", "judge", "draft"):
+        client.complete(build_request(step, "m", "p1", "s", "u", Out))
+    by_step = dict(zip(("stance", "classify", "recheck", "judge", "draft"), sent, strict=True))
+    for step in ("stance", "classify", "recheck", "judge", "draft"):  # draft off too (Ruling 11)
+        assert by_step[step]["reasoning"] == {"enabled": False}, step
+    assert all(body["provider"] == {"require_parameters": True} for body in sent)
+
+
+def test_the_reasoning_setting_is_part_of_the_key() -> None:
+    # A recording made with thinking on must never replay for a request with thinking off.
+    req = build_request("stance", "m", "p1", "s", "u", Out)
+    assert req.reasoning == REASONING["stance"]
+    assert req.key() != replace(req, reasoning=None).key()
+
+
+def test_a_mandatory_reasoning_model_gets_its_lowest_effort_instead_of_off() -> None:
+    # Such a model answers 400 to {"enabled": false}: every stance call failed in the bench (2026-10-05).
+    assert build_request("stance", "openai/gpt-oss-120b", "p1", "s", "u", Out).reasoning == {"effort": "low"}
 
 
 def test_truncated_reply_is_an_error() -> None:
@@ -199,7 +246,7 @@ class Golden(BaseModel):
     note: str | None
 
 
-GOLDEN_KEY = "f161dab50867e96edd9fb63aeaafba56dba94af3f7be62649f1d67e979bfb103"
+GOLDEN_KEY = "882db033f9a183d5f887dc0b71941ab34e3785a6c995d772fc992f52a46d6356"
 
 
 def _golden(user: str = "Is data encrypted at rest?") -> Any:
@@ -294,3 +341,66 @@ def test_error_paths_name_the_offending_definition() -> None:
 
     with pytest.raises(ValueError, match=r"\$defs\.Inner"):
         build_request("stance", "m", "p", "s", "u", Outer)
+
+
+GOLDEN_KEY_NON_ASCII = "0755b470206c3f14b82c2a718640ffdae8e6c3bb591564e3624276682f639d02"
+
+
+def test_a_non_ascii_request_key_is_pinned() -> None:
+    # Pins ensure_ascii=False in key(): flipping it re-keys every recording that holds a curly quote or an
+    # accented letter, and the ASCII golden key above would not notice.
+    user = (
+        "Wird der Zugriff viertelj\N{LATIN SMALL LETTER A WITH DIAERESIS}hrlich "
+        "gepr\N{LATIN SMALL LETTER U WITH DIAERESIS}ft? \N{LEFT DOUBLE QUOTATION MARK}Ja"
+        "\N{RIGHT DOUBLE QUOTATION MARK} \N{EM DASH} caf\N{LATIN SMALL LETTER E WITH ACUTE} \N{CHECK MARK}"
+    )
+    assert _golden(user).key() == GOLDEN_KEY_NON_ASCII
+
+
+@pytest.mark.parametrize(
+    ("raw", "cost"),
+    [("1e999", None), ("-1e999", None), ("NaN", None), ("-0.5", None), ("0.0", 0.0)],  # free models cost 0
+)
+def test_a_cost_is_kept_only_when_finite_non_negative(raw: str, cost: float | None) -> None:
+    body = json.dumps(_reply('{"ok": true, "note": null}', cost=123.0)).replace("123.0", raw).encode()
+    result = _client(_bytes(body, "application/json")).complete(_req())
+    assert result.cost_usd == cost and result.text == '{"ok": true, "note": null}'
+
+
+def test_a_call_reports_its_latency(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Only the client's clock: the trace span reads time.monotonic too.
+    monkeypatch.setattr("app.llm.client.time", SimpleNamespace(monotonic=iter([10.0, 10.25]).__next__))
+    result = _client(_json(_reply('{"ok": true, "note": null}'))).complete(_req())
+    assert result.latency_ms == 250
+
+
+def test_a_strange_finish_reason_is_not_echoed_raw() -> None:
+    client = _client(_json(_reply("{}", finish="Content<script>Filter")))
+    with pytest.raises(LLMError, match=r"finish_reason=contentscriptfilter$"):
+        client.complete(_req())
+
+
+@pytest.mark.parametrize(
+    ("value", "plain"),
+    [
+        ("", "unknown"),
+        ("\N{CJK UNIFIED IDEOGRAPH-505C}\N{CJK UNIFIED IDEOGRAPH-6B62}", "unknown"),
+        ("abcdefghij" * 5, "abcdefghij" * 2),
+        (None, "none"),
+    ],
+)
+def test_plain_keeps_only_a_short_lowercase_word(value: object, plain: str) -> None:
+    assert _plain(value) == plain
+
+
+@pytest.mark.parametrize("handler", UNUSABLE.values(), ids=UNUSABLE.keys())
+def test_an_unusable_response_keeps_its_cause(handler: Any) -> None:
+    with pytest.raises(LLMError) as caught:
+        _client(handler).complete(_req())
+    assert isinstance(caught.value.__cause__, Exception) and not isinstance(caught.value.__cause__, LLMError)
+
+
+def test_requests_differing_only_in_max_tokens_have_different_keys() -> None:
+    a = build_request("stance", "m", "stance@p1", "s", "u", OptionA, 3000)
+    b = build_request("stance", "m", "stance@p1", "s", "u", OptionA, 500)
+    assert a.key() != b.key()

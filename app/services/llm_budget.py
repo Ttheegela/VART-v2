@@ -1,6 +1,7 @@
 """Hourly model-call budgets per workspace and step, plus global hourly and daily caps (PriorPath pattern)."""
 
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -71,3 +72,20 @@ def try_consume(session: Session, workspace_id: uuid.UUID, kind: str, now: datet
     if bump(session, GLOBAL_KEY, GLOBAL_KIND, hour) > GLOBAL_PER_HOUR:
         return False  # refused here, so calls the hourly cap turns away never spend the day's allowance
     return bump(session, GLOBAL_KEY, GLOBAL_DAY_KIND, _day(hour)) <= GLOBAL_PER_DAY
+
+
+def spender(session: Session, workspace_id: uuid.UUID) -> Callable[[str], bool]:
+    """The budget hook engine code calls before every model call (app.contracts.Spend). It spends one call of
+    that step and commits at once, so the shared global counter row is never held across a model call and no
+    transaction ever holds two try_consume calls (Plan 1A Task 3 review).
+
+    Commits everything pending in `session`, not only the budget row. Read what you need from ORM objects into
+    plain values before calling it; after it, run no query and touch no ORM attribute until the model call
+    returns. One spender per session; `step` is a key of `CAPS`."""
+
+    def spend(step: str) -> bool:
+        allowed = try_consume(session, workspace_id, step)
+        session.commit()
+        return allowed
+
+    return spend

@@ -8,6 +8,7 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 .hypothesis/
+.coverage
 /public/
 web/node_modules/
 web/test-results/

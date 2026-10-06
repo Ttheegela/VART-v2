@@ -1,6 +1,7 @@
 from datetime import date, datetime, time
 from pathlib import Path
 
+from app.patterns import NEGATION
 from app.text import cell_text, contains, normalize, record_line
 
 
@@ -9,6 +10,13 @@ def test_normalize_straightens_quotes_dashes_and_spaces() -> None:
         normalize("  \u201cAccess\u201d is\u00a0reviewed \u2014 quarterly\u2019s  ")
         == '"Access" is reviewed - quarterly\'s'
     )
+
+
+def test_normalize_folds_the_modifier_letter_apostrophe() -> None:
+    # Plan 2A Ruling 12. U+0149 folds as well: NFKC turns it into U+02BC + "n", so it becomes "'n".
+    folded = normalize("isn" + chr(0x2BC) + "t")
+    assert folded == "isn't"
+    assert NEGATION.search(folded)
 
 
 def test_normalize_folds_compatibility_characters() -> None:
@@ -69,7 +77,7 @@ def test_normalize_is_pinned() -> None:
 
     out = "\n".join(normalize(chr(c)) for c in range(sys.maxunicode + 1) if not 0xD800 <= c <= 0xDFFF)
     digest = hashlib.sha256(out.encode()).hexdigest()
-    assert digest == "5897adf3140462e622674afd353b2a1510582d54d0dcef0b9dc47214c7cf65ec"
+    assert digest == "51d166991e8eaf3eec8fb43f514e3c3e644784c7976bc24355cd2b349dccd89a"
 
 
 def test_record_line_accepts_non_text_headers_and_cells() -> None:
@@ -82,3 +90,37 @@ def test_text_module_is_ascii() -> None:
     module = Path(__file__).resolve().parent.parent / "app" / "text.py"
     assert module.read_text(encoding="utf-8").isascii()
     assert Path(__file__).read_text(encoding="utf-8").isascii()
+
+
+def test_information_separators_and_nel_fold_to_spaces() -> None:
+    # U+001C-001F are whitespace to str.split(); stripping them fused words (Plan 1A Task 1 minor).
+    assert normalize("a\x1cb\x1dc\x1ed\x1fe") == "a b c d e"
+    assert normalize("a\x85b") == "a b"
+
+
+def test_normalize_drops_c1_controls_and_default_ignorables() -> None:
+    hidden = [0x80, 0x9F, 0x34F, 0x61C, 0x115F, 0x180E, 0x2065, 0x3164, 0xFE0F, 0xFFA0, 0xFFF9, 0x1D173]
+    assert normalize("x".join(chr(c) for c in hidden)) == "x" * (len(hidden) - 1)
+    assert normalize("hid" + chr(0xE0101) + chr(0xE01EF) + "den") == "hidden"  # variation selectors 17-256
+    assert normalize("quar" + chr(0xFFFE) + "terly") == "quarterly"  # a noncharacter is never visible
+
+
+def test_a_quote_may_end_right_before_a_glued_footnote_digit() -> None:
+    assert contains("Access is reviewed quarterly1 by IT.", "Access is reviewed quarterly")
+    assert not contains("TLS 12 only", "TLS 1")  # a number still may not end inside a number
+    assert not contains("Backups are unencrypted at rest.", "encrypted at rest")
+    assert not contains("reviewed quarterlyx", "reviewed quarterly")
+
+
+def test_a_quote_ending_in_a_letter_may_not_end_before_an_underscore() -> None:
+    # Plan 2A Ruling 7: only a digit may follow; letters and underscore are mid-token.
+    assert contains("MFA_enforced: false", "MFA") is False
+
+
+def test_normalize_is_idempotent_on_every_code_point() -> None:
+    import sys
+
+    for c in range(sys.maxunicode + 1):
+        if not 0xD800 <= c <= 0xDFFF:
+            once = normalize(chr(c))
+            assert normalize(once) == once, hex(c)

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -60,3 +61,21 @@ def test_a_prompt_with_a_lone_surrogate_can_be_recorded_and_replayed(tmp_path: P
     path = tmp_path / "r.jsonl"
     RecordingClient(FakeLLM(['{"ok": true}']), path).complete(req)
     assert ReplayClient(path).complete(req).text == '{"ok": true}'
+
+
+def test_latency_is_recorded_and_replayed(tmp_path: Path) -> None:
+    class Timed(FakeLLM):
+        def complete(self, req):  # type: ignore[no-untyped-def]
+            return replace(super().complete(req), latency_ms=1234)
+
+    path = tmp_path / "r.jsonl"
+    assert RecordingClient(Timed(['{"ok": true}']), path).complete(REQ).latency_ms == 1234
+    assert ReplayClient(path).complete(REQ).latency_ms == 1234
+
+
+def test_a_reply_with_a_lone_surrogate_round_trips(tmp_path: Path) -> None:
+    text = '{"ok": true, "note": "bad ' + chr(0xD800) + '"}'
+    path = tmp_path / "r.jsonl"
+    RecordingClient(FakeLLM([text]), path).complete(REQ)
+    assert ReplayClient(path).complete(REQ).text == text
+    assert RecordingClient(FakeLLM([]), path).complete(REQ).text == text
