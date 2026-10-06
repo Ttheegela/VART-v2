@@ -17,8 +17,19 @@ describe("GapCheck", () => {
   it("counts the coverage line from the rows", async () => {
     mockApi({ "GET /api/gap/core": fixtures.gap });
     render(<GapCheck {...props} />);
-    expect(await screen.findByText("checked 2 · ask me 1 · not checked 1 · of 4")).toBeInTheDocument();
+    await screen.findByRole("table", { name: "outcomes" });
+    // the status line's copy and a wrapping copy in the body, so "of N" is never cut at 320px; one is read aloud
+    const copies = screen.getAllByText("checked 2 · ask me 1 · not checked 1 · of 4");
+    expect(copies).toHaveLength(2);
+    expect(copies.filter((c) => c.getAttribute("aria-hidden") === "true")).toHaveLength(1);
     expect(coverage(fixtures.gap.rows)).toBe("checked 2 · ask me 1 · not checked 1 · of 4");
+  });
+
+  it("counts outcomes by tier, never parts", () => {
+    const rows = (["checked", "ask", "not_checked"] as const).flatMap((tier, t) =>
+      Array.from({ length: [31, 5, 70][t] }, (_, i) => ({ ...fixtures.gap.rows[0], csf_id: `X${t}-${i}`, tier })),
+    );
+    expect(coverage(rows)).toBe("checked 31 · ask me 5 · not checked 70 · of 106");
   });
 
   it("lists every outcome in grouped rows with the review line and the footer", async () => {
@@ -39,6 +50,8 @@ describe("GapCheck", () => {
     render(<GapCheck {...props} />);
     const group = await screen.findByRole("group", { name: "filter by label" });
     expect(within(group).getByRole("button", { name: /^not checked 1$/ })).toBeInTheDocument();
+    const sum = within(group).getAllByRole("button").reduce((n, b) => n + Number(b.textContent?.match(/(\d+)$/)?.[1]), 0);
+    expect(sum).toBe(fixtures.gap.rows.length);
     const gap = within(group).getByRole("button", { name: /^gap 1$/ });
     await userEvent.click(gap);
     expect(gap).toHaveAttribute("aria-pressed", "true");
@@ -69,6 +82,9 @@ describe("GapCheck", () => {
     const row = await screen.findByRole("row", { name: /^PR\.DS-01 / });
     expect(row).toHaveTextContent(FAILED);
     expect(within(row).queryByText("gap")).not.toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: /^no result 1$/ });
+    await userEvent.click(toggle);
+    expect(screen.getByRole("row", { name: /^PR\.DS-01 / })).toBeInTheDocument();
   });
 
   it("scope keys switch the scope", async () => {
@@ -108,6 +124,27 @@ describe("GapCheck", () => {
     await screen.findByRole("button", { name: "Check again" });
     await userEvent.keyboard("r");
     expect(await screen.findByRole("status")).toHaveTextContent("Nothing changed since the last check.");
+  });
+
+  it("e waits while the check is running, and says why", async () => {
+    const running = { ...fixtures.gap, run: { ...fixtures.gap.run!, status: "running" as const, done: 0 } };
+    mockApi({ "GET /api/gap/core": running, "POST /api/runs/r9/step": () => new Promise(() => {}) });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    render(<GapCheck {...props} />);
+    expect(await screen.findByRole("button", { name: "Export xlsx" })).toBeDisabled();
+    expect(screen.getByText("export when the check is done")).toBeInTheDocument();
+    await userEvent.keyboard("e");
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it("a scope switch puts the cursor back on the first row", async () => {
+    mockApi({ "GET /api/gap/core": fixtures.gap, "GET /api/gap/protect": { ...fixtures.gap, scope: "protect" } });
+    const { rerender } = render(<GapCheck {...props} />);
+    await screen.findByRole("table", { name: "outcomes" });
+    await userEvent.keyboard("jj");
+    expect(screen.getByRole("row", { name: /^PR\.DS-01 / })).toHaveAttribute("tabindex", "0");
+    rerender(<GapCheck {...props} scope="protect" />);
+    expect(await screen.findByRole("row", { name: /^GV\.RM-02 / })).toHaveAttribute("tabindex", "0");
   });
 
   it("e downloads the gap report of the run", async () => {

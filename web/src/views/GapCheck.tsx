@@ -9,8 +9,9 @@ import { useStepLoop } from "./RunGrid";
 
 const NOT_CHECKED = "not checked in this version"; // CSF spec 5.5
 const NOTHING_CHANGED = "Nothing changed since the last check."; // adversary-1 M7
-type Filter = GapLabel | "not_applicable" | "not_checked";
-const FILTERS: readonly Filter[] = [...GAP_LABELS, "not_applicable", "not_checked"];
+type Filter = GapLabel | "not_applicable" | "no_result" | "not_checked";
+const FILTERS: readonly Filter[] = [...GAP_LABELS, "not_applicable", "no_result", "not_checked"];
+const TEXT_FILTER = { no_result: "no result", not_checked: "not checked" } as const;
 
 /** The status line (CSF spec 7): counted from the rows, never typed in, so coverage is never overstated. */
 export function coverage(rows: GapRow[]): string {
@@ -19,8 +20,9 @@ export function coverage(rows: GapRow[]): string {
 }
 
 // adversary-1 I1: a visitor's N/A wins over the tier's label ("not answered" on Ask me, none on Checked).
-const filterOf = (r: GapRow): Filter | null =>
-  r.tier === "not_checked" ? "not_checked" : r.not_applicable ? "not_applicable" : r.label;
+// No label otherwise is "no result" (not run yet, or failed: adversary-1 M4), so every row has exactly one filter.
+const filterOf = (r: GapRow): Filter =>
+  r.tier === "not_checked" ? "not_checked" : r.not_applicable ? "not_applicable" : (r.label ?? "no_result");
 const group = (r: GapRow) => `${r.function} / ${r.category}`.toLowerCase();
 
 type RowProps = { row: GapRow; i: number; cursor: boolean; selected: boolean; section: string | null; pending: boolean };
@@ -64,7 +66,9 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
   const [tick, setTick] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Set<Filter>>(new Set());
-  const [cursor, setCursor] = useState(0);
+  const [cursorAt, setCursorAt] = useState({ scope: current, i: 0 });
+  const cursor = cursorAt.scope === current ? cursorAt.i : 0; // a scope switch starts at the first row
+  const setCursor = (i: number) => setCursorAt({ scope: current, i });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ scope: GapScope; text: string } | null>(null);
   const download = useRef<HTMLAnchorElement>(null);
@@ -88,14 +92,11 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
   const rows = data?.rows;
   const counts = useMemo(() => {
     const c = Object.fromEntries(FILTERS.map((l) => [l, 0])) as Record<Filter, number>;
-    for (const r of rows ?? []) {
-      const k = filterOf(r);
-      if (k) c[k] += 1;
-    }
+    for (const r of rows ?? []) c[filterOf(r)] += 1;
     return c;
   }, [rows]);
   const visible = useMemo(
-    () => (rows ?? []).filter((r) => { const k = filterOf(r); return filters.size === 0 || (k !== null && filters.has(k)); }),
+    () => (rows ?? []).filter((r) => filters.size === 0 || filters.has(filterOf(r))),
     [rows, filters],
   );
   const sections = useMemo(
@@ -123,7 +124,7 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
     } catch (e) { setError(messageOf(e)); }
     setBusy(false);
   };
-  const exportFile = () => { if (run) download.current?.click(); };
+  const exportFile = () => { if (run && !running) download.current?.click(); }; // a running check's sheet is partial
   const down = () => setCursor(Math.min(cur + 1, visible.length - 1));
   const up = () => setCursor(Math.max(cur - 1, 0));
 
@@ -158,11 +159,13 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
                 {GAP_REVIEW} · labels decided by code
                 {run ? ` · ${run.done} of ${run.total} checked · ${running ? "checking" : run.status} · $${run.cost_usd.toFixed(4)}` : " · not run yet"}
               </p>
+              {data && <p aria-hidden="true" className="text-xs text-ink-2">{coverage(data.rows)}</p>}
               <p role="status" className={said ? "text-xs text-ink-2" : "sr-only"}>{said ?? status}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button k="r" label={run ? "Check again" : "Run gap check"} primary onClick={() => void start()} busy={busy} busyLabel="Starting…" disabled={!data || running} />
-              <Button k="e" label="Export xlsx" onClick={exportFile} disabled={!run} />
+              <Button k="e" label="Export xlsx" onClick={exportFile} disabled={!run || running} />
+              {running && <span className="self-center text-xs text-ink-3">export when the check is done</span>}
               {run && <a ref={download} href={api.exportUrl(run.id)} download hidden tabIndex={-1} aria-hidden="true" />}
             </div>
           </div>
@@ -179,14 +182,14 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
             {FILTERS.map((l) => (
               <button key={l} type="button" aria-pressed={filters.has(l)} onClick={() => toggle(l)}
                 className={`flex h-6 items-center gap-1 whitespace-nowrap border px-1 text-xs hover:border-rule-strong hover:bg-paper ${filters.has(l) ? "border-ink bg-paper" : "border-transparent"}`}>
-                {l === "not_checked" ? <span className="px-1 text-ink-3">not checked</span> : l === "not_applicable" ? <LabelChip label="na" /> : <GapChip label={l} />}{" "}
+                {l === "no_result" || l === "not_checked" ? <span className="px-1 text-ink-3">{TEXT_FILTER[l]}</span> : l === "not_applicable" ? <LabelChip label="na" /> : <GapChip label={l} />}{" "}
                 <span className="font-bold tabular-nums">{counts[l]}</span>
               </button>
             ))}
           </div>
           <div className="px-4"><ErrorLine message={error ?? loopError} /></div>
           <div className="min-h-0 flex-1 overflow-auto">
-            <table aria-label="outcomes" aria-rowcount={visible.length + 1} className="w-full min-w-[56rem] table-fixed border-collapse text-sm">
+            <table aria-label="outcomes" aria-rowcount={visible.length + sections.filter((x) => x !== null).length + 1} className="w-full min-w-[56rem] table-fixed border-collapse text-sm">
               <colgroup>
                 <col className="w-[3ch]" /><col className="w-[12ch]" /><col className="w-[19ch]" /><col className="w-[6ch]" />
                 <col className="w-[40%]" /><col />
