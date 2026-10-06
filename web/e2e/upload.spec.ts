@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { fileURLToPath } from "node:url";
+import { RUN_WAIT } from "./helpers.ts";
 
 const MESSY = fileURLToPath(new URL("../../data/mapper/v05.xlsx", import.meta.url));
 const POLICY = fileURLToPath(new URL("./fixtures/backup-policy.md", import.meta.url));
@@ -14,5 +15,5 @@ test("a messy xlsx is mapped, confirmed and answered from an uploaded document",
   await expect(page.getByRole("row", { name: /backup-policy\.md/ })).toContainText("policy");
   await page.keyboard.press("r");
   await page.waitForURL(/view=run&run=/);
-  await expect(page.getByText(/20 of 20 answered · done/)).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText(/20 of 20 answered · done/)).toBeVisible({ timeout: RUN_WAIT });
 });

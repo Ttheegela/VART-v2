@@ -1,13 +1,16 @@
 import { execFileSync } from "node:child_process";
 import { expect, type Page } from "@playwright/test";
 
+/** How long a run may take: live model calls while recording are far slower than replay. */
+export const RUN_WAIT = process.env.LLM_MODE === "record" ? 1_200_000 : 150_000;
+
 /** Start the sample company from Home and wait until the run is done; returns the run id. */
 export async function sampleRun(page: Page): Promise<string> {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "Try with a sample company" })).toBeEnabled();
   await page.keyboard.press("s");
   await page.waitForURL(/view=run&run=/);
-  await expect(page.getByText(/64 of 64 answered · done/)).toBeVisible({ timeout: 150_000 });
+  await expect(page.getByText(/64 of 64 answered · done/)).toBeVisible({ timeout: RUN_WAIT });
   return new URL(page.url()).searchParams.get("run") as string;
 }
 

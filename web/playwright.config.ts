@@ -5,7 +5,7 @@ const remote = process.env.PLAYWRIGHT_BASE_URL;
 
 export default defineConfig({
   testDir: "e2e",
-  timeout: 180_000,
+  timeout: process.env.LLM_MODE === "record" ? 1_320_000 : 180_000, // live calls while recording are slow
   retries: process.env.CI ? 1 : 0,
   use: { baseURL: remote ?? "http://127.0.0.1:8000", trace: "retain-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
