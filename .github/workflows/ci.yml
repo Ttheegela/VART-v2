@@ -152,6 +152,7 @@ jobs:
         working-directory: web
       - run: npx playwright install --with-deps chromium
         working-directory: web
+      # retries are 0 in playwright.config.ts on purpose: a retry re-runs the shared sample run and can pass the 400/h per-network cap
       - run: npm run e2e
         working-directory: web
       - uses: actions/upload-artifact@v4

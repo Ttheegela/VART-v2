@@ -14,8 +14,9 @@ def test_replay_mode_serves_the_recording(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert isinstance(get_llm(), ReplayClient)
 
 
-def test_only_live_mode_runs_on_vercel(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("LLM_MODE", "replay")
+@pytest.mark.parametrize("mode", ["replay", "record"])
+def test_only_live_mode_runs_on_vercel(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, mode: str) -> None:
+    monkeypatch.setenv("LLM_MODE", mode)
     monkeypatch.setenv("LLM_RECORDING", str(tmp_path / "r.jsonl"))
     monkeypatch.setenv("VERCEL", "1")
     with pytest.raises(RuntimeError, match="live"):

@@ -15,10 +15,10 @@ description = "Fake PEM test input in the Plan 2b draft, not a key; scoped to th
 targetRules = ["private-key"]
 paths = ['''^docs/superpowers/plans/2026-10-04-vart-v2-plan2b-ingest\.md$''']
 
-# Why: every eval recording row is written with sort_keys, so it reads `"key": "<64 hex>"`, and generic-api-key matches
+# Why: every recording row (evals/recorded and web/e2e/recorded.jsonl) is written with sort_keys, so it reads `"key": "<64 hex>"`, and generic-api-key matches
 # that by name; the value is the sha256 record/replay key of a canonical LLM request, not a credential.
 [[allowlists]]
-description = "Record/replay keys (64-hex sha256) in evals/recorded/*.jsonl; scoped to that path, generic-api-key and a 64-hex secret only, so a real key inside recorded prompt text is still caught"
+description = "Record/replay keys (64-hex sha256) in evals/recorded/*.jsonl and web/e2e/recorded.jsonl; scoped to those paths, generic-api-key and a 64-hex secret only, so a real key inside recorded prompt text is still caught"
 condition = "AND"
 targetRules = ["generic-api-key"]
 paths = ['''^(?:evals/recorded/[^/]+|web/e2e/recorded)\.jsonl$''']

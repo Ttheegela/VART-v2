@@ -38,6 +38,12 @@ Progress and the decisions table: `docs/PROGRESS.md`. The detailed per-task ledg
 - `scripts/` sponsor_check, check_monochrome, export_openapi, smoke. `tests/` pytest (needs Postgres).
 - `ops/` `setup.sh` runs the infrastructure phases (accounts, release, migrate, uptime, status). Tarun runs it in his
   terminal; secrets go only through its hidden prompts.
+- API (Plan 3): `app/api/` routers by lane (`documents.py`, `questionnaires.py`, `workspace.py` inputs; `runs.py`,
+  `answers.py`, `audit.py`, `export.py` runs; `questions.py` interview; `errors.py`, `deps.py`, `schemas.py` shared),
+  `app/runs.py` (step runner), `app/questions.py` (interview service), `app/questionnaires.py` (import and mapper),
+  `app/export.py`, `app/redecide.py`.
+- UI (Plan 3): `web/src/views/` (one file per view), `web/src/lib/{api,route,keys,labels}.ts`, `design.md` (binding for
+  UI work); `web/e2e/` Playwright flows and `recorded.jsonl`.
 - Engine (Plan 2): `app/contracts.py` (frozen unit types; signatures in `docs/CONTRACTS.md`), `app/patterns.py`,
   `app/ingest/` (parse, pdf, store), `app/redact.py`, `app/classify.py`, `app/chunk.py`, `app/retrieve.py`,
   `app/stance.py`, `app/decide.py`, `app/draft.py`, `app/grounding.py`, `app/pipeline.py` (`answer_item`),
@@ -51,6 +57,8 @@ Progress and the decisions table: `docs/PROGRESS.md`. The detailed per-task ledg
   (lanes use `vart_test_<lane>`). pytest reads `TEST_DATABASE_URL`; `alembic check` and the app read `DATABASE_URL`.
 - Backend: `ruff check . && ruff format --check . && mypy app scripts datakit evals && pytest -q && alembic check`
 - Frontend: `cd web && npm run lint && npm test && npm run build`
+- E2E: `cd web && npm run e2e` (replays `web/e2e/recorded.jsonl`; re-record with the Task 7 Step 5 command in the
+  Plan 3B plan)
 - Gates: `python scripts/check_monochrome.py` (the sponsor check is CI-only: it needs the secret)
 - Dev data: `python -m datakit.validate all` (stages: facts, docs, questionnaires, keys, mapper)
 - Evals, no network: `python -m evals.run --pack dev`. Recording (`--mode record|live`) and `python -m evals.bench`
