@@ -203,8 +203,7 @@ D, Q, R, E, IV = (
     "tests.test_export",
     "tests.test_questions",
 )
-# Plan 6B Task 1: the gap stubs answer 501 until Task 3 builds them and moves them to COVERED.
-STUBS: set[tuple[str, str]] = {("/api/gap/{scope}", "get"), ("/api/gap/{scope}/run", "post")}
+STUBS: set[tuple[str, str]] = set()  # Plan 6B Task 3 built the gap paths
 COVERED: dict[tuple[str, str], str] = {
     ("/api/documents", "get"): f"{D}::test_an_upload_is_parsed_classified_and_listed",
     ("/api/documents", "post"): f"{D}::test_an_upload_is_parsed_classified_and_listed",
@@ -251,6 +250,14 @@ COVERED: dict[tuple[str, str], str] = {
     ("/api/questions/{question_id}/skip", "post"): f"{IV}::test_the_interview_over_http",
     ("/api/suggestions/{suggestion_id}/accept", "post"): f"{IV}::test_the_interview_over_http",
     ("/api/audit", "get"): f"{R}::test_the_audit_log_lists_this_workspaces_events_only",
+    (
+        "/api/gap/{scope}",
+        "get",
+    ): "tests.test_api_gap::test_the_view_lists_every_outcome_and_labels_only_what_was_checked",
+    (
+        "/api/gap/{scope}/run",
+        "post",
+    ): "tests.test_api_gap::test_starting_twice_continues_the_same_run_and_the_questionnaire_stays_built_in",
 }
 
 

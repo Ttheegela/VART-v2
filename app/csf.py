@@ -62,6 +62,9 @@ GAP_WORDS: dict[str, str] = {
     "not_answered": "Not answered",
 }
 NOT_CHECKED = "not checked in this version"
+# NIST's SP 800-53 Rev 5 page. Every related control links here: no per-control page could be verified (the
+# Reference Tool's deep links are single-page-app routes, 6A decision 3). The lead checked it (6B Task 1).
+CONTROLS_URL = "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final"
 FUNCTIONS = ("Govern", "Identify", "Protect", "Detect", "Respond", "Recover")
 _ID = re.compile(r"[A-Z]{2}\.[A-Z]{2}-\d{2}")
 _CHECKED: dict[tuple[str, str | None], PartLabel] = {  # CSF spec 5.3

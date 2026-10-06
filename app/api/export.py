@@ -10,9 +10,10 @@ from sqlalchemy import select
 
 from app.api.deps import SessionDep, WorkspaceDep
 from app.api.errors import Conflict, NotFound, limit
+from app.api.gap import gap_sheet, latest_gap
 from app.api.schemas import ERRORS, Mapping
 from app.db.models import Questionnaire, Run
-from app.export import NOTICE, export_csv, export_xlsx, rows_for
+from app.export import NOTICE, export_csv, export_xlsx, gap_report, rows_for
 from app.services import audit_log
 
 router = APIRouter(tags=["export"], responses=ERRORS)
@@ -41,19 +42,36 @@ def export_run(run_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep, request
     """The original file with the answer column filled and Status, Sources and Notes columns added; csv in,
     csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
     with =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The
-    response is an attachment with an ASCII-safe file name. 429 per network (`export`, 60 an hour)."""
+    response is an attachment with an ASCII-safe file name. A gap-check run answers the gap-report workbook
+    instead (CSF spec 7). An xlsx questionnaire's export also carries the workspace's latest done gap check as
+    a `Gap report` sheet (renamed `Gap report (2)` and so on if the file has one), stating its scope and run
+    date; a csv is unchanged. 429 per network (`export`, 60 an hour)."""
     limit(request, session, "export")
     run = session.scalar(select(Run).where(Run.id == run_id, Run.workspace_id == ws.id))
     if run is None:
         raise NotFound()
     q = session.get_one(Questionnaire, run.questionnaire_id)
+    if q.source == "csf":
+        return _gap_report(session, ws.id, run, q)
     confirmed = (q.mapping or {}).get("confirmed")
     if not q.original_bytes or not confirmed:
         raise Conflict("This questionnaire has no file to write into.")
     mapping, rows = Mapping(**confirmed), rows_for(session, run.id)
     is_csv = q.filename.lower().endswith(".csv")
-    body = (export_csv if is_csv else export_xlsx)(q.original_bytes, mapping, rows)
-    audit_log.record(session, ws.id, "export", ref=str(run.id), detail={"rows": len(rows)})
+    found = None if is_csv else latest_gap(session, ws.id)
+    gap = gap_sheet(session, *found) if found else None
+    body = (
+        export_csv(q.original_bytes, mapping, rows)
+        if is_csv
+        else export_xlsx(q.original_bytes, mapping, rows, gap)
+    )
+    audit_log.record(
+        session,
+        ws.id,
+        "export",
+        ref=str(run.id),
+        detail={"rows": len(rows), "gap": gap.scope if gap else None},
+    )
     session.commit()
     ext = "csv" if is_csv else "xlsx"
     return Response(
@@ -63,4 +81,19 @@ def export_run(run_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep, request
             "Content-Disposition": disposition(q.filename, ext),
             **({} if is_csv else {"X-Export-Notice": NOTICE}),
         },
+    )
+
+
+def _gap_report(session: SessionDep, ws_id: uuid.UUID, run: Run, q: Questionnaire) -> Response:
+    """A gap-check run's export (CSF spec 7): the gap-report workbook, named by the scope (a server value)."""
+    g = gap_sheet(session, q, run)
+    body = gap_report(g)
+    audit_log.record(
+        session, ws_id, "export", ref=str(run.id), detail={"rows": len(g.rows), "scope": g.scope}
+    )
+    session.commit()
+    return Response(
+        body,
+        media_type=XLSX,
+        headers={"Content-Disposition": f'attachment; filename="csf-2.0-{g.scope}-gap-report.xlsx"'},
     )

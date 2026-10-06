@@ -2,14 +2,25 @@ import csv
 import io
 import uuid
 from pathlib import Path
+from typing import Any
 
 import openpyxl
 import pytest
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
-from app.api.schemas import Mapping
-from app.export import DRAFT, ExportRow, export_csv, export_xlsx
+from app.api.schemas import GapRow, Mapping
+from app.export import (
+    DRAFT,
+    FOOTER,
+    GAP_HEAD,
+    REVIEW,
+    ExportRow,
+    GapSheet,
+    export_csv,
+    export_xlsx,
+    gap_report,
+)
 from tests.apiclient import visitor
 
 SAMPLES = Path(__file__).resolve().parent.parent / "data" / "questionnaires"
@@ -227,3 +238,89 @@ def test_a_questionnaire_without_its_file_is_a_409(db: Engine) -> None:
     client, ws_id = visitor(db)
     run_id = _run(db, ws_id, original=None)
     assert client.get(f"/api/runs/{run_id}/export").status_code == 409
+
+
+CONTROLS = "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final"
+
+
+def _gap_row(
+    csf_id: str, tier: Any, label: Any, explanation: str | None, answer_id: Any = None, na: bool = False
+) -> GapRow:
+    return GapRow(
+        csf_id=csf_id,
+        function="Protect",
+        category="Data Security",
+        outcome=f"NIST text of {csf_id}",
+        related_controls=["CP-09"],
+        source_url="https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
+        tier=tier,
+        item_id=None,
+        answer_id=answer_id,
+        label=label,
+        explanation=explanation,
+        sources=1 if answer_id else 0,
+        not_applicable=na,
+    )
+
+
+def test_the_gap_report_lists_every_outcome_in_scope_with_inert_cells() -> None:
+    aid = uuid.uuid4()
+    cite = {"quote": "=cmd|' /C calc'!A0", "filename": "backup-policy.docx", "line_start": 2}
+    rows = [
+        _gap_row("PR.DS-11", "checked", "covered", "=SUM(A1)", aid),
+        _gap_row("PR.DS-10", "not_checked", None, None),
+        _gap_row("PR.DS-01", "checked", None, None),  # not answered yet
+        _gap_row("PR.DS-02", "checked", None, "Not applicable: we have no data", na=True),
+        _gap_row("GV.RM-02", "ask", None, "Not applicable: not ours", na=True),  # either tier: adversary-1 I1
+        _gap_row(
+            "PR.DS-03", "checked", None, "Not checked: the model call failed twice. Press r to check again."
+        ),
+    ]
+    body = gap_report(GapSheet(rows, {aid: [cite]}, "2026-10-06", "core", "2.0", CONTROLS))
+    ws = openpyxl.load_workbook(io.BytesIO(body))["Gap report"]
+    assert ws["A1"].value == REVIEW == "Possible gap — review it"
+    assert (ws["B1"].value, ws["C1"].value) == ("Scope: core", "Run date: 2026-10-06")
+    assert tuple(c.value for c in ws[2]) == GAP_HEAD
+    assert [ws.cell(n, 4).value for n in (3, 4, 5)] == [
+        "Covered",
+        "Not checked in this version",
+        "Not run yet",
+    ]
+    assert [ws.cell(n, 4).value for n in (6, 7, 8)] == ["Not applicable", "Not applicable", "Not run yet"]
+    assert (ws["E3"].value, ws["E3"].data_type) == ("=SUM(A1)", "s")
+    assert (ws["F3"].value, ws["F3"].data_type) == ("\"=cmd|' /C calc'!A0\" (backup-policy.docx line 2)", "s")
+    assert (ws["G3"].value, ws["I3"].value, ws["J3"].value, ws["K3"].value) == (
+        "NIST text of PR.DS-11",
+        "CP-09",
+        "2026-10-06",
+        "2.0",
+    )
+    assert ws["H3"].value.endswith(CONTROLS)
+    assert ws.cell(10, 1).value == FOOTER == "Not legal advice. CSF 2.0 text © NIST, public domain."
+
+
+def test_a_questionnaire_xlsx_gains_the_gap_sheet_only_when_given_and_never_overwrites_a_sheet() -> None:
+    original = (SAMPLES / "vsq-a.xlsx").read_bytes()
+    plain = openpyxl.load_workbook(io.BytesIO(export_xlsx(original, VSQ, ROWS)))
+    assert plain.sheetnames == openpyxl.load_workbook(io.BytesIO(original)).sheetnames  # no gap: unchanged
+    gap = GapSheet(
+        [_gap_row("RC.RP-01", "checked", "gap", "=1+1", None)], {}, "2026-10-06", "recover", "2.0", CONTROLS
+    )
+    wb = openpyxl.load_workbook(io.BytesIO(export_xlsx(original, VSQ, ROWS, gap)))
+    assert wb.sheetnames == [*plain.sheetnames, "Gap report"]
+    assert wb.active.title == plain.active.title  # the visitor's sheet stays the one that opens
+    ws = wb["Gap report"]
+    assert (ws["B1"].value, ws["A3"].value) == ("Scope: recover", "RC.RP-01")
+    assert (ws["E3"].value, ws["E3"].data_type) == ("=1+1", "s")
+    taken = openpyxl.load_workbook(io.BytesIO(original))
+    taken.create_sheet("Gap report")  # a visitor's own sheet of that name
+    buf = io.BytesIO()
+    taken.save(buf)
+    names = openpyxl.load_workbook(io.BytesIO(export_xlsx(buf.getvalue(), VSQ, ROWS, gap))).sheetnames
+    assert names[-2:] == ["Gap report", "Gap report (2)"]
+    lower = openpyxl.load_workbook(io.BytesIO(original))
+    lower.create_sheet("gap report")  # Excel names are case-insensitive (preflight I4)
+    buf = io.BytesIO()
+    lower.save(buf)
+    names = openpyxl.load_workbook(io.BytesIO(export_xlsx(buf.getvalue(), VSQ, ROWS, gap))).sheetnames
+    assert names[-2:] == ["gap report", "Gap report (2)"]

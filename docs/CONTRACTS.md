@@ -203,3 +203,7 @@ change-log line; changing or removing a path, a field or a status needs the lead
   (Task 3); accepted per-part fills read Confirmed by you, evidence is compared as sets and per-part fills survive
   a re-open (Task 4). The 6A statements dropped by Task 1 (`source` `csf`, `ItemOut.csf_id`, the seam) are
   restored; "`GET /api/questionnaires` lists built-in questionnaires" stays out (it never did).
+- 2026-10-06: Plan 6B Task 3 (an added sheet, no path, field or status changed): an xlsx questionnaire export
+  carries the workspace's latest done gap check as a `Gap report` sheet (a free name when the file has one,
+  compared case-insensitively), every cell inert; with no done gap check, or for a csv, the export is unchanged
+  (Tarun, 2026-10-06). Bulk approve (`approve-verified`) skips a gap check's Not met outcomes.
