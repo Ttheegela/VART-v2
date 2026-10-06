@@ -30,6 +30,7 @@ function Inspector({ row, runId, controlsUrl, onClose, onChanged }: Props) {
   const [a, setA] = useState<AnswerDetail | null>(null);
   const [question, setQuestion] = useState<QuestionOut | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0); // a 409 on the card reloads the inspector (Task 6 review M2)
   const { answer_id: answerId, item_id: itemId, tier } = row;
   const titleId = `gap-${row.csf_id}`;
 
@@ -41,7 +42,7 @@ function Inspector({ row, runId, controlsUrl, onClose, onChanged }: Props) {
       api.questions(runId).then((qs) => { if (alive) setQuestion(qs.find((q) => q.item_ids.includes(itemId)) ?? null); }, fail);
     }
     return () => { alive = false; };
-  }, [answerId, itemId, tier, runId]);
+  }, [answerId, itemId, tier, runId, tick]);
 
   const parts = a?.parts ?? [];
   const ref = (c: CitationOut) => (a?.citations.findIndex((x) => same(x, c)) ?? -1) + 1; // footnote into sources
@@ -76,7 +77,7 @@ function Inspector({ row, runId, controlsUrl, onClose, onChanged }: Props) {
                 <span className="font-bold">part {p.n}</span>
                 <GapChip label={p.label} />
                 <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{p.question}</span>
-                {p.citations.map((c, i) => <sup key={i} className="font-bold">[{ref(c)}]</sup>)}
+                {p.citations.map((c, i) => ref(c) > 0 && <sup key={i} className="font-bold">[{ref(c)}]</sup>)}
                 {p.from_statement && <span className="text-xs text-ink-3">from your answer</span>}
               </li>
             ))}
@@ -85,10 +86,10 @@ function Inspector({ row, runId, controlsUrl, onClose, onChanged }: Props) {
       )}
       {a && a.citations.length > 0 && <Sources a={a} />}
       {a && a.dropped.length > 0 && <DroppedList dropped={a.dropped} />}
-      {tier === "ask" && (question ? (
+      {tier === "ask" && !row.not_applicable && (question ? (
         <>
           <ul>
-            <QuestionCard q={question} focus={false} onUpdated={(q) => { setQuestion(q); onChanged(); }} onStale={onChanged} />
+            <QuestionCard q={question} focus={false} onUpdated={(q) => { setQuestion(q); onChanged(); }} onStale={() => { onChanged(); setTick((t) => t + 1); }} />
           </ul>
           <p className="text-xs text-ink-3">{STATEMENT}</p>
         </>

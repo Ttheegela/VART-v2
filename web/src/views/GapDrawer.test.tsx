@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { QuestionOut } from "../lib/api";
@@ -6,6 +6,8 @@ import { fixtures, mockApi } from "../test/mockApi";
 import GapDrawer from "./GapDrawer";
 
 const [ask, checked, , unchecked] = fixtures.gap.rows;
+const err = (status: number, detail: string) =>
+  new Response(JSON.stringify({ detail }), { status, headers: { "Content-Type": "application/json" } });
 const base = { runId: "r9", controlsUrl: fixtures.gap.controls_url, onClose: () => {}, onChanged: () => {} };
 
 describe("GapDrawer", () => {
@@ -60,6 +62,40 @@ describe("GapDrawer", () => {
     expect(await screen.findByText("Your answer is saved as a dated statement and can be cited in your questionnaires.")).toBeInTheDocument();
     // preflight I3: the fill's question is its part's wording, and the card says which part
     expect(screen.getByText("Are backups of data tested?").closest("li")).toHaveTextContent(/PR\.DS-11.*part 2/);
+  });
+
+  it("a 409 on the Ask-me card reloads the inspector, so the card shows the question as it is now (Task 6 review M2)", async () => {
+    const q: QuestionOut = { ...fixtures.questions[0], id: "qq9", run_id: "r9", item_ids: ["i-GV.RM-02"], codes: ["GV.RM-02"], text: "Risk appetite?" };
+    const calls = mockApi({
+      "GET /api/answers/a-GV.RM-02": { ...fixtures.detail, id: "a-GV.RM-02", label: "unknown", value: null, text: "", citations: [], dropped: [], parts: [] },
+      "GET /api/runs/r9/questions": [q],
+      "POST /api/questions/qq9/answer": () => err(409, "This question was already answered."),
+    });
+    render(<GapDrawer {...base} row={ask} />);
+    await userEvent.type(await screen.findByLabelText("your answer to GV.RM-02"), "Yes");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText(/already answered/)).toBeInTheDocument();
+    await waitFor(() => expect(calls.filter((c) => c === "GET /api/runs/r9/questions")).toHaveLength(2));
+  });
+
+  it("a not applicable Ask-me outcome shows no question card (Task 6 review M3)", async () => {
+    const q: QuestionOut = { ...fixtures.questions[0], id: "qq9", run_id: "r9", item_ids: ["i-GV.RM-02"], codes: ["GV.RM-02"], text: "Risk appetite?" };
+    mockApi({
+      "GET /api/answers/a-GV.RM-02": { ...fixtures.detail, id: "a-GV.RM-02", label: "unknown", value: null, text: "", citations: [], dropped: [], parts: [] },
+      "GET /api/runs/r9/questions": [q],
+    });
+    render(<GapDrawer {...base} row={{ ...ask, not_applicable: true }} />);
+    expect(screen.getByText("not applicable")).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.queryByLabelText("your answer to GV.RM-02")).not.toBeInTheDocument();
+    expect(screen.queryByText(/dated statement/)).not.toBeInTheDocument();
+  });
+
+  it("a part citation missing from the sources gets no [0] footnote (Task 6 review M4)", async () => {
+    mockApi({ "GET /api/answers/a-PR.DS-11": { ...fixtures.gapDetail, citations: [] } });
+    render(<GapDrawer {...base} row={checked} />);
+    expect(await screen.findByText("parts (2)")).toBeInTheDocument();
+    expect(screen.getByText("Are backups of data created?").closest("li")).not.toHaveTextContent("[0]");
   });
 
   it("a not applicable outcome reads not applicable, and a failed one shows its sentence and no label", async () => {

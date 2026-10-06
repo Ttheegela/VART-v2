@@ -68,7 +68,7 @@ export default function Home({ workspace, startError }: { workspace: Workspace |
             <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-rule-strong px-2 py-3">
               <Button k="s" label="Try with a sample company" primary busy={busy} busyLabel="Starting…" onClick={sample} disabled={!workspace} />
               <span className="min-w-0 text-sm text-ink-2 [overflow-wrap:anywhere]">
-                Kestrelyn, a fictional SaaS company: 22 documents and the bundled Vendor Security Questionnaire. The
+                Kestrelyn, a fictional SaaS company: 23 documents and the bundled Vendor Security Questionnaire. The
                 run fills in live as each item is answered.
               </span>
             </li>
