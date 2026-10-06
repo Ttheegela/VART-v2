@@ -234,3 +234,7 @@ change-log line; changing or removing a path, a field or a status needs the lead
   `AnswerSummary.sources` for Confirmed by you counts the cited documents, at least 1 (M2). No prompt or label
   rule changes, so nothing is re-recorded.
 - 2026-10-06: Plan 6B final review fix (Ruling 14; copy and mapping only, the label id `confirmed_by_you` and the OpenAPI schema are unchanged): an Ask-me outcome the visitor answered reads "Answered by you" (view chip, drawer, sheet via `csf.gap_word`) and stays in the review set; "Confirmed by you" is only for a Checked outcome made Covered by accepted fills (Ruling 6). The failed sheet word is "Failed" (stale "Not run yet" fixed). No prompt or label rule changes, so nothing is re-recorded.
+- 2026-10-07: Plan 4 Task 6 (ingest behaviour; no signature, path, field or status changed): text a reader cannot
+  see is never a line: docx runs marked hidden (w:vanish) or under 1 pt, PDF lines whose first character is under
+  1 pt, hidden sheets and hidden rows of an uploaded workbook. Hidden rows of a questionnaire are blanked, so they
+  are never items. The bundled sample data has none, so no stored line, prompt or label moves.
