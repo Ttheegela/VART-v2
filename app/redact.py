@@ -228,8 +228,9 @@ def _person_spans(text: str, people: list[Any]) -> list[tuple[int, int]]:
     out: list[tuple[int, int]] = []
     for group in groups:
         first, last = group[0][0], group[-1][1]
-        in_a_list = text[:first].endswith(", ") or text[last:].startswith((", ", " and "))
-        # a pair inside a longer comma list ("Okta, Duo, Ping") is a list of products, not "Last, First"
+        in_a_list = text[:first].endswith(", ")
+        # a pair that follows a comma ("Okta, Duo, Ping") is a list of products, not "Last, First"; a pair
+        # that starts the list and is followed by a title or more ("Kim, Sarah, CISO") still is
         for option in ([(first, last)], group) if len(group) == 2 and not in_a_list else (group,):
             trimmed = [_trim_digits(text, a, b) for a, b in option]
             kept = [t for t in trimmed if _looks_like_a_name(text[t[0] : t[1]])]
@@ -272,18 +273,35 @@ def redact_text(text: str) -> str:
 _FILE_CONTEXT = "Notes from "
 
 
+def _suffix_spans(root: str) -> list[tuple[int, int, str]]:
+    """Regex spans of the root and of every part that starts after a separator: "\\b" treats "_" as a word
+    character, so "notes_ghp_..." hides a key from the patterns (re-review I-B)."""
+    starts = [0] + [m.end() for m in re.finditer(r"[_\W]", root)]
+    return [(a + i, b + i, label) for i in starts for a, b, label in _spans(root[i:], [])]
+
+
 def redact_filename(filename: str) -> str:
     """A file name's root read as words inside a sentence, where Presidio finds a bare name it misses alone
-    ("Dana Ortiz.docx", triage row 31). Secrets, emails and the like are found on the original root (a
-    separator would break "sk_live_..."); names on a copy whose separators are spaces, one for one, so every
-    offset holds and the separators stay ("notes_from_<PERSON>_2026.md"). The extension is split off first.
+    ("Dana Ortiz.docx", triage row 31). Secrets, emails and the like are found on the original root and on
+    each part after a separator; names on a copy whose separator runs are one space, with an index map back,
+    so the original separators stay ("notes_from_<PERSON>_2026.md"). The extension is split off first.
     A lower-case name ("dana_ortiz.md") stays a known gap, like a single word."""
     root, ext = os.path.splitext(filename)
-    words = re.sub(r"[_\W]", " ", root)
+    idx: list[int] = []
+    chars: list[str] = []
+    for i, ch in enumerate(root):
+        if re.match(r"[_\W]", ch):
+            if chars and chars[-1] != " ":
+                chars.append(" ")
+                idx.append(i)
+        else:
+            chars.append(ch)
+            idx.append(i)
+    words = "".join(chars)
     sentence = f"{_FILE_CONTEXT}{words}."
     offset = len(_FILE_CONTEXT)
-    found = _spans(root, []) + [
-        (a - offset, b - offset, label)
+    found = _suffix_spans(root) + [
+        (idx[a - offset], idx[b - offset - 1] + 1, label)
         for a, b, label in spans(sentence)
         if label == "PERSON" and a >= offset and b <= offset + len(words)
     ]

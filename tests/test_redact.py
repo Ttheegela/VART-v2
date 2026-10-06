@@ -320,3 +320,85 @@ def test_a_pair_inside_a_comma_list_is_not_merged() -> None:
 @pytest.mark.parametrize("name", ["Key Rotation.pdf", "Jamf Pro.pdf", "Data Retention.docx"])
 def test_ordinary_title_case_file_names_are_kept(name: str) -> None:
     assert redact_filename(name) == name
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Priya M. Patel.pdf",
+        "Dana - Ortiz.pdf",
+        "Dana   Ortiz.pdf",
+        "notes---Dana---Ortiz.pdf",
+        "Dana.-.Ortiz.pdf",
+    ],
+)
+def test_runs_of_separators_do_not_split_a_name_in_a_file_name(name: str) -> None:
+    # Re-review I-A: Presidio tags each word apart when two separators sit between them.
+    out = redact_filename(name)
+    assert "<PERSON>" in out and out.endswith(".pdf")
+    assert not any(w in out for w in ("Dana", "Ortiz", "Priya", "Patel"))
+
+
+_SECRETS = {
+    "stripe": "sk_live_abcdef1234567890XYZ",
+    "github_pat": "github_pat_11ABCDEFG0abcdefghijklmn",
+    "ghp": "ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+    "aws": "AKIAABCDEFGHIJKLMNOP",
+    "slack": "xoxb-1234567890-abcdefghij",
+    "google": "AIza" + "B" * 20 + "c" * 15,
+    "gitlab": "glpat-abcdefghij1234567890",
+    "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV",
+    "pem": "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7",
+}
+
+
+@pytest.mark.parametrize("join", ["{s}", "notes_{s}", "Marcus_Lee_{s}", "notes-{s}", "notes.{s}"])
+@pytest.mark.parametrize("kind", sorted(_SECRETS))
+def test_a_secret_after_a_separator_in_a_file_name_is_redacted(kind: str, join: str) -> None:
+    # Re-review I-B: "\\b" treats "_" as a word character, so "notes_ghp_..." slipped past the patterns.
+    secret = _SECRETS[kind]
+    out = redact_filename(join.format(s=secret) + ".txt")
+    assert not any(secret[i : i + 8] in out for i in range(0, len(secret) - 7)), out
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "access-control-policy",
+        "Access_Review_Q3_2026",
+        "ISO_27001_SoA",
+        "kestrelyn_token_rotation_policy",
+        "password_policy_2026",
+        "api_key_management_standard",
+        "secret-scanning-runbook",
+    ],
+)
+def test_policy_style_file_names_survive_the_secret_patterns(name: str) -> None:
+    assert redact_filename(name + ".pdf") == name + ".pdf"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Owner: Kim, Sarah, CISO",
+        "Approved by Patel, Priya, Head of Security.",
+        "Reviewers: Kim, Sarah and Morgan",
+        "Contact Kim, Sarah, or Patel, Priya.",
+    ],
+)
+def test_last_first_followed_by_a_title_or_more_is_still_a_name(text: str) -> None:
+    # Re-review I-C: only a pair PRECEDED by ", " is a list member.
+    assert "Sarah" not in redact_text(text) and "Priya" not in redact_text(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "SSO providers: Duo, Ping, Okta",
+        "SSO providers: Duo, Ping and Okta",
+        "MDM: Jamf, Kandji",
+        "Tools: Okta, Jamf, Kandji, Duo",
+    ],
+)
+def test_product_lists_stay(text: str) -> None:
+    assert redact_text(text) == text
