@@ -22,7 +22,7 @@
       "op": ">=",
       "pass": false,
       "target": 0.8,
-      "value": 0.6129
+      "value": 0.7097
     },
     "nist_text_intact": {
       "op": ">=",
@@ -50,9 +50,9 @@
     },
     "trap_coverage": {
       "op": "<=",
-      "pass": false,
+      "pass": true,
       "target": 0.0,
-      "value": 1.0
+      "value": 0.0
     }
   },
   "items": {
@@ -191,12 +191,14 @@
       "value": "Partial"
     },
     "GV.PO-01": {
-      "citations": 0,
-      "decide": "unknown",
+      "citations": 1,
+      "decide": "partial",
       "draft": "template",
-      "dropped": [],
-      "explanation": "No evidence: parts 1, 2, 3.",
-      "label": "gap",
+      "dropped": [
+        "not-evidence"
+      ],
+      "explanation": "Evidenced: part 2. No evidence: parts 1, 3. Is the policy for managing cybersecurity risks communicated, for example through training? Yes. The hr security policy says: \"All employees complete security awareness training annually.\"",
+      "label": "partly_covered",
       "parts": [
         {
           "citations": [],
@@ -215,39 +217,43 @@
           ]
         },
         {
-          "citations": [],
+          "citations": [
+            "hr-security-policy.docx:11:yes"
+          ],
           "dropped": [],
           "key": "GV.PO-01#2",
-          "label": "gap",
+          "label": "covered",
           "passages": [
+            "hr-security-policy.docx:6",
             "security-policy-template.md:25",
             "information-security-policy.docx:2",
             "security-policy-template.md:8",
             "vendor-risk-management-policy.docx:2",
             "vendor-risk-management-policy.docx:13",
             "data-classification-policy.md:2",
-            "incident-response-policy-DRAFT.docx:12",
-            "access-control-policy.docx:16"
+            "incident-response-policy-DRAFT.docx:12"
           ]
         },
         {
           "citations": [],
-          "dropped": [],
+          "dropped": [
+            "security-policy-template.md:not-evidence"
+          ],
           "key": "GV.PO-01#3",
           "label": "gap",
           "passages": [
+            "security-policy-template.md:29",
             "incident-response-policy-DRAFT.docx:12",
             "information-security-policy.docx:2",
             "vendor-risk-management-policy.docx:2",
             "security-policy-template.md:8",
             "vendor-risk-management-policy.docx:13",
             "data-classification-policy.md:2",
-            "security-policy-template.md:29",
             "access-control-policy.docx:16"
           ]
         }
       ],
-      "value": null
+      "value": "Partial"
     },
     "GV.PO-02": {
       "citations": 1,
@@ -636,12 +642,12 @@
       "value": "Partial"
     },
     "ID.RA-01": {
-      "citations": 2,
-      "decide": "partial",
+      "citations": 4,
+      "decide": "verified",
       "draft": "template",
       "dropped": [],
-      "explanation": "Evidenced: parts 1, 2. No evidence: part 3. Are vulnerabilities in assets identified? Yes. The vulnerability management policy says: \"Authenticated vulnerability scans of all production hosts and container images run weekly.\" The security faq says: \"Security researchers can report vulnerabilities to vulnerability-reports@kestrelyn.example, and Kestrelyn acknowledges each report within two business days.\" Are vulnerabilities in assets validated? Yes. The vulnerability management policy says: \"Authenticated vulnerability scans of all production hosts and container images run weekly.\"",
-      "label": "partly_covered",
+      "explanation": "Evidenced: parts 1, 2, 3. Are vulnerabilities in assets identified? Yes. The vulnerability management policy says: \"Authenticated vulnerability scans of all production hosts and container images run weekly.\" The security faq says: \"Security researchers can report vulnerabilities to vulnerability-reports@kestrelyn.example, and Kestrelyn acknowledges each report within two business days.\" Are vulnerabilities in assets validated? Yes. The vulnerability management policy says: \"Authenticated vulnerability scans of all production hosts and container images run weekly.\" Are vulnerabilities in assets recorded, for example tracked? Yes. The vulnerability management policy says: \"This policy sets out how Kestrelyn finds, tracks and fixes vulnerabilities in the systems that make up Kestrelyn Ledger.\"",
+      "label": "covered",
       "parts": [
         {
           "citations": [
@@ -681,23 +687,26 @@
           ]
         },
         {
-          "citations": [],
+          "citations": [
+            "vulnerability-management-policy.docx:3:yes",
+            "vulnerability-management-policy.docx:6:yes"
+          ],
           "dropped": [],
           "key": "ID.RA-01#3",
-          "label": "gap",
+          "label": "covered",
           "passages": [
             "vendor-risk-management-policy.docx:13",
-            "vulnerability-management-policy.docx:9",
+            "vulnerability-management-policy.docx:2",
+            "vulnerability-management-policy.docx:5",
             "security-faq.md:29",
-            "vulnerability-management-policy.docx:11",
             "asset-inventory.xlsx:1",
             "asset-management-policy.docx:5",
             "security-policy-template.md:27",
-            "asset-inventory.xlsx:8"
+            "data-classification-policy.md:10"
           ]
         }
       ],
-      "value": "Partial"
+      "value": "Yes"
     },
     "ID.RA-02": {
       "citations": 1,
@@ -729,49 +738,54 @@
       "value": "No"
     },
     "ID.RA-08": {
-      "citations": 1,
+      "citations": 5,
       "decide": "partial",
       "draft": "template",
       "dropped": [],
-      "explanation": "Evidenced: parts 1, 3. No evidence: part 2. Are processes for receiving vulnerability disclosures established? Yes. The security faq says: \"Security researchers can report vulnerabilities to vulnerability-reports@kestrelyn.example, and Kestrelyn acknowledges each report within two business days.\" Are processes for responding to vulnerability disclosures established? Yes. The security faq says: \"Security researchers can report vulnerabilities to vulnerability-reports@kestrelyn.example, and Kestrelyn acknowledges each report within two business days.\"",
+      "explanation": "Evidenced: parts 2, 3. Partly evidenced: part 1. Are processes for receiving vulnerability disclosures, such as reports, established? Partly. The security faq says: \"Security researchers can report vulnerabilities to vulnerability-reports@kestrelyn.example, and Kestrelyn acknowledges each report within two business days.\" The vulnerability management policy says: \"All vulnerability findings must be reported and tracked to resolution.\" Are processes for analyzing vulnerability disclosures, for example prioritized, established? Yes. The vulnerability management policy says: \"Findings are prioritized by severity and by how easily they can be exploited.\" Are processes for responding to vulnerability disclosures, for example tracked, established? Yes. The vulnerability management policy says: \"This policy sets out how Kestrelyn finds, tracks and fixes vulnerabilities in the systems that make up Kestrelyn Ledger.\" The security faq says: \"Security researchers can report vulnerabilities to vulnerability-reports@kestrelyn.example, and Kestrelyn acknowledges each report within two business days.\"",
       "label": "partly_covered",
       "parts": [
         {
           "citations": [
-            "security-faq.md:29:yes"
+            "security-faq.md:29:yes",
+            "vulnerability-management-policy.docx:6:partial"
           ],
           "dropped": [],
           "key": "ID.RA-08#1",
-          "label": "covered",
+          "label": "partly_covered",
           "passages": [
-            "vendor-risk-management-policy.docx:13",
             "incident-response-policy-DRAFT.docx:2",
+            "vendor-risk-management-policy.docx:13",
+            "security-faq.md:29",
+            "vulnerability-management-policy.docx:5",
             "logging-and-monitoring-policy.docx:6",
             "vulnerability-management-policy.docx:9",
-            "security-faq.md:29",
-            "vulnerability-management-policy.docx:11",
-            "security-policy-template.md:27",
-            "security-improvement-plan.md:4"
+            "logging-and-monitoring-policy.docx:2",
+            "penetration-test-report-2026.pdf:2"
           ]
         },
         {
-          "citations": [],
+          "citations": [
+            "vulnerability-management-policy.docx:7:yes"
+          ],
           "dropped": [],
           "key": "ID.RA-08#2",
-          "label": "gap",
+          "label": "covered",
           "passages": [
             "incident-response-policy-DRAFT.docx:2",
             "vendor-risk-management-policy.docx:13",
+            "vulnerability-management-policy.docx:5",
             "vulnerability-management-policy.docx:9",
             "logging-and-monitoring-policy.docx:6",
             "security-faq.md:29",
             "security-policy-template.md:27",
-            "vulnerability-management-policy.docx:11",
             "master-services-agreement-template.docx:8"
           ]
         },
         {
           "citations": [
+            "vulnerability-management-policy.docx:3:yes",
+            "vulnerability-management-policy.docx:6:yes",
             "security-faq.md:29:yes"
           ],
           "dropped": [],
@@ -780,11 +794,11 @@
           "passages": [
             "incident-response-policy-DRAFT.docx:2",
             "vendor-risk-management-policy.docx:13",
-            "vulnerability-management-policy.docx:9",
+            "vulnerability-management-policy.docx:2",
+            "vulnerability-management-policy.docx:5",
             "logging-and-monitoring-policy.docx:6",
             "security-faq.md:29",
             "security-policy-template.md:27",
-            "vulnerability-management-policy.docx:11",
             "master-services-agreement-template.docx:8"
           ]
         }
@@ -1040,20 +1054,18 @@
       "value": null
     },
     "PR.AA-06": {
-      "citations": 1,
-      "decide": "partial",
+      "citations": 0,
+      "decide": "unknown",
       "draft": "template",
       "dropped": [],
-      "explanation": "Partly evidenced: part 1. No evidence: parts 2, 3. Is physical access to assets managed? Partly. The asset management policy says: \"All physical assets must be labeled with a company property tag.\"",
-      "label": "partly_covered",
+      "explanation": "No evidence: parts 1, 2, 3.",
+      "label": "gap",
       "parts": [
         {
-          "citations": [
-            "asset-management-policy.docx:8:partial"
-          ],
+          "citations": [],
           "dropped": [],
           "key": "PR.AA-06#1",
-          "label": "partly_covered",
+          "label": "gap",
           "passages": [
             "asset-management-policy.docx:2",
             "access-control-policy.docx:28",
@@ -1098,7 +1110,7 @@
           ]
         }
       ],
-      "value": "Partial"
+      "value": null
     },
     "PR.DS-01": {
       "citations": 2,
@@ -1414,27 +1426,29 @@
       "value": null
     },
     "PR.PS-02": {
-      "citations": 0,
-      "decide": "unknown",
+      "citations": 1,
+      "decide": "partial",
       "draft": "template",
       "dropped": [],
-      "explanation": "No evidence: parts 1, 2, 3.",
-      "label": "gap",
+      "explanation": "Evidenced: part 1. No evidence: parts 2, 3. Is software maintained, for example patched dependencies? Yes. The vulnerability management policy says: \"Critical vulnerabilities are patched within 14 days of discovery.\"",
+      "label": "partly_covered",
       "parts": [
         {
-          "citations": [],
+          "citations": [
+            "vulnerability-management-policy.docx:11:yes"
+          ],
           "dropped": [],
           "key": "PR.PS-02#1",
-          "label": "gap",
+          "label": "covered",
           "passages": [
             "information-security-policy.docx:7",
             "secure-development-policy.md:5",
             "secure-development-policy.md:2",
+            "vulnerability-management-policy.docx:11",
             "vendor-risk-management-policy.docx:2",
             "business-continuity-policy.md:2",
-            "soc2-type-ii-report-summary.pdf:10",
             "business-continuity-policy.md:5",
-            "vendor-risk-management-policy.docx:6"
+            "soc2-type-ii-report-summary.pdf:10"
           ]
         },
         {
@@ -1470,7 +1484,7 @@
           ]
         }
       ],
-      "value": null
+      "value": "Partial"
     },
     "PR.PS-04": {
       "citations": 3,
@@ -1721,32 +1735,29 @@
   },
   "label_misses": [
     "DE.CM-09: expected covered, got partly_covered",
-    "GV.PO-01: expected covered, got gap",
-    "ID.RA-01: expected covered, got partly_covered",
+    "GV.PO-01: expected covered, got partly_covered",
     "ID.RA-08: expected covered, got partly_covered",
-    "PR.AA-06: expected gap, got partly_covered",
     "PR.DS-01: expected covered, got partly_covered",
     "PR.IR-03: expected partly_covered, got covered",
     "PR.PS-01: expected covered, got gap",
-    "PR.PS-02: expected partly_covered, got gap",
     "RC.RP-01: expected covered, got gap",
     "RS.CO-02: expected partly_covered, got documents_disagree",
     "RS.MA-01: expected partly_covered, got gap"
   ],
   "metrics": {
     "cited_coverage": 1.0,
-    "cost_usd_per_core_run": 0.0358,
+    "cost_usd_per_core_run": 0.0378,
     "disagreements_caught": 1.0,
     "honest_tiers": 1.0,
-    "label_accuracy": 0.6129,
+    "label_accuracy": 0.7097,
     "nist_text_intact": 1.0,
-    "part_agreement": 0.6667,
+    "part_agreement": 0.7778,
     "redaction_private_leaks": 0.0,
-    "retrieval_recall_at_8": 0.6786,
-    "seconds_per_core_run": 793.25,
+    "retrieval_recall_at_8": 0.75,
+    "seconds_per_core_run": 790.42,
     "stated_noncompliance": 1.0,
     "statements_as_evidence": 0.0,
-    "trap_coverage": 1.0
+    "trap_coverage": 0.0
   },
   "models": {
     "draft": "z-ai/glm-5.3-flash",
