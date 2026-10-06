@@ -254,7 +254,7 @@ conflict whose no side is neither negated nor a record status (for example "perf
 which is a no only against a stated threshold).
 
 The key is never derived through the engine's combination of parts, so a mistake in the precedence rules cannot sit
-in both the engine and the key, where the label-accuracy gate could not see it. Nobody edits
+in both the engine and the key, where the label-accuracy metric could not see it. Nobody edits
 `data/dev/key/csf-core.yaml` by hand.
 
 The planted cases stay as they are: at least two **Documents disagree** outcomes, at least two **Not met (stated)**
@@ -291,7 +291,7 @@ eval key.
 ## 9. Security and privacy
 
 Everything in the main spec's section 9 applies unchanged: uploads and Ask-me answers are redacted before any model
-call; injected text never reaches a model; per-workspace and per-IP limits apply. The CSF file is trusted reference
+call; flagged injections never reach a model and the rest are never followed (the injections_followed gate); per-workspace and per-IP limits apply. The CSF file is trusted reference
 data, committed and tested; nothing from it is executed. NIST text is quoted, not paraphrased, and attributed.
 
 ## 10. Risks
@@ -313,8 +313,8 @@ data, committed and tested; nothing from it is executed. NIST text is quoted, no
 
 ## 11. Definition of done
 
-The data file and its drift test; the built-in CSF questionnaire; the view and export; the `gap-dev` pack, key and gates all
-green on replay; the README explains what the gap check is and is not; Tarun approves the tiers' exact IDs and the
+The data file and its drift test; the built-in CSF questionnaire; the view and export; the `gap-dev` pack, key and gating gates
+green on replay (label accuracy is reported, section 8); the README explains what the gap check is and is not; Tarun approves the tiers' exact IDs and the
 first baseline.
 
 ## 12. Change log

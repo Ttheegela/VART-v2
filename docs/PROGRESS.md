@@ -85,10 +85,11 @@ plan's "Execution notes").
 | 2026-10-06 | Tarun chose option A for the CSF gap check: every Checked outcome is cut into NIST parts by a fixed rule, each part is a question run through the unchanged pipeline, and code combines the parts' labels (CSF spec 5.2-5.3, amended) |
 | 2026-10-06 | The gap-dev key is judged blind: a judge sees NIST's text, the dev documents and the fact sheet, never engine output, and the key is derived in code from that, never hand-edited or run through the engine's combination (CSF spec 8) |
 | 2026-10-06 | Tarun accepted and reported the per-part baseline: label accuracy 0.7097 (22 of 31) against the spec's 0.80, after two judged key rounds and one per-part tuning round |
+| 2026-10-06 | The 6A `app/redact.py` change (a word of a found name also names that person) ships to every upload and Ask-me answer when 6A merges, before 6B: it is a privacy gain, at the cost of over-redacting a capitalised name word used as an ordinary word in the same line |
 | 2026-10-06 | `label_accuracy` in gap-dev is reported, not gating, with its 0.80 target kept in the table and marked "reported: below target, accepted 2026-10-06", until a later plan improves stance; every other gate gates |
 
 ## 6A baseline (gap-dev, 2026-10-06)
-Per-part design, replayed from the recording with no key. Gates: 8/8 gating pass; `label_accuracy` 0.7097 is reported
+Per-part design, replayed from the recording with no key. Gates: 9/9 gating pass; `label_accuracy` 0.7097 is reported
 below its 0.80 target.
 
 | Reported | Value |
@@ -114,7 +115,7 @@ The 9 label misses of 31 Checked outcomes, each with its cause (from `gap-parts-
 - RS.MA-01, Partly, got Gap: stance; the plan line lacks the "third parties" qualifier, and one part carries both
   qualifiers.
 
-Six misses are retrieval and five are stance (one is both in effect); combine and the key caused none.
+Four misses are retrieval and five are stance; combine and the key caused none.
 
 ## 6B carry-over
 From Ruling 18 (per-part design):
@@ -124,8 +125,7 @@ From Ruling 18 (per-part design):
 - (d) The inspector shows each part's status (and a draft-only quote's document status).
 - Stance improvement: raise `label_accuracy` to its 0.80 target (qualifier and stated-limit reads; part retrieval
   vocabulary), then make it gating again.
-- Also: `app.csf.evidence` drops statements after the top-8 cut, so filter before the cut when 6B touches retrieval;
-  Plan 3's questionnaire cap must exclude source `csf` (adversary-3 I4).
+- Also: `app.csf.evidence` drops statements after the top-8 cut, so filter before the cut when 6B touches retrieval.
 
 ## How to run
 See `CLAUDE.md` (commands) and `README.md`.

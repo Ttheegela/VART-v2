@@ -55,7 +55,7 @@ Progress and the decisions table: `docs/PROGRESS.md`. The detailed per-task ledg
 - Backend: `ruff check . && ruff format --check . && mypy app scripts datakit evals && pytest -q && alembic check`
 - Frontend: `cd web && npm run lint && npm test && npm run build`
 - Gates: `python scripts/check_monochrome.py` (the sponsor check is CI-only: it needs the secret)
-- Dev data: `python -m datakit.validate all` (stages: facts, docs, questionnaires, keys, mapper)
+- Dev data: `python -m datakit.validate all` (stages: facts, docs, questionnaires, keys, mapper, csf, gap)
 - Evals, no network: `python -m evals.run --pack dev` and `python -m evals.run --pack gap-dev` (label_accuracy is
   reported there, not gating). Recording (`--mode record|live`) and `python -m evals.bench`
   use the eval key, never the production key. The lead, or an agent it names, runs them without asking Tarun, never
