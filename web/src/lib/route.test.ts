@@ -12,3 +12,9 @@ describe("route", () => {
     expect(readRoute("")).toEqual({ view: "home" });
   });
 });
+
+it("the gap view keeps its scope and outcome in the query string", () => {
+  const r = readRoute("?view=gap&scope=protect&item=PR.DS-11");
+  expect(r).toEqual({ view: "gap", scope: "protect", item: "PR.DS-11" });
+  expect(href(r)).toBe("?view=gap&item=PR.DS-11&scope=protect");
+});

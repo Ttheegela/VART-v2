@@ -28,4 +28,10 @@ describe("Export", () => {
     await userEvent.keyboard("e");
     expect(clicked).toBe(1);
   });
+
+  it("says an xlsx carries the latest gap check", async () => {
+    mockApi({ "GET /api/runs/r1/answers": { run: fixtures.run, rows: fixtures.rows } });
+    render(<ExportView workspace={fixtures.workspace} onGone={() => {}} runId="r1" />);
+    expect(await screen.findByText(/an xlsx also gets a Gap report sheet/)).toBeInTheDocument();
+  });
 });

@@ -6,6 +6,7 @@ import { ensureWorkspace, messageOf, type Workspace } from "./lib/api";
 import { useRoute } from "./lib/route";
 import AuditLog from "./views/AuditLog";
 import ExportView from "./views/Export";
+import GapCheck from "./views/GapCheck";
 import Home from "./views/Home";
 import Questions from "./views/Questions";
 import RunGrid from "./views/RunGrid";
@@ -42,6 +43,7 @@ export default function App() {
       {route.view === "questions" && route.run && <Questions {...props} runId={route.run} />}
       {route.view === "export" && route.run && <ExportView {...props} runId={route.run} />}
       {route.view === "audit" && <AuditLog {...props} />}
+      {route.view === "gap" && <GapCheck {...props} scope={route.scope} outcome={route.item} />}
       {!route.run && ["run", "questions", "export"].includes(route.view) && <ErrorLine message="No run is selected; start one from the workspace." />}
     </ErrorBoundary>
   );

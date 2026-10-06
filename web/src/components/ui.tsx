@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
-import type { Label } from "../lib/api";
-import { CHIP, LABEL_WORD } from "../lib/labels";
+import type { GapLabel, Label } from "../lib/api";
+import { CHIP, GAP_CHIP, GAP_WORD, LABEL_WORD } from "../lib/labels";
+
+const CHIP_BASE = "inline-block min-w-[9ch] px-1 text-center text-xs font-medium leading-[18px]";
 
 export function Kbd({ children }: { children: ReactNode }) {
   return <kbd aria-hidden="true">{children}</kbd>;
@@ -42,10 +44,14 @@ export function Button({ k, shortcut, label, onClick, submit, primary, quiet, di
 
 export function LabelChip({ label }: { label: Label }) {
   return (
-    <span className={`inline-block min-w-[9ch] px-1 text-center text-xs font-medium leading-[18px] ${CHIP[label]}`}>
+    <span className={`${CHIP_BASE} ${CHIP[label]}`}>
       {LABEL_WORD[label]}
     </span>
   );
+}
+
+export function GapChip({ label }: { label: GapLabel }) {
+  return <span className={`${CHIP_BASE} ${GAP_CHIP[label]}`}>{GAP_WORD[label]}</span>;
 }
 
 export function ErrorLine({ message }: { message: string | null }) {

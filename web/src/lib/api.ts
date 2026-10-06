@@ -22,6 +22,11 @@ export type SuggestionOut = S["SuggestionOut"];
 export type AuditEventOut = S["AuditEventOut"];
 export type LinesOut = S["LinesOut"];
 export type Label = AnswerSummary["label"];
+export type GapOut = S["GapOut"];
+export type GapRow = S["GapRow"];
+export type PartOut = S["PartOut"];
+export type GapLabel = NonNullable<GapRow["label"]>;
+export type GapScope = GapOut["scope"];
 
 export class ApiError extends Error {
   status: number;
@@ -134,4 +139,6 @@ export const api = {
   acceptSuggestion: (id: string) => send<AnswerSummary>(`/api/suggestions/${enc(id)}/accept`, "POST"),
   audit: () => request<AuditEventOut[]>("/api/audit"),
   resetWorkspace: () => send<void>("/api/workspace/reset", "POST"),
+  gap: (scope: GapScope) => request<GapOut>(`/api/gap/${scope}`),
+  startGap: (scope: GapScope) => send<RunOut>(`/api/gap/${scope}/run`, "POST"),
 };

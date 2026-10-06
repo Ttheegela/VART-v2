@@ -10,18 +10,20 @@ const VIEWS: [View, string][] = [
   ["questions", "questions for you"],
   ["export", "export"],
   ["audit", "audit log"],
+  ["gap", "gap check"],
 ];
 
 export const KEY_TABLE: [string, string][] = [
   ["s / o", "try with a sample company / use your own files (Home)"],
-  ["1–5", "workspace · run · questions for you · export · audit log"],
+  ["1–6", "workspace · run · questions for you · export · audit log · gap check"],
   ["v p c u y x", "toggle a label filter (Run)"],
+  ["g i p d s o a", "gap check scope: govern · identify · protect · detect · respond · recover · all core"],
   ["/", "focus search"],
   ["j / k", "move down / up a row (and ↓ / ↑)"],
   ["enter", "open the evidence drawer"],
   ["esc", "close the drawer or this sheet; clear search"],
-  ["r", "re-run live"],
-  ["e", "export xlsx"],
+  ["r", "re-run live (Run); run the gap check or check again (Gap check)"],
+  ["e", "export xlsx (Run, Export); the gap report (Gap check)"],
   ["A", "approve all verified"],
   ["i", "answer this question"],
   ["a", "approve"],
@@ -131,7 +133,7 @@ type ShellProps = {
 export function Shell({ mode, cursor, hints, runId, expiresAt, children }: ShellProps) {
   const route = useRoute();
   const [sheet, setSheet] = useState(false);
-  const target = (v: View) => (v === "workspace" || v === "audit" ? { view: v } : runId ? { view: v, run: runId } : null);
+  const target = (v: View) => (v === "workspace" || v === "audit" || v === "gap" ? { view: v } : runId ? { view: v, run: runId } : null);
   useKeys({
     "?": () => setSheet(true), // the open sheet handles its own Esc, so a drawer's Esc is never taken here
     ...Object.fromEntries(

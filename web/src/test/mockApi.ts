@@ -1,6 +1,7 @@
 import { vi } from "vitest";
 import type {
-  AnswerDetail, AuditEventOut, DocumentOut, Health, QuestionOut, QuestionnaireDetail, RunOut, RunRow, Workspace,
+  AnswerDetail, AuditEventOut, DocumentOut, GapOut, GapRow, Health, QuestionOut, QuestionnaireDetail, RunOut, RunRow,
+  Workspace,
 } from "../lib/api";
 
 type Handler = unknown | Response | ((init: RequestInit | undefined, url: URL) => unknown | Response | Promise<unknown>);
@@ -80,5 +81,24 @@ const questions: QuestionOut[] = [{
   suggestions: [],
 }];
 const audit: AuditEventOut[] = [{ at: "2026-10-06T10:02:00Z", actor: "visitor", action: "run.done", ref: "r1", detail: {} }];
+const gapRow = (
+  csf_id: string, fn: string, category: string, tier: GapRow["tier"], label: GapRow["label"], explanation: string | null,
+): GapRow => ({
+  csf_id, function: fn, category, outcome: `NIST's outcome text for ${csf_id}.`, related_controls: ["CP-09"],
+  source_url: "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters", tier,
+  item_id: tier === "not_checked" ? null : `i-${csf_id}`, answer_id: label ? `a-${csf_id}` : null, label, explanation,
+  sources: label === "covered" ? 1 : 0,
+});
+const gap: GapOut = {
+  scope: "core", csf_version: "2.0", retrieved: "2026-10-05",
+  controls_url: "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final",
+  run: { ...run, id: "r9", questionnaire_id: "q9", total: 2, done: 2 },
+  rows: [
+    gapRow("GV.RM-02", "Govern", "Risk Management Strategy", "ask", "not_answered", null),
+    gapRow("PR.DS-11", "Protect", "Data Security", "checked", "covered", "Evidenced: parts 1, 2, 3, 4."),
+    gapRow("PR.DS-01", "Protect", "Data Security", "checked", "gap", "No evidence: parts 1, 2, 3."),
+    gapRow("PR.DS-10", "Protect", "Data Security", "not_checked", null, null),
+  ],
+};
 
-export const fixtures = { workspace, health, run, rows, detail, documents, questionnaire, questions, audit };
+export const fixtures = { workspace, health, run, rows, detail, documents, questionnaire, questions, audit, gap };
