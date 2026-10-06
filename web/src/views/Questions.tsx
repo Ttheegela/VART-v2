@@ -3,6 +3,7 @@ import { Shell, goneOn404, type ViewProps } from "../components/Shell";
 import { Button, ErrorLine, GapChip, LabelChip } from "../components/ui";
 import { ApiError, api, messageOf, type GapLabel, type QuestionOut, type SuggestionOut } from "../lib/api";
 import { useRoute } from "../lib/route";
+import { tourOpen } from "../lib/tour";
 
 const MAX = 4000;
 /** A part's fill in the gap check's words (CSF spec 5.3; adversary-2 M4). */
@@ -16,7 +17,7 @@ export function QuestionCard({ q, focus, gap = false, onUpdated, onStale }: { q:
   const [filledNothing, setFilledNothing] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
   const code = q.codes[0] ?? "item";
-  useEffect(() => { if (focus) box.current?.focus(); }, [focus]);
+  useEffect(() => { if (focus && !tourOpen()) box.current?.focus(); }, [focus]); // the tour keeps focus on its Next
   const fail = (e: unknown, reload = false) => {
     if (e instanceof ApiError && e.status === 429) setError(`Too many answers at once.${e.retryAfter ? ` Try again in ${e.retryAfter} s.` : ""}`);
     else setError(messageOf(e));
@@ -132,7 +133,7 @@ function QuestionsFor({ workspace, onGone, runId }: ViewProps & { runId: string 
   return (
     <Shell mode="ASK" cursor={`${open} open`} hints={[["ctrl+enter", "send"], ["?", "all keys"]]} expiresAt={workspace.expires_at} runId={runId}>
       <div className="mx-auto max-w-3xl p-4">
-        <h1 className="border-b border-ink text-xs font-medium text-ink-2">questions for you ({open})</h1>
+        <h1 data-tour="questions" className="border-b border-ink text-xs font-medium text-ink-2">questions for you ({open})</h1>
         <ErrorLine message={error} />
         {noCard && <p role="status" className="py-3 text-sm text-ink-2">No question for this item; mark it not applicable or re-run.</p>}
         {list && list.length === 0 && <p className="py-3 text-sm text-ink-2">Nothing to ask: every item has an answer from the documents, or the run is still filling.</p>}

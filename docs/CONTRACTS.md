@@ -234,3 +234,47 @@ change-log line; changing or removing a path, a field or a status needs the lead
   `AnswerSummary.sources` for Confirmed by you counts the cited documents, at least 1 (M2). No prompt or label
   rule changes, so nothing is re-recorded.
 - 2026-10-06: Plan 6B final review fix (Ruling 14; copy and mapping only, the label id `confirmed_by_you` and the OpenAPI schema are unchanged): an Ask-me outcome the visitor answered reads "Answered by you" (view chip, drawer, sheet via `csf.gap_word`) and stays in the review set; "Confirmed by you" is only for a Checked outcome made Covered by accepted fills (Ruling 6). The failed sheet word is "Failed" (stale "Not run yet" fixed). No prompt or label rule changes, so nothing is re-recorded.
+- 2026-10-07: Plan 4 Task 2 (behaviour inside existing statuses; no path, field or status changed): a step answers
+  its claimed items, or a gap check's parts, at the same time, each job on its own session, spender and cost meter;
+  it spends before every model call and holds no transaction across one. Every claimed item is settled in
+  questionnaire order: items that ran beside a refused, outage-hit or missing-recording item are written, not given
+  back (they were paid), and an item whose write fails stays claimed while the others are still written. After the
+  writes it raises ReplayMiss, then a refused budget, then an unexpected error, then the 503 when no model call
+  returned in the step (an answer that needed no call, Failed at the attempt limit, an Ask-me outcome or a part
+  with no passage, shows nothing about the provider). When a call returned, each item that met an outage keeps its
+  attempt; when none did, only the first item that met it keeps its attempt and the others are refunded (Ruling 5),
+  so a true outage costs at most one attempt a step and items the provider always fails still end Failed. A 429 is
+  retried once after a short pause (Retry-After plus up to 0.5 s of jitter, at most 2 s; 1 s to 1.5 s without one).
+  Whether the deadline cut a retry is decided when the retry is refused, not at settlement. A failed outcome now
+  pays for each of its parts, since they run at once. A step answers by 270 s whatever the provider does; a job
+  still running then goes back with its attempt counted, its cost is not added to the run (it may still spend,
+  counted in every cap), and a part it stores later lands on no row (the write is guarded by the step's claim).
+- 2026-10-07: Plan 4 Task 3 (an added optional query parameter and two optional fields): `POST
+  /api/questionnaires/{id}/runs?live=` (default false) copies the precomputed sample run when the questionnaire is
+  a bundled sample (`vsq-a.xlsx`, `mvsp-b.csv`) with the snapshot's items over the untouched sample pack, chunked as
+  the snapshot records, and `data/dev/sample-run.json` is current; a second press returns the same copy. `POST
+  /api/gap/core/run` does the same for a new core gap check. A copy is done at $0 with no model call;
+  `RunOut.precomputed` is true for it. `live=true` (Re-run live) always runs the engine; a function-scope gap check
+  always runs live. `GET /api/version` gains `sample_precomputed`. Counted under `run` as before. A Check again that
+  re-opens outcomes records the deployed models in `run.models`, so a copied run then reads `precomputed: false`
+  (each part keeps its own model). No prompt or label rule changes.
+- 2026-10-07: Plan 4 Task 4 (a 409 on an existing path, Ruling 8; migration `e7d1f3a5b9c2`, additive):
+  `POST /api/questionnaires/{id}/runs` answers 409 ("A run of this questionnaire is still going; wait for it to
+  finish first.") while a live run of that questionnaire is running and a step touched it in the last 10 minutes.
+  A running run idle for 10 minutes is closed as `failed` when a new run of its questionnaire starts or a document
+  delete is asked, so it blocks neither; a step records `runs.stepped_at`. `POST /api/gap/{scope}/run` starts a new
+  run when the latest is `failed`. A copied sample run is never refused (it spends nothing). A step refused by a
+  model budget (429) sets `stepped_at` to the end of its Retry-After, so a run waiting on it is not closed
+  (preflight I5); a step never writes into a run closed since it read it; `reopen_changed` (Check again) sets
+  `stepped_at`. The UI says why a closed run stopped. No prompt or label rule changes.
+- 2026-10-07: Plan 4 Task 5 (behaviour inside existing statuses; the PATCH declares the sentence 422): `PATCH
+  /api/answers/{id}` on a Confirmed-by-you answer stores the edit as a new dated, redacted statement and points the
+  answer at it (Plan 3 M6), counted under the per-network `interview` cap (429); the earlier statement stays as a
+  citation target but stops being evidence (`evidence_allowed` false) and its open fills are dismissed. Answering a
+  question, skipping one, accepting a fill and editing a confirmed answer take the workspace row FOR NO KEY UPDATE
+  first (two statement writers take turns; FOR KEY SHARE would deadlock them), so none can deadlock against a
+  workspace reset (a reset that wins is the GONE 404).
+- 2026-10-07: Plan 4 Task 6 (ingest behaviour; no signature, path, field or status changed): text a reader cannot
+  see is never a line: docx runs marked hidden (w:vanish) or under 1 pt, PDF lines whose first character is under
+  1 pt, hidden sheets and hidden rows of an uploaded workbook. Hidden rows of a questionnaire are blanked, so they
+  are never items. The bundled sample data has none, so no stored line, prompt or label moves.

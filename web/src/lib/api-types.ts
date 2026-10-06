@@ -14,7 +14,11 @@ export interface paths {
     get: operations["get_answer_api_answers__answer_id__get"];
     /**
      * Edit Answer
-     * @description Edit the text; the answer becomes unapproved and `edited`. 409 for a gap check's outcome.
+     * @description Edit the text; the answer becomes unapproved and `edited`. On a Confirmed-by-you answer the edit is the
+     * visitor's new answer: it is stored as a new dated, redacted statement and the answer points to it
+     * (Plan 3 M6; the old statement stops being evidence and its open fills are dismissed), counted under the
+     * network's `interview` cap (each pays for redaction, adversary-1 N2).
+     * 409 for a gap check's outcome; 422 when the redacted answer is empty or too long.
      */
     patch: operations["edit_answer_api_answers__answer_id__patch"];
   };
@@ -159,8 +163,10 @@ export interface paths {
   "/api/questionnaires/{questionnaire_id}/runs": {
     /**
      * Create Run
-     * @description A new run over every item, all pending. 422 when the questionnaire has no items yet; 429 per network
-     * (`run`, 20 an hour); 503 when the demo is full.
+     * @description A new run over every item, all pending. A bundled sample questionnaire over the untouched sample pack
+     * copies the precomputed sample run instead (done, $0, no model call; a second press returns the same copy)
+     * unless `live=true` (Re-run live). 422 when the questionnaire has no items yet; 429 per network (`run`, 20
+     * an hour); 503 when the demo is full.
      */
     post: operations["create_run_api_questionnaires__questionnaire_id__runs_post"];
   };
@@ -916,6 +922,11 @@ export interface components {
       models: {
         [key: string]: string;
       };
+      /**
+       * Precomputed
+       * @default false
+       */
+      precomputed?: boolean;
       /** Prompt Versions */
       prompt_versions: {
         [key: string]: string;
@@ -1010,6 +1021,11 @@ export interface components {
       models: {
         [key: string]: string;
       };
+      /**
+       * Sample Precomputed
+       * @default false
+       */
+      sample_precomputed?: boolean;
       /** Version */
       version: string;
     };
@@ -1098,7 +1114,11 @@ export interface operations {
   };
   /**
    * Edit Answer
-   * @description Edit the text; the answer becomes unapproved and `edited`. 409 for a gap check's outcome.
+   * @description Edit the text; the answer becomes unapproved and `edited`. On a Confirmed-by-you answer the edit is the
+   * visitor's new answer: it is stored as a new dated, redacted statement and the answer points to it
+   * (Plan 3 M6; the old statement stops being evidence and its open fills are dismissed), counted under the
+   * network's `interview` cap (each pays for redaction, adversary-1 N2).
+   * 409 for a gap check's outcome; 422 when the redacted answer is empty or too long.
    */
   edit_answer_api_answers__answer_id__patch: {
     parameters: {
@@ -1136,10 +1156,10 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
-      /** @description Validation Error */
+      /** @description Refused input: a sentence, or FastAPI's validation list */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          "application/json": components["schemas"]["ErrorOut"] | components["schemas"]["HTTPValidationError"];
         };
       };
       /** @description A per-network limit or the model budget; see Retry-After */
@@ -2104,11 +2124,16 @@ export interface operations {
   };
   /**
    * Create Run
-   * @description A new run over every item, all pending. 422 when the questionnaire has no items yet; 429 per network
-   * (`run`, 20 an hour); 503 when the demo is full.
+   * @description A new run over every item, all pending. A bundled sample questionnaire over the untouched sample pack
+   * copies the precomputed sample run instead (done, $0, no model call; a second press returns the same copy)
+   * unless `live=true` (Re-run live). 422 when the questionnaire has no items yet; 429 per network (`run`, 20
+   * an hour); 503 when the demo is full.
    */
   create_run_api_questionnaires__questionnaire_id__runs_post: {
     parameters: {
+      query?: {
+        live?: boolean;
+      };
       path: {
         questionnaire_id: string;
       };

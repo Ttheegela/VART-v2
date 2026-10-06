@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { RUN_WAIT, sampleRun, xlsxCells } from "./helpers.ts";
 
-// One sample run feeds all four tests: each run spends ~120 model calls, and the network cap is 400 an hour
-// (Ruling 20). Serial, in this order: the export approves the verified answers, and the interview changes an item.
+// One sample run feeds all four tests. It is copied from data/dev/sample-run.json (Plan 4 Task 3): no model call.
+// Serial, in this order: the export approves the verified answers, and the interview changes an item.
 test.describe.configure({ mode: "serial" });
 
 let page: Page;
@@ -17,13 +17,28 @@ test.afterAll(async () => {
   await page.close();
 });
 
-/** Reload the finished run, so a test starts with no filter, drawer or focus left by the one before. */
+/** Reload the finished run, so a test starts with no filter, drawer or focus left by the one before. The guided
+ * tour opens on every visit to the sample run (Decision 17), so it is skipped first. */
 async function openRun(): Promise<void> {
   await page.goto(`/?view=run&run=${run}`);
   await expect(page.getByText(/64 of 64 answered · done/)).toBeVisible();
+  await page.getByRole("dialog", { name: "guided tour" }).getByRole("button", { name: "Skip" }).click();
 }
 
+test("the guided tour opens on the sample run, can be skipped, and opens again on the next visit", async () => {
+  const tour = page.getByRole("dialog", { name: "guided tour" });
+  await expect(tour).toBeVisible();
+  await expect(tour.getByText(/^step 1 of \d+$/)).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page).toHaveURL(/view=workspace/);
+  await page.keyboard.press("Escape");
+  await expect(tour).toBeHidden();
+  await openRun(); // the default walkthrough: it is back on the next visit, and openRun skips it
+  await expect(tour).toBeHidden();
+});
+
 test("the sample flow fills the questionnaire and opens the evidence", async () => {
+  await expect(page.getByText(/precomputed sample answers/)).toBeVisible();
   const rows = page.getByRole("row", { name: /^VSQ-\d\d / });
   await expect(rows).toHaveCount(64);
   await page.keyboard.press("v"); // the verified filter (the command line also has "Approve all verified")

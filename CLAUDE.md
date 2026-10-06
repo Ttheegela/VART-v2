@@ -51,6 +51,9 @@ Progress and the decisions table: `docs/PROGRESS.md`. The detailed per-task ledg
   gap labels); `app/runs.py` answers a gap-check run part by part (`run_items.parts`).
 - `data/csf/` NIST CSF 2.0 extract, `tiers.yaml`, built `csf-2.0.json` (`python -m datakit.csf build`);
   `data/dev/gap/` the gap check's outcome map and judged overrides (`python -m datakit.gap dev`); the planted improvement plan is in the dev pack.
+- Plan 4: `app/sample_run.py` (precomputed sample run), `scripts/sample_snapshot.py`, `data/dev/sample-run.json`,
+  `data/holdout/` (the holdout company; nobody tunes on it), `web/src/lib/tour.ts` and `web/src/components/Tour.tsx`
+  (the guided tour), `docs/` (SECURITY, ARCHITECTURE, RUNBOOK, EVALS, CUSTOMER_BRIEF, LEARNING, PORTFOLIO).
 - `evals/`: `run.py` (harness), `gap.py` (the `gap-dev` pack), `score.py` (metrics, gates), `bench.py` (model bench), `recorded/` (replayed model
   outputs), `results/` (committed results; CI fails on drift).
 
@@ -63,9 +66,11 @@ Progress and the decisions table: `docs/PROGRESS.md`. The detailed per-task ledg
 - E2E: `cd web && npm run e2e` (replays `web/e2e/recorded.jsonl`; re-record with the Task 7 Step 5 command in the
   Plan 3B plan)
 - Gates: `python scripts/check_monochrome.py` (the sponsor check is CI-only: it needs the secret)
+- E2E in WebKit: `cd web && npx playwright install webkit` once, then `npx playwright test --project=webkit`.
+- Sample snapshot, no key: `SESSION_SECRET=snapshot-only python scripts/sample_snapshot.py` (CI fails until it is regenerated after a re-recording).
 - Dev data: `python -m datakit.validate all` (stages: facts, docs, questionnaires, keys, mapper, csf, gap)
 - Evals, no network: `python -m evals.run --pack dev` and `python -m evals.run --pack gap-dev` (label_accuracy is
-  reported there, not gating). Recording (`--mode record|live`) and `python -m evals.bench`
+  reported there, not gating); holdout: `python -m evals.run --pack holdout`. Recording (`--mode record|live`) and `python -m evals.bench`
   use the eval key, never the production key. The lead, or an agent it names, runs them without asking Tarun, never
   prints the key, and asks before spending past its $5 cap:
   `(set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.run --pack dev --mode record)`

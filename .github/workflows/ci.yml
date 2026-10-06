@@ -47,10 +47,15 @@ jobs:
       - run: pytest -q tests/test_decide.py tests/test_decide_properties.py --cov=app.decide --cov-branch --cov-fail-under=100
       - run: python -m evals.run --pack dev
       - run: python -m evals.run --pack gap-dev
+      - run: python -m evals.run --pack holdout
       - run: git diff --exit-code evals/results
       - run: alembic check
       - run: python scripts/export_openapi.py && git diff --exit-code openapi.json
       - run: python -m datakit.validate all
+      - run: |
+          for stage in facts docs questionnaires keys; do
+            python -m datakit.validate "$stage" --pack holdout
+          done
   frontend:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -151,7 +156,7 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
         working-directory: web
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
         working-directory: web
       # retries are 0 in playwright.config.ts on purpose: a retry re-runs the shared sample run and can pass the 400/h per-network cap
       - run: npm run e2e

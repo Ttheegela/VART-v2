@@ -1,0 +1,10 @@
+sheet: Recertifications
+title: Marrowgate access recertification log
+as_of: "2026-09-22"
+headers: [System, Owner, Last review completed, Next review due, Status]
+rows:
+  - [Entra ID, Noor Haddad, "2026-09-14", "2026-12-14", Current]
+  - [AWS, Noor Haddad, "2026-09-14", "2026-12-14", Current]
+  - [GitHub, Tobias Achterberg, "2026-03-02", "2026-06-02", Overdue]
+  - [Marrowgate Payroll admin console, Tobias Achterberg, "2026-03-02", "2026-06-02", Overdue]
+  - [HR information system, Rafael Quintero, "2026-03-02", "2026-06-02", Overdue]

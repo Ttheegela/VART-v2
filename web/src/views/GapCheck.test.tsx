@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GapRow } from "../lib/api";
-import { GAP_FOOTER, GAP_REVIEW } from "../lib/labels";
+import { GAP_FOOTER, GAP_REVIEW, RUN_CLOSED } from "../lib/labels";
 import { fixtures, mockApi } from "../test/mockApi";
 import GapCheck, { coverage } from "./GapCheck";
 
@@ -95,6 +95,12 @@ describe("GapCheck", () => {
     expect(screen.getByRole("row", { name: /^PR\.DS-01 / })).toBeInTheDocument();
   });
 
+  it("a check closed as abandoned says why and how to start again (Plan 4 Task 4)", async () => {
+    mockApi({ "GET /api/gap/core": { ...fixtures.gap, run: { ...fixtures.gap.run!, status: "failed" } } });
+    render(<GapCheck {...props} />);
+    expect(await screen.findByText(RUN_CLOSED)).not.toHaveClass("sr-only");
+  });
+
   it("scope keys switch the scope", async () => {
     const calls = mockApi({
       "GET /api/gap/core": fixtures.gap,
@@ -155,6 +161,21 @@ describe("GapCheck", () => {
     expect(screen.getByText("export when the check is done")).toBeInTheDocument();
     await userEvent.keyboard("e");
     expect(click).not.toHaveBeenCalled();
+  });
+
+  it("Check again after a stopped loop steps the run again (adversary-2 I1)", async () => {
+    const running = { ...fixtures.gap, run: { ...fixtures.gap.run!, status: "running" as const, done: 0 } };
+    let steps = 0;
+    mockApi({
+      "GET /api/gap/core": running,
+      "POST /api/gap/core/run": running.run,
+      "POST /api/runs/r9/step": () => { if (steps++ === 0) return new Response("{}", { status: 500 }); return new Promise(() => {}); },
+    });
+    render(<GapCheck {...props} />);
+    await screen.findByRole("alert");
+    expect(steps).toBe(1);
+    await userEvent.keyboard("r");
+    await waitFor(() => expect(steps).toBe(2));
   });
 
   it("a scope switch puts the cursor back on the first row", async () => {

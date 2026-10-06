@@ -17,6 +17,8 @@ from app.text import normalize
 MAX_PAGES = 200  # spec 9: 20,000 lines is about 200 pages
 MIN_CHARS = 20  # fewer letters than this in the whole file: a scan with no text layer
 MAX_PARAGRAPH = 1_500  # characters after which a sentence end starts a new paragraph even without a gap
+MIN_SIZE = 1.0  # text under 1 pt cannot be read on the page (Plan 3 adversary-3 M4). Invisible render mode is
+# kept on purpose: OCR'd scans put their whole text layer there, and the reader sees it as the page image.
 GAP = 1.6  # a vertical gap wider than this many font sizes can start a paragraph
 _TERMINAL = re.compile(r"[.!?:;][\"')\]]?$")
 _BULLET = re.compile(r"^(?:[-*\N{BULLET}\N{BLACK SMALL SQUARE}\N{EN DASH}]\s|\(?[0-9a-z]{1,3}[.)]\s)")
@@ -46,7 +48,13 @@ def _visual_lines(pdf: pdfium.PdfDocument) -> list[Visual]:
                     i = start + len(part) - len(part.lstrip())
                     size = round(pdfium_c.FPDFText_GetFontSize(textpage.raw, i), 1) if exact else 0.0
                     bottom = textpage.get_charbox(i, loose=True)[1] if exact else 0.0
-                    out.append(Visual(part.strip(), size, bottom, number))
+                    # the size on the page: the font size times the text matrix and CTM scale (Tf is not it)
+                    m = pdfium_c.FS_MATRIX()
+                    pdfium_c.FPDFText_GetMatrix(textpage.raw, i, m)
+                    shown = pdfium_c.FPDFText_GetFontSize(textpage.raw, i) * abs(m.a * m.d - m.b * m.c) ** 0.5
+                    # ponytail: the line's first character only; a tiny phrase inside a readable line is a gap
+                    if exact and shown >= MIN_SIZE:  # inexact: dropped, not trusted (adversary-2 M6)
+                        out.append(Visual(part.strip(), size, bottom, number))
                 start += len(part) + 2
         finally:
             textpage.close()

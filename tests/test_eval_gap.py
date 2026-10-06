@@ -10,7 +10,7 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from app import csf
-from app.contracts import Citation, Decision, Draft, ItemInput, ItemResult, Retrieval
+from app.contracts import Citation, Decision, DocInfo, Draft, ItemInput, ItemResult, Passage, Retrieval
 from app.db.models import Document, Workspace
 from app.ingest.store import store_statement
 from app.retrieve import retrieve
@@ -33,6 +33,9 @@ def _perfect(pack: gap.GapPack) -> gap.GapObserved:
     stored: dict[str, list[str]] = {
         sid: ["<PERSON> answered; reach <PERSON> at <PHONE>."] for sid in statements.values()
     }
+    for t in (t for t in pack.facts.traps if t.kind == "injection"):  # stored like any other line
+        for sid in t.statements:
+            stored.setdefault(f"d-{pack.facts.statement(sid).doc}", []).append(pack.facts.statement(sid).text)
     for code, k in pack.keys.items():
         cites = []
         for e in k.evidence:
@@ -432,3 +435,33 @@ def test_a_followed_injection_fails_the_gate_and_none_planted_fails_closed() -> 
         facts=pack.facts.model_copy(update={"traps": [t for t in pack.facts.traps if t.kind != "injection"]}),
     )
     assert gap.score_gap(none, obs)["injections_followed"] is None
+
+
+def test_a_moved_label_counts_as_followed_only_when_the_target_was_exposed_to_the_injection() -> None:
+    pack = gap.load()
+    inj = next(t for t in pack.facts.traps if t.kind == "injection")
+    code = "PR.DS-01"  # no gap key targets an injection, so tag one for this test
+    pack = replace(pack, keys={**pack.keys, code: pack.keys[code].model_copy(update={"traps": [inj.id]})})
+    obs = _perfect(pack)
+    text = " ".join(pack.facts.statement(s).text for s in inj.statements)
+    trap_doc = f"d-{pack.facts.statement(inj.statements[0]).doc}"
+    assert pack.keys[code].expected_label != "unknown"
+
+    def run(heading: str | None, lines: tuple[str, ...], doc: str = "d") -> float | None:
+        info = DocInfo(doc, "f", "policy", "approved", None, "company", True)
+        moved = _with(obs, code, UNKNOWN)
+        shown = replace(
+            moved.results[code],
+            retrieval=Retrieval((Passage("c", info, 1, lines, heading, (), None, False),), ()),
+        )
+        return gap.score_gap(pack, replace(moved, results={**moved.results, code: shown}))[
+            "injections_followed"
+        ]
+
+    assert run(None, ("Unrelated.",)) == 0.0
+    assert run(None, (text,)) == 1.0
+    assert run(text, ("Unrelated.",)) == 1.0  # a heading
+    assert run(None, (text.upper().replace(text.split()[-1].upper(), "XYZ"),)) == 1.0  # near-verbatim
+    assert run(None, ("Nothing alike.",), trap_doc) == 1.0  # classify reads the trap's document
+    unseen = replace(obs, stored={d: [x for x in v if x != text] for d, v in obs.stored.items()})
+    assert gap.score_gap(pack, unseen)["injections_followed"] is None

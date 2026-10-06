@@ -3,7 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { RunRowsOut } from "../lib/api";
+import { RUN_CLOSED } from "../lib/labels";
 import { fixtures, mockApi } from "../test/mockApi";
+import Tour from "../components/Tour";
 import RunGrid, { mergeRows, useStepLoop } from "./RunGrid";
 
 const props = { workspace: fixtures.workspace, onGone: () => {}, runId: "r1" };
@@ -18,6 +20,12 @@ describe("RunGrid", () => {
     expect(within(row).getByText("Draft, not approved")).toBeInTheDocument();
     expect(within(screen.getByRole("row", { name: /VSQ-03/ })).getByText("answering…")).toBeInTheDocument();
     expect(screen.getByText("# access control")).toBeInTheDocument();
+  });
+
+  it("a run closed as abandoned says why and how to start again (Plan 4 Task 4)", async () => {
+    mockApi({ "GET /api/runs/r1/answers": { run: { ...fixtures.run, status: "failed" }, rows: fixtures.rows } });
+    render(<RunGrid {...props} />);
+    expect(await screen.findByText(RUN_CLOSED)).not.toHaveClass("sr-only");
   });
 
   it("approve all says how many edited answers it left for a look", async () => {
@@ -131,6 +139,25 @@ describe("RunGrid", () => {
     await waitFor(() => expect(onGone).toHaveBeenCalled());
   });
 
+  it("Re-run live answered 409 on this still-running run resumes its loop and shows no error (Ruling 12)", async () => {
+    const running = { ...fixtures.run, status: "running" as const, done: 2 };
+    let n = 0;
+    const calls = mockApi({
+      "GET /api/runs/r1/answers": { run: running, rows: fixtures.rows },
+      "POST /api/runs/r1/step": () =>
+        ++n === 1 ? new Response("{}", { status: 500 }) : { run: fixtures.run, answered: [] },
+      "POST /api/questionnaires/q1/runs": new Response(JSON.stringify({ detail: "A run of this questionnaire is still going; wait for it to finish first." }), { status: 409 }),
+    });
+    render(<RunGrid {...props} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Request failed (500)");
+    await userEvent.click(screen.getByRole("button", { name: /Re-run live/ }));
+    await waitFor(() => expect(calls.filter((c) => c === "POST /api/runs/r1/step")).toHaveLength(2));
+    expect(calls).toContain("POST /api/questionnaires/q1/runs");
+    expect(await screen.findByRole("status")).toHaveTextContent("Run done: 3 of 3 answered.");
+    expect(screen.queryByText(/still going/)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("a 429 stops the loop and says why", async () => {
     mockApi({
       "GET /api/runs/r1/answers": { run: { ...fixtures.run, status: "running" }, rows: fixtures.rows },
@@ -172,6 +199,21 @@ describe("RunGrid", () => {
     const merged = mergeRows(fixtures.rows, [{ ...fixtures.rows[2], answer: fixtures.rows[1].answer }]);
     expect(merged.map((r) => r.answer?.id ?? null)).toEqual(["a1", "a2", "a2"]);
     expect(merged[0]).toBe(fixtures.rows[0]); // unchanged rows keep their identity, so memoized rows skip render
+  });
+  it("re-run live asks for a live run, and a copied run says it is precomputed", async () => {
+    const searches: string[] = [];
+    mockApi({
+      "GET /api/runs/r1/answers": { run: { ...fixtures.run, precomputed: true, cost_usd: 0 }, rows: fixtures.rows },
+      "GET /api/questionnaires": [],
+      "POST /api/questionnaires/q1/runs": (_init: RequestInit | undefined, url: URL) => {
+        searches.push(url.search);
+        return { ...fixtures.run, id: "r2", status: "running", done: 0, precomputed: false };
+      },
+    });
+    render(<RunGrid {...props} />);
+    expect(await screen.findByText(/precomputed sample answers/)).toBeInTheDocument();
+    await userEvent.keyboard("r");
+    await waitFor(() => expect(searches).toEqual(["?live=true"]));
   });
 });
 
@@ -259,17 +301,49 @@ describe("useStepLoop", () => {
     expect(result.current.running).toBe(false);
   });
 
-  it("a 503 from step stops the loop and shows the sentence, even with Retry-After (no auto-retry)", async () => {
+  // Ruling 12 (Plan 4 Task 4 fix round 1): this replaces Plan 3's "a 503 stops the loop". The server now backs
+  // off on an outage (Ruling 5), and a stopped loop left a running run that Re-run live refused (409). The test
+  // still pins the sentence, the Retry-After wait and that no call is made early; only the stop became a resume.
+  it("a 503 waits for Retry-After, shows the sentence, then resumes", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    const down = "The model provider is not answering right now; try the run again in a minute.";
+    const down = "Model calls are failing right now; the run resumes when they return.";
+    let n = 0;
     const calls = mockApi({
-      "POST /api/runs/r1/step": new Response(JSON.stringify({ detail: down }), { status: 503, headers: { "Retry-After": "60" } }),
+      "POST /api/runs/r1/step": () =>
+        ++n === 1
+          ? new Response(JSON.stringify({ detail: down }), { status: 503, headers: { "Retry-After": "60" } })
+          : { run: fixtures.run, answered },
     });
-    const { result } = renderHook(() => useStepLoop("r1", start, () => {}));
-    await act(() => vi.advanceTimersByTimeAsync(180_000));
+    const { result } = renderHook(() => {
+      const [d, setD] = useState<RunRowsOut | null>(start);
+      return useStepLoop("r1", d, setD);
+    });
+    await act(() => vi.advanceTimersByTimeAsync(59_000));
     expect(calls).toHaveLength(1);
     expect(result.current.error).toBe(down);
+    expect(result.current.running).toBe(true);
+    await act(() => vi.advanceTimersByTimeAsync(1_000));
+    expect(calls).toHaveLength(2);
+    expect(result.current.error).toBeNull();
     expect(result.current.running).toBe(false);
+  });
+
+  it("a 503 without Retry-After waits 60 s, then resumes", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    let n = 0;
+    const calls = mockApi({
+      "POST /api/runs/r1/step": () =>
+        ++n === 1 ? new Response(JSON.stringify({ detail: "Model calls are off right now." }), { status: 503 }) : { run: fixtures.run, answered },
+    });
+    const { result } = renderHook(() => {
+      const [d, setD] = useState<RunRowsOut | null>(start);
+      return useStepLoop("r1", d, setD);
+    });
+    await act(() => vi.advanceTimersByTimeAsync(59_000));
+    expect(calls).toHaveLength(1);
+    expect(result.current.running).toBe(true);
+    await act(() => vi.advanceTimersByTimeAsync(1_000));
+    expect(calls).toHaveLength(2);
   });
 
   it("any other error stops the loop", async () => {
@@ -290,5 +364,39 @@ describe("useStepLoop", () => {
     unmount();
     await act(() => vi.advanceTimersByTimeAsync(60_000));
     expect(calls).toHaveLength(1);
+  });
+
+  it("a precomputed sample run starts the tour by itself, and t starts it again", async () => {
+    mockApi({
+      "GET /api/runs/r1/answers": { run: { ...fixtures.run, precomputed: true }, rows: fixtures.rows },
+      "GET /api/questionnaires": [],
+    });
+    render(<><RunGrid {...props} /><Tour /></>);
+    expect(await screen.findByRole("dialog", { name: "guided tour" })).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "guided tour" })).toBeNull();
+    await userEvent.keyboard("t");
+    expect(await screen.findByRole("dialog", { name: "guided tour" })).toBeInTheDocument();
+  });
+
+  it("a visitor's own run never starts the tour and has no Tour button", async () => {
+    mockApi({ "GET /api/runs/r1/answers": { run: fixtures.run, rows: fixtures.rows }, "GET /api/questionnaires": [] });
+    render(<><RunGrid {...props} /><Tour /></>);
+    await screen.findByRole("row", { name: /VSQ-02/ });
+    await userEvent.keyboard("t");
+    expect(screen.queryByRole("dialog", { name: "guided tour" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Tour" })).toBeNull();
+  });
+
+  it("re-run live closes the tour the moment the run starts (adversary I5)", async () => {
+    mockApi({
+      "GET /api/runs/r1/answers": { run: { ...fixtures.run, precomputed: true }, rows: fixtures.rows },
+      "GET /api/questionnaires": [],
+      "POST /api/questionnaires/q1/runs": () => new Promise(() => {}), // still starting: the route has not moved
+    });
+    render(<><RunGrid {...props} /><Tour /></>);
+    expect(await screen.findByRole("dialog", { name: "guided tour" })).toBeInTheDocument();
+    await userEvent.keyboard("r");
+    expect(screen.queryByRole("dialog", { name: "guided tour" })).toBeNull();
   });
 });

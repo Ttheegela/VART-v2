@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { ApiError, api, messageOf, type Workspace } from "../lib/api";
 import { useKeys } from "../lib/keys";
 import { go, href, useRoute, type View } from "../lib/route";
+import { useTour } from "../lib/tour";
 import { Button, Kbd } from "./ui";
 
 const VIEWS: [View, string][] = [
@@ -31,6 +32,7 @@ export const KEY_TABLE: [string, string][] = [
   ["l / q / w", "load the sample documents / sample questionnaire A / B (Workspace)"],
   ["R", "reset the workspace: delete everything now (Workspace)"],
   ["ctrl+enter", "send an answer (Questions for you)"],
+  ["t", "the guided tour (on the sample company's run)"],
   ["?", "show all keys"],
 ];
 
@@ -133,6 +135,7 @@ type ShellProps = {
 export function Shell({ mode, cursor, hints, runId, expiresAt, children }: ShellProps) {
   const route = useRoute();
   const [sheet, setSheet] = useState(false);
+  const tour = useTour().open;
   const target = (v: View) => (v === "workspace" || v === "audit" || v === "gap" ? { view: v } : runId ? { view: v, run: runId } : null);
   useKeys({
     "?": () => setSheet(true), // the open sheet handles its own Esc, so a drawer's Esc is never taken here
@@ -144,7 +147,7 @@ export function Shell({ mode, cursor, hints, runId, expiresAt, children }: Shell
   return (
     <div className="grid h-dvh grid-rows-[36px_minmax(0,1fr)_28px] bg-paper text-ink">
       <header data-chrome className="flex h-9 items-center gap-4 overflow-hidden bg-chrome px-4 text-on-chrome-2">
-        <a href="/" className="font-bold tracking-[0.12em] text-on-chrome">VART</a>
+        <a href="/" data-tour="brand" className="font-bold tracking-[0.12em] text-on-chrome">VART</a>
         <nav aria-label="views" className="flex min-w-0 flex-1 gap-1 overflow-x-auto p-1 text-xs">
           {VIEWS.map(([v, name], i) => {
             const t = target(v);
@@ -169,7 +172,7 @@ export function Shell({ mode, cursor, hints, runId, expiresAt, children }: Shell
         </nav>
         {left && <span className="hidden text-xs min-[900px]:inline">{left}</span>}
       </header>
-      <main className="min-h-0 overflow-auto">{children}</main>
+      <main className={`min-h-0 overflow-auto ${tour ? "pb-80 min-[900px]:pb-0" : ""}`}>{/* room under the tour card for the last rows */}{children}</main>
       <footer data-chrome className="flex h-7 items-center gap-3 overflow-hidden bg-chrome px-4 text-xs text-on-chrome-2">
         <span className="shrink-0 whitespace-nowrap bg-on-chrome px-1 font-bold text-ink">{mode}</span>
         {cursor && <span className="min-w-0 truncate">{cursor}</span>}

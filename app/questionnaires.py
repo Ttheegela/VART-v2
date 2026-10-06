@@ -15,7 +15,7 @@ from openpyxl.utils import column_index_from_string, get_column_letter
 
 from app.api.schemas import Mapping, PreviewRow
 from app.contracts import ItemInput
-from app.ingest.parse import MAX_BYTES, IngestError, decode, sniff
+from app.ingest.parse import MAX_BYTES, IngestError, decode, hidden_rows, sniff
 
 MAX_ITEMS = 150  # spec 9
 MAX_ROWS = 2000  # rows read per sheet (a 150-item questionnaire with section rows fits many times over)
@@ -108,11 +108,14 @@ def read_sheets(filename: str, data: bytes) -> tuple[str, list[Sheet]]:
             sheets = []
             for ws in wb.worksheets:
                 if ws.sheet_state != "visible":
-                    continue  # hidden sheets are not the visitor's questionnaire (hidden rows are kept)
+                    continue  # hidden sheets are not the questionnaire; hidden rows are blanked below
                 ws.reset_dimensions()
+                hidden = hidden_rows(ws)  # a hidden row is not a question the visitor sees
                 rows = [
-                    [_text(v) for v in r[:MAX_COLS]]
-                    for _, r in zip(range(MAX_ROWS), ws.iter_rows(values_only=True), strict=False)
+                    [] if n in hidden else [_text(v) for v in r[:MAX_COLS]]
+                    for n, (_, r) in enumerate(
+                        zip(range(MAX_ROWS), ws.iter_rows(values_only=True), strict=False), 1
+                    )
                 ]
                 sheets.append(Sheet(ws.title, _pad(rows)))
             return fmt, sheets

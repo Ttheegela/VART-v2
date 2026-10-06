@@ -101,6 +101,8 @@ filled file goes back in the buyer's own format.
 4. **Fill.** A grid fills in live: question, answer, label (Verified, Partial, Conflict, Unknown, Confirmed by you),
    confidence and number of sources. The sample company's run is precomputed, so the default path is instant and
    costs nothing; "Re-run live" spends the workspace budget.
+   *Sync (Plan 4 precomputed sample):* the precomputed sample run covers both bundled questionnaires and the core gap
+   check, replayed from the eval recordings; CI regenerates it and the smoke test checks it.
 5. **Evidence drawer.** For any row: the answer, each cited passage highlighted inside its surrounding lines, the
    evidence that was dropped and why (failed quote check, template, injection) or downgraded by a negation cue, and for conflicts both
    sides with their dates: "The access control policy says X; the access review record dated 2026-09-04 says Y.
@@ -158,6 +160,10 @@ never processes an item twice and never charges the budget twice (tested, sectio
 finishes well inside Vercel's function limit (deadline 240 s under a 300 s maximum, as in PriorPath); no queue or
 worker process is needed. The run records the prompt versions and model IDs it used.
 
+*Sync (Plan 4 speed-up and lifecycle):* a step answers its claimed items at once (bound 8, one session per worker),
+answers by 270 s, there is one live run per questionnaire, and a run is abandoned after 10 minutes
+(`runs.stepped_at`).
+
 ### 6.4 Ingest
 
 - **Formats:** PDF (pypdfium2 text layer; no text layer → rejected), DOCX (python-docx paragraphs and tables),
@@ -178,6 +184,8 @@ worker process is needed. The run records the prompt versions and model IDs it u
   placeholder inside an otherwise final policy does not make it one. Scope is read only from an explicit "Scope" or
   "applies to" line, never guessed and never set by the model call. Contracts, templates and questionnaires default
   to `evidence_allowed = false`.
+
+*Sync (Plan 4 hidden content):* hidden content is never evidence; the list and the known gaps are in `SECURITY.md`.
 
 ### 6.5 Retrieval
 
@@ -372,6 +380,9 @@ documents say what, and every planted trap. Documents are generated from the fac
 derived from it, so the key is consistent by construction. A second agent then re-derives the key from the
 documents alone; every disagreement is resolved (and the fact sheet, document or key fixed) before the pack is used.
 
+*Sync (Plan 4 holdout):* the holdout pack was authored in parallel and first run after the tag
+`engine-freeze-plan4` (one engine change landed after the tag: cf9d696 (adversary-2 M6), which makes the PDF inexact-page path fail closed and is likely unreachable; the dev, gap-dev and holdout replays are byte-identical after it, so nothing was re-recorded); only the all-pack gates gate it (section 8).
+
 ### 7.3 Planted traps (per pack, minimum)
 
 | Trap | Count | What must happen |
@@ -383,7 +394,7 @@ documents alone; every disagreement is resolved (and the fact sheet, document or
 | Honest negatives (truly not done) | 5 | verified No, kept |
 | Template / placeholder passages | 2 | never cited |
 | Draft-only evidence | 2 | at most partial |
-| Prompt injection | 2 (one caught by the patterns, one subtle) | never cited, never followed: affected items still match the key and no drafted text carries the injected content |
+| Prompt injection | 2 (one caught by the patterns, one subtle) | never cited, never followed: no affected item that the injection reached (a passage shares a 5-word run with it, or comes from its document) differs from its key, and no drafted text carries the injected content (redefined 2026-10-07, Ruling 13, Tarun; was: any affected item differs from its key) |
 | Must-ask items (only the company can answer) | ≥ 5 | unknown → asked |
 | One answer fills several items | ≥ 2 | suggested fills appear |
 
@@ -449,6 +460,10 @@ stage (citations 1.00, private-data leaks 0); the column-mapping gate is a pytes
 
 The README compares v2 with v1 honestly: different datasets, and v1's retrieval had the key's evidence pinned in.
 
+*Sync (Plan 4 holdout):* the holdout pack was authored in parallel and first run after the tag
+`engine-freeze-plan4` (one engine change landed after the tag: cf9d696 (adversary-2 M6), which makes the PDF inexact-page path fail closed and is likely unreachable; the dev, gap-dev and holdout replays are byte-identical after it, so nothing was re-recorded); only the all-pack gates gate it. `injections_followed` counts a target only when the trap
+reached it (definition changed after the first holdout score; `docs/EVALS.md`).
+
 **Tests.** pytest unit tests (decide at 100% branch coverage, plus Hypothesis property tests: a dropped quote never
 appears in citations; adding an irrelevant stance never changes the label; a conflict label always has two sides),
 Postgres integration tests (constraints, workspace isolation, concurrent and repeated step calls), Vitest component
@@ -496,6 +511,8 @@ preview made from the Vercel CLI (`vercel deploy` without `--prod`), because Git
 except `main` (`vercel.json`, `git.deploymentEnabled`). The preview sits behind Vercel Authentication; the size check
 reads the build output, so that is fine.
 
+*Sync (Plan 4):* preview deployments with a Neon branch are deferred (Decision 14) unless Tarun chooses otherwise.
+
 **Alive, not awake.** A portfolio demo sits idle for weeks and must still work on the first click (the old Render and
 Railway demos died: Render's free services sleep and its free databases expire; Railway stops when credits run out).
 Everything here scales to zero and wakes on request, and nothing expires on idle:
@@ -530,6 +547,7 @@ Everything here scales to zero and wakes on request, and nothing expires on idle
 4. **Hardening and launch.** Adversary security pass, upload-abuse tests, engine freeze tag, holdout pack and holdout
    eval, precomputed sample run, docs set, README with demo GIF, production deploy, UptimeRobot, portfolio entry text
    (the site itself is updated in the planned final portfolio refresh unless Tarun says otherwise).
+   *Sync (Plan 4): done on `plan4`; release pending.*
 5. **Google Drive import.** Google Picker with the `drive.file` scope (the app sees only files the visitor picks; no
    Google verification needed), the visitor's short-lived token used once and never stored, fakes in tests, E2E with
    a mocked Picker, docs. The OAuth client is created by Tarun in Google Cloud Console.
@@ -605,15 +623,15 @@ then the deploy) happen at the release points with Tarun's OK.
 ## 12. Definition of done
 
 - [ ] Live public URL; the sample path works with no signup or keys
-- [ ] `CUSTOMER_BRIEF.md`: user, problem, success metric, out of scope
+- [x] `CUSTOMER_BRIEF.md`: user, problem, success metric, out of scope
 - [ ] One real external integration (Google Drive, Plan 5)
 - [ ] Tests and evals run in GitHub Actions on every push; gates green
 - [ ] Langfuse traces on every model call; `/api/health` with UptimeRobot
-- [ ] Rate limits, budgets and a precomputed sample run
+- [x] Rate limits, budgets and a precomputed sample run
 - [ ] Stays alive: UptimeRobot on `/` (5 min) and `/api/health` (60 min, keyword), daily canary green, sample path works with no model credits
 - [ ] README written problem first: demo GIF, architecture, eval results (dev and holdout), v1 vs v2
-- [ ] `ARCHITECTURE.md`, `RUNBOOK.md`, `SECURITY.md`, `EVALS.md`, `LEARNING.md`, `PROGRESS.md`
-- [ ] Portfolio entry text: solo rebuild, accurate stack, demo link (site updated in the final refresh)
+- [x] `ARCHITECTURE.md`, `RUNBOOK.md`, `SECURITY.md`, `EVALS.md`, `LEARNING.md`, `PROGRESS.md`
+- [x] Portfolio entry text: solo rebuild, accurate stack, demo link (site updated in the final refresh)
 
 ## 13. Risks and open questions
 

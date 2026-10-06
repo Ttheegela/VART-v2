@@ -1866,6 +1866,11 @@
             "title": "Models",
             "type": "object"
           },
+          "precomputed": {
+            "default": false,
+            "title": "Precomputed",
+            "type": "boolean"
+          },
           "prompt_versions": {
             "additionalProperties": {
               "type": "string"
@@ -2107,6 +2112,11 @@
             "title": "Models",
             "type": "object"
           },
+          "sample_precomputed": {
+            "default": false,
+            "title": "Sample Precomputed",
+            "type": "boolean"
+          },
           "version": {
             "title": "Version",
             "type": "string"
@@ -2241,7 +2251,7 @@
         ]
       },
       "patch": {
-        "description": "Edit the text; the answer becomes unapproved and `edited`. 409 for a gap check's outcome.",
+        "description": "Edit the text; the answer becomes unapproved and `edited`. On a Confirmed-by-you answer the edit is the\nvisitor's new answer: it is stored as a new dated, redacted statement and the answer points to it\n(Plan 3 M6; the old statement stops being evidence and its open fills are dismissed), counted under the\nnetwork's `interview` cap (each pays for redaction, adversary-1 N2).\n409 for a gap check's outcome; 422 when the redacted answer is empty or too long.",
         "operationId": "edit_answer_api_answers__answer_id__patch",
         "parameters": [
           {
@@ -2310,11 +2320,18 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused input: a sentence, or FastAPI's validation list"
           },
           "429": {
             "content": {
@@ -3982,7 +3999,7 @@
     },
     "/api/questionnaires/{questionnaire_id}/runs": {
       "post": {
-        "description": "A new run over every item, all pending. 422 when the questionnaire has no items yet; 429 per network\n(`run`, 20 an hour); 503 when the demo is full.",
+        "description": "A new run over every item, all pending. A bundled sample questionnaire over the untouched sample pack\ncopies the precomputed sample run instead (done, $0, no model call; a second press returns the same copy)\nunless `live=true` (Re-run live). 422 when the questionnaire has no items yet; 429 per network (`run`, 20\nan hour); 503 when the demo is full.",
         "operationId": "create_run_api_questionnaires__questionnaire_id__runs_post",
         "parameters": [
           {
@@ -3993,6 +4010,16 @@
               "format": "uuid",
               "title": "Questionnaire Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "live",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Live",
+              "type": "boolean"
             }
           }
         ],

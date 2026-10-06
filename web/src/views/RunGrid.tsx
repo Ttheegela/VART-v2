@@ -3,8 +3,9 @@ import { Shell, goneOn404, type ViewProps } from "../components/Shell";
 import { Button, ErrorLine, Kbd, LabelChip } from "../components/ui";
 import { ApiError, api, messageOf, type Label, type RunRow, type RunRowsOut, type StepOut } from "../lib/api";
 import { useKeys } from "../lib/keys";
-import { FILTER_KEY, LABELS, approvalText, confidenceText } from "../lib/labels";
+import { FILTER_KEY, LABELS, RUN_CLOSED, approvalText, confidenceText } from "../lib/labels";
 import { go } from "../lib/route";
+import { maybeStartTour, startTour, stopTour, type TourContext } from "../lib/tour";
 import EvidenceDrawer from "./EvidenceDrawer";
 
 /** Unchanged rows keep their identity, so memoized rows skip rendering when a step answers others. */
@@ -17,8 +18,9 @@ const IDLE_FIRST_MS = 2000;
 const IDLE_MAX_MS = 10_000;
 
 /** Calls step while the run is running. A step with no answers while still running (another tab holds the
- * claims) waits 2 s, doubling to 10 s, until answers arrive. A 429 with Retry-After waits as told and shows the
- * scope sentence meanwhile; a 404 calls `onGone` when given; any other error stops the loop and is shown in words.
+ * claims) waits 2 s, doubling to 10 s, until answers arrive. A 429 with Retry-After, or a 503 (Retry-After, else
+ * 60 s: the server backs off on an outage, Ruling 12), waits as told and shows the sentence meanwhile; a 404 calls
+ * `onGone` when given; any other error stops the loop and is shown in words. `resume` restarts a stopped loop.
  * A step that returns is always merged, even after a cleanup (the server has claimed those items), and a remount
  * (StrictMode, or a status flip) awaits the call already in flight instead of sending a second one. */
 export function useStepLoop(
@@ -26,6 +28,7 @@ export function useStepLoop(
 ) {
   const [failure, setFailure] = useState<{ runId: string; message: string } | null>(null);
   const [stopped, setStopped] = useState<string | null>(null); // the run whose loop an error ended
+  const [restarts, setRestarts] = useState(0); // bumped by `resume`: the effect runs the loop again
   const latest = useRef(data);
   const sink = useRef(onData);
   const gone = useRef(onGone);
@@ -38,6 +41,7 @@ export function useStepLoop(
   const status = data?.run.status;
   useEffect(() => {
     if (status !== "running") return;
+    stopTour(); // the tour never sits on a live run (adversary-1 I5)
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const wait = (ms: number) => new Promise<void>((resolve) => { timer = setTimeout(resolve, ms); });
@@ -74,6 +78,7 @@ export function useStepLoop(
           }
           setFailure({ runId, message: messageOf(e) });
           if (e instanceof ApiError && e.status === 429 && e.retryAfter) await wait(e.retryAfter * 1000);
+          else if (e instanceof ApiError && e.status === 503) await wait((e.retryAfter ?? 60) * 1000);
           else return setStopped(runId);
         }
       }
@@ -82,10 +87,11 @@ export function useStepLoop(
       alive = false;
       clearTimeout(timer);
     };
-  }, [runId, status]);
+  }, [runId, status, restarts]);
   return {
     error: failure?.runId === runId ? failure.message : null,
     running: status === "running" && stopped !== runId,
+    resume: () => { setFailure(null); setStopped(null); setRestarts((n) => n + 1); },
   };
 }
 
@@ -151,7 +157,7 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
     if (!questionnaireId) return;
     api.questionnaires().then((qs) => setName(qs.find((q) => q.id === questionnaireId)?.filename ?? null), () => {});
   }, [questionnaireId]);
-  const { error: loopError, running } = useStepLoop(runId, data, setData, onGone);
+  const { error: loopError, running, resume } = useStepLoop(runId, data, setData, onGone);
 
   const rows = data?.rows;
   const counts = useMemo(() => {
@@ -187,7 +193,12 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
     if (!data || running || busy) return;
     setBusy("rerun");
     setActionError(null);
-    try { const run = await api.createRun(data.run.questionnaire_id); go({ view: "run", run: run.id }); } catch (e) { setActionError(messageOf(e)); }
+    stopTour(); // a run is starting (preflight I3)
+    try { const run = await api.createRun(data.run.questionnaire_id, true); go({ view: "run", run: run.id }); } catch (e) {
+      // this run is still going (its loop had stopped on an error): pick it up again instead of a dead end (Ruling 12)
+      if (e instanceof ApiError && e.status === 409 && data.run.status === "running") resume();
+      else setActionError(messageOf(e));
+    }
     setBusy(null);
   };
   const approveAll = async () => {
@@ -200,6 +211,14 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
     } catch (e) { setActionError(goneOn404(e, onGone)); }
     setBusy(null);
   };
+  const sampleDone = data?.run.precomputed === true && data.run.status === "done"; // never a visitor's data or a live run
+  const tourCtx = (): TourContext => ({
+    runId,
+    conflictItem: data?.rows.find((r) => r.answer?.label === "conflict")?.item.id ?? null,
+  });
+  useEffect(() => {
+    if (sampleDone) maybeStartTour(tourCtx()); // every time the sample run opens (Decision 17)
+  }, [sampleDone, runId]); // eslint-disable-line react-hooks/exhaustive-deps
   // a download link, as on the Export view: a refusal saves as a file instead of replacing the app with JSON
   const exportFile = () => { if (data) download.current?.click(); };
 
@@ -213,10 +232,11 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
     r: () => void rerun(),
     e: exportFile,
     A: () => void approveAll(),
+    t: () => { if (sampleDone) startTour(tourCtx()); },
   }, !open);
 
   const current = visible[cur];
-  const status = !data ? "" : running ? "Answering questions." : data.run.status === "done" ? `Run done: ${data.run.done} of ${data.run.total} answered.` : `Run ${data.run.status}.`;
+  const status = !data ? "" : running ? "Answering questions." : data.run.status === "done" ? `Run done: ${data.run.done} of ${data.run.total} answered.` : data.run.status === "failed" ? RUN_CLOSED : `Run ${data.run.status}.`;
   return (
     <Shell
       mode="RUN"
@@ -233,11 +253,12 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
                 {name && <>{name}<span className="px-1 text-ink-3">/</span></>}run {runId.slice(0, 8)}
               </h1>
               <p className="text-xs text-ink-3">
-                {data ? `${data.run.done} of ${data.run.total} answered · ${running ? "answering" : data.run.status} · $${data.run.cost_usd.toFixed(4)}` : "loading…"}
+                {data ? `${data.run.done} of ${data.run.total} answered · ${running ? "answering" : data.run.status}${data.run.precomputed ? " · precomputed sample answers" : ""} · $${data.run.cost_usd.toFixed(4)}` : "loading…"}
               </p>
-              <p role="status" className="sr-only">{status}</p>
+              <p role="status" className={status === RUN_CLOSED ? "text-xs text-ink-2" : "sr-only"}>{status}</p>
             </div>
             <div className="flex flex-wrap gap-2">
+              {sampleDone && <Button k="t" label="Tour" onClick={() => startTour(tourCtx())} />}
               <Button k="r" label="Re-run live" onClick={() => void rerun()} busy={busy === "rerun"} busyLabel="Starting…" disabled={!data || running} />
               <Button k="e" label="Export" onClick={exportFile} disabled={!data} />
               <a ref={download} href={api.exportUrl(runId)} download hidden tabIndex={-1} aria-hidden="true" />
@@ -245,7 +266,7 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-rule-strong bg-sunken px-4 py-1">
-            <div role="group" aria-label="filter by label" className="flex flex-wrap gap-x-3 gap-y-1">
+            <div role="group" aria-label="filter by label" data-tour="filters" className="flex flex-wrap gap-x-3 gap-y-1">
               {LABELS.map((l) => (
                 <button key={l} type="button" aria-pressed={filters.has(l)} aria-keyshortcuts={FILTER_KEY[l]} onClick={() => toggle(l)}
                   className={`flex h-6 items-center gap-1 whitespace-nowrap border px-1 text-xs hover:border-rule-strong hover:bg-paper ${filters.has(l) ? "border-ink bg-paper" : "border-transparent"}`}>

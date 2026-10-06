@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ExpiredNotice } from "./components/Shell";
+import Tour from "./components/Tour";
 import { ErrorLine } from "./components/ui";
 import { ensureWorkspace, messageOf, type Workspace } from "./lib/api";
 import { useRoute } from "./lib/route";
@@ -32,6 +33,7 @@ export default function App() {
     return (
       <ErrorBoundary>
         <Home workspace={workspace} startError={error} />
+        <Tour />
       </ErrorBoundary>
     );
   }
@@ -45,6 +47,7 @@ export default function App() {
       {route.view === "audit" && <AuditLog {...props} />}
       {route.view === "gap" && <GapCheck {...props} scope={route.scope} outcome={route.item} />}
       {!route.run && ["run", "questions", "export"].includes(route.view) && <ErrorLine message="No run is selected; start one from the workspace." />}
+      <Tour />
     </ErrorBoundary>
   );
 }

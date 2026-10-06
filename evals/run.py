@@ -4,7 +4,7 @@
     python -m evals.run --pack dev --mode record    # needs OPENROUTER_API_KEY: the eval key, see CLAUDE.md
     python -m evals.run --pack gap-dev              # the CSF gap check (evals/gap.py)
 
-Writes evals/results/latest.{json,md} (gap-dev: evals/results/gap-dev.{json,md}); exits 0 when every gate
+Writes evals/results/latest.{json,md} (gap-dev, holdout: their own stems); exits 0 when every gate
 passes, 1 when one fails, 2 when a recording
 is missing, a record run left a request unrecorded, or the setup is wrong. Replay never calls a model; a
 missing recording stops the run (Plan 1A Task 4: ReplayMiss is caught before any other LLMError)."""
@@ -48,6 +48,21 @@ RECORDED = ROOT / "evals" / "recorded"
 RESULTS = ROOT / "evals" / "results"
 ANSWERS = ROOT / "evals" / "fixtures"
 STATEMENT_DATE = date(2026, 10, 4)  # fixed so statement prompts and recordings never change with the clock
+# Spec 8: the holdout pack is reported, not tuned. Only the gates the spec holds on every pack gate it.
+ALL_PACKS = frozenset(
+    {
+        "citations_valid",
+        "template_or_draft_cited_as_verified",
+        "injections_followed",
+        "asked_twice",
+        "answer_checks_pass",
+        "redaction_citations_valid",
+        "redaction_private_leaks",
+    }
+)
+HOLDOUT_NOTE = "holdout: reported, not tuned (spec 8)"
+REPORTED: dict[str, frozenset[str]] = {"holdout": frozenset(score.GATES) - ALL_PACKS}
+STEMS = {"gap-dev": "gap-dev", "holdout": "holdout"}  # each pack keeps its own committed results
 
 
 def always(step: str) -> bool:
@@ -272,12 +287,12 @@ def run(pack_name: str, llm: LLMClient, models: dict[str, str]) -> dict[str, Any
     red = _redaction(pack, llm, models)
     observed.redaction = replace(red, leaks=red.leaks + interview_leaks)
     metrics = score.score(pack, observed)
-    return {
+    report: dict[str, Any] = {
         "pack": pack_name,
         "models": models,
         "prompts": [CLASSIFY_PROMPT, STANCE_PROMPT, DRAFT_PROMPT, JUDGE_PROMPT],
         "metrics": metrics,
-        "gates": score.gates(metrics),
+        "gates": score.gates(metrics, reported=REPORTED.get(pack_name, frozenset())),
         "label_misses": score.label_misses(pack, observed),
         "items": {
             code: {
@@ -290,6 +305,9 @@ def run(pack_name: str, llm: LLMClient, models: dict[str, str]) -> dict[str, Any
             for code, r in sorted(results.items())
         },
     }
+    if pack_name == "holdout":
+        report["reported_note"] = HOLDOUT_NOTE
+    return report
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -356,7 +374,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
         keep_used(path, keys)
     RESULTS.mkdir(parents=True, exist_ok=True)
-    stem = "gap-dev" if args.pack == "gap-dev" else "latest"  # each pack keeps its own committed results
+    stem = STEMS.get(args.pack, "latest")
     (RESULTS / f"{stem}.json").write_text(json.dumps(jsonable(report), indent=2, sort_keys=True) + "\n")
     (RESULTS / f"{stem}.md").write_text(score.markdown(report))
     gating = {n: g for n, g in report["gates"].items() if g.get("gating", True)}

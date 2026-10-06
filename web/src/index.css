@@ -63,6 +63,14 @@
   [data-chrome] :focus-visible {
     outline-color: var(--color-on-chrome);
   }
+  /* The guided tour's outline on the element a step is about (Plan 4 Task 3b): ink, as a focus ring. */
+  [data-tour-on] {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+  [data-chrome] [data-tour-on] {
+    outline-color: var(--color-on-chrome);
+  }
   /* Key hint: shown next to every action it drives; the border takes the text colour of its context. */
   kbd {
     display: inline-block;
