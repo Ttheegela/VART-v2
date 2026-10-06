@@ -1,9 +1,12 @@
 import inspect
 import json
+import threading
+import time
 
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
+from app.db.models import Answer
 from app.redecide import redecide
 from tests import factories as f
 
@@ -77,3 +80,32 @@ def test_an_edited_or_confirmed_answer_is_left_alone(db: Engine) -> None:
 def test_no_model_is_called(db: Engine) -> None:
     # redecide takes no LLM client at all: the signature is the guarantee (spec 6.7).
     assert "llm" not in inspect.signature(redecide).parameters
+
+
+def test_an_edit_in_flight_is_waited_out_and_kept(db: Engine) -> None:
+    # Integration carry 3 (adversary-3 inputs M7): redecide locks the answer rows, so an edit holding the row
+    # finishes first and the re-decide then leaves the edited answer alone.
+    with Session(db) as s:
+        ws, doc, a = _answered(s)
+        doc.status = "draft"
+        s.commit()
+        ws_id, doc_id, a_id = ws.id, doc.id, a.id
+    result: list[int] = []
+    with Session(db) as editor:
+        row = editor.scalars(select(Answer).where(Answer.id == a_id).with_for_update()).one()
+        row.edited, row.text = True, "Yes, our own words."
+        editor.flush()
+
+        def run() -> None:
+            with Session(db) as t:
+                result.append(redecide(t, ws_id, doc_id))
+
+        th = threading.Thread(target=run)
+        th.start()
+        time.sleep(0.5)
+        assert th.is_alive()  # waiting on the editor's row lock
+        editor.commit()
+    th.join(10)
+    assert result == [0]
+    with Session(db) as s:
+        assert s.get_one(Answer, a_id).text == "Yes, our own words."

@@ -224,7 +224,7 @@ def read_items(sheets: list[Sheet], mapping: Mapping) -> list[ParsedItem]:
         if not question:
             filled = [c for c in row if c]
             if filled:
-                section = filled[0]
+                section = filled[0][:MAX_TOPIC]  # a label the visitor never mapped is cut, not refused
             continue
         topic = at(row, mapping.topic_col) if mapping.topic_col else section
         if len(question) > MAX_QUESTION:
@@ -242,10 +242,8 @@ def read_items(sheets: list[Sheet], mapping: Mapping) -> list[ParsedItem]:
 
 
 def preview(sheets: list[Sheet], mapping: Mapping) -> list[PreviewRow]:
-    try:
-        items = read_items(sheets, mapping)
-    except IngestError:
-        return []
+    """Raises read_items' IngestError, so an upload is refused at once, not at the mapping's PUT."""
+    items = read_items(sheets, mapping)
     return [
         PreviewRow(row=i.row, id=i.code, question=i.question, topic=i.topic, answer=i.answer)
         for i in items[:PREVIEW]

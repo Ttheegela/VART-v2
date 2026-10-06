@@ -328,12 +328,19 @@ def test_an_approved_item_is_not_overwritten_and_its_question_is_moot(s: Session
 
 def test_an_edited_conflict_can_still_be_answered_but_a_fill_will_not_replace_the_edit(s: Session) -> None:
     # Adversary-3 N3: an edited conflict is still a conflict; only a fill must respect the edit.
-    ws, r = _done_run(s, ["Data", "Data"], ["conflict", "partial"])
-    first, second = qs.ensure_questions(s, ws.id, r.id)
-    s.execute(Answer.__table__.update().values(edited=True))
+    # Integration carry 1: an edited item is not even re-checked (no model call, no dead fill).
+    ws, r = _done_run(s, ["Data", "Data", "Data"], ["conflict", "partial", "partial"])
+    first, edited, later = (s.get_one(Item, q.item_ids[0]) for q in qs.ensure_questions(s, ws.id, r.id))
+    s.execute(Answer.__table__.update().where(Answer.item_id != later.id).values(edited=True))
     s.commit()
-    _, answer, found = qs.answer_question(s, ws.id, first.id, TEXT, _recheck_llm(), MODELS, TODAY)
-    assert answer is not None and answer.label == "user_confirmed" and len(found) == 1
+    llm = _recheck_llm()
+    q1 = next(q for q in qs.ensure_questions(s, ws.id, r.id) if q.item_ids == [first.id])
+    _, answer, found = qs.answer_question(s, ws.id, q1.id, TEXT, llm, MODELS, TODAY)
+    assert answer is not None and answer.label == "user_confirmed"
+    assert [sg.item_id for sg in found] == [later.id]
+    assert len([req for req in llm.requests if req.step == "recheck"]) == 1
+    s.execute(Answer.__table__.update().where(Answer.item_id == later.id).values(edited=True))
+    s.commit()  # edited after the fill was offered
     with pytest.raises(qs.Conflict):
         qs.accept_suggestion(s, ws.id, found[0].id)
 

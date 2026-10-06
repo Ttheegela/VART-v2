@@ -59,12 +59,17 @@ def redecide(session: Session, workspace_id: uuid.UUID, document_id: uuid.UUID) 
     if not chunk_ids:
         return 0
     answers = session.scalars(
-        select(Answer).where(
+        select(Answer)
+        .where(
             Answer.workspace_id == workspace_id,
             Answer.label.in_(REDECIDED),
             Answer.edited.is_(False),
             Answer.chunk_ids.has_any(array(chunk_ids)),
         )
+        # lock as edit, approve and accept do (answer before question, Ruling 9), by id so re-decides agree;
+        # a concurrent edit is waited out and then excluded by `edited` (adversary-3 inputs M7)
+        .order_by(Answer.id)
+        .with_for_update()
     ).all()
     changed = 0
     for a in answers:

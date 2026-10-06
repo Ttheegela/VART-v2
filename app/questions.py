@@ -206,7 +206,11 @@ def _suggest(
 ) -> list[SuggestedFill]:
     if llm is None:
         return []
-    pairs = [(i, a) for i, a in _open_pairs(session, run_id) if i.id != answered_item and i.topic == topic]
+    pairs = [
+        (i, a)
+        for i, a in _open_pairs(session, run_id)
+        if i.id != answered_item and i.topic == topic and _still_open(a)  # no dead fill for an edit
+    ]
     opens = [
         OpenItem(ItemInput(str(i.id), i.question, i.topic), cast(ItemLabel, a.label))
         for i, a in pairs[:MAX_RECHECKS]

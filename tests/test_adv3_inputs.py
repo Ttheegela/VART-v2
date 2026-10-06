@@ -87,6 +87,26 @@ def test_i2_a_long_question_or_topic_is_refused() -> None:
         read_items(sheets, m)
 
 
+def test_a_long_section_label_is_cut_to_the_topic_cap_not_refused() -> None:
+    # Integration carry 2 (inputs recheck N1): the fallback topic is from a column the visitor never mapped.
+    m = Mapping(sheet=None, header_row=1, id_col=None, question_col="A", answer_col="B", comments_col=None)
+    _, sheets = read_sheets("q.csv", f"Question,Answer\r\n,{'s' * (MAX_TOPIC + 50)}\r\nq,\r\n".encode())
+    [item] = read_items(sheets, m)
+    assert item.topic == "s" * MAX_TOPIC
+
+
+def test_a_long_question_is_refused_at_upload(db: Engine) -> None:
+    # Integration carry 2 (inputs recheck N2): the preview no longer swallows the refusal until the PUT.
+    client, _ = visitor(db)
+    body = f"Question,Answer\r\n{'x' * (MAX_QUESTION + 1)},\r\n".encode()
+    r = client.post("/api/questionnaires", files={"file": ("q.csv", body, "text/csv")})
+    assert (r.status_code, r.json()["detail"]) == (
+        422,
+        f"Row 2's question is longer than {MAX_QUESTION:,} characters.",
+    )
+    assert client.get("/api/questionnaires").json() == []
+
+
 def test_i4_a_document_over_the_text_cap_is_refused() -> None:
     line = "a" * 10_000 + "\n\n"
     with pytest.raises(IngestError, match="characters of text"):
