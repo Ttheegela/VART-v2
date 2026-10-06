@@ -5,6 +5,7 @@ import { api, messageOf, type GapLabel, type GapOut, type GapRow, type GapScope,
 import { useKeys } from "../lib/keys";
 import { GAP_FOOTER, GAP_LABELS, GAP_REVIEW, RUN_CLOSED, SCOPES, SCOPE_KEY } from "../lib/labels";
 import { go } from "../lib/route";
+import { stopTour } from "../lib/tour";
 import GapDrawer from "./GapDrawer";
 import { useStepLoop } from "./RunGrid";
 
@@ -134,6 +135,7 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
     setBusy(true);
     setError(null);
     setNotice(null);
+    stopTour(); // a run is starting (preflight I3); the step loop also stops it while the run is running
     try {
       const out = await api.startGap(current);
       if (out.status === "done") setNotice({ scope: current, text: NOTHING_CHANGED });
@@ -178,7 +180,7 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
                 {GAP_REVIEW} · labels decided by code
                 {run ? ` · ${checked} checked · ${running ? "checking" : run.status} · $${run.cost_usd.toFixed(4)}` : " · not run yet"}
               </p>
-              {data && <p aria-hidden="true" className="text-xs text-ink-2">{coverage(data.rows)}</p>}
+              {data && <p aria-hidden="true" data-tour="coverage" className="text-xs text-ink-2">{coverage(data.rows)}</p>}
               <p role="status" className={said ? "text-xs text-ink-2" : "sr-only"}>{said ?? status}</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -235,7 +237,7 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
               </tbody>
             </table>
           </div>
-          <p className="border-t border-rule-strong px-4 py-1 text-xs text-ink-3">{GAP_FOOTER}</p>
+          <p data-tour="legal" className="border-t border-rule-strong px-4 py-1 text-xs text-ink-3">{GAP_FOOTER}</p>
         </div>
         {open && data && (
           <GapDrawer row={open} runId={data.run?.id ?? null} controlsUrl={data.controls_url} onClose={close} onChanged={reload} />

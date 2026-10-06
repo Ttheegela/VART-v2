@@ -5,6 +5,7 @@ import { ApiError, api, messageOf, type Label, type RunRow, type RunRowsOut, typ
 import { useKeys } from "../lib/keys";
 import { FILTER_KEY, LABELS, RUN_CLOSED, approvalText, confidenceText } from "../lib/labels";
 import { go } from "../lib/route";
+import { maybeStartTour, startTour, stopTour, type TourContext } from "../lib/tour";
 import EvidenceDrawer from "./EvidenceDrawer";
 
 /** Unchanged rows keep their identity, so memoized rows skip rendering when a step answers others. */
@@ -40,6 +41,7 @@ export function useStepLoop(
   const status = data?.run.status;
   useEffect(() => {
     if (status !== "running") return;
+    stopTour(); // the tour never sits on a live run (adversary-1 I5)
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const wait = (ms: number) => new Promise<void>((resolve) => { timer = setTimeout(resolve, ms); });
@@ -191,6 +193,7 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
     if (!data || running || busy) return;
     setBusy("rerun");
     setActionError(null);
+    stopTour(); // a run is starting (preflight I3)
     try { const run = await api.createRun(data.run.questionnaire_id, true); go({ view: "run", run: run.id }); } catch (e) {
       // this run is still going (its loop had stopped on an error): pick it up again instead of a dead end (Ruling 12)
       if (e instanceof ApiError && e.status === 409 && data.run.status === "running") resume();
@@ -208,6 +211,14 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
     } catch (e) { setActionError(goneOn404(e, onGone)); }
     setBusy(null);
   };
+  const sampleDone = data?.run.precomputed === true && data.run.status === "done"; // never a visitor's data or a live run
+  const tourCtx = (): TourContext => ({
+    runId,
+    conflictItem: data?.rows.find((r) => r.answer?.label === "conflict")?.item.id ?? null,
+  });
+  useEffect(() => {
+    if (sampleDone) maybeStartTour(tourCtx()); // every time the sample run opens (Decision 17)
+  }, [sampleDone, runId]); // eslint-disable-line react-hooks/exhaustive-deps
   // a download link, as on the Export view: a refusal saves as a file instead of replacing the app with JSON
   const exportFile = () => { if (data) download.current?.click(); };
 
@@ -221,6 +232,7 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
     r: () => void rerun(),
     e: exportFile,
     A: () => void approveAll(),
+    t: () => { if (sampleDone) startTour(tourCtx()); },
   }, !open);
 
   const current = visible[cur];
@@ -246,6 +258,7 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
               <p role="status" className={status === RUN_CLOSED ? "text-xs text-ink-2" : "sr-only"}>{status}</p>
             </div>
             <div className="flex flex-wrap gap-2">
+              {sampleDone && <Button k="t" label="Tour" onClick={() => startTour(tourCtx())} />}
               <Button k="r" label="Re-run live" onClick={() => void rerun()} busy={busy === "rerun"} busyLabel="Starting…" disabled={!data || running} />
               <Button k="e" label="Export" onClick={exportFile} disabled={!data} />
               <a ref={download} href={api.exportUrl(runId)} download hidden tabIndex={-1} aria-hidden="true" />
@@ -253,7 +266,7 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-rule-strong bg-sunken px-4 py-1">
-            <div role="group" aria-label="filter by label" className="flex flex-wrap gap-x-3 gap-y-1">
+            <div role="group" aria-label="filter by label" data-tour="filters" className="flex flex-wrap gap-x-3 gap-y-1">
               {LABELS.map((l) => (
                 <button key={l} type="button" aria-pressed={filters.has(l)} aria-keyshortcuts={FILTER_KEY[l]} onClick={() => toggle(l)}
                   className={`flex h-6 items-center gap-1 whitespace-nowrap border px-1 text-xs hover:border-rule-strong hover:bg-paper ${filters.has(l) ? "border-ink bg-paper" : "border-transparent"}`}>

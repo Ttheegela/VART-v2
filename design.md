@@ -195,3 +195,7 @@ a single key cannot say which row. Enter in a form submits it from any field, a 
   the coverage line sits in the status line's cursor slot. An outcome marked N/A reads `not applicable` (the
   questionnaire chip) with its own filter count; a failed outcome has no chip and shows its failure sentence; `r`
   with nothing changed says "Nothing changed since the last check." under the review line.
+- 2026-10-07 · Guided tour (Plan 4 Task 3b): a non-modal card, bottom right (22rem) from 900 px and full width above
+  the status line below it, under the key sheet; ink outline on the step's element; keys → ← Esc only while focus is
+  in the card (Enter presses the focused button), and t or the Tour button starts it again on the sample run. It
+  opens every time the precomputed sample run opens; Skip closes it for that visit.
