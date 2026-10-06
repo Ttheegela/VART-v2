@@ -1,13 +1,31 @@
 import json
 import uuid
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from dataclasses import replace
+from datetime import date
 from pathlib import Path
 
 import pytest
+from sqlalchemy import Engine, func, select
+from sqlalchemy.orm import Session
 
 from app import csf
 from app.contracts import ItemInput
+from app.db.models import DocumentLine, Item, Questionnaire
+from app.ingest.store import store_statement
+from app.services.llm_budget import spender
+from tests import factories as f
+from tests.fakes import FakeLLM
+
+MODELS = {"stance": "m/stance", "draft": "m/draft"}
+QUOTE = "Customer data at rest is encrypted with AES-256."
+
+
+@pytest.fixture
+def s(db: Engine) -> Iterator[Session]:
+    with Session(db) as session:
+        yield session
 
 
 def _one(tier: str) -> csf.Outcome:
@@ -122,3 +140,120 @@ def test_the_loader_rejects_a_bad_data_file(
     finally:
         monkeypatch.undo()
         csf.framework.cache_clear()
+
+
+def test_the_built_in_questionnaire_holds_one_item_per_outcome_in_scope(s: Session) -> None:
+    ws = f.workspace(s)
+    s.commit()
+    q = csf.questionnaire_for(s, ws.id, "protect")
+    items = s.scalars(select(Item).where(Item.questionnaire_id == q.id).order_by(Item.position)).all()
+    want = csf.in_scope("protect")
+    assert (q.source, q.filename, q.mapping["scope"], q.mapping["csf_version"]) == (
+        "csf",
+        "csf-2.0",
+        "protect",
+        "2.0",
+    )
+    assert [(i.position, i.code, i.csf_id, i.row_ref) for i in items] == [
+        (n, o.id, o.id, o.id) for n, o in enumerate(want, 1)
+    ]
+    assert [(i.topic, i.question) for i in items] == [(o.category, o.question) for o in want]
+
+
+def test_the_questionnaire_is_reused_per_scope(s: Session) -> None:
+    ws = f.workspace(s)
+    s.commit()
+    first = csf.questionnaire_for(s, ws.id, "core").id
+    assert csf.questionnaire_for(s, ws.id, "core").id == first
+    assert csf.questionnaire_for(s, ws.id, "detect").id != first
+    other = f.workspace(s)
+    s.commit()
+    assert csf.questionnaire_for(s, other.id, "core").id != first  # never another workspace's
+    assert s.scalar(select(func.count(Questionnaire.id))) == 3
+
+
+def test_a_later_mapping_key_does_not_hide_the_questionnaire(s: Session) -> None:
+    ws = f.workspace(s)
+    s.commit()
+    q = csf.questionnaire_for(s, ws.id, "core")
+    q.mapping = {**q.mapping, "confirmed": True}  # Plan 3 adds keys to a mapping
+    s.commit()
+    assert csf.questionnaire_for(s, ws.id, "core").id == q.id
+    assert s.scalar(select(func.count(Questionnaire.id))) == 1
+
+
+def test_a_changed_tier_list_gives_a_new_questionnaire(s: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    ws = f.workspace(s)
+    s.commit()
+    first = csf.questionnaire_for(s, ws.id, "govern").id
+    fw = csf.framework()
+    reworded = replace(
+        fw,
+        outcomes=tuple(
+            replace(o, question="Is the policy approved?") if o.id == "GV.PO-01" else o for o in fw.outcomes
+        ),
+    )
+    monkeypatch.setattr(csf, "framework", lambda: reworded)
+    q = csf.questionnaire_for(s, ws.id, "govern")
+    assert q.id != first
+    asked = s.scalar(select(Item.question).where(Item.questionnaire_id == q.id, Item.csf_id == "GV.PO-01"))
+    assert asked == "Is the policy approved?"
+
+
+def test_an_unknown_scope_creates_nothing(s: Session) -> None:
+    ws = f.workspace(s)
+    s.commit()
+    with pytest.raises(ValueError, match="unknown scope"):
+        csf.questionnaire_for(s, ws.id, "Protect")
+    assert s.scalar(select(func.count(Questionnaire.id))) == 0
+
+
+def test_a_checked_outcome_runs_the_ordinary_pipeline(s: Session) -> None:
+    ws = f.workspace(s)
+    doc = f.document(s, ws, filename="crypto-policy.docx")
+    f.chunk(s, doc, line_start=4, line_end=4, text=QUOTE)
+    s.commit()
+    stance = json.dumps({"passages": [{"passage": 1, "stance": "yes", "quote": QUOTE, "note": "states it"}]})
+    draft = json.dumps({"text": f'Yes. The crypto policy says "{QUOTE}"'})
+    llm = FakeLLM([stance, draft])
+    o = csf.framework().get("PR.DS-01")
+    r = csf.check_outcome(s, ws.id, o, llm, MODELS, spender(s, ws.id))
+    assert r is not None and r.item == csf.item_input(o)
+    assert csf.gap_label(o, r.decision.label, r.decision.value) == "covered"
+    assert [req.step for req in llm.requests] == ["stance", "draft"]
+
+
+def test_ask_me_and_not_checked_outcomes_never_reach_a_model(s: Session) -> None:
+    ws = f.workspace(s)
+    doc = f.document(s, ws)
+    f.chunk(s, doc, text="Leadership sets the cybersecurity risk tolerance every year.")
+    s.commit()
+    llm = FakeLLM([])  # any model call raises AssertionError
+    ask = next(o for o in csf.framework().outcomes if o.tier == "ask")
+    assert csf.check_outcome(s, ws.id, ask, llm, MODELS, spender(s, ws.id)) is None
+    unchecked = next(o for o in csf.framework().outcomes if o.tier == "not_checked")
+    with pytest.raises(ValueError, match="not checked"):
+        csf.check_outcome(s, ws.id, unchecked, llm, MODELS, spender(s, ws.id))
+    assert llm.requests == []
+
+
+def test_ask_me_outcomes_are_queued_once_and_an_answer_confirms_them(s: Session) -> None:
+    core = csf.in_scope("core")
+    queue = csf.ask_queue(core, {})
+    assert [e.key for e in queue] == [o.id for o in core if o.tier == "ask"]
+    assert all(e.reason == "unknown" and e.question == csf.framework().get(e.key).question for e in queue)
+    assert "GV.RR-02" not in [e.key for e in csf.ask_queue(core, {"GV.RR-02": 1})]  # asked once already
+
+    ws = f.workspace(s)
+    s.commit()
+    o = csf.framework().get("GV.RR-02")
+    doc = store_statement(
+        s,
+        ws.id,
+        "Dana Ortiz, Head of Security, owns the program.",
+        filename="answer-GV.RR-02.txt",
+        today=date(2026, 10, 5),
+    )
+    lines = s.scalars(select(DocumentLine.text).where(DocumentLine.document_id == doc.id)).all()
+    assert doc.kind == "statement" and "Dana Ortiz" not in " ".join(lines)  # redacted before storage
+    assert csf.gap_label(o, "user_confirmed", None, doc.id) == "confirmed_by_you"

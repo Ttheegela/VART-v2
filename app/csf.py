@@ -2,14 +2,24 @@
 mapping over decide's output (decide itself does not change).
 data/csf/csf-2.0.json is built and drift-tested by datakit/csf.py; the app only reads it."""
 
+import hashlib
 import json
 import re
+import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 from typing import Literal, get_args
 
-from app.contracts import ItemInput, ItemLabel, Value
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.contracts import ItemInput, ItemLabel, ItemResult, OpenItem, QueueEntry, Spend, Value
+from app.db.models import Item, Questionnaire, Workspace
+from app.interview import plan_queue
+from app.llm.client import LLMClient
+from app.pipeline import answer_item
 
 DATA = Path(__file__).resolve().parent.parent / "data" / "csf" / "csf-2.0.json"
 Tier = Literal["checked", "ask", "not_checked"]
@@ -126,3 +136,86 @@ def gap_label(
     if o.tier == "ask":
         return "not_answered"
     return _CHECKED.get((label or "", value))
+
+
+FILENAME = "csf-2.0"
+
+
+def _digest(outcomes: Sequence[Outcome]) -> str:
+    rows = [[o.id, o.tier, o.question, o.category] for o in outcomes]
+    return hashlib.sha256(json.dumps(rows).encode()).hexdigest()[:16]
+
+
+def questionnaire_for(session: Session, workspace_id: uuid.UUID, scope: str) -> Questionnaire:
+    """The workspace's built-in CSF questionnaire for `scope` (CSF spec 6), created on first use with one
+    item per Checked and Ask-me outcome in scope. It is reused only while the CSF data behind it is the same
+    (version, retrieval date, scope and a digest of the items), so a deploy that changes the tiers or a
+    question gives the next run new items instead of stale ones. Found by those mapping keys (JSONB
+    containment), so a key added to the mapping later does not hide it. Commits."""
+    outcomes = in_scope(scope)
+    fw = framework()
+    mapping = {
+        "csf_version": fw.version,
+        "retrieved": fw.retrieved,
+        "scope": scope,
+        "digest": _digest(outcomes),
+    }
+    # Lock the workspace row, as ingest does, so two first calls at once create one questionnaire.
+    session.execute(select(Workspace.id).where(Workspace.id == workspace_id).with_for_update())
+    q = session.scalars(
+        select(Questionnaire).where(
+            Questionnaire.workspace_id == workspace_id,
+            Questionnaire.source == "csf",
+            Questionnaire.mapping.contains(mapping),
+        )
+    ).first()
+    if q is None:
+        q = Questionnaire(workspace_id=workspace_id, filename=FILENAME, source="csf", mapping=mapping)
+        session.add(q)
+        session.flush()
+        session.add_all(
+            Item(
+                workspace_id=workspace_id,
+                questionnaire_id=q.id,
+                position=n,
+                row_ref=o.id,
+                code=o.id,
+                csf_id=o.id,
+                topic=o.category,
+                question=item_input(o).question,
+            )
+            for n, o in enumerate(outcomes, 1)
+        )
+    session.commit()
+    return q
+
+
+def check_outcome(
+    session: Session,
+    workspace_id: uuid.UUID,
+    o: Outcome,
+    llm: LLMClient,
+    models: Mapping[str, str],
+    spend: Spend,
+) -> ItemResult | None:
+    """One outcome of a gap-check run (CSF spec 5.2-5.5). Checked: answer_item unchanged (it spends before
+    each model call and holds no transaction across one). Ask me: None, with no retrieval and no model call;
+    the visitor answers it through ask_queue and store_statement. Not checked: never part of a run."""
+    if o.tier == "checked":
+        return answer_item(session, workspace_id, item_input(o), llm, models, spend)
+    if o.tier == "ask":
+        return None
+    raise ValueError(f"{o.id} is {NOT_CHECKED}")
+
+
+def ask_queue(outcomes: Sequence[Outcome], asked: Mapping[str, int]) -> list[QueueEntry]:
+    """Questions for you (CSF spec 5.4): the Ask-me outcomes, through the interview planner, so an outcome
+    already asked (`asked[id] >= 1`) is not queued again. An answer is stored with store_statement (redacted)
+    and shows Confirmed by you through gap_label, citing that statement."""
+    return plan_queue(
+        [
+            OpenItem(item_input(o), "unknown", asked.get(o.id, 0), o.question or "")
+            for o in outcomes
+            if o.tier == "ask"
+        ]
+    )
