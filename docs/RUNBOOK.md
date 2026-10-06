@@ -11,7 +11,8 @@ pasted into a file, a commit, an issue or a chat.
 1. Open a pull request from the work branch to `main`; wait for green CI (gates, backend, frontend, end-to-end).
 2. Check the function size on a CLI preview (below).
 3. Tarun runs `ops/setup.sh migrate` (migrations never run in the build).
-4. Fast-forward `main` to the pull request's head. Vercel deploys `main`.
+4. Fast-forward `main` to the pull request's head. Vercel deploys `main`. Migrate and deploy while no run is mid-step
+   (a quiet moment on the demo): a step that straddles the switch can meet the old code or schema halfway.
 5. `python scripts/smoke.py https://vart-v2.vercel.app` prints one `ok:` line, or one `FAIL: <check>: <reason>` line.
 6. Check `/api/health` (`"status":"ok"`) and, after the next 17:00 UTC run, the canary.
 7. Safari check on the Mac and on an iPhone (below).
@@ -35,6 +36,7 @@ database only for additive migrations; otherwise leave the new column in place, 
 | 503 "the demo is full" | the storage breaker: the database is near its size limit | wait for the sweeps, or run the cleanup once; look at Neon storage |
 | smoke `FAIL: sample` | the deployed models or data differ from the sample snapshot | a model variable changed without a re-recording: restore it, or re-record, regenerate and release |
 | a run that never finishes | its steps stopped | after 10 minutes the run counts as abandoned; the visitor can start a new run |
+| 429 on every step after a long provider outage | each step's retries spent the workspace's stance calls: a long outage exhausts the 150-an-hour stance cap in about 20 to 25 minutes | nothing to fix: steps answer 429 until the hour turns, then the run goes on |
 
 ## The sample snapshot
 `python scripts/sample_snapshot.py` rebuilds it from the eval recordings; no key is needed. A CI test fails when the

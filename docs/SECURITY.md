@@ -44,11 +44,14 @@ Applied to uploads and to the visitor's own answers before storage and before an
   even where it is an ordinary word (over-redaction, accepted).
 
 ## Content a reader cannot see
-Not read as evidence: Word text marked hidden or smaller than 1 point; PDF lines whose first character is smaller
-than 1 point; hidden sheets and hidden rows of an uploaded workbook; hidden rows of a questionnaire (never asked or
-answered). Known gaps: white or background-coloured text and similar tricks; text hidden by a Word character style;
-hidden columns; a tiny phrase inside a readable PDF line; text outside the visible page. PDF text in the "invisible"
-render mode is read on purpose: OCR'd scans keep their whole text layer there.
+Not read as evidence: Word text marked hidden or smaller than 1 point on the run itself; PDF lines whose first
+character is shown smaller than 1 point; hidden sheets and hidden or zero-height rows of an uploaded workbook; hidden
+rows of a questionnaire (never asked or answered). Known gaps: white or background-coloured text and similar tricks;
+Word text hidden or shrunk by a character style, a paragraph style or the document defaults (docDefaults); hidden
+columns and cells with a `;;;` number format; a tiny phrase inside a readable PDF line; PDF text squeezed by
+horizontal scaling (`1 Tz`), cut away by a clip path, or placed outside the visible page; Markdown comments
+(`<!-- -->`). PDF text in the "invisible" render mode is read on purpose: OCR'd scans keep their whole text layer
+there.
 
 ## Prompt injection
 Passage text is data, and every system prompt says so. Passages that match the injection patterns are removed

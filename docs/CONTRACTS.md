@@ -255,8 +255,9 @@ change-log line; changing or removing a path, a field or a status needs the lead
   the snapshot records, and `data/dev/sample-run.json` is current; a second press returns the same copy. `POST
   /api/gap/core/run` does the same for a new core gap check. A copy is done at $0 with no model call;
   `RunOut.precomputed` is true for it. `live=true` (Re-run live) always runs the engine; a function-scope gap check
-  always runs live. `GET /api/version` gains `sample_precomputed`. Counted under `run` as before. No prompt or label
-  rule changes.
+  always runs live. `GET /api/version` gains `sample_precomputed`. Counted under `run` as before. A Check again that
+  re-opens outcomes records the deployed models in `run.models`, so a copied run then reads `precomputed: false`
+  (each part keeps its own model). No prompt or label rule changes.
 - 2026-10-07: Plan 4 Task 4 (a 409 on an existing path, Ruling 8; migration `e7d1f3a5b9c2`, additive):
   `POST /api/questionnaires/{id}/runs` answers 409 ("A run of this questionnaire is still going; wait for it to
   finish first.") while a live run of that questionnaire is running and a step touched it in the last 10 minutes.
