@@ -113,7 +113,7 @@ def check(pack: str) -> list[str]:
     p += [
         f"outcome {m.csf_id}: a label override needs missing"
         for m in gap.outcomes
-        if m.label and not m.missing
+        if m.label and not (m.missing or "").strip()
     ]
     p += [f"Checked outcome {i} has no control" for i in sorted(want - set(ids))]
     p += [f"outcome {i} is not a Checked CSF outcome" for i in sorted(set(ids) - want)]
