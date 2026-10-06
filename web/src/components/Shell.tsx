@@ -31,6 +31,7 @@ export const KEY_TABLE: [string, string][] = [
   ["l / q / w", "load the sample documents / sample questionnaire A / B (Workspace)"],
   ["R", "reset the workspace: delete everything now (Workspace)"],
   ["ctrl+enter", "send an answer (Questions for you)"],
+  ["t", "the guided tour (on the sample company's run)"],
   ["?", "show all keys"],
 ];
 
@@ -144,7 +145,7 @@ export function Shell({ mode, cursor, hints, runId, expiresAt, children }: Shell
   return (
     <div className="grid h-dvh grid-rows-[36px_minmax(0,1fr)_28px] bg-paper text-ink">
       <header data-chrome className="flex h-9 items-center gap-4 overflow-hidden bg-chrome px-4 text-on-chrome-2">
-        <a href="/" className="font-bold tracking-[0.12em] text-on-chrome">VART</a>
+        <a href="/" data-tour="brand" className="font-bold tracking-[0.12em] text-on-chrome">VART</a>
         <nav aria-label="views" className="flex min-w-0 flex-1 gap-1 overflow-x-auto p-1 text-xs">
           {VIEWS.map(([v, name], i) => {
             const t = target(v);

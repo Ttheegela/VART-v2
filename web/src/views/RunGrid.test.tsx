@@ -4,6 +4,7 @@ import { StrictMode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { RunRowsOut } from "../lib/api";
 import { fixtures, mockApi } from "../test/mockApi";
+import Tour from "../components/Tour";
 import RunGrid, { mergeRows, useStepLoop } from "./RunGrid";
 
 const props = { workspace: fixtures.workspace, onGone: () => {}, runId: "r1" };
@@ -305,5 +306,39 @@ describe("useStepLoop", () => {
     unmount();
     await act(() => vi.advanceTimersByTimeAsync(60_000));
     expect(calls).toHaveLength(1);
+  });
+
+  it("a precomputed sample run starts the tour by itself, and t starts it again", async () => {
+    mockApi({
+      "GET /api/runs/r1/answers": { run: { ...fixtures.run, precomputed: true }, rows: fixtures.rows },
+      "GET /api/questionnaires": [],
+    });
+    render(<><RunGrid {...props} /><Tour /></>);
+    expect(await screen.findByRole("dialog", { name: "guided tour" })).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "guided tour" })).toBeNull();
+    await userEvent.keyboard("t");
+    expect(await screen.findByRole("dialog", { name: "guided tour" })).toBeInTheDocument();
+  });
+
+  it("a visitor's own run never starts the tour and has no Tour button", async () => {
+    mockApi({ "GET /api/runs/r1/answers": { run: fixtures.run, rows: fixtures.rows }, "GET /api/questionnaires": [] });
+    render(<><RunGrid {...props} /><Tour /></>);
+    await screen.findByRole("row", { name: /VSQ-02/ });
+    await userEvent.keyboard("t");
+    expect(screen.queryByRole("dialog", { name: "guided tour" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Tour" })).toBeNull();
+  });
+
+  it("re-run live closes the tour the moment the run starts (adversary I5)", async () => {
+    mockApi({
+      "GET /api/runs/r1/answers": { run: { ...fixtures.run, precomputed: true }, rows: fixtures.rows },
+      "GET /api/questionnaires": [],
+      "POST /api/questionnaires/q1/runs": () => new Promise(() => {}), // still starting: the route has not moved
+    });
+    render(<><RunGrid {...props} /><Tour /></>);
+    expect(await screen.findByRole("dialog", { name: "guided tour" })).toBeInTheDocument();
+    await userEvent.keyboard("r");
+    expect(screen.queryByRole("dialog", { name: "guided tour" })).toBeNull();
   });
 });

@@ -25,7 +25,7 @@ export default function ExportView({ workspace, onGone, runId }: ViewProps & { r
   return (
     <Shell mode="EXPORT" cursor="" hints={[["e", "export"], ["?", "all keys"]]} expiresAt={workspace.expires_at} runId={runId}>
       <div className="mx-auto max-w-3xl space-y-3 p-4 text-sm">
-        <h1 className="border-b border-ink text-xs font-medium text-ink-2">export</h1>
+        <h1 data-tour="export" className="border-b border-ink text-xs font-medium text-ink-2">export</h1>
         <ErrorLine message={error} />
         {data && <p className="tabular-nums">{approved} approved · {draft} draft · {unanswered} unanswered</p>}
         <p className="text-ink-2">

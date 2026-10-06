@@ -62,6 +62,7 @@ export function DrawerFrame({ title, titleId, root, onClose, children }: FramePr
   return (
     <aside
       ref={root}
+      data-tour="drawer"
       tabIndex={-1}
       aria-labelledby={titleId}
       role={narrow ? "dialog" : undefined}

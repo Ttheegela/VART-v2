@@ -25,8 +25,9 @@ export function href(r: Route): string {
   return `?${q.toString()}`;
 }
 
-export function go(r: Route): void {
-  window.history.pushState(null, "", href(r));
+/** `replace`: no new history entry (the guided tour's moves, so browser Back does not walk the tour). */
+export function go(r: Route, { replace = false }: { replace?: boolean } = {}): void {
+  window.history[replace ? "replaceState" : "pushState"](null, "", href(r));
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 

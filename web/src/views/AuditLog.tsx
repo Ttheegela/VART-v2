@@ -30,7 +30,7 @@ export default function AuditLog({ workspace, onGone }: ViewProps) {
         </div>
         <ErrorLine message={error} />
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[40rem] table-fixed text-sm">
+          <table data-tour="audit" className="w-full min-w-[40rem] table-fixed text-sm">
             <thead className="text-xs text-ink-2"><tr className="h-6"><th className="w-48 text-left">time</th><th className="w-20 text-left">actor</th><th className="w-56 text-left">action</th><th className="text-left">ref</th></tr></thead>
             <tbody>
               {shown.map((e, i) => (

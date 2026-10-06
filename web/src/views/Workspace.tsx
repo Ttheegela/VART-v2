@@ -282,7 +282,7 @@ export default function WorkspaceView({ workspace, onGone }: ViewProps) {
     <Shell mode="WORKSPACE" cursor={note} hints={[["r", "start run"], ["?", "all keys"]]} expiresAt={workspace.expires_at} runId={current?.latest_run_id ?? undefined}>
       <div className="space-y-6 p-4">
         <h1 className="sr-only">workspace</h1>
-        <section aria-labelledby="docs-h" className="space-y-2">
+        <section aria-labelledby="docs-h" data-tour="documents" className="space-y-2">
           <h2 id="docs-h" className="border-b border-ink pb-1 text-xs font-medium text-ink-2">documents ({docs.length})</h2>
           <div className="flex flex-wrap items-end gap-3">
             <label className="flex min-w-0 flex-col text-xs">upload documents
@@ -312,7 +312,7 @@ export default function WorkspaceView({ workspace, onGone }: ViewProps) {
             <p className="text-xs text-ink-3">Sample policies adapted from JupiterOne templates, CC BY-SA 4.0 (<a className="underline" href={NOTICE_URL}>NOTICE</a>).</p>
           )}
         </section>
-        <section aria-labelledby="q-h" className="space-y-2">
+        <section aria-labelledby="q-h" data-tour="questionnaire" className="space-y-2">
           <h2 id="q-h" className="border-b border-ink pb-1 text-xs font-medium text-ink-2">questionnaire</h2>
           <div className="flex flex-wrap items-end gap-3">
             <label className="flex min-w-0 flex-col text-xs">upload a questionnaire
