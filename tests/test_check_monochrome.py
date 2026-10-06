@@ -451,3 +451,36 @@ def test_main_fails_when_there_is_nothing_to_check(
     monkeypatch.setattr(check_monochrome, "ROOT", tmp_path)  # no web/ in here
     assert check_monochrome.main() == 1
     assert "no files" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "a {\n  color:\n    red;\n}\n",  # a value on the next line
+        "a { box-shadow: 0 0 1px black, 0 0 2px red; }\n",  # a colour after a top-level comma (CSS)
+        "<rect fill=red />\n",  # an unquoted HTML attribute
+        "a { -webkit-text-stroke: 1px red; }\n",
+        "a { text-emphasis: filled red; }\n",
+        "a { color: LinkText; }\n",  # a system colour that is blue in every browser
+        "a { background: Highlight; }\n",
+        "a { accent-color: AccentColor; }\n",
+    ],
+)
+def test_the_carried_over_misses_are_caught(tmp_path: Path, source: str) -> None:
+    f = tmp_path / ("x.html" if source.startswith("<") else "x.css")
+    f.write_text(source, encoding="utf-8")
+    assert violations(f), source
+
+
+def test_a_comma_in_a_js_style_object_still_ends_the_value(tmp_path: Path) -> None:
+    f = tmp_path / "x.tsx"
+    f.write_text('const s = { color: "black", outline: "none" };\n', encoding="utf-8")
+    assert violations(f) == []
+
+
+def test_the_design_tokens_pass(tmp_path: Path) -> None:
+    f = tmp_path / "x.css"
+    f.write_text(
+        "@theme { --color-mark: var(--color-neutral-200); }\nmark { background: var(--color-mark); }\n"
+    )
+    assert violations(f) == []
