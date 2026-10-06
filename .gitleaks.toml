@@ -59,3 +59,11 @@ condition = "AND"
 targetRules = ["generic-api-key"]
 paths = ['''^(?:evals/fixtures/gap-dev-answers\.json|docs/superpowers/plans/2026-10-05-vart-csf-plan6a-backend\.md)$''']
 regexes = ['''^sk9Kestrel2026xQ$''']
+
+# Why: gitleaks' default rules have no OpenRouter rule, and a bare key (no "key =" before it) slips past
+# generic-api-key (Plan 1 final review). Plan 4 Task 8.
+[[rules]]
+id = "openrouter-api-key"
+description = "OpenRouter API key"
+regex = '''\bsk-or-v1-[0-9a-f]{64}\b'''
+keywords = ["sk-or-v1-"]
