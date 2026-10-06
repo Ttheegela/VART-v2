@@ -57,6 +57,8 @@ function QuestionCard({ q, focus, onUpdated, onStale }: { q: QuestionOut; focus:
         {q.status === "skipped" && <span className="text-xs text-ink-3">skipped</span>}
       </div>
       <p className="text-base [overflow-wrap:anywhere]">{q.follow_up ?? q.text}</p>
+      {/* a skip is final (spec 6.9: never asked twice); say how an item that is still open gets closed */}
+      {q.status === "skipped" && <p className="text-xs text-ink-3">Not asked again. If this item is still open, mark it not applicable from the run grid.</p>}
       {open && (
         <div className="space-y-1">
           <textarea
@@ -118,13 +120,17 @@ function QuestionsFor({ workspace, onGone, runId }: ViewProps & { runId: string 
     return () => { alive = false; };
   }, [runId, onGone, tick]);
   const isOpen = (q: QuestionOut) => q.status === "open" || q.status === "follow_up";
-  const focusId = (route.item ? list?.find((q) => q.item_ids.includes(route.item as string)) : undefined)?.id ?? list?.find(isOpen)?.id;
+  // ?item= focuses that item's card, never another one: typing into a different item's card would answer it
+  const forItem = route.item ? list?.find((q) => q.item_ids.includes(route.item as string)) : undefined;
+  const noCard = Boolean(route.item && list && !forItem);
+  const focusId = route.item ? forItem?.id : list?.find(isOpen)?.id;
   const open = list?.filter(isOpen).length ?? 0;
   return (
     <Shell mode="ASK" cursor={`${open} open`} hints={[["ctrl+enter", "send"], ["?", "all keys"]]} expiresAt={workspace.expires_at} runId={runId}>
       <div className="mx-auto max-w-3xl p-4">
         <h1 className="border-b border-ink text-xs font-medium text-ink-2">questions for you ({open})</h1>
         <ErrorLine message={error} />
+        {noCard && <p role="status" className="py-3 text-sm text-ink-2">No question for this item; mark it not applicable or re-run.</p>}
         {list && list.length === 0 && <p className="py-3 text-sm text-ink-2">Nothing to ask: every item has an answer from the documents, or the run is still filling.</p>}
         <ul>
           {list?.map((q) => (

@@ -4,12 +4,12 @@ import re
 import uuid
 from urllib.parse import quote
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from sqlalchemy import select
 
 from app.api.deps import SessionDep, WorkspaceDep
-from app.api.errors import Conflict, NotFound
+from app.api.errors import Conflict, NotFound, limit
 from app.api.schemas import ERRORS, Mapping
 from app.db.models import Questionnaire, Run
 from app.export import NOTICE, export_csv, export_xlsx, rows_for
@@ -37,11 +37,12 @@ XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     response_class=Response,
     responses={200: {"content": {XLSX: {}, "text/csv": {}}, "description": "The filled file"}},
 )
-def export_run(run_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -> Response:
+def export_run(run_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep, request: Request) -> Response:
     """The original file with the answer column filled and Status, Sources and Notes columns added; csv in,
     csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
     with =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The
-    response is an attachment with an ASCII-safe file name."""
+    response is an attachment with an ASCII-safe file name. 429 per network (`export`, 60 an hour)."""
+    limit(request, session, "export")
     run = session.scalar(select(Run).where(Run.id == run_id, Run.workspace_id == ws.id))
     if run is None:
         raise NotFound()

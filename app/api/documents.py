@@ -186,6 +186,10 @@ def delete_document(document_id: uuid.UUID, ws: WorkspaceDep, session: SessionDe
     """409 while a run is going (a step may be citing the document) and when a run used the document (reset
     the workspace to start over)."""
     doc = _own(session, ws, document_id)
+    # a run's insert takes a key-share lock on the workspace row (its foreign key), so this row lock waits for
+    # a run being created and keeps a new one from starting between the check and the delete (final review M8)
+    if session.scalar(select(Workspace.id).where(Workspace.id == ws.id).with_for_update()) is None:
+        raise HTTPException(404, GONE)
     if session.scalar(select(exists().where(Run.workspace_id == ws.id, Run.status == "running"))):
         raise Conflict("A run is in progress; wait for it to finish.")
     chunk_ids = [str(c) for c in session.scalars(select(Chunk.id).where(Chunk.document_id == doc.id))]

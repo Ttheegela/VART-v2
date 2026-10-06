@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
@@ -93,6 +94,10 @@ def health() -> JSONResponse:
         body["canary"] = {"ok": bool(ok), "at": at.isoformat(), "credits_usd": credits}
         if not ok or at < datetime.now(UTC) - CANARY_STALE:
             body["status"] = "degraded"
+    if os.environ.get("VERCEL") == "1" and get_settings().llm_mode != "live":
+        body["status"] = (
+            "degraded"  # get_llm refuses every step there: say so at deploy, not on the first run
+        )
     return JSONResponse(body)
 
 

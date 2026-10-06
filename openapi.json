@@ -3424,7 +3424,7 @@
     },
     "/api/questionnaires/{questionnaire_id}/mapping": {
       "put": {
-        "description": "Replace the items with the ones this mapping reads. 422 when it finds none or more than 150; 409 once a\nrun exists for the questionnaire, or for a built-in `csf` one (it has no file to map).",
+        "description": "Replace the items with the ones this mapping reads. 422 when it finds none or more than 150; 409 once a\nrun exists for the questionnaire, or for a built-in `csf` one (it has no file to map); 429 per network\n(`upload`: each mapping re-parses the stored file).",
         "operationId": "confirm_mapping_api_questionnaires__questionnaire_id__mapping_put",
         "parameters": [
           {
@@ -4121,7 +4121,7 @@
     },
     "/api/runs/{run_id}/export": {
       "get": {
-        "description": "The original file with the answer column filled and Status, Sources and Notes columns added; csv in,\ncsv out. Unapproved answers read \"Draft, not approved\". Every cell written is inert text: a value starting\nwith =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The\nresponse is an attachment with an ASCII-safe file name.",
+        "description": "The original file with the answer column filled and Status, Sources and Notes columns added; csv in,\ncsv out. Unapproved answers read \"Draft, not approved\". Every cell written is inert text: a value starting\nwith =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The\nresponse is an attachment with an ASCII-safe file name. 429 per network (`export`, 60 an hour).",
         "operationId": "export_run_api_runs__run_id__export_get",
         "parameters": [
           {

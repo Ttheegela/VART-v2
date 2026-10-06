@@ -103,6 +103,7 @@ describe("Questions", () => {
     render(<Questions {...props} />);
     await userEvent.click(await screen.findByRole("button", { name: "Skip" }));
     expect(await screen.findByText("skipped")).toBeInTheDocument();
+    expect(screen.getByText(/mark it not applicable from the run grid/)).toBeInTheDocument();
   });
 
   it("focuses the question for ?item=", async () => {
@@ -111,6 +112,14 @@ describe("Questions", () => {
     mockApi({ "GET /api/runs/r1/questions": two });
     render(<Questions {...props} />);
     expect(await screen.findByLabelText("your answer to VSQ-04")).toHaveFocus();
+  });
+
+  it("says so when ?item= has no question, and focuses no other card", async () => {
+    window.history.replaceState(null, "", "/?view=questions&run=r1&item=i404");
+    mockApi({ "GET /api/runs/r1/questions": fixtures.questions });
+    render(<Questions {...props} />);
+    expect(await screen.findByRole("status")).toHaveTextContent("No question for this item; mark it not applicable or re-run.");
+    expect(screen.getByLabelText("your answer to VSQ-03")).not.toHaveFocus();
   });
 
   it("drops a stale load when the run changes", async () => {

@@ -259,3 +259,15 @@ def test_the_documents_sample_load_makes_no_model_call(db: Engine, monkeypatch: 
     client, _ = visitor(db)
     assert client.post("/api/documents/sample").status_code == 201
     assert seen and all(llm is None for llm in seen)
+
+
+def test_mapping_and_export_are_limited_per_network(db: Engine, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Final review M3: both re-read a stored file on every call.
+    client, _ = visitor(db)
+    q = _post(client, "v04.xlsx").json()
+    monkeypatch.setitem(ip_limits.LIMITS, "upload", (0, ip_limits.LIMITS["upload"][1]))
+    r = client.put(f"/api/questionnaires/{q['id']}/mapping", json=q["detected"])
+    assert r.status_code == 429 and int(r.headers["retry-after"]) >= 1
+    monkeypatch.setitem(ip_limits.LIMITS, "export", (1, ip_limits.LIMITS["export"][1]))
+    assert client.get(f"/api/runs/{q['id']}/export").status_code == 404  # counted; not a run id
+    assert client.get(f"/api/runs/{q['id']}/export").status_code == 429

@@ -1,5 +1,6 @@
 import io
 import threading
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,7 +8,7 @@ from sqlalchemy import Engine, func, select, text
 from sqlalchemy.orm import Session
 
 from app.api import documents as api
-from app.db.models import AuditEvent, Document, SuggestedFill, Workspace
+from app.db.models import AuditEvent, Document, Run, SuggestedFill, Workspace
 from app.main import app
 from app.services import ip_limits
 from datakit.schemas import Facts, load_yaml
@@ -222,3 +223,25 @@ def test_every_action_is_audited_without_document_text(db: Engine) -> None:
         events = s.query(AuditEvent).filter_by(workspace_id=ws_id).all()
     assert [e.action for e in events] == ["document.upload"]
     assert "quarterly" not in str(events[0].detail)
+
+
+def test_a_delete_waits_for_a_run_being_created_and_then_refuses(db: Engine) -> None:
+    # Final review M8: the run check is not a stale read; the workspace row lock waits out the run's insert.
+    client, ws_id = visitor(db)
+    doc_id = _upload(client).json()["id"]
+    result: list[int] = []
+    with Session(db) as creator:
+        ws = creator.get_one(Workspace, ws_id)
+        creator.add(Run(workspace_id=ws_id, questionnaire_id=f.questionnaire(creator, ws).id, models={}))
+        creator.flush()  # the run exists but is not committed: it holds a key-share lock on the workspace row
+
+        def delete() -> None:
+            result.append(client.delete(f"/api/documents/{doc_id}").status_code)
+
+        th = threading.Thread(target=delete)
+        th.start()
+        time.sleep(0.5)
+        assert th.is_alive()
+        creator.commit()
+    th.join(10)
+    assert result == [409]

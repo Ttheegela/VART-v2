@@ -147,3 +147,8 @@ change-log line; changing or removing a path, a field or a status needs the lead
   52 columns are refused with the existing 422 sentence; `lines?from=&to=` is at most 20,000 (422); questionnaire
   file names are normalised; hidden sheets are skipped on import; the export's added columns sit past every
   mapped column.
+- 2026-10-06: Plan 3 final review fix (no path or field changed; the 429 shape every limit already uses):
+  `PUT /api/questionnaires/{id}/mapping` counts under the per-network `upload` limit, and `GET /api/runs/{id}/export`
+  under a new `export` kind (60 an hour). An upload refuses only a too-long question; other mapping refusals wait for
+  the PUT. `GET /api/runs/{id}/questions` also plans questions for items that became open after the first visit
+  (a metadata override's re-decide), ranked after the existing ones.

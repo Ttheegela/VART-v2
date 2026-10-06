@@ -20,6 +20,29 @@ describe("RunGrid", () => {
     expect(screen.getByText("# access control")).toBeInTheDocument();
   });
 
+  it("approve all says how many edited answers it left for a look", async () => {
+    mockApi({
+      "GET /api/runs/r1/answers": { run: fixtures.run, rows: fixtures.rows },
+      "POST /api/runs/r1/approve-verified": { approved: 1, skipped_edited: 2 },
+    });
+    render(<RunGrid {...props} />);
+    await userEvent.click(await screen.findByRole("button", { name: /Approve all verified/ }));
+    expect(await screen.findByText("2 edited answers left for you to approve one by one.")).toBeInTheDocument();
+  });
+
+  it("export is a download link click, never a page navigation", async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    mockApi({ "GET /api/runs/r1/answers": { run: fixtures.run, rows: fixtures.rows } });
+    render(<RunGrid {...props} />);
+    await screen.findByRole("row", { name: /VSQ-02/ });
+    await userEvent.keyboard("e");
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(click.mock.contexts[0]).toHaveAttribute("download");
+    expect(click.mock.contexts[0]).toHaveAttribute("href", "/api/runs/r1/export");
+    expect(screen.getByRole("button", { name: "Export" })).toBeInTheDocument();
+    click.mockRestore();
+  });
+
   it("shows a dash for the confidence of answers no model scored", async () => {
     const rows = [
       { ...fixtures.rows[0], answer: { ...fixtures.rows[0].answer!, label: "user_confirmed" as const } },

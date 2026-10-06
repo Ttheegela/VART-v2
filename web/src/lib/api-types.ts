@@ -127,7 +127,8 @@ export interface paths {
     /**
      * Confirm Mapping
      * @description Replace the items with the ones this mapping reads. 422 when it finds none or more than 150; 409 once a
-     * run exists for the questionnaire, or for a built-in `csf` one (it has no file to map).
+     * run exists for the questionnaire, or for a built-in `csf` one (it has no file to map); 429 per network
+     * (`upload`: each mapping re-parses the stored file).
      */
     put: operations["confirm_mapping_api_questionnaires__questionnaire_id__mapping_put"];
   };
@@ -179,7 +180,7 @@ export interface paths {
      * @description The original file with the answer column filled and Status, Sources and Notes columns added; csv in,
      * csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
      * with =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The
-     * response is an attachment with an ASCII-safe file name.
+     * response is an attachment with an ASCII-safe file name. 429 per network (`export`, 60 an hour).
      */
     get: operations["export_run_api_runs__run_id__export_get"];
   };
@@ -1804,7 +1805,8 @@ export interface operations {
   /**
    * Confirm Mapping
    * @description Replace the items with the ones this mapping reads. 422 when it finds none or more than 150; 409 once a
-   * run exists for the questionnaire, or for a built-in `csf` one (it has no file to map).
+   * run exists for the questionnaire, or for a built-in `csf` one (it has no file to map); 429 per network
+   * (`upload`: each mapping re-parses the stored file).
    */
   confirm_mapping_api_questionnaires__questionnaire_id__mapping_put: {
     parameters: {
@@ -2202,7 +2204,7 @@ export interface operations {
    * @description The original file with the answer column filled and Status, Sources and Notes columns added; csv in,
    * csv out. Unapproved answers read "Draft, not approved". Every cell written is inert text: a value starting
    * with =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The
-   * response is an attachment with an ASCII-safe file name.
+   * response is an attachment with an ASCII-safe file name. 429 per network (`export`, 60 an hour).
    */
   export_run_api_runs__run_id__export_get: {
     parameters: {

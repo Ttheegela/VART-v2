@@ -80,7 +80,12 @@ def ensure_questions(session: Session, workspace_id: uuid.UUID, run_id: uuid.UUI
     if run is None:
         raise NotFound()
     existing = list(session.scalars(select(InterviewQuestion).where(InterviewQuestion.run_id == run_id)))
-    if run.status == "done" and not existing:
+    # Every open item without a question gets one, also after the first visit: a metadata override can turn a
+    # verified answer into a conflict later (redecide), and its item must not be a dead end (final review I1).
+    # An item already asked is never planned again (spec 6.9).
+    asked = {i for q in existing for i in q.item_ids}
+    pairs = [(i, a) for i, a in _open_pairs(session, run_id) if i.id not in asked]
+    if run.status == "done" and pairs:
         opens = [
             # a conflict's drafted text is the question to ask; the rest are asked as written (P18)
             OpenItem(
@@ -89,21 +94,21 @@ def ensure_questions(session: Session, workspace_id: uuid.UUID, run_id: uuid.UUI
                 0,
                 a.text if a.label == "conflict" else "",
             )
-            for i, a in _open_pairs(session, run_id)
+            for i, a in pairs
         ]
+        after = max((q.rank for q in existing), default=-1) + 1  # new questions queue after the existing ones
         rows = [
             {
                 "workspace_id": workspace_id,
                 "run_id": run_id,
                 "item_ids": sorted([uuid.UUID(e.key)]),  # the unique key is order-sensitive (Task 1 review)
                 "reason": e.reason,
-                "rank": n,
+                "rank": after + n,
                 "text": e.question,
             }
             for n, e in enumerate(plan_queue(opens))
         ]
-        if rows:
-            session.execute(insert(InterviewQuestion).values(rows).on_conflict_do_nothing())
+        session.execute(insert(InterviewQuestion).values(rows).on_conflict_do_nothing())
         session.commit()
         existing = list(session.scalars(select(InterviewQuestion).where(InterviewQuestion.run_id == run_id)))
     live = [q for q in existing if q.status in ASKABLE]

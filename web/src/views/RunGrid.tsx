@@ -133,6 +133,8 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
   const [cursor, setCursor] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [leftEdited, setLeftEdited] = useState(0); // edited verified answers approve-verified left for a look
+  const download = useRef<HTMLAnchorElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const body = useRef<HTMLTableSectionElement>(null);
 
@@ -192,10 +194,14 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
     if (verifiedOpen === 0 || busy) return;
     setBusy("approve");
     setActionError(null);
-    try { await api.approveVerified(runId); setData(await api.runAnswers(runId)); } catch (e) { setActionError(goneOn404(e, onGone)); }
+    try {
+      setLeftEdited((await api.approveVerified(runId)).skipped_edited ?? 0);
+      setData(await api.runAnswers(runId));
+    } catch (e) { setActionError(goneOn404(e, onGone)); }
     setBusy(null);
   };
-  const exportFile = () => { if (data) window.location.assign(api.exportUrl(runId)); };
+  // a download link, as on the Export view: a refusal saves as a file instead of replacing the app with JSON
+  const exportFile = () => { if (data) download.current?.click(); };
 
   useKeys({
     ...Object.fromEntries(LABELS.map((l) => [FILTER_KEY[l], () => toggle(l)])),
@@ -233,7 +239,8 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
             </div>
             <div className="flex flex-wrap gap-2">
               <Button k="r" label="Re-run live" onClick={() => void rerun()} busy={busy === "rerun"} busyLabel="Starting…" disabled={!data || running} />
-              <Button k="e" label="Export xlsx" onClick={exportFile} disabled={!data} />
+              <Button k="e" label="Export" onClick={exportFile} disabled={!data} />
+              <a ref={download} href={api.exportUrl(runId)} download hidden tabIndex={-1} aria-hidden="true" />
               <Button k="A" shortcut="Shift+A" label={`Approve all verified (${verifiedOpen})`} primary onClick={() => void approveAll()} busy={busy === "approve"} busyLabel="Approving…" disabled={verifiedOpen === 0} />
             </div>
           </div>
@@ -256,6 +263,7 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
             </label>
           </div>
           <div className="px-4"><ErrorLine message={loadError ?? loopError ?? actionError} /></div>
+          {leftEdited > 0 && <p role="status" className="px-4 text-xs text-ink-2">{leftEdited} edited {leftEdited === 1 ? "answer" : "answers"} left for you to approve one by one.</p>}
           <div className="min-h-0 flex-1 overflow-auto">
             <table aria-label="answers" aria-rowcount={visible.length + 1} className="w-full min-w-[56rem] table-fixed border-collapse text-sm">
               {/* widths on <col> so ch is measured in the rows' font, not the smaller header's */}

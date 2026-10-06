@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import SessionDep, WorkspaceDep
 from app.api.documents import require_upload_allowance
-from app.api.errors import GONE, Conflict, NotFound
+from app.api.errors import GONE, Conflict, NotFound, limit
 from app.api.schemas import (
     ERRORS,
     MAX_QUESTIONNAIRE_BYTES,
@@ -232,10 +232,12 @@ def load_sample_questionnaire(
 
 @router.put("/api/questionnaires/{questionnaire_id}/mapping", responses=SENTENCE_422)
 def confirm_mapping(
-    questionnaire_id: uuid.UUID, mapping: Mapping, ws: WorkspaceDep, session: SessionDep
+    questionnaire_id: uuid.UUID, mapping: Mapping, ws: WorkspaceDep, session: SessionDep, request: Request
 ) -> QuestionnaireDetail:
     """Replace the items with the ones this mapping reads. 422 when it finds none or more than 150; 409 once a
-    run exists for the questionnaire, or for a built-in `csf` one (it has no file to map)."""
+    run exists for the questionnaire, or for a built-in `csf` one (it has no file to map); 429 per network
+    (`upload`: each mapping re-parses the stored file)."""
+    limit(request, session, "upload")  # commits: before the lock
     q = _own(session, ws, questionnaire_id, lock=True)
     if q.source == "csf":
         raise Conflict("A built-in questionnaire has no file to map.")

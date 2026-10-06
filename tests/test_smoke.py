@@ -20,6 +20,7 @@ CHECKS = [
     ("/api/health", "health"),
     ("/api/workspace", "workspace cookie"),
     ("/api/version", "version"),
+    ("/api/workspace/reset", "same-site write"),
 ]
 
 
@@ -47,6 +48,9 @@ def _transport(
             )
         if request.url.path == "/api/version":
             return httpx.Response(200, json=VERSION)
+        if request.url.path == "/api/workspace/reset":  # the guard: Origin must name the host it reached
+            same = request.headers.get("origin") == f"https://{request.url.host}"
+            return httpx.Response(204) if same else httpx.Response(403, json={"detail": "cross-site"})
         return httpx.Response(404)
 
     return httpx.MockTransport(handler)
@@ -98,6 +102,7 @@ def test_a_missing_workspace_cookie_fails() -> None:
         ("/api/health", "health", httpx.Response(503, json=HEALTHY)),
         ("/api/workspace", "workspace cookie", httpx.Response(429, json={}, headers=COOKIE)),
         ("/api/version", "version", httpx.Response(500, json=VERSION)),
+        ("/api/workspace/reset", "same-site write", httpx.Response(403, json={"detail": "cross-site"})),
     ],
     ids=[name for _, name in CHECKS],
 )

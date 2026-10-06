@@ -472,3 +472,50 @@ def test_interview_answers_are_limited_per_network(db: Engine, monkeypatch: pyte
     assert client.post(url, json={"text": "a"}).status_code == 404
     r = client.post(url, json={"text": "a"})
     assert r.status_code == 429 and "Retry-After" in r.headers
+
+
+def test_an_item_redecide_opens_after_the_queue_exists_gets_a_question(db: Engine) -> None:
+    # Final review I1: a metadata override turns a verified answer into a conflict after Questions was opened;
+    # the next GET plans a question for it (after the existing ones), and the visitor can answer it.
+    client, ws_id = visitor(db)
+    yes_q, no_q = "Backups are encrypted.", "Backups are not encrypted."
+    with Session(db) as s:
+        ws = s.get_one(Workspace, ws_id)
+        r = _fill(s, ws, ["Data", "Data"], ["unknown", "unknown"])
+        a_doc, b_doc = f.document(s, ws), f.document(s, ws, filename="old.docx", evidence_allowed=False)
+        a_chunk, b_chunk = f.chunk(s, a_doc, text=yes_q), f.chunk(s, b_doc, text=no_q)
+        target = s.scalars(select(Answer).where(Answer.run_id == r.id).order_by(Answer.id)).all()[1]
+        target.label, target.value, target.text, target.confidence = "verified", "Yes", "Yes.", 0.9
+        target.citations = [
+            {
+                "chunk_id": str(a_chunk.id),
+                "document_id": str(a_doc.id),
+                "filename": a_doc.filename,
+                "line_start": 1,
+                "line_end": 1,
+                "quote": yes_q,
+                "stance": "yes",
+                "note": "",
+            }
+        ]
+        target.stances = [
+            {"passage": 1, "stance": "yes", "quote": yes_q, "note": ""},
+            {"passage": 2, "stance": "no", "quote": no_q, "note": ""},
+        ]
+        target.chunk_ids = [str(a_chunk.id), str(b_chunk.id)]
+        s.commit()
+        run_id, item_id, b_id = r.id, target.item_id, b_doc.id
+    app.dependency_overrides[get_llm] = lambda: _recheck_llm()
+    try:
+        before = client.get(f"/api/runs/{run_id}/questions").json()
+        assert len(before) == 1 and str(item_id) not in before[0]["item_ids"]
+        patched = client.patch(f"/api/documents/{b_id}", json={"evidence_allowed": True}).json()
+        assert patched["redecided"] == 1
+        after = client.get(f"/api/runs/{run_id}/questions").json()
+        assert [q["id"] for q in after[:1]] == [before[0]["id"]]  # queued after the existing one
+        (new,) = [q for q in after if q["item_ids"] == [str(item_id)]]
+        assert (new["status"], new["reason"]) == ("open", "conflict")
+        done = client.post(f"/api/questions/{new['id']}/answer", json={"text": TEXT}).json()
+        assert done["answer"]["label"] == "user_confirmed"
+    finally:
+        app.dependency_overrides.clear()

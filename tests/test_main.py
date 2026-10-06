@@ -30,6 +30,15 @@ def test_healthy_with_no_canary_yet(client: TestClient) -> None:
     assert r.json() == {"status": "ok", "db": "ok", "canary": None}
 
 
+def test_a_non_live_llm_mode_on_vercel_degrades_health(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Final review M5: get_llm refuses replay and record on Vercel; health says so before the first step does.
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setattr(main, "get_settings", lambda: type("S", (), {"llm_mode": "replay"})())
+    assert client.get("/api/health").json()["status"] == "degraded"
+
+
 def test_healthy_with_a_fresh_passing_canary(client: TestClient, db: Engine) -> None:
     _canary(db, ok=True, age=timedelta(hours=2))
     body = client.get("/api/health").json()
