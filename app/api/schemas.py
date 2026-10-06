@@ -297,7 +297,9 @@ class PartOut(BaseModel):
     label: PartLabel
     citations: list[CitationOut]
     dropped: list[DroppedOut]
-    from_statement: bool  # an accepted fill from the visitor's answer replaced this part (CSF spec 5.6)
+    # An accepted fill from the visitor's answer replaced this part (CSF spec 5.6); the explanation names it
+    # under "Confirmed by you" and the gap sheet marks its quote "(your answer)" (adversary-1 I3).
+    from_statement: bool
 
 
 class AnswerDetail(AnswerSummary):
@@ -379,7 +381,10 @@ GapScope = CsfScope  # "core" or one CSF function, lowercase
 
 
 class GapRow(BaseModel):
-    """One CSF 2.0 outcome in the Gap check view (CSF spec 7)."""
+    """One CSF 2.0 outcome in the Gap check view (CSF spec 7). An outcome the visitor marked not applicable
+    has `not_applicable` set, `label` None and the visitor's reason as `explanation`, on either tier
+    (adversary-1 I1). An outcome whose model call failed twice has `label` None and the failure sentence as
+    `explanation`, never a gap label (adversary-1 M4)."""
 
     csf_id: str
     function: str
@@ -390,9 +395,12 @@ class GapRow(BaseModel):
     tier: Tier
     item_id: uuid.UUID | None  # None for a not-checked outcome, and before the scope's first run
     answer_id: uuid.UUID | None  # None until the outcome is answered
-    label: GapLabel | None  # code's (app.csf.gap_label); None: not checked, not answered yet, not applicable
+    # code's (app.csf.gap_label); None: not checked, not answered yet, not applicable, or the model failed.
+    # Confirmed by you also when every part that is not a gap was filled from the visitor's answer (adv-1 I3).
+    label: GapLabel | None
     explanation: str | None  # code's one paragraph; for Confirmed by you, the visitor's stored answer
     sources: int  # cited documents
+    not_applicable: bool = False  # the visitor marked this outcome not applicable (adversary-1 I1)
 
 
 class GapOut(BaseModel):

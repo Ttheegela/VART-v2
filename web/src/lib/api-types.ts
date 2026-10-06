@@ -85,7 +85,8 @@ export interface paths {
      * Gap View
      * @description Every outcome of the scope's functions in NIST's order (the core: all 106), each with its tier and,
      * once the latest run of the scope's current questionnaire has answered it, its gap label and explanation.
-     * Labels are decided by code; a not-checked outcome never carries one. Writes nothing; no model call.
+     * Labels are decided by code; a not-checked outcome never carries one, nor does one the visitor marked not
+     * applicable (`not_applicable`) or one whose model call failed twice. Writes nothing; no model call.
      */
     get: operations["gap_view_api_gap__scope__get"];
   };
@@ -97,7 +98,7 @@ export interface paths {
      * deleted with the visitor's questionnaires. Answers a new run when none exists on it, the running one, or
      * the done one with every outcome whose evidence changed since (a new upload) re-opened, all of its parts;
      * with nothing changed it stays done and no model is called. 429 per network (`run`, 20 an hour); 503 when
-     * the demo is full.
+     * the demo is full. Two presses at once answer the same run (the questionnaire is locked first).
      */
     post: operations["start_gap_api_gap__scope__run_post"];
   };
@@ -623,7 +624,10 @@ export interface components {
     };
     /**
      * GapRow
-     * @description One CSF 2.0 outcome in the Gap check view (CSF spec 7).
+     * @description One CSF 2.0 outcome in the Gap check view (CSF spec 7). An outcome the visitor marked not applicable
+     * has `not_applicable` set, `label` None and the visitor's reason as `explanation`, on either tier
+     * (adversary-1 I1). An outcome whose model call failed twice has `label` None and the failure sentence as
+     * `explanation`, never a gap label (adversary-1 M4).
      */
     GapRow: {
       /** Answer Id */
@@ -640,6 +644,11 @@ export interface components {
       item_id: string | null;
       /** Label */
       label: ("covered" | "partly_covered" | "not_met" | "documents_disagree" | "gap" | "confirmed_by_you" | "not_answered") | null;
+      /**
+       * Not Applicable
+       * @default false
+       */
+      not_applicable?: boolean;
       /** Outcome */
       outcome: string;
       /** Related Controls */
@@ -1622,7 +1631,8 @@ export interface operations {
    * Gap View
    * @description Every outcome of the scope's functions in NIST's order (the core: all 106), each with its tier and,
    * once the latest run of the scope's current questionnaire has answered it, its gap label and explanation.
-   * Labels are decided by code; a not-checked outcome never carries one. Writes nothing; no model call.
+   * Labels are decided by code; a not-checked outcome never carries one, nor does one the visitor marked not
+   * applicable (`not_applicable`) or one whose model call failed twice. Writes nothing; no model call.
    */
   gap_view_api_gap__scope__get: {
     parameters: {
@@ -1682,7 +1692,7 @@ export interface operations {
    * deleted with the visitor's questionnaires. Answers a new run when none exists on it, the running one, or
    * the done one with every outcome whose evidence changed since (a new upload) re-opened, all of its parts;
    * with nothing changed it stays done and no model is called. 429 per network (`run`, 20 an hour); 503 when
-   * the demo is full.
+   * the demo is full. Two presses at once answer the same run (the questionnaire is locked first).
    */
   start_gap_api_gap__scope__run_post: {
     parameters: {

@@ -193,7 +193,7 @@ CALLS: dict[tuple[str, str], dict[str, object]] = {
     ("/api/gap/{scope}", "get"): {},
     ("/api/gap/{scope}/run", "post"): {},
 }
-# Ruling 7: no operation is a stub after the Plan 3 merge; each is named by the test that exercises it.
+# Ruling 7: every built operation is named by the test that exercises it; a stub is in STUBS until built.
 # ponytail: the check proves each named test exists, not that it still calls its route (checked by hand at
 # integration); record request.scope["route"] across the suite if a rename ever slips through.
 D, Q, R, E, IV = (
@@ -273,8 +273,8 @@ def test_every_contract_operation_is_a_stub_or_tested() -> None:
 
 
 @pytest.mark.parametrize(("path", "method"), sorted(CALLS))
-def test_every_operation_is_reachable_and_built(db: Engine, path: str, method: str) -> None:
-    # Review I-3: every operation is reachable and none is shadowed; after the merge none is a 501 stub.
+def test_every_operation_is_reachable_and_only_stubs_answer_501(db: Engine, path: str, method: str) -> None:
+    # Review I-3: every operation is reachable and none is shadowed; 501 only for an operation in STUBS.
     client, _ = visitor(db)
     r = client.request(method.upper(), _url(path), **CALLS[(path, method)])  # type: ignore[arg-type]
     assert r.status_code != 405, (path, method, r.status_code)

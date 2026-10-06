@@ -12,7 +12,8 @@ router = APIRouter(tags=["gap"], responses=ERRORS)
 def gap_view(scope: GapScope, ws: WorkspaceDep, session: SessionDep) -> GapOut:
     """Every outcome of the scope's functions in NIST's order (the core: all 106), each with its tier and,
     once the latest run of the scope's current questionnaire has answered it, its gap label and explanation.
-    Labels are decided by code; a not-checked outcome never carries one. Writes nothing; no model call."""
+    Labels are decided by code; a not-checked outcome never carries one, nor does one the visitor marked not
+    applicable (`not_applicable`) or one whose model call failed twice. Writes nothing; no model call."""
     raise HTTPException(501, "Not built yet.")
 
 
@@ -23,5 +24,5 @@ def start_gap(scope: GapScope, ws: WorkspaceDep, session: SessionDep, request: R
     deleted with the visitor's questionnaires. Answers a new run when none exists on it, the running one, or
     the done one with every outcome whose evidence changed since (a new upload) re-opened, all of its parts;
     with nothing changed it stays done and no model is called. 429 per network (`run`, 20 an hour); 503 when
-    the demo is full."""
+    the demo is full. Two presses at once answer the same run (the questionnaire is locked first)."""
     raise HTTPException(501, "Not built yet.")

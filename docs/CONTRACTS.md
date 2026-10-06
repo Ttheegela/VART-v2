@@ -13,7 +13,7 @@ the change log at the end, and a re-recording of the evals when a prompt or a la
 | classify | `app/classify.py` (plan2b) | `PROMPT_VERSION = "classify@p1"`; `rules(fmt, texts) -> tuple[DocMeta, bool]`; `classify(filename, parsed, llm, model, spend) -> DocMeta` | fallback only |
 | chunk | `app/chunk.py` (plan2b) | `chunk_lines(lines) -> list[ChunkSpec]`; `flags_of(text) -> tuple[Flag, ...]` | no |
 | store | `app/ingest/store.py` (plan2b) | `ingest_document(session, workspace_id, filename, data, *, source, llm, model, spend) -> Document`; `store_statement(session, workspace_id, text, *, filename, today) -> Document` | via classify |
-| retrieve | `app/retrieve.py` (2A) | `build_query(question, topic) -> str`; `retrieve(session, workspace_id, question, topic) -> Retrieval`; `document_passages(session, workspace_id, document_id) -> tuple[Passage, ...]` | no |
+| retrieve | `app/retrieve.py` (2A) | `build_query(question, topic) -> str`; `retrieve(session, workspace_id, question, topic, exclude_kinds=()) -> Retrieval` (6B: `exclude_kinds` drops those document kinds from the candidates; the default is unchanged); `document_passages(session, workspace_id, document_id) -> tuple[Passage, ...]` | no |
 | stance | `app/stance.py` (2A) | `PROMPT_VERSION = "stance@p3"`; `user_prompt(item, passages) -> str`; `stance(llm, item, passages, model, step="stance") -> tuple[Stance, ...]` | yes |
 | decide | `app/decide.py` (2A) | `decide(passages, stances, dropped=()) -> Decision` | no |
 | draft | `app/draft.py` (2A) | `PROMPT_VERSION = "draft@p2"`; `plain_name(filename: str) -> str`; `user_prompt(item: ItemInput, decision: Decision) -> str`; `check(text, decision, documents) -> list[str]`; `template_answer(decision) -> str`; `write_draft(llm, item, decision, model, spend, documents) -> Draft` | yes |
@@ -97,19 +97,34 @@ change-log line; changing or removing a path, a field or a status needs the lead
   per call by `llm_budget.spender(session, workspace_id, network=errors.network(request))` (steps and interview
   rechecks; never through `limit`), `interview` 60 answers (through `limit`, before any write); per workspace an hour per step (`llm_budget.CAPS`); globally 1,500 model calls
   an hour and 4,000 a day.
+- Plan 6A (shipped): `QuestionnaireOut.source` includes `csf` (with `format` `builtin` and `detected` null);
+  `ItemOut.csf_id`; runs are scoped by questionnaire. The seam is per-item dispatch in `app/runs.py` on
+  `Questionnaire.source` / `Item.csf_id`; 6B may change the internals of `_answer`, `_values` and `step` (they
+  are not frozen), and may add paths and optional fields (extending `CONTRACT` with a change-log line), but not
+  change or remove ones defined here.
 - Gap check (Plan 6B): `GET /api/gap/{scope}` (`core` or one CSF function, lowercase) answers `GapOut`: every
   outcome of the scope's functions in NIST's order with its tier, and the label (`app.csf.gap_label`) and
-  explanation from the latest run of the scope's current built-in questionnaire; it writes nothing.
+  explanation from the latest run of the scope's current built-in questionnaire; it writes nothing. An outcome
+  the visitor marked not applicable has `GapRow.not_applicable`, no label and its reason as the explanation, on
+  either tier, and the gap sheet writes "Not applicable". An outcome whose model call failed twice has no label
+  and the failure sentence as its explanation (never Gap); the sheet writes "Not run yet".
   `POST /api/gap/{scope}/run` creates or reuses that questionnaire (Plan 3 Ruling 5: built-in ones are never
-  counted, listed or deleted) and answers the run to step: a new one, the running one, or the done one with
-  every outcome whose evidence changed re-opened in full (`app.runs.reopen_changed`, CSF spec 5.6; none
-  changed: it stays done). It is counted under `run`, and 503 when the demo is full. A step claims csf items until their parts add up to
-  `STEP_PARTS` (8) and stores each part's result in `run_items.parts` as it lands. `AnswerDetail.parts` lists a
-  Checked outcome's parts; `SuggestionOut.part` names the part a fill is for (0: the whole item); on a gap-check
-  run an answer is re-checked against the open parts in its CSF function. On a gap-check run,
-  `GET /api/runs/{id}/export` answers the gap-report workbook (it was a 409), and Questions for you holds the
-  Ask-me outcomes only. An xlsx questionnaire export carries the latest done gap check as a `Gap report` sheet.
-  `Mapping.scope` stays unused.
+  counted, listed or deleted), locks it, and answers the run to step: a new one, the running one, or the done
+  one with every outcome whose evidence changed (compared as sets of passages) or whose answer failed re-opened
+  in full (`app.runs.reopen_changed`, CSF spec 5.6; none changed: it stays done). Two presses at once answer the
+  same run. It is counted under `run`, and 503 when the demo is full.
+  A step claims csf items until their parts add up to `STEP_PARTS` (8), stores each part's result in
+  `run_items.parts` as it lands, and checks its deadline before each part not yet stored: an outcome cut off
+  there is released with its stored parts kept and no attempt counted, and the next step resumes it.
+  A Checked part's evidence never includes statements (`retrieve(..., exclude_kinds=("statement",))`).
+  `AnswerDetail.parts` lists a Checked outcome's parts; `SuggestionOut.part` names the part a fill is for (0:
+  the whole item); on a gap-check run an answer is re-checked against the open parts in its CSF function, and
+  a re-open keeps the open per-part fills. An accepted per-part fill reads "Confirmed by you: part n" in the
+  explanation and "(your answer)" in the sheet's quotes, and the outcome is Confirmed by you once every part
+  that is not a gap was filled.
+  On a gap-check run, `GET /api/runs/{id}/export` answers the gap-report workbook (it was a 409), and Questions
+  for you holds the Ask-me outcomes only. An xlsx questionnaire export carries the latest done gap check as a
+  `Gap report` sheet. `Mapping.scope` stays unused.
 
 ## Change log
 
@@ -179,3 +194,12 @@ change-log line; changing or removing a path, a field or a status needs the lead
 - 2026-10-06: Plan 6B Task 1, preflight M5 and I3: a `runs` row records `STEP_PARTS`, `outcome_values` and
   `reopen_changed` for Tasks 3-4 (only these names of `app/runs.py` are contract); when `SuggestionOut.part` is
   above 0, its `question` is that part's wording (Task 4), not the outcome's.
+- 2026-10-06: Plan 6B Task 1 fix round 1 (an added optional field and wording; lead's OK, Ruling 4, under rule 10
+  for `retrieve`): `GapRow.not_applicable` (bool, default false; adversary-1 I1). `app.retrieve.retrieve` gains
+  an optional `exclude_kinds=()` (Task 4; the default keeps today's candidates, so no prompt, label or replay
+  changes and nothing is re-recorded). Recorded for the lane tasks (adversary-1 as ruled): a step checks its
+  deadline before each unstored part and releases a cut-off outcome with its parts kept (Task 2); a failed
+  outcome carries no gap label (Task 3) and is re-opened by Check again (Task 4); two first presses answer one run
+  (Task 3); accepted per-part fills read Confirmed by you, evidence is compared as sets and per-part fills survive
+  a re-open (Task 4). The 6A statements dropped by Task 1 (`source` `csf`, `ItemOut.csf_id`, the seam) are
+  restored; "`GET /api/questionnaires` lists built-in questionnaires" stays out (it never did).

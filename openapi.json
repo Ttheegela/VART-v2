@@ -1027,7 +1027,7 @@
         "type": "object"
       },
       "GapRow": {
-        "description": "One CSF 2.0 outcome in the Gap check view (CSF spec 7).",
+        "description": "One CSF 2.0 outcome in the Gap check view (CSF spec 7). An outcome the visitor marked not applicable\nhas `not_applicable` set, `label` None and the visitor's reason as `explanation`, on either tier\n(adversary-1 I1). An outcome whose model call failed twice has `label` None and the failure sentence as\n`explanation`, never a gap label (adversary-1 M4).",
         "properties": {
           "answer_id": {
             "anyOf": [
@@ -1095,6 +1095,11 @@
               }
             ],
             "title": "Label"
+          },
+          "not_applicable": {
+            "default": false,
+            "title": "Not Applicable",
+            "type": "boolean"
           },
           "outcome": {
             "title": "Outcome",
@@ -3183,7 +3188,7 @@
     },
     "/api/gap/{scope}": {
       "get": {
-        "description": "Every outcome of the scope's functions in NIST's order (the core: all 106), each with its tier and,\nonce the latest run of the scope's current questionnaire has answered it, its gap label and explanation.\nLabels are decided by code; a not-checked outcome never carries one. Writes nothing; no model call.",
+        "description": "Every outcome of the scope's functions in NIST's order (the core: all 106), each with its tier and,\nonce the latest run of the scope's current questionnaire has answered it, its gap label and explanation.\nLabels are decided by code; a not-checked outcome never carries one, nor does one the visitor marked not\napplicable (`not_applicable`) or one whose model call failed twice. Writes nothing; no model call.",
         "operationId": "gap_view_api_gap__scope__get",
         "parameters": [
           {
@@ -3285,7 +3290,7 @@
     },
     "/api/gap/{scope}/run": {
       "post": {
-        "description": "Start or continue the gap check for this scope, then call POST /api/runs/{id}/step while `running`.\nCreates (or reuses) the workspace's built-in questionnaire for the scope; it is never counted, listed or\ndeleted with the visitor's questionnaires. Answers a new run when none exists on it, the running one, or\nthe done one with every outcome whose evidence changed since (a new upload) re-opened, all of its parts;\nwith nothing changed it stays done and no model is called. 429 per network (`run`, 20 an hour); 503 when\nthe demo is full.",
+        "description": "Start or continue the gap check for this scope, then call POST /api/runs/{id}/step while `running`.\nCreates (or reuses) the workspace's built-in questionnaire for the scope; it is never counted, listed or\ndeleted with the visitor's questionnaires. Answers a new run when none exists on it, the running one, or\nthe done one with every outcome whose evidence changed since (a new upload) re-opened, all of its parts;\nwith nothing changed it stays done and no model is called. 429 per network (`run`, 20 an hour); 503 when\nthe demo is full. Two presses at once answer the same run (the questionnaire is locked first).",
         "operationId": "start_gap_api_gap__scope__run_post",
         "parameters": [
           {
