@@ -1,21 +1,25 @@
 """Fill runs (spec 6.3): a run lists its items as run_items; each POST /api/runs/{id}/step claims up to
 STEP_ITEMS of them in a short transaction (FOR UPDATE SKIP LOCKED), answers them outside any transaction, and
-writes one answer row per item (UNIQUE (run_id, item_id): a duplicate write does nothing). No queue, no
-worker: the browser drives the loop; a gap-check step claims outcomes by their parts (CSF spec 5.7) and stores
-each part as it lands."""
+writes one answer row per item (UNIQUE (run_id, item_id): a duplicate write does nothing). No queue, no worker
+process: the browser drives the loop. A step answers its claimed items, or a gap check's parts, at the same
+time on a small thread pool, each job on its own session, spender and cost meter (Plan 4 Task 2); a gap-check
+step claims outcomes by their parts (CSF spec 5.7) and stores each part as it lands."""
 
 import logging
+import random
 import time
 import uuid
 from collections.abc import Callable, Mapping
+from concurrent.futures import ThreadPoolExecutor, wait
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from functools import partial
 from typing import Any
 
 import openai
-from sqlalchemy import and_, delete, func, or_, select, update
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import Engine, and_, delete, func, literal, or_, select, update
+from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.exc import DataError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -40,6 +44,8 @@ STALE = timedelta(
     minutes=5
 )  # a claim this old belongs to a crashed step (DEADLINE_S keeps live ones younger)
 DEADLINE_S = 240.0  # under Vercel's 300 s function limit, as in PriorPath
+# a step answers by then whatever its jobs do: under Vercel's 300 s, so STALE never meets a live step
+HARD_S = 270.0
 MAX_ATTEMPTS = 3  # claims before an item that keeps crashing its step is answered as failed
 FAILED_TEXT = "No answer: the model call failed twice. Re-run live to try again."
 STEP_PARTS = 8  # CSF spec 5.7: a gap-check step claims outcomes until their parts add up to 8 (8 x 15 s p90)
@@ -47,22 +53,20 @@ STEP_PARTS = 8  # CSF spec 5.7: a gap-check step claims outcomes until their par
 ASK: dict[str, Any] = {"label": "unknown", "value": None, "text": "", "confidence": 0.0}
 
 
-class _OutOfTime(Exception):
-    """The step's deadline passed before a part not yet stored (adversary-1 M3): the outcome goes back with
-    the parts it stored, and the next step resumes it."""
-
-
 class CostMeter:
     """Counts the cost of every result the client returns, even when the caller then fails to use it (a
-    reply that does not match the schema is still billed: triage rows 16 and 51)."""
+    reply that does not match the schema is still billed: triage rows 16 and 51), and how many returned
+    (`calls`: the provider answered, Task 2 re-review I1)."""
 
     def __init__(self, inner: LLMClient) -> None:
         self.inner = inner
         self._cost = 0.0
+        self.calls = 0
 
     def complete(self, req: LLMRequest) -> LLMResult:
         result = self.inner.complete(req)
         self._cost += result.cost_usd or 0.0
+        self.calls += 1
         return result
 
     def take(self) -> float:
@@ -175,17 +179,42 @@ def _retryable(exc: LLMError) -> bool:
     return not (isinstance(status, int) and 400 <= status < 500 and status not in (408, 429))
 
 
+class _DeadlineCut(LLMError):
+    """A retryable model error whose single retry the step's deadline cut (adversary-1 M2): decided when the
+    retry was refused, not when the step settles. Its cause is the original error's, so `_provider_down` and
+    `_retryable` read it the same."""
+
+
+def _retry_pause(exc: LLMError) -> float:
+    """Seconds to wait before retrying: a short pause on a rate limit (429), so a step's workers do not
+    re-fire their calls in the same second (adversary-1 I3): Retry-After (else 1 s) plus up to 0.5 s of
+    jitter, at most 2 s. No wait otherwise."""
+    cause = exc.__cause__
+    if getattr(cause, "status_code", None) != 429:
+        return 0.0
+    try:
+        after = max(0.0, float(cause.response.headers.get("retry-after", "")))  # type: ignore[union-attr]
+    except (AttributeError, ValueError):
+        after = 1.0
+    return min(2.0, after + random.uniform(0.0, 0.5))
+
+
 def _once[T](session: Session, call: Callable[[], T], can_retry: Callable[[], bool]) -> T:
-    """`call`, and once more after a failed model call (a malformed reply rarely repeats). Never again on a
-    missing recording or a refused budget, nor once `can_retry` says the step's deadline has passed."""
+    """`call`, and once more after a failed model call (a malformed reply rarely repeats), after a short pause
+    on a rate limit (`_retry_pause`). Never again on a missing recording or a refused budget, nor once
+    `can_retry` says the step's deadline has passed (`_DeadlineCut`)."""
     try:
         return call()
     except (ReplayMiss, BudgetExhausted):
         raise
     except LLMError as exc:
-        if not _retryable(exc) or not can_retry():
+        if not _retryable(exc):
             raise
+        if not can_retry():
+            raise _DeadlineCut(*exc.args) from exc.__cause__
         session.rollback()
+        if pause := _retry_pause(exc):
+            time.sleep(pause)
         return call()
 
 
@@ -202,6 +231,174 @@ def _answer(
     return _once(session, partial(answer_item, session, workspace_id, item, llm, models, spend), can_retry)
 
 
+@dataclass
+class _Done:
+    """One job's result: the values to write (None for a part job, or on an error), its cost, its error, and
+    how many of its model calls returned."""
+
+    values: dict[str, Any] | None
+    cost: float
+    error: Exception | None = None
+    calls: int = 0
+
+
+class _Late(Exception):
+    """A job still running at HARD_S: the step answered without it (Plan 3 N1)."""
+
+
+def _session(engine: Engine) -> Session:
+    """A worker's own session: a Session never crosses threads (Plan 4 Task 2)."""
+    return Session(engine, expire_on_commit=False)
+
+
+def _item_job(
+    engine: Engine,
+    workspace_id: uuid.UUID,
+    item: ItemInput,
+    llm: LLMClient,
+    models: Mapping[str, str],
+    network: str | None,
+    can_retry: Callable[[], bool],
+) -> _Done:
+    """One questionnaire item on a worker thread: its own session, spender and cost meter. Every error comes
+    back to the request's thread with the cost already paid."""
+    meter = CostMeter(llm)
+    try:
+        with _session(engine) as s:
+            spend = spender(s, workspace_id, network=network)
+            result = _answer(s, workspace_id, item, meter, models, spend, can_retry)
+            return _Done(_values(result), meter.take(), calls=meter.calls)
+    except Exception as exc:
+        return _Done(None, meter.take(), exc, meter.calls)
+
+
+def _part_job(
+    engine: Engine,
+    workspace_id: uuid.UUID,
+    run_id: uuid.UUID,
+    item_id: uuid.UUID,
+    claimed_at: datetime,
+    o: csf.Outcome,
+    n: int,
+    llm: LLMClient,
+    models: Mapping[str, str],
+    network: str | None,
+    can_retry: Callable[[], bool],
+) -> _Done:
+    """Part n of a gap-check outcome on a worker thread, stored the moment it lands (CSF spec 5.7) with one
+    atomic `parts || {n: part}`, so two parts of one outcome finishing together never lose each other. Only
+    while this step's claim holds (adversary-1 M1): a part landing after the step answered without it (late),
+    or after a release, a reclaim or Check again, touches no row; the next step runs it again."""
+    meter = CostMeter(llm)
+    try:
+        with _session(engine) as s:
+            spend = spender(s, workspace_id, network=network)
+            r = _once(s, partial(csf.check_part, s, workspace_id, o, n, meter, models, spend), can_retry)
+            judged = {"question": o.parts[n - 1], "stance_prompt": STANCE_PROMPT, "model": models["stance"]}
+            part = _no_nul({**judged, **_raw(r)})
+            s.execute(
+                update(RunItem)
+                .where(
+                    RunItem.run_id == run_id,
+                    RunItem.item_id == item_id,
+                    RunItem.state == "claimed",
+                    RunItem.claimed_at == claimed_at,
+                )
+                .values(parts=RunItem.parts.op("||")(literal({str(n): part}, JSONB)))
+            )
+            s.commit()
+            return _Done(None, meter.take(), calls=meter.calls)
+    except Exception as exc:
+        return _Done(None, meter.take(), exc, meter.calls)
+
+
+def _keep_current_parts(
+    session: Session, run_id: uuid.UUID, item_id: uuid.UUID, o: csf.Outcome, models: Mapping[str, str]
+) -> list[int]:
+    """Drop stored parts that no longer stand for the deployed wording, stance prompt and model
+    (`_is_current`, adversary-1 M5); return the part numbers still to run. Does not commit."""
+    have = (
+        session.scalar(select(RunItem.parts).where(RunItem.run_id == run_id, RunItem.item_id == item_id))
+        or {}
+    )
+    keep = {k: v for k, v in have.items() if k.isdigit() and _is_current(o, int(k), v, models)}
+    if keep != have:
+        session.execute(
+            update(RunItem).where(RunItem.run_id == run_id, RunItem.item_id == item_id).values(parts=keep)
+        )
+    return [n for n in range(1, len(o.parts) + 1) if str(n) not in keep]
+
+
+def _run_all(
+    jobs: dict[uuid.UUID, list[Callable[[], _Done]]], in_time: Callable[[], bool], hard_at: float
+) -> dict[uuid.UUID, list[_Done | None]]:
+    """Every job at once, at most STEP_PARTS workers. A job that would start after the deadline is not started
+    (None); a job still running at `hard_at` (time.monotonic) is late (`_Late`) and the pool is left behind
+    without waiting for it. Results come back per item in the order the jobs were listed."""
+
+    def guarded(job: Callable[[], _Done]) -> _Done | None:
+        try:
+            ok = in_time()
+        except Exception as exc:  # a broken clock is this job's error, not the step's (review M1)
+            return _Done(None, 0.0, exc)
+        return job() if ok else None
+
+    out: dict[uuid.UUID, list[_Done | None]] = {item_id: [] for item_id in jobs}
+    flat = [(item_id, job) for item_id, listed in jobs.items() for job in listed]
+    if not flat:
+        return out
+    pool = ThreadPoolExecutor(max_workers=min(len(flat), STEP_PARTS))
+    futures = [(item_id, pool.submit(guarded, job)) for item_id, job in flat]
+    wait([fut for _, fut in futures], timeout=max(0.0, hard_at - time.monotonic()))
+    pool.shutdown(wait=False, cancel_futures=True)
+    for item_id, fut in futures:
+        if fut.cancelled():
+            out[item_id].append(None)  # never started: as if the deadline kept it
+        elif fut.done():
+            out[item_id].append(fut.result())
+        else:
+            out[item_id].append(_Done(None, 0.0, _Late()))
+    return out
+
+
+def _worst(errors: list[Exception]) -> Exception:
+    """An item's most decisive error: a missing recording, a refused budget, a late job, a provider outage,
+    then the first of the rest."""
+    for kind in (ReplayMiss, BudgetExhausted, _Late):
+        for e in errors:
+            if isinstance(e, kind):
+                return e
+    for e in errors:
+        if isinstance(e, LLMError) and _provider_down(e):
+            return e
+    return errors[0]
+
+
+def _stored(session: Session, run_id: uuid.UUID, item_id: uuid.UUID) -> dict[str, Any]:
+    parts: dict[str, Any] = (
+        session.scalar(select(RunItem.parts).where(RunItem.run_id == run_id, RunItem.item_id == item_id))
+        or {}
+    )
+    return parts
+
+
+def _safe_write(
+    session: Session,
+    workspace_id: uuid.UUID,
+    run_id: uuid.UUID,
+    item_id: uuid.UUID,
+    values: dict[str, Any],
+    cost: float,
+) -> None:
+    """The database refused a value: write the failure, not a reclaim loop."""
+    try:
+        _write(session, workspace_id, run_id, item_id, values, cost)
+    except DataError as exc:
+        session.rollback()
+        log.error("run %s item %s: %s on write; answered as failed", run_id, item_id, type(exc).__name__)
+        _write(session, workspace_id, run_id, item_id, FAILED, cost)
+
+
 def _is_current(o: csf.Outcome, n: int, raw: Mapping[str, Any], models: Mapping[str, str]) -> bool:
     """A stored part still stands for part n as deployed: the same wording, judged by the same stance prompt
     and model (adversary-1 M5). A part filled from the visitor's answer has no judge of its own; only its
@@ -210,51 +407,6 @@ def _is_current(o: csf.Outcome, n: int, raw: Mapping[str, Any], models: Mapping[
         return False
     judged = (raw.get("stance_prompt"), raw.get("model")) == (STANCE_PROMPT, models["stance"])
     return judged or bool(raw.get("statement_id"))
-
-
-def _answer_outcome(
-    session: Session,
-    workspace_id: uuid.UUID,
-    run_id: uuid.UUID,
-    item_id: uuid.UUID,
-    o: csf.Outcome,
-    llm: LLMClient,
-    models: Mapping[str, str],
-    spend: Spend,
-    can_retry: Callable[[], bool],
-) -> dict[str, Any]:
-    """One gap-check outcome (CSF spec 5.2-5.5, 5.7). Ask me: no retrieval and no call. Checked: every part
-    not stored yet runs through the pipeline (each retried once, `_once`) and is stored the moment it lands,
-    so a step refused by the budget mid-outcome resumes without paying again. A stored part whose wording,
-    stance prompt or model differs from the deployed one runs again (`_is_current`). The deadline is checked
-    before each part not yet stored (`_OutOfTime`). Then code combines the parts (`outcome_values`)."""
-    if o.tier != "checked":
-        return dict(ASK)
-    have = (
-        session.scalar(select(RunItem.parts).where(RunItem.run_id == run_id, RunItem.item_id == item_id))
-        or {}
-    )
-    parts = {
-        k: have[k]
-        for n in range(1, len(o.parts) + 1)
-        if (k := str(n)) in have and _is_current(o, n, have[k], models)
-    }
-    session.commit()  # no transaction stays open into the first model call
-    for n, text in enumerate(o.parts, 1):
-        if str(n) in parts:
-            continue
-        if not can_retry():
-            raise _OutOfTime()
-        call = partial(csf.check_part, session, workspace_id, o, n, llm, models, spend)
-        judged = {"question": text, "stance_prompt": STANCE_PROMPT, "model": models["stance"]}
-        parts[str(n)] = _no_nul({**judged, **_raw(_once(session, call, can_retry))})
-        session.execute(
-            update(RunItem)
-            .where(RunItem.run_id == run_id, RunItem.item_id == item_id)
-            .values(parts=dict(parts))
-        )
-        session.commit()
-    return outcome_values(o, parts)
 
 
 def outcome_values(o: csf.Outcome, parts: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
@@ -389,111 +541,162 @@ def step(
     now: datetime | None = None,
     network: str | None = None,
 ) -> list[uuid.UUID]:
-    """Answer up to STEP_ITEMS items; returns the item ids answered. Raises BudgetExhausted (a
-    `llm_budget.Refused` naming the cap; unstarted items go back to pending) and ReplayMiss (never degraded,
-    contract rule). `network` is `errors.network(request)`: the spender counts each call."""
+    """Answer the claimed items at once (Plan 4 Task 2): up to STEP_ITEMS questionnaire items, or the parts of
+    gap-check outcomes up to STEP_PARTS, each job on a worker thread with its own session, spender and cost
+    meter, spending before every model call and holding no transaction across one. A job starts, or retries,
+    only before DEADLINE_S (`clock`); the step answers by HARD_S in real time. Then, on this thread in
+    questionnaire order: write every answer that came back (one row per item; a duplicate write does nothing),
+    count every paid call, give back the items that met a refusal, a missing recording or the deadline
+    (attempt refunded), and those that met an outage or were late (attempt kept). When no model call returned
+    in the step (an answer with no call shows nothing about the provider), only the first item that met the
+    outage keeps its attempt and the others are refunded (Ruling 5); a late job's stays. An item whose write
+    fails stays claimed with its attempt and cost counted, and the others are still settled. Raises, after the
+    writes: ReplayMiss, then a `llm_budget.Refused` naming the cap, then an unexpected error (its item stays
+    claimed), then ModelsUnavailable when no model call returned. Returns the item ids answered. `network` is
+    `errors.network(request)`: each spender counts each call for it."""
     run = _run(session, workspace_id, run_id)
     if run.status != "running":
         return []
     by_parts = (
         session.scalar(select(Questionnaire.source).where(Questionnaire.id == run.questionnaire_id)) == "csf"
     )
+    hard_at = time.monotonic() + HARD_S  # real time: it bounds real waiting, whatever `clock` says
     deadline = clock() + DEADLINE_S
-    claimed = _claim(session, run_id, now or datetime.now(UTC), by_parts=by_parts)
-    meter = CostMeter(llm)
-    spend = spender(session, workspace_id, network=network)
-    answered: list[uuid.UUID] = []
+    claimed_at = now or datetime.now(UTC)
+    claimed = _claim(session, run_id, claimed_at, by_parts=by_parts)
+    engine = session.get_bind()
+    assert isinstance(engine, Engine)
+
+    def in_time() -> bool:
+        return clock() <= deadline
+
+    jobs: dict[uuid.UUID, list[Callable[[], _Done]]] = {}
+    ready: dict[uuid.UUID, dict[str, Any]] = {}  # answered with no model call
+    outcomes: dict[uuid.UUID, csf.Outcome] = {}
     for n, (item_id, attempts) in enumerate(claimed):
-        rest = [i for i, _ in claimed[n:]]
-        if clock() > deadline:
-            _release(session, run_id, rest)
-            break
-        if attempts >= MAX_ATTEMPTS:
-            _write(session, workspace_id, run_id, item_id, FAILED, 0.0)
-            answered.append(item_id)
-            continue
         try:
+            if attempts >= MAX_ATTEMPTS:
+                ready[item_id] = FAILED
+                continue
             row = session.get_one(Item, item_id)
             # an id a data refresh withdrew is answered as the question it was (adversary-1 N1)
             o = csf.outcome_or_none(row.csf_id) if row.csf_id is not None else None
-            if o is not None:
-                values = _answer_outcome(
-                    session,
-                    workspace_id,
-                    run_id,
-                    item_id,
-                    o,
-                    meter,
-                    models,
-                    spend,
-                    lambda: clock() <= deadline,
-                )
-            else:
+            if o is None:
                 item = ItemInput(str(row.id), row.question, row.topic)
-                values = _values(
-                    _answer(session, workspace_id, item, meter, models, spend, lambda: clock() <= deadline)
-                )
-        except _OutOfTime:
-            _release(session, run_id, rest)  # refunds: the stored parts stay, the outcome was not tried out
-            _add_cost(session, run_id, meter.take())
-            session.commit()
-            break
-        except (BudgetExhausted, ReplayMiss) as exc:
-            session.rollback()
-            refused: BudgetExhausted | None = None
-            if isinstance(exc, BudgetExhausted):
-                kind = str(exc.args[0]) if exc.args else "stance"
-                scope = (
-                    exc.scope
-                    if isinstance(exc, Refused)
-                    else refusal_scope(session, workspace_id, kind, network)
-                )
-                refused = Refused(kind, scope)
-            _release(session, run_id, rest)
-            _add_cost(session, run_id, meter.take())
-            session.commit()
-            raise (refused or exc) from None
-        except LLMError as exc:
-            session.rollback()
-            if _provider_down(exc):
-                # an outage is not a bad answer: the items go back, but the one that met it keeps its
-                # attempt, so an item the provider always fails still ends FAILED (adversary-3 N1)
-                _release(session, run_id, rest[:1], refund=False)
-                _release(session, run_id, rest[1:])
-                _add_cost(session, run_id, meter.take())
-                session.commit()
-                if answered:
-                    break  # the next step meets the outage itself
-                raise ModelsUnavailable() from None
-            if _retryable(exc) and clock() > deadline:
-                # the deadline cut the retry: not tried twice, so not failed (Task 8 review)
-                _release(session, run_id, rest)
-                _add_cost(session, run_id, meter.take())
-                session.commit()
-                break
-            values = FAILED
-        except SQLAlchemyError as exc:
-            session.rollback()  # triage row 24: a failed transaction must not swallow the next write
-            # the type only: the statement's parameters carry the question's words (adversary-3 M1)
-            log.error("run %s item %s: %s; answered as failed", run_id, item_id, type(exc).__name__)
-            values = FAILED
+                jobs[item_id] = [
+                    partial(_item_job, engine, workspace_id, item, llm, models, network, in_time)
+                ]
+            elif o.tier != "checked":
+                ready[item_id] = dict(ASK)
+            else:
+                outcomes[item_id] = o
+                jobs[item_id] = [
+                    partial(
+                        _part_job,
+                        engine,
+                        workspace_id,
+                        run_id,
+                        item_id,
+                        claimed_at,
+                        o,
+                        k,
+                        llm,
+                        models,
+                        network,
+                        in_time,
+                    )
+                    for k in _keep_current_parts(session, run_id, item_id, o, models)
+                ]
         except Exception:
-            _keep_cost(session, run_id, meter.take(), claimed[n + 1 :])
+            # nothing started: this item stays claimed, every other one goes back (preflight M4)
+            _keep_cost(session, run_id, 0.0, claimed[:n] + claimed[n + 1 :])
             raise
-        cost = meter.take()
+    session.commit()  # the request's session holds no transaction while the workers call models
+    results = _run_all(jobs, in_time, hard_at)
+
+    answered: list[uuid.UUID] = []
+    give_back: list[uuid.UUID] = []
+    down: list[uuid.UUID] = []  # met an outage, in questionnaire order
+    late: list[uuid.UUID] = []  # still running at HARD_S: the attempt stays
+    replay: ReplayMiss | None = None
+    refused: BudgetExhausted | None = None
+    crashed: Exception | None = None
+    for item_id, _ in claimed:
+        done = results.get(item_id, [])
+        cost = sum(d.cost for d in done if d is not None)
+        errors = [d.error for d in done if d is not None and d.error is not None]
         try:
-            try:
-                _write(session, workspace_id, run_id, item_id, values, cost)
-            except DataError as exc:  # the database refused a value: write the failure, not a reclaim loop
-                session.rollback()
-                log.error(
-                    "run %s item %s: %s on write; answered as failed", run_id, item_id, type(exc).__name__
+            if item_id in ready:
+                _write(session, workspace_id, run_id, item_id, ready[item_id], 0.0)
+                answered.append(item_id)
+                continue
+            if not errors and None not in done:
+                values = (
+                    outcome_values(outcomes[item_id], _stored(session, run_id, item_id))
+                    if item_id in outcomes
+                    else done[0].values  # type: ignore[union-attr]
                 )
-                _write(session, workspace_id, run_id, item_id, FAILED, cost)
-        except Exception:
-            _keep_cost(session, run_id, cost, claimed[n + 1 :])
-            raise
-        answered.append(item_id)
+                _safe_write(session, workspace_id, run_id, item_id, values or FAILED, cost)
+                answered.append(item_id)
+                continue
+            _add_cost(session, run_id, cost)
+            session.commit()
+            cost = 0.0  # counted
+            if not errors:  # the deadline kept a job from starting: not tried, so no attempt spent
+                give_back.append(item_id)
+                continue
+            err = _worst(errors)
+            if isinstance(err, ReplayMiss):
+                replay = replay or err
+                give_back.append(item_id)
+            elif isinstance(err, BudgetExhausted):
+                refused = refused or err
+                give_back.append(item_id)
+            elif isinstance(err, _Late):
+                late.append(item_id)
+            elif isinstance(err, LLMError) and _provider_down(err):
+                down.append(item_id)
+            elif isinstance(err, _DeadlineCut):
+                give_back.append(item_id)  # the deadline cut the retry: not tried twice, so not failed
+            elif isinstance(err, (LLMError, SQLAlchemyError)):
+                if isinstance(err, SQLAlchemyError):  # the type only: its parameters carry the words
+                    log.error("run %s item %s: %s; answered as failed", run_id, item_id, type(err).__name__)
+                _write(session, workspace_id, run_id, item_id, FAILED, 0.0)  # its cost is already added
+                answered.append(item_id)
+            else:
+                crashed = crashed or err  # stays claimed, attempt counted: a crash loop ends at MAX_ATTEMPTS
+        except Exception as exc:
+            # the write failed: this item stays claimed with its attempt and its paid calls counted, and the
+            # others are still settled, not given back to be paid again (adversary-1 M3)
+            session.rollback()
+            _add_cost(session, run_id, cost)
+            session.commit()
+            crashed = crashed or exc
+    _release(session, run_id, give_back)
+    # A model call returned in this step: the outage was selective, so each item that met it keeps its attempt
+    # (adversary-3 N1). None did (an answer with no call, as Failed at MAX_ATTEMPTS, Ask me or a part with no
+    # passage, shows nothing about the provider): only the first item that met it keeps its attempt and the
+    # rest are refunded (Ruling 5, preflight I1), so a true outage costs at most one attempt a step and items
+    # the provider always fails still end FAILED, one by one (Task 2 re-review I1).
+    spoke = any(d.calls for listed in results.values() for d in listed if d is not None)
+    first = down[:1] if not spoke else down
+    _release(session, run_id, first, refund=False)
+    _release(session, run_id, down[len(first) :])
+    _release(session, run_id, late, refund=False)
+    if replay is not None:
+        raise replay
+    if refused is not None:
+        kind = str(refused.args[0]) if refused.args else "stance"
+        scope = (
+            refused.scope
+            if isinstance(refused, Refused)
+            else refusal_scope(session, workspace_id, kind, network)
+        )
+        raise Refused(kind, scope) from None
+    if crashed is not None:
+        raise crashed
+    if (down or late) and not spoke:
+        raise ModelsUnavailable()  # when a call returned, the next step meets the outage itself
     _finish_if_done(session, run)
     return answered
 
