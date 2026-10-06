@@ -12,6 +12,7 @@ datakit
 !/data/dev
 /data/dev/*
 !/data/dev/docs
+!/data/dev/sample-run.json
 !/data/questionnaires
 !/data/csf
 /data/csf/*

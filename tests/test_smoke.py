@@ -13,7 +13,7 @@ SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "smoke.py"
 UI = '<div id="root"></div>'
 HEALTHY: dict[str, object] = {"status": "ok", "db": "ok", "canary": None}
 COOKIE = {"set-cookie": "vart_ws=abc; HttpOnly; Path=/"}
-VERSION = {"version": "2.0.0.dev0", "models": {}}
+VERSION = {"version": "2.0.0.dev0", "models": {}, "sample_precomputed": True}
 # (path, the name its FAIL line carries): one row per request check() makes.
 CHECKS = [
     ("/", "UI"),
@@ -198,3 +198,8 @@ def test_a_malformed_base_url_exits_1_with_one_fail_line_and_no_traceback() -> N
     assert result.returncode == 1
     assert result.stdout == ""
     assert result.stderr.startswith("FAIL: base URL: ") and result.stderr.count("\n") == 1
+
+
+def test_a_deploy_whose_sample_would_go_live_fails() -> None:
+    stale = httpx.Response(200, json={**VERSION, "sample_precomputed": False})
+    assert "sample" in _fail(_transport(HEALTHY, answers={"/api/version": stale}))

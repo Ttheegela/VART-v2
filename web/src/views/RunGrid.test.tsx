@@ -173,6 +173,21 @@ describe("RunGrid", () => {
     expect(merged.map((r) => r.answer?.id ?? null)).toEqual(["a1", "a2", "a2"]);
     expect(merged[0]).toBe(fixtures.rows[0]); // unchanged rows keep their identity, so memoized rows skip render
   });
+  it("re-run live asks for a live run, and a copied run says it is precomputed", async () => {
+    const searches: string[] = [];
+    mockApi({
+      "GET /api/runs/r1/answers": { run: { ...fixtures.run, precomputed: true, cost_usd: 0 }, rows: fixtures.rows },
+      "GET /api/questionnaires": [],
+      "POST /api/questionnaires/q1/runs": (_init: RequestInit | undefined, url: URL) => {
+        searches.push(url.search);
+        return { ...fixtures.run, id: "r2", status: "running", done: 0, precomputed: false };
+      },
+    });
+    render(<RunGrid {...props} />);
+    expect(await screen.findByText(/precomputed sample answers/)).toBeInTheDocument();
+    await userEvent.keyboard("r");
+    await waitFor(() => expect(searches).toEqual(["?live=true"]));
+  });
 });
 
 describe("useStepLoop", () => {

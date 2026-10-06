@@ -234,3 +234,11 @@ change-log line; changing or removing a path, a field or a status needs the lead
   `AnswerSummary.sources` for Confirmed by you counts the cited documents, at least 1 (M2). No prompt or label
   rule changes, so nothing is re-recorded.
 - 2026-10-06: Plan 6B final review fix (Ruling 14; copy and mapping only, the label id `confirmed_by_you` and the OpenAPI schema are unchanged): an Ask-me outcome the visitor answered reads "Answered by you" (view chip, drawer, sheet via `csf.gap_word`) and stays in the review set; "Confirmed by you" is only for a Checked outcome made Covered by accepted fills (Ruling 6). The failed sheet word is "Failed" (stale "Not run yet" fixed). No prompt or label rule changes, so nothing is re-recorded.
+- 2026-10-07: Plan 4 Task 3 (an added optional query parameter and two optional fields): `POST
+  /api/questionnaires/{id}/runs?live=` (default false) copies the precomputed sample run when the questionnaire is
+  a bundled sample (`vsq-a.xlsx`, `mvsp-b.csv`) with the snapshot's items over the untouched sample pack, chunked as
+  the snapshot records, and `data/dev/sample-run.json` is current; a second press returns the same copy. `POST
+  /api/gap/core/run` does the same for a new core gap check. A copy is done at $0 with no model call;
+  `RunOut.precomputed` is true for it. `live=true` (Re-run live) always runs the engine; a function-scope gap check
+  always runs live. `GET /api/version` gains `sample_precomputed`. Counted under `run` as before. No prompt or label
+  rule changes.

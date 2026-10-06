@@ -215,6 +215,7 @@ class RunOut(_Out):
     prompt_versions: dict[str, str]
     started_at: datetime
     finished_at: datetime | None
+    precomputed: bool = False  # Plan 4 Task 3: copied from the sample snapshot, no model called
 
 
 class AnswerSummary(BaseModel):

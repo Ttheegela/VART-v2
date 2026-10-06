@@ -53,6 +53,13 @@ def check(c: httpx.Client) -> str:
     version = get_json(c, "version", "/api/version")
     if not isinstance(version.get("version"), str):
         raise fail("version", 'GET /api/version has no string "version"', version)
+    if version.get("sample_precomputed") is not True:
+        raise fail(
+            "sample",
+            "the deployed models or sample data differ from data/dev/sample-run.json: the sample path would "
+            "call models (re-record, run scripts/sample_snapshot.py, or set the models back)",
+            version,
+        )
     # A browser-style write: the cross-site guard compares Origin with the Host the function sees, so a
     # platform that rewrote Host would 403 every production write (final review M4). It resets the smoke's
     # own workspace.

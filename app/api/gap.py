@@ -16,6 +16,7 @@ from app.contracts import ItemLabel, Value
 from app.db.models import Answer, Document, Item, Questionnaire, Run
 from app.export import FAILED_SENTENCE, GapSheet
 from app.runs import FAILED_TEXT, create_run, reopen_changed
+from app.sample_run import copy_gap_run
 from app.services.capacity import ensure_capacity
 from app.settings import get_settings
 
@@ -175,10 +176,16 @@ def start_gap(scope: GapScope, ws: WorkspaceDep, session: SessionDep, request: R
     # workspaces grow past that.
     session.execute(select(Questionnaire.id).where(Questionnaire.id == q.id).with_for_update())
     run = latest_run(session, q.id)
-    if run is None:
-        run = create_run(session, ws_id, q.id, get_settings().models())
+    if run is None:  # under the lock above, so a copy is made once too (adversary-1 M6)
+        models = get_settings().models()
+        run = copy_gap_run(session, ws_id, q, models) or create_run(session, ws_id, q.id, models)
     elif run.status == "done":
         # commits; nothing changed: it stays done. Judged against the deployed models (review I1)
-        reopen_changed(session, ws_id, run.id, get_settings().models())
+        models = get_settings().models()
+        if reopen_changed(session, ws_id, run.id, models):
+            # Plan 4 Task 3 review I1: re-opened parts run live on the visitor's evidence from here, so a
+            # copied run stops reading as precomputed (drops "snapshot") and records the models they use
+            run.models = dict(models)
+            session.commit()
         session.refresh(run)
     return run_out(session, run)
