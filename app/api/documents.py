@@ -68,6 +68,7 @@ SAMPLE_ORDER = (  # pinned by tests/test_api_documents.py::test_the_sample_pack_
     "security-policy-template.md",
     "engineering-wiki-export.md",
     "security-faq.md",
+    "security-improvement-plan.md",
 )
 
 
@@ -129,7 +130,7 @@ def load_sample_documents(ws: WorkspaceDep, session: SessionDep) -> list[Documen
     """The sample company's documents (not redacted, not counted against the upload limit). Idempotent."""
     ws_id = ws.id
     loaded = 0
-    for name in SAMPLE_ORDER:  # rules classify all 22 (plan2b Task 3): no model call, no budget
+    for name in SAMPLE_ORDER:  # rules classify all 23 (plan2b Task 3): no model call, no budget
         # Pre-flight P19: lock the workspace row, re-check, insert in one transaction; ingest_document
         # commits before it stores a sample (dropping the lock), so its steps run here.
         if session.scalar(select(Workspace.id).where(Workspace.id == ws_id).with_for_update()) is None:

@@ -50,3 +50,10 @@ cues, which caused the two VSQ disagreements: a control planned for later does n
 - Re-verified by a fresh blind reader: verified Yes, citing the new sentence (cryptography-policy.docx line 15).
   On the TLS sentence alone its reply was "related but a different topic, so I did not count it", the same
   judgement as before.
+
+## 2026-10-06: VSQ-55 re-derived (Plan 6B), no blind re-check
+
+The planted improvement plan (security-improvement-plan.md) joined the sample pack, so the pack now has 23
+documents. Its sentence "Security alerts are not yet routed to the on-call rotation; ..." disagrees with the logging
+policy (trap G1), and VSQ-55 was re-derived from verified / Yes to conflict. No fresh blind reader re-checked it;
+the blind verification above covers the 22-document pack. Tallies now: VSQ-A 29/5/9/8/13, MVSP-B unchanged.

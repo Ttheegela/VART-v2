@@ -88,7 +88,7 @@ def test_the_sample_pack_loads_once_in_fact_sheet_order(db: Engine) -> None:
     assert list(api.SAMPLE_ORDER) == [d.filename for d in facts.documents]
     client, _ = visitor(db)
     first = client.post("/api/documents/sample")
-    assert first.status_code == 201 and len(first.json()) == 22
+    assert first.status_code == 201 and len(first.json()) == 23
     assert [d["filename"] for d in first.json()] == list(api.SAMPLE_ORDER)
     again = client.post("/api/documents/sample")
     assert [d["id"] for d in again.json()] == [d["id"] for d in first.json()]
@@ -114,7 +114,7 @@ def test_two_tabs_loading_the_sample_at_once_store_it_once(db: Engine) -> None:
     with Session(db) as s:
         n = s.scalar(select(func.count()).select_from(Document).where(Document.workspace_id == ws_id))
         names = s.scalars(select(Document.filename).where(Document.workspace_id == ws_id)).all()
-    assert n == 22 and len(set(names)) == 22
+    assert n == 23 and len(set(names)) == 23
 
 
 def test_a_metadata_override_is_stored_as_the_users(db: Engine) -> None:

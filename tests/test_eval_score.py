@@ -285,18 +285,19 @@ def _unflagged(*codes: str) -> Observed:
 def test_a_conflict_trap_counts_as_caught_when_one_of_its_items_is_flagged() -> None:
     # Spec 8 "recall on planted conflicts" (Tarun's decision 2026-10-05): D1 is keyed on VSQ-09 and VSQ-13;
     # flagging VSQ-09 alone catches it. The per-item numbers stay in the report, ungated.
+    # Plan 6B: G1 (VSQ-55) is the sixth conflict trap, so the counts are out of 6 traps and 8 items.
     metrics = score(PACK, _unflagged("VSQ-13"))
     assert metrics["conflict_recall"] == 1.0 and gates(metrics)["conflict_recall"]["pass"] is True
     assert metrics["date_rule_correct"] == 1.0 and gates(metrics)["date_rule_correct"]["pass"] is True
-    assert metrics["conflict_items_recall"] == 0.8571 and metrics["date_rule_items_correct"] == 0.75
+    assert metrics["conflict_items_recall"] == 0.875 and metrics["date_rule_items_correct"] == 0.75
     assert "conflict_items_recall" not in GATES and "date_rule_items_correct" not in GATES
 
 
 def test_a_conflict_trap_with_no_item_flagged_is_missed() -> None:
     metrics = score(PACK, _unflagged("VSQ-09", "VSQ-13"))
-    assert metrics["conflict_recall"] == 0.8 and gates(metrics)["conflict_recall"]["pass"] is False
+    assert metrics["conflict_recall"] == 0.8333 and gates(metrics)["conflict_recall"]["pass"] is False
     assert metrics["date_rule_correct"] == 0.6667 and gates(metrics)["date_rule_correct"]["pass"] is False
-    assert metrics["conflict_items_recall"] == 0.7143 and metrics["date_rule_items_correct"] == 0.5
+    assert metrics["conflict_items_recall"] == 0.75 and metrics["date_rule_items_correct"] == 0.5
 
 
 def test_a_pack_without_conflict_traps_fails_the_conflict_gates() -> None:

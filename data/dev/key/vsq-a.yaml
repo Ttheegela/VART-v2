@@ -798,17 +798,22 @@ items:
   traps: []
   fills: []
 - code: VSQ-55
-  expected_label: verified
-  expected_value: 'Yes'
+  expected_label: conflict
+  expected_value: null
   must_ask: false
   evidence:
   - doc: lmp
     quote: Security events generate alerts that page the on-call rotation.
     stance: 'yes'
-  conflict_trap: null
+  - doc: sip
+    quote: Security alerts are not yet routed to the on-call rotation; on-call paging for security alerts is planned for 2027.
+    stance: 'no'
+  conflict_trap: G1
   scope_note_expected: false
   honest_negative: false
-  traps: []
+  traps:
+  - G1
+  - G4
   fills: []
 - code: VSQ-56
   expected_label: verified
