@@ -1,7 +1,7 @@
 import json
 import threading
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import date, timedelta
 
 import pytest
@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app import questions as qs
 from app.api.deps import get_llm
-from app.db.models import Answer, Document, Item, Run, SuggestedFill, Workspace
+from app.db.models import Answer, Document, InterviewQuestion, Item, Run, SuggestedFill, Workspace
 from app.llm.client import LLMRequest, LLMResult
 from app.main import app
 from app.services import ip_limits, llm_budget
@@ -283,6 +283,76 @@ def test_two_answers_at_once_store_one_statement(db: Engine) -> None:
     assert sorted(outcomes) == ["conflict", "ok"]
     with Session(db) as s:
         assert len(s.scalars(select(Document).where(Document.kind == "statement")).all()) == 1
+
+
+def test_a_failure_after_the_statement_is_written_leaves_nothing_and_a_retry_works(
+    s: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws, r = _done_run(s, ["Data Security"])
+    (q,) = qs.ensure_questions(s, ws.id, r.id)
+    real = qs.audit_log.record
+
+    def boom(*a: object, **k: object) -> None:
+        raise RuntimeError("killed")
+
+    monkeypatch.setattr(qs.audit_log, "record", boom)
+    with pytest.raises(RuntimeError):
+        qs.answer_question(s, ws.id, q.id, TEXT, None, MODELS, TODAY)
+    s.expire_all()
+    assert s.scalars(select(Document).where(Document.kind == "statement")).all() == []
+    assert (s.get_one(InterviewQuestion, q.id).status, s.scalars(select(Answer.label)).one()) == (
+        "open",
+        "unknown",
+    )
+    monkeypatch.setattr(qs.audit_log, "record", real)
+    _, answer, _ = qs.answer_question(s, ws.id, q.id, TEXT, None, MODELS, TODAY)
+    assert answer is not None and answer.label == "user_confirmed"
+
+
+def test_an_item_answered_elsewhere_cannot_be_overwritten_by_its_old_question(s: Session) -> None:
+    ws, r = _done_run(s, ["Data Security"])
+    (q,) = qs.ensure_questions(s, ws.id, r.id)
+    s.execute(Answer.__table__.update().values(label="na", text="Not applicable: x"))
+    s.commit()
+    with pytest.raises(qs.Conflict):
+        qs.answer_question(s, ws.id, q.id, TEXT, None, MODELS, TODAY)
+    assert s.scalars(select(Answer.label)).one() == "na"
+
+
+def _race(db: Engine) -> list[BaseException]:
+    with Session(db) as s:
+        ws, r = _done_run(s, ["Data Security", "Data Security"])
+        _, second = qs.ensure_questions(s, ws.id, r.id)
+        fill_item = s.get_one(Item, second.item_ids[0])
+        statement = f.document(s, ws, filename="answer-001.txt", kind="statement", source="statement")
+        sid = f.suggestion(s, r, fill_item, statement).id
+        s.commit()
+        ws_id, qid = ws.id, second.id
+    errors: list[BaseException] = []
+
+    def one(fn: Callable[[Session], object]) -> None:
+        with Session(db) as t:
+            try:
+                fn(t)
+            except qs.Conflict:
+                pass
+            except BaseException as exc:
+                errors.append(exc)
+
+    jobs = [
+        lambda t: qs.accept_suggestion(t, ws_id, sid),
+        lambda t: qs.answer_question(t, ws_id, qid, TEXT, None, MODELS, TODAY),
+    ]
+    threads = [threading.Thread(target=one, args=(j,)) for j in jobs]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join(20)
+    return errors
+
+
+def test_an_accept_and_an_answer_on_one_item_never_deadlock(db: Engine) -> None:
+    assert [e for _ in range(5) for e in _race(db)] == []
 
 
 # ------------------------------------------------------------------ over HTTP

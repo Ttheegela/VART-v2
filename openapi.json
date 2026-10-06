@@ -3634,7 +3634,7 @@
     },
     "/api/questions/{question_id}/answer": {
       "post": {
-        "description": "Accept the answer, or ask the one follow-up. An accepted answer is stored as a dated, redacted\nstatement, the item becomes \"Confirmed by you\", and open items in the same topic are re-checked (at most\n8, budgeted) for suggested fills. 409 when the question is closed; 429 per network (`llm`, per model call)\nor model budget.",
+        "description": "Accept the answer, or ask the one follow-up. An accepted answer is stored as a dated, redacted\nstatement, the item becomes \"Confirmed by you\", and open items in the same topic are re-checked (at most\n8, budgeted) for suggested fills; when the model budget or the network's `llm` calls are used up the\nanswer is kept and no fills come back. 409 when the question is closed or its item was answered since;\n429 when the network's `interview` cap (60 an hour) is used up.",
         "operationId": "answer_question_api_questions__question_id__answer_post",
         "parameters": [
           {

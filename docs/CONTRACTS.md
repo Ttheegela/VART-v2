@@ -131,3 +131,7 @@ change-log line; changing or removing a path, a field or a status needs the lead
 - 2026-10-06: Plan 3A Task 9 (added optional field, allowed after the freeze): `ApprovedCount.skipped_edited` (int, default 0)
   counts the edited verified answers `approve-verified` leaves for a look (adversary-1 M5). New per-network cap kind
   `interview` (60 an hour) on `POST /api/questions/{id}/answer` (adversary-1 N2); no path or status changed.
+- 2026-10-06: Plan 3A Task 9 fix round 1 (wording only, no path, field or status changed): `POST /api/questions/{id}/answer`
+  keeps the answer and returns no suggestions when the re-check's model budget is refused (200); only the `interview`
+  cap is a 429; 409 also when the item was answered since. `store_statement(..., commit=False)` lets the interview
+  write statement, answer and question in one transaction (Ruling 9).

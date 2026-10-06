@@ -292,6 +292,8 @@ def step(
             if _retryable(exc) and clock() > deadline:
                 # the deadline cut the retry: not tried twice, so not failed (Task 8 review)
                 _release(session, run_id, rest)
+                _add_cost(session, run_id, meter.take())
+                session.commit()
                 break
             values = FAILED
         except SQLAlchemyError:

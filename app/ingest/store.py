@@ -76,6 +76,7 @@ def _store(
     sha256: str,
     meta: DocMeta,
     lines: Sequence[Line],
+    commit: bool = True,
 ) -> Document:
     if source != "sample":
         # Lock the workspace row and count again: ingest_document committed its first check before classify
@@ -120,7 +121,10 @@ def _store(
                 for c in chunks
             ],
         )
-    session.commit()
+    if commit:
+        session.commit()
+    else:
+        session.flush()
     return doc
 
 
@@ -170,7 +174,7 @@ def ingest_document(
 
 
 def store_statement(
-    session: Session, workspace_id: uuid.UUID, text: str, *, filename: str, today: date
+    session: Session, workspace_id: uuid.UUID, text: str, *, filename: str, today: date, commit: bool = True
 ) -> Document:
     """The visitor's accepted interview answer as a dated statement (spec 6.9): kind and source 'statement',
     evidence, dated `today`, redacted like an upload. One plain line per non-empty line, not Markdown: an
@@ -183,4 +187,4 @@ def store_statement(
         raise IngestError("The answer is empty.")
     meta = DocMeta("statement", "final", today, None, True, "rule")
     digest = hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
-    return _store(session, workspace_id, filename, "statement", digest, meta, lines)
+    return _store(session, workspace_id, filename, "statement", digest, meta, lines, commit)

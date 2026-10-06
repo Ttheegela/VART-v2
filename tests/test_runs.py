@@ -447,6 +447,17 @@ def test_a_retryable_error_past_the_deadline_gives_the_item_back_untried(s: Sess
     ]
 
 
+def test_the_deadline_release_keeps_the_cost_already_spent(s: Session) -> None:
+    ws, q = _questionnaire(s, n=1)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    llm = ByStepLLM({"stance": "not json"}, cost=0.01)  # billed, then fails the schema
+    late = runs.DEADLINE_S + 1
+    ticks = iter([0.0, 0.0])
+    runs.step(s, ws.id, run.id, llm, MODELS, clock=lambda: next(ticks, late))
+    assert s.scalars(select(Answer)).all() == []
+    assert s.scalar(select(Run.cost_usd).where(Run.id == run.id)) == Decimal("0.01")
+
+
 def test_a_client_error_past_the_deadline_is_still_a_failed_answer(s: Session) -> None:
     ws, q = _questionnaire(s, n=1)
     run = runs.create_run(s, ws.id, q.id, MODELS)

@@ -88,8 +88,9 @@ def answer_question(
 ) -> AnswerQuestionOut:
     """Accept the answer, or ask the one follow-up. An accepted answer is stored as a dated, redacted
     statement, the item becomes "Confirmed by you", and open items in the same topic are re-checked (at most
-    8, budgeted) for suggested fills. 409 when the question is closed; 429 per network (`llm`, per model call)
-    or model budget."""
+    8, budgeted) for suggested fills; when the model budget or the network's `llm` calls are used up the
+    answer is kept and no fills come back. 409 when the question is closed or its item was answered since;
+    429 when the network's `interview` cap (60 an hour) is used up."""
     ws_id = ws.id
     limit(request, session, "interview")
     q, answer, found = qs.answer_question(

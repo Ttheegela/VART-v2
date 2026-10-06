@@ -106,10 +106,15 @@ def answer_question(
     today: date,
     network: str | None = None,
 ) -> tuple[InterviewQuestion, Answer | None, list[SuggestedFill]]:
-    q = _question(session, workspace_id, question_id, lock=True)
+    # Lock order everywhere: answer, question, suggestions (so accept and answer cannot deadlock).
+    q = _question(session, workspace_id, question_id)
+    item = session.get_one(Item, q.item_ids[0])
+    answer = _answer_of(session, q.run_id, item.id, lock=True)
+    session.refresh(q, with_for_update=True)
     if q.status not in ASKABLE:
         raise Conflict("This question is already closed.")
-    item = session.get_one(Item, q.item_ids[0])
+    if answer.label not in OPEN:
+        raise Conflict("This item was answered since; the question no longer applies.")
     if q.status == "open" and follow_up(item.question, text) is not None:
         q.status, q.asked_count, q.answer_text = "follow_up", 1, redact_text(text)
         audit_log.record(session, workspace_id, "question.follow_up", ref=str(q.id))
@@ -117,40 +122,47 @@ def answer_question(
         return q, None, []
     first = q.answer_text if q.status == "follow_up" else None  # already redacted
     combined = f"{first}\n{text}" if first else text
-    run_id, topic, position, item_id, asked = q.run_id, item.topic, item.position, item.id, q.asked_count + 1
-    q.status = (
-        "answered"  # the commit in store_statement frees the row lock: a second request must see it closed
-    )
+    run_id, topic, item_id = q.run_id, item.topic, item.id
     try:
+        # one transaction: the statement, the answer and the question close together or not at all
         statement = store_statement(
-            session, workspace_id, combined, filename=statement_filename(position), today=today
+            session,
+            workspace_id,
+            combined,
+            filename=statement_filename(item.position),
+            today=today,
+            commit=False,
         )
+        statement_id = statement.id
+        lines = list(
+            session.scalars(
+                select(DocumentLine.text)
+                .where(DocumentLine.document_id == statement_id)
+                .order_by(DocumentLine.n)
+            )
+        )
+        answer.label, answer.value, answer.statement_id = "user_confirmed", None, statement_id
+        answer.text, answer.confidence, answer.approved_at = " ".join(lines), 1.0, None
+        answer.edited = False
+        # the engine's evidence no longer describes this answer (pre-flight P7)
+        answer.citations, answer.dropped, answer.conflict, answer.scope_note = [], [], None, None
+        answer.stances, answer.chunk_ids, answer.retrieval_dropped = [], [], []
+        q.status, q.asked_count, q.statement_id = "answered", q.asked_count + 1, statement_id
+        q.answer_text = "\n".join(lines)
+        session.execute(
+            update(SuggestedFill)
+            .where(
+                SuggestedFill.run_id == run_id,
+                SuggestedFill.item_id == item_id,
+                SuggestedFill.status == "open",
+            )
+            .values(status="dismissed")
+        )
+        audit_log.record(session, workspace_id, "question.answer", ref=str(q.id))
+        session.commit()
     except BaseException:
-        session.rollback()  # an empty or over-long answer leaves the question open
+        session.rollback()  # nothing of the answer persists: a retry starts clean
         raise
-    statement_id = statement.id
-    q = _question(session, workspace_id, question_id, lock=True)
-    lines = list(
-        session.scalars(
-            select(DocumentLine.text).where(DocumentLine.document_id == statement_id).order_by(DocumentLine.n)
-        )
-    )
-    answer = _answer_of(session, run_id, item_id, lock=True)
-    answer.label, answer.value, answer.statement_id = "user_confirmed", None, statement_id
-    answer.text, answer.confidence, answer.approved_at, answer.edited = " ".join(lines), 1.0, None, False
-    # the engine's evidence no longer describes this answer (pre-flight P7)
-    answer.citations, answer.dropped, answer.conflict, answer.scope_note = [], [], None, None
-    answer.stances, answer.chunk_ids, answer.retrieval_dropped = [], [], []
-    q.asked_count, q.answer_text, q.statement_id = asked, "\n".join(lines), statement_id
-    session.execute(
-        update(SuggestedFill)
-        .where(
-            SuggestedFill.run_id == run_id, SuggestedFill.item_id == item_id, SuggestedFill.status == "open"
-        )
-        .values(status="dismissed")
-    )
-    audit_log.record(session, workspace_id, "question.answer", ref=str(q.id))
-    session.commit()
     found = _suggest(session, workspace_id, run_id, statement_id, topic, item_id, llm, models, network)
     return q, answer, found
 
@@ -232,15 +244,14 @@ def skip(session: Session, workspace_id: uuid.UUID, question_id: uuid.UUID) -> I
 
 def accept_suggestion(session: Session, workspace_id: uuid.UUID, suggestion_id: uuid.UUID) -> Answer:
     sg = session.scalar(
-        select(SuggestedFill)
-        .where(SuggestedFill.id == suggestion_id, SuggestedFill.workspace_id == workspace_id)
-        .with_for_update()
+        select(SuggestedFill).where(
+            SuggestedFill.id == suggestion_id, SuggestedFill.workspace_id == workspace_id
+        )
     )
     if sg is None:
         raise NotFound()
-    if sg.status != "open":
-        raise Conflict("This suggestion was already used or dismissed.")
-    # question rows before the answer row, the order answer_question locks them in
+    # lock order as answer_question: answer, question, suggestions
+    a = _answer_of(session, sg.run_id, sg.item_id, lock=True)
     session.execute(
         update(InterviewQuestion)
         .where(
@@ -250,7 +261,10 @@ def accept_suggestion(session: Session, workspace_id: uuid.UUID, suggestion_id: 
         )
         .values(status="answered")
     )
-    a = _answer_of(session, sg.run_id, sg.item_id, lock=True)
+    session.refresh(sg, with_for_update=True)
+    if sg.status != "open":
+        session.rollback()
+        raise Conflict("This suggestion was already used or dismissed.")
     if a.label not in OPEN:
         session.rollback()
         raise Conflict("This item was answered since; the suggestion no longer applies.")
