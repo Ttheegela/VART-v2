@@ -37,8 +37,9 @@ its CDN.
 
 Opening the precomputed sample run starts a ten-step tour in the browser: what VART does, documents, the
 questionnaire, the run grid, the evidence drawer, Questions for you, export, the audit log, the gap check and a note
-that this is not legal advice. It starts every time the sample run opens (there is no "seen" flag), never runs on a
-visitor's own data, closes when another run opens or a live gap check runs, and `t`, the Tour button or `?` starts it
+that this is not legal advice. It starts every time the sample run opens (there is no "seen" flag), never starts on a
+run the engine made for the visitor's own files (a sample copy the visitor has answered questions in keeps it, because
+it still carries the sample snapshot's mark), closes when another run opens or a live gap check runs, and `t`, the Tour button or `?` starts it
 again. It is browser code over the sample run's stored answers, so it makes no request of its own and spends nothing.
 
 ## One fill run
@@ -61,17 +62,17 @@ again. It is browser code over the sample run's stored answers, so it makes no r
 ```
 
 1. **Create.** A new run records the prompt versions and model ids it uses. One live run per questionnaire: a second
-   start answers 409. A running run no step has touched for 10 minutes (abandoned) is closed as failed when a new run
-   starts or a document is deleted, so it never blocks anything.
+   start answers 409. A running run no step has touched for 10 minutes (abandoned) is closed as failed when a new run of
+   its questionnaire starts or a document delete is asked, so it never blocks those. A gap check is not closed that way:
+   an abandoned one stays running and the visitor's `r` resumes it.
 2. **Claim.** A step claims the next pending items (4 for a questionnaire; for a gap check, outcomes until their
    parts add up to 8) with `FOR UPDATE SKIP LOCKED`, so a repeated or concurrent call never takes the same item. A
    claim older than 5 minutes (a crashed step) is reclaimed.
 3. **Work at the same time.** Every claimed item (every not-yet-stored part of a claimed outcome) is one job, run by
    a pool of at most 8 workers. Each worker has its own database session and budget counter. A worker spends the
    budget before every model call and never holds a transaction open while a model runs. The budget counters are
-   single atomic statements, so concurrent workers cannot spend past a cap. The speed-up is expected to be about 3 to 4 times
-   faster than one item at a time (a 64-item run in about 3.5 minutes against about 11;
-   to be measured in Task 9).
+   single atomic statements, so concurrent workers cannot spend past a cap. The speed-up is about 3 times: a live 64-item run
+   took 231 s in 16 steps ($0.06) against about 11 minutes.
 4. **Time limits.** `DEADLINE_S` (240 s) decides whether a job or a retry may start; `HARD_S` (270 s) bounds the whole
    step. A job still running at `HARD_S` is abandoned and its item goes back with its attempt counted, so a step always
    answers before Vercel's 300 s limit. An item that fails `MAX_ATTEMPTS` times is answered as failed.

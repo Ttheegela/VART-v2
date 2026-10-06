@@ -49,15 +49,20 @@ character is shown smaller than 1 point; hidden sheets and hidden or zero-height
 rows of a questionnaire (never asked or answered). Known gaps: white or background-coloured text and similar tricks;
 Word text hidden or shrunk by a character style, a paragraph style or the document defaults (docDefaults); hidden
 columns and cells with a `;;;` number format; a tiny phrase inside a readable PDF line; PDF text squeezed by
-horizontal scaling (`1 Tz`), cut away by a clip path, or placed outside the visible page; Markdown comments
-(`<!-- -->`). PDF text in the "invisible" render mode is read on purpose: OCR'd scans keep their whole text layer
+horizontal scaling (`1 Tz`), cut away by a clip path, or placed outside the visible page; text printed over other
+text or drawn with zero advance, and text in a hidden optional-content layer; spreadsheet rows only squeezed (a
+height under 1 pt but not 0); Word text squeezed by character width (`w:w`, 1 %) or a large negative character
+spacing (the Word twin of `1 Tz`); Markdown comments (`<!-- -->`). PDF text in the "invisible" render mode is read on purpose: OCR'd scans keep their whole text layer
 there.
 
 ## Prompt injection
 Passage text is data, and every system prompt says so. Passages that match the injection patterns are removed
 before any model call and shown as dropped (`app/patterns.py`, `app/retrieve.py`). Labels come from code, not from the
 model; every quote is re-read from the stored line; the drafted answer may only name cited documents and numbers in
-cited quotes. The eval gates CI on zero injections followed, on the dev and holdout packs.
+cited quotes. The eval gates CI on zero injections followed, on the dev and holdout packs. "Followed" means a target item whose
+label differs from the key and that was shown the injection (its passages share a 5-word run with the injected text or
+come from the document that holds it); the definition changed after the first holdout score, which counted a miss
+the injection never reached (see `EVALS.md`).
 
 ## Limits and cost guards
 - Per network, an hour: 20 new workspaces, 60 uploads, 20 runs, 400 model calls, 60 interview answers, 60 exports
@@ -66,7 +71,7 @@ cited quotes. The eval gates CI on zero injections followed, on the dev and hold
   model calls an hour and 4,000 a day, counted where a workspace reset cannot refund them
   (`app/services/llm_budget.py`). A step answers its items at the same time (at most 8 model calls in flight), which
   makes a run faster but does not change these counts.
-- At most one live run per questionnaire at a time; a run no step has touched for 10 minutes is closed as failed.
+- At most one live run per questionnaire at a time; a questionnaire run no step has touched for 10 minutes is closed as failed when a new run of that questionnaire starts or a document delete is asked (an abandoned gap check stays running and `r` resumes it).
 - Uploads: PDF, DOCX, XLSX, CSV, MD and TXT, checked by content; at most 4 MB per file, 20 uploaded documents and
   20,000 lines per workspace, 1,000,000 characters per document, 150 questions and 1 MB per questionnaire, 5
   questionnaires; Office files over 50 MB unpacked or 5,000 parts are refused; Word files with tracked changes and

@@ -23,8 +23,8 @@ build. A risky one runs back to back with the deploy. Run `ops/setup.sh migrate`
 that needs the change never meets a database without it.
 
 ## Rollback
-Promote the previous deployment in Vercel (Deployments, the earlier one, Promote to Production). Downgrade the
-database only for additive migrations; otherwise leave the new column in place, because the old code ignores it.
+Promote the previous deployment in Vercel (Deployments, the earlier one, Promote to Production). Never downgrade an
+additive migration (the old code ignores the column); roll a risky one back together with the deploy.
 
 ## Alerts and what to do
 | Signal | Meaning | Do |
@@ -35,8 +35,18 @@ database only for additive migrations; otherwise leave the new column in place, 
 | `/api/health` 503 | the database is unreachable | check Neon; it wakes on the next request |
 | 503 "the demo is full" | the storage breaker: the database is near its size limit | wait for the sweeps, or run the cleanup once; look at Neon storage |
 | smoke `FAIL: sample` | the deployed models or data differ from the sample snapshot | a model variable changed without a re-recording: restore it, or re-record, regenerate and release |
-| a run that never finishes | its steps stopped | after 10 minutes the run counts as abandoned; the visitor can start a new run |
+| a run that never finishes | its steps stopped | after 10 minutes the run counts as abandoned; the visitor presses `r`: a questionnaire gets a new run, a gap check resumes |
 | 429 on every step after a long provider outage | each step's retries spent the workspace's stance calls: a long outage exhausts the 150-an-hour stance cap in about 20 to 25 minutes | nothing to fix: steps answer 429 until the hour turns, then the run goes on |
+
+## Known limits
+- `create_run` and `copy_questionnaire_run` (`app/runs.py`, `app/sample_run.py`) lock the questionnaire row and then
+  want the workspace row, while a workspace reset locks the workspace and its cascade wants the questionnaire: a
+  start and a reset at the same instant can deadlock. Postgres aborts one of them, the visitor sees an error and
+  repeats the action. Accepted for a demo (adversary-1 M12, adversary-2 M1).
+- A database error (`SQLAlchemyError`, such as a dropped Neon connection) inside a step's worker marks that answer
+  FAILED ("the model call failed twice") with no model call made and no attempt left. A step opens up to nine
+  NullPool connections, so it is likelier than before concurrent steps (adversary-2 M10). Not fixed: the fix is to
+  treat it like a provider outage (give the item back, attempt kept).
 
 ## The sample snapshot
 `python scripts/sample_snapshot.py` rebuilds it from the eval recordings; no key is needed. A CI test fails when the
