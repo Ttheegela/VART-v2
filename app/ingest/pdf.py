@@ -53,7 +53,7 @@ def _visual_lines(pdf: pdfium.PdfDocument) -> list[Visual]:
                     pdfium_c.FPDFText_GetMatrix(textpage.raw, i, m)
                     shown = pdfium_c.FPDFText_GetFontSize(textpage.raw, i) * abs(m.a * m.d - m.b * m.c) ** 0.5
                     # ponytail: the line's first character only; a tiny phrase inside a readable line is a gap
-                    if not (exact and shown < MIN_SIZE):
+                    if exact and shown >= MIN_SIZE:  # inexact: dropped, not trusted (adversary-2 M6)
                         out.append(Visual(part.strip(), size, bottom, number))
                 start += len(part) + 2
         finally:

@@ -90,6 +90,16 @@ def test_a_scan_or_an_empty_pdf_is_refused() -> None:
         parse("scan.pdf", bytes(blank.output()))
 
 
+def test_a_page_whose_char_index_is_inexact_is_dropped_not_trusted(monkeypatch: pytest.MonkeyPatch) -> None:
+    import pypdfium2 as pdfium
+
+    real = pdfium.PdfTextPage.get_text_range
+    extra = "\U0001f600"
+    monkeypatch.setattr(pdfium.PdfTextPage, "get_text_range", lambda s, *a, **k: real(s, *a, **k) + extra)
+    with pytest.raises(IngestError, match="no text layer"):
+        parse("h.pdf", _pdf("Text that would otherwise be long enough to read."))
+
+
 def test_a_password_protected_pdf_is_refused() -> None:
     pdf = FPDF()
     pdf.set_encryption(owner_password="owner", user_password="user")

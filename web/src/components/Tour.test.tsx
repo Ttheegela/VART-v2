@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { useKeys } from "../lib/keys";
 import { go } from "../lib/route";
-import { STEPS, maybeStartTour, startTour } from "../lib/tour";
+import { STEPS, maybeStartTour, moveTour, startTour } from "../lib/tour";
 import { fixtures, mockApi } from "../test/mockApi";
 import GapCheck from "../views/GapCheck";
 import Questions from "../views/Questions";
@@ -126,6 +126,17 @@ describe("Tour", () => {
     render(<Tour />);
     act(() => startTour(ctx));
     act(() => go({ view: "run", run: "r2" }));
+    expect(dialog()).toBeNull();
+  });
+
+  it("closes when the visitor navigates to a view the step is not on (adversary-2 M8)", () => {
+    render(<Tour />);
+    act(() => startTour(ctx));
+    act(() => go({ view: "workspace" })); // step 1 has no view of its own: the tour leaves it alone
+    expect(dialog()).not.toBeNull();
+    act(() => moveTour(1)); // the tour's own move to the workspace
+    expect(dialog()).not.toBeNull();
+    act(() => go({ view: "gap" }));
     expect(dialog()).toBeNull();
   });
 

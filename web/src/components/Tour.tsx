@@ -20,6 +20,14 @@ export default function Tour() {
     if (r && href(r) !== window.location.search) go(r, { replace: true }); // browser Back skips the tour's moves
   }, [open, step, ctx, s]);
 
+  const seen = useRef(route.view);
+  useEffect(() => { // the visitor navigated away from the step's view (adversary-2 M8); a step's own move matches it
+    const moved = seen.current !== route.view;
+    seen.current = route.view;
+    const want = ctx && s.route(ctx)?.view;
+    if (open && moved && want && want !== route.view) stopTour();
+  }, [open, ctx, s, route.view]);
+
   useEffect(() => {
     if (!open || !ctx) return;
     if ((route.run && route.run !== ctx.runId) || (route.item && narrow())) stopTour(); // never on a live run

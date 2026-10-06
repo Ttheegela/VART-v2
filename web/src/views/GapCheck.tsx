@@ -97,7 +97,7 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
   // The Run grid's loop drives the steps; after each one the rows are read again from GET /api/gap/{scope}.
   const run = data?.run ?? null;
   const loop = useMemo<RunRowsOut | null>(() => (run ? { run, rows: [] } : null), [run]);
-  const { error: loopError, running } = useStepLoop(run?.id ?? "", loop, reload, onGone);
+  const { error: loopError, running, resume } = useStepLoop(run?.id ?? "", loop, reload, onGone);
 
   const rows = data?.rows;
   const counts = useMemo(() => {
@@ -138,7 +138,8 @@ export default function GapCheck({ workspace, onGone, scope, outcome }: ViewProp
     stopTour(); // a run is starting (preflight I3); the step loop also stops it while the run is running
     try {
       const out = await api.startGap(current);
-      if (out.status === "done") setNotice({ scope: current, text: NOTHING_CHANGED });
+      if (out.status === "running") resume(); // a stopped loop on a still-running run (adversary-2 I1)
+      else if (out.status === "done") setNotice({ scope: current, text: NOTHING_CHANGED });
       reload();
     } catch (e) { setError(messageOf(e)); }
     setBusy(false);

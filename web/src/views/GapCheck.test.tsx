@@ -163,6 +163,21 @@ describe("GapCheck", () => {
     expect(click).not.toHaveBeenCalled();
   });
 
+  it("Check again after a stopped loop steps the run again (adversary-2 I1)", async () => {
+    const running = { ...fixtures.gap, run: { ...fixtures.gap.run!, status: "running" as const, done: 0 } };
+    let steps = 0;
+    mockApi({
+      "GET /api/gap/core": running,
+      "POST /api/gap/core/run": running.run,
+      "POST /api/runs/r9/step": () => { if (steps++ === 0) return new Response("{}", { status: 500 }); return new Promise(() => {}); },
+    });
+    render(<GapCheck {...props} />);
+    await screen.findByRole("alert");
+    expect(steps).toBe(1);
+    await userEvent.keyboard("r");
+    await waitFor(() => expect(steps).toBe(2));
+  });
+
   it("a scope switch puts the cursor back on the first row", async () => {
     mockApi({ "GET /api/gap/core": fixtures.gap, "GET /api/gap/protect": { ...fixtures.gap, scope: "protect" } });
     const { rerender } = render(<GapCheck {...props} />);
