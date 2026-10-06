@@ -66,7 +66,7 @@ def redecide(session: Session, workspace_id: uuid.UUID, document_id: uuid.UUID) 
             Answer.edited.is_(False),
             Answer.chunk_ids.has_any(array(chunk_ids)),
         )
-        # lock as edit, approve and accept do (answer before question, Ruling 9), by id so re-decides agree;
+        # lock answers first as app/questions.py's lock order says, by id as approve-verified does;
         # a concurrent edit is waited out and then excluded by `edited` (adversary-3 inputs M7)
         .order_by(Answer.id)
         .with_for_update()

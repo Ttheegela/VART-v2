@@ -484,3 +484,31 @@ def test_the_design_tokens_pass(tmp_path: Path) -> None:
         "@theme { --color-mark: var(--color-neutral-200); }\nmark { background: var(--color-mark); }\n"
     )
     assert violations(f) == []
+
+
+@pytest.mark.parametrize(
+    ("name", "source"),
+    [
+        ("x.tsx", "const borderClass = mark ? 'a' : 'b';\n"),
+        ("x.tsx", "const color = linkText;\n"),
+        ("x.tsx", "<Cell border={highlight} />\n"),
+        ("x.tsx", "const filter = highlight;\n"),
+        ("x.tsx", 'const s = { background: highlight ? "a" : "b" };\n'),
+        ("x.css", ".border:hover { content: 'mark' }\n"),
+    ],
+)
+def test_system_colour_words_as_identifiers_pass(tmp_path: Path, name: str, source: str) -> None:
+    # Task 6 review M1: mark and highlight are ordinary variable names; `border = x` is an assignment.
+    assert violations(_file(tmp_path, source, name)) == []
+
+
+@pytest.mark.parametrize(
+    ("name", "source"),
+    [
+        ("x.tsx", 'const s = { color: "LinkText" };\n'),
+        ("x.html", '<p style="color:LinkText">x</p>\n'),
+        ("x.tsx", 'const s = { boxShadow: "0 0 1px black, 0 0 2px red" };\n'),  # review M8
+    ],
+)
+def test_quoted_colours_in_scripts_are_still_caught(tmp_path: Path, name: str, source: str) -> None:
+    assert violations(_file(tmp_path, source, name))

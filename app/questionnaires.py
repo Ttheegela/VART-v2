@@ -59,6 +59,11 @@ class ParsedItem:
     answer: str | None
 
 
+class QuestionTooLong(IngestError):
+    """A question over MAX_QUESTION: the one read_items refusal an upload shows at once. The others wait for
+    the visitor's mapping, since a detected topic column or sheet may be the wrong guess."""
+
+
 def _text(value: object) -> str:
     return "" if value is None else " ".join(str(value).split())
 
@@ -228,7 +233,7 @@ def read_items(sheets: list[Sheet], mapping: Mapping) -> list[ParsedItem]:
             continue
         topic = at(row, mapping.topic_col) if mapping.topic_col else section
         if len(question) > MAX_QUESTION:
-            raise IngestError(f"Row {n}'s question is longer than {MAX_QUESTION:,} characters.")
+            raise QuestionTooLong(f"Row {n}'s question is longer than {MAX_QUESTION:,} characters.")
         if topic and len(topic) > MAX_TOPIC:
             raise IngestError(f"Row {n}'s topic is longer than {MAX_TOPIC} characters.")
         items.append(
@@ -242,8 +247,13 @@ def read_items(sheets: list[Sheet], mapping: Mapping) -> list[ParsedItem]:
 
 
 def preview(sheets: list[Sheet], mapping: Mapping) -> list[PreviewRow]:
-    """Raises read_items' IngestError, so an upload is refused at once, not at the mapping's PUT."""
-    items = read_items(sheets, mapping)
+    """Empty when the mapping reads no items; a too-long question is raised, so the upload is refused."""
+    try:
+        items = read_items(sheets, mapping)
+    except QuestionTooLong:
+        raise
+    except IngestError:
+        return []  # e.g. a long text column detected as the topic: the visitor fixes it at PUT .../mapping
     return [
         PreviewRow(row=i.row, id=i.code, question=i.question, topic=i.topic, answer=i.answer)
         for i in items[:PREVIEW]

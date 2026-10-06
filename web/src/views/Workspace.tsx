@@ -178,6 +178,8 @@ export default function WorkspaceView({ workspace, onGone }: ViewProps) {
   const [docs, setDocs] = useState<DocumentOut[]>([]);
   const [qs, setQs] = useState<QuestionnaireOut[]>([]);
   const [current, setCurrent] = useState<QuestionnaireOut | null>(null);
+  const qsNow = useRef(qs); // the list as last rendered, for a handler that resumes after an await
+  useEffect(() => { qsNow.current = qs; });
   const [docError, setDocError] = useState<string | null>(null);
   const [qError, setQError] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
@@ -250,8 +252,8 @@ export default function WorkspaceView({ workspace, onGone }: ViewProps) {
       return;
     }
     // the list as it is now, not as it was when the delete started (an upload may have landed meanwhile)
-    let rest: QuestionnaireOut[] = [];
-    setQs((all) => (rest = all.filter((x) => x.id !== q.id)));
+    const rest = qsNow.current.filter((x) => x.id !== q.id);
+    setQs(rest);
     setCurrent((c) => (c?.id === q.id ? rest[0] ?? null : c));
     // the pressed button is gone; focus the list's first remaining control, or the upload input
     requestAnimationFrame(() => (list.current?.querySelector("button") ?? qInput.current)?.focus());

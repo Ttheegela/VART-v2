@@ -60,10 +60,17 @@ EMOJI = re.compile(r"[\U0001F000-\U0001FAFF\u2705\u274C\u274E\u2B50\uFE0F]")
 # functions sepia( and hue-rotate( (function names are case-insensitive; Tailwind classes are not).
 FILTER = re.compile(r"\b(?:sepia|hue-rotate-\d+|saturate-(?:[2-9]\d\d|1\d\d))\b|\b(?i:sepia|hue-rotate)\(")
 
+
 # A colour name only styles something where it is a value, so prose such as "red-flagged" or "the green light"
 # is left alone. It is matched whole: not inside a longer word, a hyphenated name, a path or a member access.
-_COLOURED = "|".join(sorted((set(CSS_COLOURS) - set(GREYS)) | set(SYSTEM)))
-NAMED = re.compile(rf"(?<![A-Za-z0-9./-])(?:{_COLOURED})(?![A-Za-z0-9.-])", re.IGNORECASE)
+def _names(names: set[str]) -> re.Pattern[str]:
+    return re.compile(rf"(?<![A-Za-z0-9./-])(?:{'|'.join(sorted(names))})(?![A-Za-z0-9.-])", re.IGNORECASE)
+
+
+NAMED = _names((set(CSS_COLOURS) - set(GREYS)) | set(SYSTEM))
+# In a script, mark, highlight and linkText are ordinary identifiers; a system colour counts only when quoted.
+SCRIPT_NAMED = _names(set(CSS_COLOURS) - set(GREYS))
+QUOTED = re.compile(r""""[^"]*"|'[^']*'|`[^`]*`""")
 # Custom properties, anything ending in color or shadow (accent-color, borderTopColor, box-shadow, ...),
 # filter (drop-shadow() takes a colour) and the colour shorthands.
 _PROPERTY = (
@@ -72,27 +79,29 @@ _PROPERTY = (
     r"|-webkit-text-stroke)[\w-]*)"
 )
 # In a script a value ends at ; or }, at the comma before the next object key, or at the line's end (commas
-# inside parentheses stay). In a CSS file a declaration ends only at ; or }, so commas (box-shadow: a, b) and
-# newlines are inside it.
-_VALUE = r"(?:[^;,}()\n]|\((?:[^()]|\([^()]*\))*\))*"
-_CSS_VALUE = r"(?:[^;}()]|\((?:[^()]|\([^()]*\))*\))*"
+# inside parentheses or a quoted string stay: boxShadow: "0 0 1px black, 0 0 2px red"). In a CSS file a
+# declaration ends only at ; or } (or the { of a rule: .a:hover {), so commas and newlines are inside it.
+_VALUE = r"""(?:"[^"\n]*"|'[^'\n]*'|[^;,}()\n]|\((?:[^()]|\([^()]*\))*\))*"""
+_CSS_VALUE = r"(?:[^;{}()]|\((?:[^()]|\([^()]*\))*\))*"
 
 
-def _style_values(value: str) -> tuple[re.Pattern[str], ...]:
+def _style_values(value: str, unquoted: bool) -> tuple[re.Pattern[str], ...]:
+    attribute = r""""[^"]*"|'[^']*'|\{[^{}]*\}""" + (r"""|[^\s>"'{}]+""" if unquoted else "")
     return (
         # color: red;  { backgroundColor: "red" }   (CSS declarations and JS/TS style objects)
         re.compile(_PROPERTY + r"""["']?\s*:\s*(?P<value>""" + value + ")", re.IGNORECASE),
-        # fill="red"  fill=red  stroke={dark ? "red" : "black"}   (HTML, SVG and JSX attributes)
-        re.compile(
-            _PROPERTY + r"""\s*=\s*(?P<value>"[^"]*"|'[^']*'|\{[^{}]*\}|[^\s>"'{}]+)""", re.IGNORECASE
-        ),
+        # fill="red"  stroke={dark ? "red" : "black"}  and, in HTML and SVG only, fill=red   (attributes; in a
+        # script `border = x` is an assignment)
+        re.compile(_PROPERTY + r"\s*=\s*(?P<value>" + attribute + ")", re.IGNORECASE),
         # bg-[red]  shadow-[0_0_4px_red]   (Tailwind arbitrary values)
         re.compile(r"-\[(?P<value>[^\]]*)\]"),
     )
 
 
-STYLE_VALUES = _style_values(_VALUE)
-CSS_STYLE_VALUES = _style_values(_CSS_VALUE)
+STYLE_VALUES = _style_values(_VALUE, unquoted=False)
+MARKUP_STYLE_VALUES = _style_values(_VALUE, unquoted=True)
+CSS_STYLE_VALUES = _style_values(_CSS_VALUE, unquoted=False)
+MARKUP = {".html", ".svg"}
 
 
 def _grey(hex_colour: str) -> bool:
@@ -102,22 +111,34 @@ def _grey(hex_colour: str) -> bool:
     return h[0:2].lower() == h[2:4].lower() == h[4:6].lower()  # red, green, blue; any alpha is ignored
 
 
-def _colour_names(text: str, patterns: tuple[re.Pattern[str], ...]) -> list[tuple[int, str]]:
+def _colour_names(text: str, patterns: tuple[re.Pattern[str], ...], script: bool) -> list[tuple[int, str]]:
     """(line, name) for each colour name in a style value; the whole text is scanned, so a declaration may
     span lines. By position, so a name two patterns both see (bg-[color:red]) counts once."""
     hits: dict[int, tuple[int, str]] = {}
     for pattern in patterns:
         for style in pattern.finditer(text):
             line = text.count("\n", 0, style.start()) + 1
-            for name in NAMED.finditer(style["value"]):
-                hits[style.start("value") + name.start()] = (line, name.group(0))
+            at, value = style.start("value"), style["value"]
+            names = [
+                (at + m.start(), m.group(0)) for m in (SCRIPT_NAMED if script else NAMED).finditer(value)
+            ]
+            if script:  # a system colour only inside a string
+                names += [
+                    (at + q.start() + m.start(), m.group(0))
+                    for q in QUOTED.finditer(value)
+                    for m in NAMED.finditer(q.group(0))
+                ]
+            for pos, name in names:
+                hits[pos] = (line, name)
     return list(hits.values())
 
 
 def violations(path: Path) -> list[str]:
     text = path.read_text(encoding="utf-8")
-    patterns = CSS_STYLE_VALUES if path.suffix == ".css" else STYLE_VALUES
-    found = [f"{path}:{n}: colour name {name}" for n, name in _colour_names(text, patterns)]
+    css, markup = path.suffix == ".css", path.suffix in MARKUP
+    patterns = CSS_STYLE_VALUES if css else MARKUP_STYLE_VALUES if markup else STYLE_VALUES
+    names = _colour_names(text, patterns, script=not (css or markup))
+    found = [f"{path}:{n}: colour name {name}" for n, name in names]
     for n, line in enumerate(text.splitlines(), start=1):
         found += [f"{path}:{n}: colour utility {m.group(0)}" for m in UTILITY.finditer(line)]
         found += [

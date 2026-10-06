@@ -141,7 +141,7 @@ change-log line; changing or removing a path, a field or a status needs the lead
   `POST /api/runs/{id}/step` answers 503 with `Retry-After: 60` when the model provider is failing (401, 402, 408, 429,
   5xx, connection errors); the items stay pending, nothing is written as failed, the cost is kept. Schema mismatches
   and other 4xx are still the failed answer. A reset between two reads of one row is the `GONE` 404.
-- 2026-10-07: inputs lane, adversary-3 fix round (no path, field or status changed; limits only): a document
+- 2026-10-06: inputs lane, adversary-3 fix round (no path, field or status changed; limits only): a document
   delete answers 409 while a run in the workspace is `running`; a document over 1,000,000 characters of text, a
   question over 2,000 or a topic over 200 characters, an xlsx over 4 MB unpacked, and a csv over 2,000 rows or
   52 columns are refused with the existing 422 sentence; `lines?from=&to=` is at most 20,000 (422); questionnaire

@@ -44,10 +44,6 @@ class ModelsUnavailable(Exception):
     run waits instead of writing failed answers. A 503 with Retry-After."""
 
 
-def not_built() -> HTTPException:
-    return HTTPException(status_code=501, detail="Not built yet.")
-
-
 def network(request: Request) -> str:
     """The caller's network as ip_limits stores it (a salted hash), for `llm_budget.spender(network=)`."""
     return ip_hash(client_ip(request), get_settings().session_secret)

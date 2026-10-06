@@ -107,6 +107,21 @@ def test_a_long_question_is_refused_at_upload(db: Engine) -> None:
     assert client.get("/api/questionnaires").json() == []
 
 
+def test_a_long_detected_topic_column_does_not_block_the_upload(db: Engine) -> None:
+    # Task 6 review I1: "Control Specification" is detected as the topic; only the PUT decides the mapping.
+    client, _ = visitor(db)
+    body = (
+        f"Question ID,Control Specification,Question,Answer\r\nA-1,{'s' * 250},Do you encrypt backups?,\r\n"
+    )
+    r = client.post("/api/questionnaires", files={"file": ("caiq.csv", body.encode(), "text/csv")})
+    assert r.status_code == 201, r.text
+    q = r.json()
+    assert q["detected"]["topic_col"] == "B" and q["preview"] == []
+    put = client.put(f"/api/questionnaires/{q['id']}/mapping", json=q["detected"] | {"topic_col": None})
+    assert put.status_code == 200, put.text
+    assert put.json()["item_count"] == 1
+
+
 def test_i4_a_document_over_the_text_cap_is_refused() -> None:
     line = "a" * 10_000 + "\n\n"
     with pytest.raises(IngestError, match="characters of text"):

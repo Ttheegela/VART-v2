@@ -192,6 +192,8 @@ CALLS: dict[tuple[str, str], dict[str, object]] = {
     ("/api/audit", "get"): {},
 }
 # Ruling 7: no operation is a stub after the Plan 3 merge; each is named by the test that exercises it.
+# ponytail: the check proves each named test exists, not that it still calls its route (checked by hand at
+# integration); record request.scope["route"] across the suite if a rename ever slips through.
 D, Q, R, E, IV = (
     "tests.test_api_documents",
     "tests.test_api_questionnaires",

@@ -132,15 +132,16 @@ def approve_verified(run_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -
     """Approve every verified answer not yet approved (design key A). An edited answer is left for a look
     (adversary-1 M5): approve it by itself; `skipped_edited` counts them."""
     run = _own(session, ws, run_id)
+    open_verified = (
+        Answer.run_id == run.id,
+        Answer.label == "verified",
+        Answer.edited.is_(False),
+        Answer.approved_at.is_(None),
+    )
+    # lock in id order first, as redecide does, so the two bulk lockers cannot deadlock (task-6 review M2)
+    ids = session.scalars(select(Answer.id).where(*open_verified).order_by(Answer.id).with_for_update()).all()
     result = session.execute(
-        update(Answer)
-        .where(
-            Answer.run_id == run.id,
-            Answer.label == "verified",
-            Answer.edited.is_(False),
-            Answer.approved_at.is_(None),
-        )
-        .values(approved_at=func.now())
+        update(Answer).where(Answer.id.in_(ids), *open_verified).values(approved_at=func.now())
     )
     n = int(result.rowcount or 0)  # type: ignore[attr-defined]
     skipped = session.scalar(
