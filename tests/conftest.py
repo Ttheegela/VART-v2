@@ -27,7 +27,7 @@ from app.db.session import get_engine  # noqa: E402
 
 TABLES = (
     "workspaces, documents, document_lines, chunks, questionnaires, items, runs, run_items, answers, "
-    "audit_events, llm_usage, ip_limits, canary_runs"
+    "interview_questions, suggestions, audit_events, llm_usage, ip_limits, canary_runs"
 )
 
 

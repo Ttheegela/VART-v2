@@ -5,7 +5,17 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.db.models import Answer, Chunk, Document, Item, Questionnaire, Run, Workspace
+from app.db.models import (
+    Answer,
+    Chunk,
+    Document,
+    InterviewQuestion,
+    Item,
+    Questionnaire,
+    Run,
+    SuggestedFill,
+    Workspace,
+)
 
 CITATION: dict[str, Any] = {
     "chunk_id": "c1",
@@ -76,3 +86,27 @@ def answer(s: Session, r: Run, it: Item, **kw: Any) -> Answer:
     s.add(a)
     s.flush()
     return a
+
+
+def question(s: Session, r: Run, it: Item, **kw: Any) -> InterviewQuestion:
+    values: dict[str, Any] = {"item_ids": [it.id], "reason": "unknown", "rank": 0, "text": it.question}
+    q = InterviewQuestion(workspace_id=r.workspace_id, run_id=r.id, **(values | kw))
+    s.add(q)
+    s.flush()
+    return q
+
+
+def suggestion(s: Session, r: Run, it: Item, statement: Document, **kw: Any) -> SuggestedFill:
+    values: dict[str, Any] = {
+        "label": "verified",
+        "value": "Yes",
+        "text": "Yes.",
+        "citations": [CITATION],
+        "confidence": 0.9,
+    }
+    sg = SuggestedFill(
+        workspace_id=r.workspace_id, run_id=r.id, item_id=it.id, statement_id=statement.id, **(values | kw)
+    )
+    s.add(sg)
+    s.flush()
+    return sg

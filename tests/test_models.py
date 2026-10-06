@@ -181,6 +181,8 @@ def test_deleting_a_workspace_deletes_everything_in_it(s: Session) -> None:
     s.add(AuditEvent(workspace_id=ws.id, actor="visitor", action="upload"))
     s.add(RunItem(run_id=r.id, item_id=it.id))
     s.add(LlmUsage(workspace_id=ws.id, hour_start=datetime(2026, 1, 1, tzinfo=UTC), kind="draft", calls=1))
+    f.question(s, r, it)
+    f.suggestion(s, r, it, stmt)
     s.commit()
     s.execute(delete(Workspace).where(Workspace.id == ws.id))
     s.commit()
@@ -193,6 +195,8 @@ def test_deleting_a_workspace_deletes_everything_in_it(s: Session) -> None:
         "runs",
         "run_items",
         "answers",
+        "interview_questions",
+        "suggestions",
         "audit_events",
         "llm_usage",
     ):
@@ -231,3 +235,53 @@ def test_a_chunk_is_not_a_record_row_unless_marked(s: Session) -> None:
     row = f.chunk(s, doc, line_start=2, line_end=2, text="System: Okta; Status: Overdue", record=True)
     s.commit()
     assert (plain.record, row.record) == (False, True)
+
+
+def test_answer_keeps_what_decide_needs_to_run_again(s: Session) -> None:
+    q = f.questionnaire(s, f.workspace(s))
+    a = f.answer(s, f.run(s, q), f.item(s, q))
+    s.refresh(a)
+    assert (a.stances, a.chunk_ids, a.retrieval_dropped) == ([], [], [])
+
+
+def test_a_question_is_asked_at_most_twice(s: Session) -> None:
+    ws = f.workspace(s)
+    q = f.questionnaire(s, ws)
+    r = f.run(s, q)
+    it = f.item(s, q)
+    with pytest.raises(IntegrityError, match="ck_interview_questions_asked"):
+        f.question(s, r, it, asked_count=3)
+
+
+def test_one_question_per_item_set_per_run(s: Session) -> None:
+    ws = f.workspace(s)
+    q = f.questionnaire(s, ws)
+    r = f.run(s, q)
+    it = f.item(s, q)
+    f.question(s, r, it)
+    with pytest.raises(IntegrityError, match="uq_interview_questions_items"):
+        f.question(s, r, it)
+
+
+def test_a_suggestion_needs_a_citation_and_a_cited_label(s: Session) -> None:
+    ws = f.workspace(s)
+    q = f.questionnaire(s, ws)
+    r = f.run(s, q)
+    it = f.item(s, q)
+    st = f.document(s, ws, source="statement", kind="statement")
+    with pytest.raises(IntegrityError, match="ck_suggestions_cited"):
+        f.suggestion(s, r, it, st, citations=[])
+    s.rollback()
+    with pytest.raises(IntegrityError, match="ck_suggestions_label"):
+        f.suggestion(s, r, it, st, label="unknown")
+
+
+def test_run_items_count_their_attempts(s: Session) -> None:
+    ws = f.workspace(s)
+    q = f.questionnaire(s, ws)
+    r = f.run(s, q)
+    ri = RunItem(run_id=r.id, item_id=f.item(s, q).id)
+    s.add(ri)
+    s.flush()
+    s.refresh(ri)
+    assert ri.attempts == 0
