@@ -2,17 +2,39 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A visitor runs NIST's CSF 2.0 gap check over their own documents from a Gap check view: they start a run per scope and check it again after an upload, answer the Ask-me outcomes, inspect each outcome part by part next to NIST's text and the cited lines, and export a gap-report sheet. Every label is decided by code.
+**Goal:** A visitor runs NIST's CSF 2.0 gap check over their own documents from a Gap check view. They can:
+- start a run per scope, and check it again after an upload;
+- answer the Ask-me outcomes;
+- inspect each outcome part by part, next to NIST's text and the cited lines;
+- export a gap-report sheet, alone or inside their filled questionnaire.
 
-**Architecture:** Part 0 (Task 1) adds one additive migration (`run_items.parts`, `suggestions.part`) and freezes the contract additions: two paths under `/api/gap/{scope}` (answering 501 until built), the optional fields `AnswerDetail.parts` and `SuggestionOut.part`, and the new `app/csf.py` signatures in `docs/CONTRACTS.md`. After adversary checkpoint 1, two lanes run in parallel on disjoint files:
-- **api** (Tasks 2-4): the step runner answers csf items part by part, claiming outcomes until their parts reach 8 and storing each part's result as it lands; the gap endpoints, the inspector's parts and the gap-report sheet; the re-check after an upload or an answer, and re-decide per part.
+The sample pack gains the planted improvement plan, so the live demo shows a stated non-compliance. Every label is decided by code.
+
+**Architecture:** Part 0 (Task 1) adds one additive migration (`run_items.parts`, `suggestions.part`) and freezes the contract additions:
+- two paths under `/api/gap/{scope}` (answering 501 until built);
+- the optional fields `AnswerDetail.parts` and `SuggestionOut.part`;
+- the gap sheet in both exports;
+- the new `app/csf.py` signatures in `docs/CONTRACTS.md`.
+
+After adversary checkpoint 1, three lanes run in parallel on disjoint files:
+- **api** (Tasks 2-4):
+  - the step runner answers csf items part by part, claiming outcomes until their parts reach 8 and storing each part's result as it lands;
+  - the gap endpoints, the inspector's parts, and the gap-report sheet (alone, and inside a questionnaire's xlsx);
+  - check again (every part of each affected outcome), Ask-me answers that fill Checked parts in the same CSF function, and re-decide per part.
 - **ui** (Tasks 5-6): the Gap check view (tab 6) and its inspector, built against the generated types and the fetch mock.
+- **data** (Task 7, the lead): the planted `security-improvement-plan.md` moves from the gap-only extension into the dev pack, which is also the sample pack. The dev keys are re-derived from the fact sheet and the dev eval is re-recorded. If a gating dev gate fails, the plan stops at Tarun.
 
-The lead merges both lanes into `plan6b` and adds one Playwright flow on recorded replies (Task 7). The whole-branch adversary checkpoint, the docs, the final review and the release plan follow (Task 8). Decide, stance, the draft prompt, retrieval and `answer_retrieved` do not change, so no eval is re-recorded.
+The lead merges the three lanes into `plan6b` and re-records the E2E suite with one new Playwright flow (Task 8). The whole-branch adversary checkpoint, the docs, the final review and the release plan follow (Task 9). Decide, stance, the draft prompt, retrieval and `answer_retrieved` do not change. Only Task 7's new document re-records anything: the dev eval, and the E2E's sample flow.
 
-**Tech Stack:** Python 3.12, FastAPI, SQLAlchemy 2 + Alembic (JSONB), openpyxl, pytest with Postgres; React 19 + Vite + TypeScript + Tailwind v4, Vitest + Testing Library, Playwright with `LLM_MODE=replay`.
+**Tech Stack:** Python 3.12, FastAPI, SQLAlchemy 2 + Alembic (JSONB), openpyxl, pytest with Postgres, the datakit fact-sheet tools; React 19 + Vite + TypeScript + Tailwind v4, Vitest + Testing Library, Playwright with `LLM_MODE=replay`.
 
-**Spec:** `docs/superpowers/specs/2026-10-05-vart-csf-gap-check-design.md`: sections 5 (5.1 start, 5.4 Ask me, 5.5 not checked, 5.6 per-part re-check, 5.7 cost and claim rule), 7 (view, export, copy), 8 (the E2E side only) and 11 (definition of done). It sits on the main spec `docs/superpowers/specs/2026-10-03-vart-v2-design.md`: 6.3 step runner, 6.7 re-decide, 6.9 interview, 6.10 export, 6.12 API.
+**Spec:** `docs/superpowers/specs/2026-10-05-vart-csf-gap-check-design.md`:
+- section 5: 5.1 start, 5.4 Ask me, 5.5 not checked, 5.6 per-part re-check, 5.7 cost and claim rule;
+- section 7: view, export, copy;
+- section 8: the planted cases and the E2E;
+- section 11: definition of done.
+
+It sits on the main spec `docs/superpowers/specs/2026-10-03-vart-v2-design.md`: 6.3 step runner, 6.7 re-decide, 6.9 interview, 6.10 export, 6.12 API, 8 dev-pack gates.
 
 Other inputs:
 - the 6A plan `docs/superpowers/plans/2026-10-05-vart-csf-plan6a-backend.md` (Task 8 and its 6B carries);
@@ -23,20 +45,55 @@ Other inputs:
 
 ## Execution notes (read first)
 
-- **Branches and worktrees.** Integration branch `plan6b` in `~/Desktop/portfolio/projects/VART-wt-plan6b`, from released `main` at `d071aa2` (Plans 3 and 6A live; Neon at `a7c3e9d1b2f4`). Part 0 (Task 1) runs there. After adversary checkpoint 1 the lead creates two lane worktrees from `plan6b`: `plan6b-api` in `~/Desktop/portfolio/projects/VART-wt-6b-api` (Tasks 2-4, in order) and `plan6b-ui` in `~/Desktop/portfolio/projects/VART-wt-6b-ui` (Tasks 5-6, in order). The lead merges both into `plan6b` (Task 7). Test databases: `vart_test_plan6b` (Part 0, integration, E2E) and `vart_test_6b_api` (api lane). The lead creates each once from the main checkout: `docker compose exec db createdb -U vart <name>`. The ui lane needs no database.
-- **Decisions this plan takes.** Tarun confirms them when he reviews the plan:
-  1. **One migration, additive** (`c4e8a2d6f1b3`). Carry (a) needs somewhere to keep a part's result before its outcome is whole, and carry (c) needs a fill to name its part. Two columns do it and no table: `run_items.parts JSONB NOT NULL DEFAULT '{}'` (keys `"1"`..`"n"`, each the part's stored result plus its wording) and `suggestions.part SMALLINT NOT NULL DEFAULT 0` (0 is a whole item), with `uq_suggestions_fill` widened by `part`. Old code runs on the new schema unchanged, so Tarun migrates Neon before `main` moves, as for every release.
+- **Branches and worktrees.** Integration branch `plan6b` in `~/Desktop/portfolio/projects/VART-wt-plan6b`, from released `main` at `d071aa2` (Plans 3 and 6A live; Neon at `a7c3e9d1b2f4`). Part 0 (Task 1) runs there. After adversary checkpoint 1, the lead creates three lane worktrees from `plan6b`:
+
+  | Lane | Branch | Worktree | Tasks | Database |
+  |---|---|---|---|---|
+  | api | `plan6b-api` | `~/Desktop/portfolio/projects/VART-wt-6b-api` | 2-4, in order | `vart_test_6b_api` |
+  | ui | `plan6b-ui` | `~/Desktop/portfolio/projects/VART-wt-6b-ui` | 5-6, in order | none |
+  | data | `plan6b-data` | `~/Desktop/portfolio/projects/VART-wt-6b-data` | 7, the lead | `vart_test_6b_data` |
+
+  The lead merges all three into `plan6b` (Task 8). Part 0, integration and the E2E use `vart_test_plan6b`. The lead creates each database once from the main checkout: `docker compose exec db createdb -U vart <name>`.
+- **Decisions.** Tarun answered open questions 1-4 on 2026-10-06; decisions 3, 5, 7 and 8 are his answers.
+  1. **One migration, additive** (`c4e8a2d6f1b3`). Carry (a) needs somewhere to keep a part's result before its outcome is whole, and carry (c) needs a fill to name its part. Two columns do it, and no table:
+     - `run_items.parts JSONB NOT NULL DEFAULT '{}'`, keyed `"1"`..`"n"`, each the part's stored result plus its wording;
+     - `suggestions.part SMALLINT NOT NULL DEFAULT 0` (0 is a whole item), with `uq_suggestions_fill` widened by `part`.
+
+     Old code runs on the new schema unchanged, so Tarun migrates Neon before `main` moves, as for every release.
   2. **Where the parts live.** A part's stored result is `{"question": <part wording>, **runs._raw(result)}`, plus `"statement_id"` when an accepted fill wrote it. The `answers` row stays the outcome's display record (CSF spec 5.3). Its `chunk_ids` are the union of the parts' chunk ids, so `redecide` still finds it, and it has no stances of its own.
-  3. **Check again re-runs only the parts whose evidence changed.** The trigger is `r` on a scope whose run is done (`POST /api/gap/{scope}/run`). A part counts as changed when its retrieval (no model call) now returns other passages than it was judged on, or when its wording changed. Spec 5.6's last bullet says a new upload re-runs every part of an affected outcome; this narrows it to the changed parts. An unchanged part sends the same prompt, so re-running it can change nothing in replay and only costs a call live. A sync line goes into the spec (Task 8). An upload never starts model calls by itself: the view offers "Check again".
+  3. **Check again re-runs every part of each affected outcome** (CSF spec 5.6, as written). The trigger is `r` on a scope whose run is done (`POST /api/gap/{scope}/run`); an upload never starts model calls by itself, and the view offers "Check again". An outcome counts as affected when any of its parts now retrieves other passages than it was judged on, when its wording changed, or when it is incomplete. The comparison is retrieval only, with no model call. Every machine-judged part of an affected outcome is dropped and runs again. A part filled by a fill the visitor accepted stays: it is the visitor's work, like an approved outcome.
   4. **Paths.** `GET /api/gap/{scope}` and `POST /api/gap/{scope}/run`. `Mapping.scope`, kept free in Plan 3 for 6B, stays unused, because `GapOut.scope` and the questionnaire's stored mapping carry the scope.
-  5. **Export.** The gap report is what `GET /api/runs/{id}/export` returns for a gap-check run. That path answered 409 for such a run before (it has no file), so the change adds a status there. A questionnaire run's export does not change (open question 1).
+  5. **The gap sheet goes in both exports.**
+     - A gap-check run's export (`GET /api/runs/{id}/export`) is the gap-report workbook. That path answered 409 for such a run before, so the change adds a status there.
+     - A questionnaire run's xlsx export also carries the workspace's latest *done* gap-check run as a `Gap report` sheet. If the visitor's workbook already has a sheet of that name, the new sheet is `Gap report (2)`, and so on. Row 1 states the scope and the run date. When no gap-check run is done, the export is unchanged.
+     - A csv export cannot hold a second sheet and is unchanged.
+     - Every cell is inert, as before.
   6. **800-53 controls** link to one NIST page (`csf.CONTROLS_URL`), not one page per control. As with 6A's decision 3, no per-control URL could be verified (the Reference Tool's deep links are single-page-app routes). The lead checks the URL in a browser in Task 1 Step 7.
-  7. **The sample pack stays as it is.** It does not gain the gap extension's `security-improvement-plan.md`: adding it would change the dev pack's retrieval and force a re-record. So the live demo shows no Not met (stated) unless the visitor uploads such a line (open question 2).
-  8. **Per-part fills after an Ask-me answer** are built and tested (carry c), but today the same-topic rule (spec 6.9) never pairs them. No v1 Ask-me outcome shares a CSF category with a Checked one: the Ask-me categories are GV.OC, GV.RM, GV.RR, GV.OV and GV.SC, and the only Checked Govern category is GV.PO. The fills work as soon as the tiers pair. The test sets one topic by hand (open question 3).
+  7. **The sample pack gains `security-improvement-plan.md`** (Task 7), so the live demo shows Not met (stated) on ID.RA-02 and DE.AE-07. The sample pack is `data/dev/docs`, so the dev eval sees the new document too.
+     - The document, its statements, the controls only it names, and its traps move from `data/dev/gap/facts.yaml` into `data/dev/facts.yaml`.
+     - The questionnaire keys are re-derived (`python -m datakit.derive_key dev`), never edited by hand.
+     - The dev eval is re-recorded with the eval key, and its gates are re-checked. If a gating gate fails, including `label_accuracy` 0.90 (82 of 89 today; at least 81 of 89 passes), the plan stops and the lead takes it to Tarun. No gate is lowered and nothing is tuned.
+     - `gap-dev` already loads the document, so its results must stay byte-identical.
+  8. **Fills widen to the same CSF function.** In a gap-check run, an Ask-me answer is re-checked against the open parts of Checked outcomes in the answered outcome's CSF function (all five Ask-me outcomes are Govern, so they reach GV.PO-01 and GV.PO-02's parts). A questionnaire keeps spec 6.9's same-topic rule.
+     - `app.interview.recheck` is frozen and filters by topic, so `app/questions.py` calls it once per topic group; nothing frozen changes.
+     - The calls stay under the per-answer cap: at most `MAX_RECHECKS` (8) re-checks within `RECHECK_SECONDS` (90 s), each spent through the per-network `llm` counter.
+     - A fill stays a suggestion until the visitor accepts it.
   9. **Questions for you on a gap-check run holds its Ask-me outcomes only** (6A decision 6, now enforced in `ensure_questions`). As for any run, they are planned once the run is done.
   10. **The view's path is `workspace / csf 2.0 / <scope>`.** The API has no company name for spec 7's `<company>`.
   11. **The gap view's filter toggles have no single keys.** `g i p d s o a r e` are taken, and spare letters would read as noise. The toggles are Tab-reached buttons, like the Workspace row actions; design.md gets a line.
-- **Network budget for the E2E.** The CI suite shares one per-network cap of 400 model calls an hour. Plan 3's specs use about 150. The gap flow runs one core check over the sample documents: at most 73 stance calls (one per part with passages), no draft call, and no recheck call, because the Ask-me answer's topic pairs with no Checked outcome (note 8). Total about 223. Task 7 Step 5 measures it from `ip_limits` after a full replay.
+- **Network budget for the E2E.** The CI suite shares one per-network cap of 400 model calls an hour.
+  - Plan 3's specs use about 150. The sample run's 64 items make the same number of calls with one more document in the pack.
+  - The gap flow runs one core check over the sample documents: at most 73 stance calls (one per part with passages) and no draft call.
+  - Its Ask-me answer (GV.RM-02, Govern) is re-checked against GV.PO-01 and GV.PO-02's open parts: at most 7 recheck calls, under the cap of 8.
+  - Total about 231. Task 8 Step 5 measures it from `ip_limits` after a full replay.
+- **Eval-key spend** (lead only; `~/.config/vart/eval.env`, $5 cap):
+
+  | Task | Spend |
+  |---|---|
+  | 1-6 | none |
+  | 7 | dev re-record about $0.10 (only items whose prompts changed are paid); gap-dev $0.04 only if it drifts |
+  | 8 | E2E re-record about $0.15: sample flow about $0.05, gap flow about $0.08, re-checks about $0.01 |
+  | Total | about $0.25-0.30; ask Tarun if the key's remaining credit is under $1 |
 
 ## Lanes
 
@@ -45,52 +102,80 @@ Other inputs:
 | Part 0: migration and contract additions | 1 | `plan6b` | lead (Opus 5.5) | Opus |
 | Lane api | 2, 3, 4 | `plan6b-api` | Opus 5.5 (2, 4), Sonnet 5.5 (3) | Opus (2, 4), Sonnet (3) |
 | Lane ui | 5, 6 | `plan6b-ui` | Opus 5.5 | Opus |
-| Integration and E2E | 7 | `plan6b` | lead | Opus |
-| Checkpoint, docs, release | 8 | `plan6b` | lead | final Opus review; Tarun approves every outward step |
+| Lane data | 7 | `plan6b-data` | lead (Opus 5.5; recording) | Opus (keys derived, gates held) |
+| Integration and E2E | 8 | `plan6b` | lead | Opus |
+| Checkpoint, docs, release | 9 | `plan6b` | lead | final Opus review; Tarun approves every outward step |
 
-The lanes share only Task 1's frozen output (`openapi.json`, `web/src/lib/api-types.ts`, the migration), so their files are disjoint. Inside the api lane, Task 3 calls Task 2's runner and Task 4 changes Task 3's POST handler, so those three run in order. Inside the ui lane, Task 6 renders its drawer inside Task 5's view.
+The lanes share only Task 1's frozen output (`openapi.json`, `web/src/lib/api-types.ts`, the migration), so their files are disjoint. The data lane touches only `data/dev`, the sample list, two count tests, and the dev eval's recordings and results. Inside the api lane, Task 3 calls Task 2's runner and Task 4 changes Task 3's POST handler, so those three run in order. Inside the ui lane, Task 6 renders its drawer inside Task 5's view.
 
 ## Global Constraints
 
 - Every commit message ends with exactly this paragraph: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` (also when a Sonnet model commits).
 - Never open, list, copy or quote anything under `~/Desktop/portfolio/projects/ai-money-hackathon/`; never type the sponsor's company or people names.
 - Never use `git stash`. Set work aside with a WIP commit on your own branch.
-- Tests never touch the network or a real key (pytest-socket): model calls go through `tests/fakes.py` (`FakeLLM`, `ByStepLLM`). The E2E replays `web/e2e/recorded.jsonl`; only the lead records, with the eval key, and only in Task 7.
+- Tests never touch the network or a real key (pytest-socket): model calls go through `tests/fakes.py` (`FakeLLM`, `ByStepLLM`). Only the lead records, with the eval key: the dev eval in Task 7, and the E2E (replayed from `web/e2e/recorded.jsonl`) in Task 8.
 - Backend chain, green before every commit (run `ruff format .` first; with `export TEST_DATABASE_URL=postgresql+psycopg://vart:vart@localhost:5434/<lane db> && export DATABASE_URL=$TEST_DATABASE_URL`): `ruff check . && ruff format --check . && mypy app scripts datakit evals && pytest -q && alembic check`. Never run `docker compose` from a worktree.
 - Frontend chain: `cd web && npm run lint && npm test && npm run build`, then `python scripts/check_monochrome.py` from the repo root.
 - After any change to `app/api/schemas.py` or a route: `python scripts/export_openapi.py && (cd web && npm run gen:api)`, and commit both files. No hand-written request or response type under `web/src`.
-- Hard rule 11: engine code spends the budget before every model call and holds no database transaction across one. Each part reaches a model only through `app.csf.check_part` → `answer_retrieved`. Ask-me and not-checked outcomes make no model call (CSF spec 5.4-5.5).
+- Hard rule 11: engine code spends the budget before every model call and holds no database transaction across one. Each part reaches a model only through `app.csf.check_part` → `answer_retrieved`; a re-check only through `app.interview.recheck`. Ask-me and not-checked outcomes make no model call of their own (CSF spec 5.4-5.5).
 - `ck_answers_cited` is unchanged: no Covered or Partly covered result without a citation (CSF spec 6).
-- Frozen, never edited by a task: `app/text.py`, `app/patterns.py`, `app/contracts.py`, `app/decide.py`, `app/stance.py`, `app/draft.py`, `app/pipeline.py`, `app/retrieve.py`, `app/interview.py`, `app/ingest/`, `app/redact.py`, every prompt, `data/`, `evals/`. After adversary checkpoint 1, the Task 1 additions to `app/api/schemas.py` and every path, method and status in `openapi.json` are frozen too; a change needs the lead's OK and a change-log line in `docs/CONTRACTS.md`.
-- The evals do not move: `python -m evals.run --pack dev && python -m evals.run --pack gap-dev && git diff --exit-code evals/results` passes after every api-lane task.
-- CSF spec 4: "What the visitor sees as 'the framework' is always NIST's verbatim `outcome` text." The view, the inspector and the export show `outcome` unedited.
+- Frozen, never edited by a task: `app/text.py`, `app/patterns.py`, `app/contracts.py`, `app/decide.py`, `app/stance.py`, `app/draft.py`, `app/pipeline.py`, `app/retrieve.py`, `app/interview.py`, `app/ingest/`, `app/redact.py`, every prompt, `data/csf/`, `evals/*.py`, and the gates in `evals/score.py`.
+  - `data/dev` and the dev eval's recordings and results change only in Task 7, and only as it says.
+  - After adversary checkpoint 1, the Task 1 additions to `app/api/schemas.py`, and every path, method and status in `openapi.json`, are frozen too. A change needs the lead's OK and a change-log line in `docs/CONTRACTS.md`.
+- Keys come only from the fact sheet: `data/dev/key/*.yaml` are written by `python -m datakit.derive_key dev` and `python -m datakit.gap dev`, never by hand.
+- No gate is lowered. When a gating gate fails after Task 7's re-record, the plan stops and the lead takes the misses to Tarun.
+- The evals do not move outside Task 7: `python -m evals.run --pack dev && python -m evals.run --pack gap-dev && git diff --exit-code evals/results` passes after every api-lane task (against the lane's base) and on `plan6b` after Task 8's merge.
+- CSF spec 4: "What the visitor sees as 'the framework' is always NIST's verbatim `outcome` text." The view, the inspector and both exports show `outcome` unedited.
 - CSF spec 5.5: "Not-checked outcomes make no model call and carry no label." CSF spec 2: "Every finding reads 'possible gap, review it'; the view and the export say so."
 - Copy, exactly (CSF spec 7): `Possible gap — review it` and `Not legal advice. CSF 2.0 text © NIST, public domain.` (an em dash, and the © sign).
 - The status line counts tiers from the rows and is never typed in. For the core it reads `checked 31 · ask me 5 · not checked 70 · of 106`.
 - Monochrome UI only: black, white and `neutral-*` (`scripts/check_monochrome.py`); labels in words, never colour alone; design.md direction C components (28px rows, filter line, command line, inspector drawer, key hints).
 - Production migrations run from Tarun's terminal (`ops/setup.sh migrate`), never in a build or by an agent; the migration reaches Neon before `main` moves.
 - The eval key (`VART_EVAL_OPENROUTER_API_KEY` in `~/.config/vart/eval.env`) is loaded inside the command and never printed; spending past its $5 cap needs Tarun.
-- Each task owns the files it lists; the reviewer rejects edits outside them. The same failure twice: stop and report. Never weaken, skip or delete a test.
+- Each task owns the files it lists; the reviewer rejects edits outside them. The same failure twice: stop and report. Never weaken, skip or delete a test; a count a test pins changes only when the data it counts changes (Task 7).
 
 ## Review Focus
 
 1. **A step refused by the hourly stance cap in the middle of an outcome.** A second core run in the same hour does this (CSF spec 5.7). Expect: the parts already paid for stay stored; no answer row appears until every part is there; the next step pays only for the parts still missing; each paid call is counted once in `runs.cost_usd`. Pinned in Task 2 (`test_a_refused_budget_keeps_the_paid_parts_and_the_next_step_pays_only_the_rest`).
 2. **A metadata override after a gap run** (a document marked draft or not evidence). Expect: each part is decided again from its own stored stances, then the parts are combined again. Decide must never run over the outcome row's empty stances, which would turn every outcome into Gap. A part filled by an accepted fill keeps its result. Pinned in Task 4 (`test_a_metadata_override_redecides_each_part_and_recombines`).
-3. **`r` pressed again on a done scope**, with or without a new upload, or pressed in two tabs at once. Expect: only the parts whose evidence changed run again. The visitor's edited, approved, confirmed or not-applicable outcomes and accepted parts stay. With nothing changed the run stays done and no model is called. Two presses re-open an outcome once. Pinned in Task 4 (`test_check_again_reruns_only_the_parts_whose_evidence_changed`, `test_check_again_keeps_the_visitors_outcomes_and_accepted_parts`, `test_check_again_with_nothing_changed_stays_done`, `test_check_again_after_an_upload_reopens_only_what_the_new_document_reaches`).
+3. **`r` pressed again on a done scope**, with or without a new upload, or pressed in two tabs at once. Expect:
+   - every machine-judged part of each affected outcome runs again, and unaffected outcomes keep their results;
+   - the visitor's edited, approved, confirmed or not-applicable outcomes and accepted parts stay;
+   - with nothing changed, the run stays done and no model is called;
+   - two presses re-open an outcome once.
+
+   Pinned in Task 4: `test_check_again_reruns_every_part_of_an_affected_outcome`, `test_check_again_keeps_the_visitors_outcomes_and_accepted_parts`, `test_check_again_with_nothing_changed_stays_done`, `test_check_again_after_an_upload_reopens_the_outcomes_the_new_document_reaches`.
 4. **A deploy rewords a part** while results for the old wording are stored, mid-run or after. Expect: a stored part whose wording differs from the deployed one runs again; the others are kept. Pinned in Task 2 (`test_a_stored_part_with_other_wording_is_run_again`).
-5. **Coverage overstated in the view or the export.** That would be a label on a not-checked outcome, an unanswered Ask-me outcome shown as anything but Not answered, counts typed in, or an export that leaves out unchecked outcomes. Expect: labels come only from `csf.gap_label`; the status line is counted from the rows; the export lists every outcome in scope, the unchecked ones as "Not checked in this version". Pinned in Task 3 (`test_the_view_lists_every_outcome_and_labels_only_what_was_checked`, `test_the_gap_report_lists_every_outcome_in_scope_with_inert_cells`) and Task 5 (`it("counts the coverage line from the rows")`).
+5. **Coverage overstated in the view or an export.** That would be:
+   - a label on a not-checked outcome;
+   - an unanswered Ask-me outcome shown as anything but Not answered;
+   - counts typed in;
+   - an export that leaves out unchecked outcomes;
+   - a gap sheet slipped into a questionnaire export without its scope and date.
+
+   Expect: labels come only from `csf.gap_label`; the status line is counted from the rows; both exports list every outcome in scope, the unchecked ones as "Not checked in this version", under a row that names the scope and run date. Pinned in Task 3 (`test_the_view_lists_every_outcome_and_labels_only_what_was_checked`, `test_the_gap_report_lists_every_outcome_in_scope_with_inert_cells`, `test_a_questionnaire_export_carries_the_latest_gap_sheet_only_when_one_exists`) and Task 5 (`it("counts the coverage line from the rows")`).
+6. **A loosely related Ask-me answer counted as evidence.** For example, a Govern answer about risk appetite read as proof that the policy is "enforced". Expect:
+   - it fills nothing by itself: a fill is a suggestion until the visitor accepts it;
+   - each fill quotes a line of the visitor's own stored, redacted statement (decide's containment check);
+   - it reaches only Checked parts in the same CSF function, never another function's;
+   - it makes at most 8 re-check calls within 90 s per answer.
+
+   Pinned in Task 4 (`test_a_govern_answer_suggests_fills_for_govern_parts_only_until_accepted`, `test_an_answer_never_fills_another_functions_parts`).
 
 ## Review gates (run by the lead)
 
-- **Adversary checkpoint 1** (Fable 5.1) after Task 1, before the lane worktrees exist. It reads the migration, the schema additions, the stubs, `openapi.json`, the CONTRACTS.md lines and this plan's Tasks 2-6, and asks:
+- **Adversary checkpoint 1** (Fable 5.1) after Task 1, before the lane worktrees exist. It reads the migration, the schema additions, the stubs, `openapi.json`, the CONTRACTS.md lines and this plan's Tasks 2-7, and asks:
   - what does the view or the inspector need that no field carries;
   - what can a visitor trigger that has no error shape;
   - can a stored part outlive the documents or the wording it describes;
-  - does any path let an Ask-me answer or a not-checked outcome reach a model?
+  - does any path let an Ask-me answer or a not-checked outcome reach a model, other than the re-check of a stored answer;
+  - can moving the planted document change a key by hand rather than by derivation?
+
   Fixes land in Part 0, with the types regenerated, before the lanes start.
 - **Two-failure rule**: the same failure twice in a task stops it for a Fable look.
-- **Adversary checkpoint 2** (Fable 5.1) on `main..plan6b` after Task 7 (Task 8 Step 1): what input, label, lock order or copy did everyone miss? Fixes land before the docs and the final review.
-- **Final Opus review** of `main..plan6b` after Task 8 Step 6. Pushing, the pull request, the migration and the fast-forward of `main` are Tarun's.
+- **Task 7's gate check** is a stop point: a gating dev gate below its value goes to Tarun before anything else merges.
+- **Adversary checkpoint 2** (Fable 5.1) on `main..plan6b` after Task 8 (Task 9 Step 1): what input, label, lock order, copy or fill did everyone miss? Fixes land before the docs and the final review.
+- **Final Opus review** of `main..plan6b` after Task 9 Step 6. Pushing, the pull request, the migration and the fast-forward of `main` are Tarun's.
 
 ## File Structure
 
@@ -100,39 +185,46 @@ app/db/models.py                                MOD (T1)  RunItem.parts, Suggest
 app/api/schemas.py                              MOD (T1)  GapRow, GapOut, PartOut; AnswerDetail.parts; SuggestionOut.part
 app/api/gap.py                                  NEW (T1 stubs, T3 built, T4 check again)
 app/main.py                                     MOD (T1)  include the gap router
-openapi.json, web/src/lib/api-types.ts          GEN (T1)  regenerated
-docs/CONTRACTS.md                               MOD (T1, T8)
+openapi.json, web/src/lib/api-types.ts          GEN (T1, T3)  regenerated
+docs/CONTRACTS.md                               MOD (T1, T9)
 tests/test_models.py, tests/test_openapi.py     MOD (T1)
 app/csf.py                                      MOD (T2 current_mapping, check_part, part_result; T3 CONTROLS_URL)
 app/runs.py                                     MOD (T2 per-part runner, outcome_values; T4 reopen_changed)
 tests/test_csf_parts.py                         MOD (T2)
 tests/test_runs_csf.py                          NEW (T2, T4)
 app/api/answers.py                              MOD (T3)  AnswerDetail.parts
-app/export.py, app/api/export.py                MOD (T3)  the gap-report workbook
+app/export.py, app/api/export.py                MOD (T3)  GapSheet; gap-report workbook; gap sheet in a questionnaire's xlsx
 tests/test_api_gap.py                           NEW (T3, T4)
 tests/test_export.py                            MOD (T3)
-app/questions.py, app/api/questions.py          MOD (T4)  Ask-me only; per-part fills; accept per part
+app/questions.py, app/api/questions.py          MOD (T4)  Ask-me only; per-part fills in the same CSF function; accept per part
 app/redecide.py, tests/test_redecide.py         MOD (T4)  re-decide per part
 tests/test_questions_csf.py                     NEW (T4)
 web/src/lib/{api,route,labels}.ts               MOD (T5)
 web/src/components/{ui,Shell}.tsx               MOD (T5)  GapChip; tab 6; key sheet lines
-web/src/App.tsx                                 MOD (T5)
+web/src/App.tsx, web/src/views/Export.tsx       MOD (T5)  route; the export view names the gap sheet
 web/src/views/GapCheck.tsx (+ .test.tsx)        NEW (T5), MOD (T6)
 web/src/test/mockApi.ts                         MOD (T5, T6)
 design.md                                       MOD (T5)
 web/src/views/EvidenceDrawer.tsx                MOD (T6)  DrawerFrame and DroppedList extracted, behaviour unchanged
 web/src/views/Questions.tsx                     MOD (T6)  QuestionCard exported
 web/src/views/GapDrawer.tsx (+ .test.tsx)       NEW (T6)
-web/e2e/gap.spec.ts                             NEW (T7)
-web/e2e/recorded.jsonl                          MOD (T7, appended by the lead's record run)
-README.md, CLAUDE.md, docs/PROGRESS.md, the CSF spec   MOD (T8)
+data/dev/src/sip.md                             NEW (T7)  the planted plan's source
+data/dev/docs/security-improvement-plan.md      NEW (T7)  rendered; replaces data/dev/gap/docs/security-improvement-plan.md (deleted)
+data/dev/facts.yaml, data/dev/gap/facts.yaml    MOD (T7)  the document's entries move from the gap extension to the dev sheet
+data/dev/key/vsq-a.yaml, data/dev/key/mvsp-b.yaml   MOD (T7, re-derived)  data/dev/key/csf-core.yaml re-derived, unchanged
+app/api/documents.py                            MOD (T7)  SAMPLE_ORDER gains the document (23)
+tests/test_api_documents.py, tests/test_eval_run.py   MOD (T7)  22 -> 23 sample documents
+evals/recorded/dev.jsonl, evals/results/latest.{json,md}   MOD (T7, the lead's record run)
+web/e2e/gap.spec.ts                             NEW (T8)
+web/e2e/recorded.jsonl                          MOD (T8, the lead's record run)
+README.md, CLAUDE.md, docs/PROGRESS.md, the CSF spec   MOD (T9)
 ```
 
 ---
 
 ### Task 1: Migration and contract additions (Part 0)
 
-**Runs on:** `plan6b`, by the lead. **Reviewer:** Opus. **Then:** adversary checkpoint 1.
+**Runs on:** `plan6b`, by the lead. **Reviewer:** Opus. **Eval key:** none. **Then:** adversary checkpoint 1.
 
 **Files:**
 - Create: `migrations/versions/c4e8a2d6f1b3_csf_parts.py`, `app/api/gap.py`
@@ -377,8 +469,9 @@ def start_gap(scope: GapScope, ws: WorkspaceDep, session: SessionDep, request: R
     """Start or continue the gap check for this scope, then call POST /api/runs/{id}/step while `running`.
     Creates (or reuses) the workspace's built-in questionnaire for the scope; it is never counted, listed or
     deleted with the visitor's questionnaires. Answers a new run when none exists on it, the running one, or
-    the done one with every part whose evidence changed since (a new upload) re-opened; with nothing changed it
-    stays done and no model is called. 429 per network (`run`, 20 an hour); 503 when the demo is full."""
+    the done one with every outcome whose evidence changed since (a new upload) re-opened, all of its parts; with
+    nothing changed it stays done and no model is called. 429 per network (`run`, 20 an hour); 503 when the demo
+    is full."""
     raise HTTPException(501, "Not built yet.")
 ```
 
@@ -410,12 +503,14 @@ Replace the HTTP section's "Plan 6B room" bullet with:
   explanation from the latest run of the scope's current built-in questionnaire; it writes nothing.
   `POST /api/gap/{scope}/run` creates or reuses that questionnaire (Plan 3 Ruling 5: built-in ones are never
   counted, listed or deleted) and answers the run to step: a new one, the running one, or the done one with
-  every part whose evidence changed re-opened (`app.runs.reopen_changed`; none changed: it stays done). It is
-  counted under `run`, and 503 when the demo is full. A step claims csf items until their parts add up to
+  every outcome whose evidence changed re-opened in full (`app.runs.reopen_changed`, CSF spec 5.6; none
+  changed: it stays done). It is counted under `run`, and 503 when the demo is full. A step claims csf items until their parts add up to
   `STEP_PARTS` (8) and stores each part's result in `run_items.parts` as it lands. `AnswerDetail.parts` lists a
-  Checked outcome's parts; `SuggestionOut.part` names the part a fill is for (0: the whole item). On a gap-check
-  run, `GET /api/runs/{id}/export` answers the gap-report workbook (it was a 409), and Questions for you holds
-  the Ask-me outcomes only. `Mapping.scope` stays unused.
+  Checked outcome's parts; `SuggestionOut.part` names the part a fill is for (0: the whole item); on a gap-check
+  run an answer is re-checked against the open parts in its CSF function. On a gap-check run,
+  `GET /api/runs/{id}/export` answers the gap-report workbook (it was a 409), and Questions for you holds the
+  Ask-me outcomes only. An xlsx questionnaire export carries the latest done gap check as a `Gap report` sheet.
+  `Mapping.scope` stays unused.
 ```
 
 Add to the change log:
@@ -437,13 +532,13 @@ git commit -m "feat(csf): Plan 6B contract additions and the per-part migration"
 
 - [ ] **Step 10 (lead): adversary checkpoint 1, then the lanes**
 
-Dispatch Fable 5.1 on `main..plan6b` with this plan's Tasks 2-6 and the questions under "Review gates". Fix its findings in Part 0, regenerate the types, add change-log lines, and commit. Then create the two lane worktrees from `plan6b` (Execution notes).
+Dispatch Fable 5.1 on `main..plan6b` with this plan's Tasks 2-7 and the questions under "Review gates". Fix its findings in Part 0, regenerate the types, add change-log lines, and commit. Then create the three lane worktrees from `plan6b` (Execution notes).
 
 ---
 
 ### Task 2: The step runner answers a gap-check run part by part
 
-**Lane:** api, worktree `VART-wt-6b-api`, database `vart_test_6b_api`. **Implementer:** Opus 5.5. **Reviewer:** Opus (budget, transactions, resume).
+**Lane:** api, worktree `VART-wt-6b-api`, database `vart_test_6b_api`. **Implementer:** Opus 5.5. **Reviewer:** Opus (budget, transactions, resume). **Eval key:** none.
 
 **Files:**
 - Modify: `app/csf.py` (`current_mapping`, `check_part`, `part_result`; `check_parts` and `questionnaire_for` reuse them), `app/runs.py`
@@ -916,14 +1011,14 @@ git commit -m "feat(csf): the step runner answers gap-check outcomes part by par
 
 ---
 
-### Task 3: The gap endpoints, the inspector's parts and the gap-report sheet
+### Task 3: The gap endpoints, the inspector's parts and the gap sheet in both exports
 
-**Lane:** api (after Task 2). **Implementer:** Sonnet 5.5. **Reviewer:** Sonnet (Opus looks at the export's inert cells in checkpoint 2).
+**Lane:** api (after Task 2). **Implementer:** Sonnet 5.5. **Reviewer:** Sonnet (Opus looks at the exports' inert cells in checkpoint 2). **Eval key:** none.
 
 **Files:**
-- Modify: `app/csf.py` (`CONTROLS_URL`), `app/api/gap.py` (replace the stubs), `app/api/answers.py` (`_dropped`, `_parts`, `detail`), `app/export.py` (`gap_report`), `app/api/export.py` (gap-check runs)
+- Modify: `app/csf.py` (`CONTROLS_URL`), `app/api/gap.py` (replace the stubs), `app/api/answers.py` (`_dropped`, `_parts`, `detail`), `app/export.py` (`GapSheet`, `gap_report`, `export_xlsx(..., gap=None)`), `app/api/export.py` (a gap-check run's report; the latest gap sheet in a questionnaire's xlsx)
 - Create: `tests/test_api_gap.py`
-- Modify: `tests/test_export.py`
+- Modify: `tests/test_export.py`, `docs/CONTRACTS.md` (one change-log line)
 
 **Interfaces:**
 - Consumes:
@@ -935,7 +1030,11 @@ git commit -m "feat(csf): the step runner answers gap-check outcomes part by par
   - `csf.CONTROLS_URL: str`
   - `app.api.gap.latest_run(session, questionnaire_id) -> Run | None`
   - `app.api.gap.gap_rows(session, scope: str, q: Questionnaire | None, run: Run | None) -> list[GapRow]`
-  - `app.export.gap_report(rows: list[GapRow], citations: dict[uuid.UUID, list[dict[str, Any]]], run_date: str, version: str, controls_url: str) -> bytes`
+  - `app.api.gap.gap_sheet(session, q: Questionnaire, run: Run) -> GapSheet`
+  - `app.api.gap.latest_gap(session, workspace_id) -> tuple[Questionnaire, Run] | None` (the latest *done* gap-check run)
+  - `app.export.GapSheet(rows: list[GapRow], citations: dict[uuid.UUID, list[dict[str, Any]]], run_date: str, scope: str, version: str, controls_url: str)` (frozen dataclass)
+  - `app.export.gap_report(g: GapSheet) -> bytes`
+  - `app.export.export_xlsx(original, mapping, rows, gap: GapSheet | None = None) -> bytes` (the existing function gains the optional last argument)
   - `app.export.REVIEW`, `FOOTER`, `GAP_SHEET = "Gap report"`, `GAP_HEAD`
   - The built `GET /api/gap/{scope}` and `POST /api/gap/{scope}/run` (Task 4 adds check again to the POST)
 
@@ -1068,11 +1167,30 @@ def test_the_gap_report_downloads_for_a_gap_run(db: Engine) -> None:
     recover = [o for o in csf.framework().outcomes if o.function == "Recover"]
     assert [ws.cell(n, 1).value for n in range(3, 3 + len(recover))] == [o.id for o in recover]
     assert ws.cell(len(recover) + 4, 1).value == FOOTER
+    assert (ws["B1"].value, ws["C1"].value) == ("Scope: recover", f"Run date: {run['started_at'][:10]}")
+
+
+def test_a_questionnaire_export_carries_the_latest_gap_sheet_only_when_one_exists(db: Engine) -> None:
+    client, _ = visitor(db)
+    q = client.post("/api/questionnaires/sample/vsq-a").json()
+    qrun = client.post(f"/api/questionnaires/{q['id']}/runs").json()  # no step needed: an empty run exports
+    before = openpyxl.load_workbook(io.BytesIO(client.get(f"/api/runs/{qrun['id']}/export").content))
+    assert "Gap report" not in before.sheetnames  # no gap check yet: the export is unchanged
+    gap = client.post("/api/gap/recover/run").json()
+    _finish(client, gap["id"], ByStepLLM({}))
+    after = openpyxl.load_workbook(io.BytesIO(client.get(f"/api/runs/{qrun['id']}/export").content))
+    assert after.sheetnames == [*before.sheetnames, "Gap report"]
+    ws = after["Gap report"]
+    assert (ws["A1"].value, ws["B1"].value) == ("Possible gap — review it", "Scope: recover")
+    assert ws["A3"].value == "RC.RP-01" and ws["D3"].value == "Gap"
 ```
 
-Append to `tests/test_export.py`, adding `uuid`, `from typing import Any`, `from app.api.schemas import GapRow` and `from app.export import FOOTER, GAP_HEAD, REVIEW, gap_report` to its imports:
+Append to `tests/test_export.py`, adding `from typing import Any`, `GapRow` to the `app.api.schemas` import and `FOOTER, GAP_HEAD, REVIEW, GapSheet, gap_report` to the `app.export` import:
 
 ```python
+CONTROLS = "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final"
+
+
 def _gap_row(csf_id: str, tier: Any, label: Any, explanation: str | None, answer_id: Any = None) -> GapRow:
     return GapRow(
         csf_id=csf_id,
@@ -1098,9 +1216,10 @@ def test_the_gap_report_lists_every_outcome_in_scope_with_inert_cells() -> None:
         _gap_row("PR.DS-10", "not_checked", None, None),
         _gap_row("PR.DS-01", "checked", None, None),  # not answered yet
     ]
-    body = gap_report(rows, {aid: [cite]}, "2026-10-06", "2.0", "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final")
+    body = gap_report(GapSheet(rows, {aid: [cite]}, "2026-10-06", "core", "2.0", CONTROLS))
     ws = openpyxl.load_workbook(io.BytesIO(body))["Gap report"]
     assert ws["A1"].value == REVIEW == "Possible gap — review it"
+    assert (ws["B1"].value, ws["C1"].value) == ("Scope: core", "Run date: 2026-10-06")
     assert tuple(c.value for c in ws[2]) == GAP_HEAD
     assert [ws.cell(n, 4).value for n in (3, 4, 5)] == ["Covered", "Not checked in this version", "Not run yet"]
     assert (ws["E3"].value, ws["E3"].data_type) == ("=SUM(A1)", "s")
@@ -1108,14 +1227,33 @@ def test_the_gap_report_lists_every_outcome_in_scope_with_inert_cells() -> None:
     assert (ws["G3"].value, ws["I3"].value, ws["J3"].value, ws["K3"].value) == (
         "NIST text of PR.DS-11", "CP-09", "2026-10-06", "2.0"
     )
-    assert ws["H3"].value.endswith("https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final")
+    assert ws["H3"].value.endswith(CONTROLS)
     assert ws.cell(7, 1).value == FOOTER == "Not legal advice. CSF 2.0 text © NIST, public domain."
+
+
+def test_a_questionnaire_xlsx_gains_the_gap_sheet_only_when_given_and_never_overwrites_a_sheet() -> None:
+    original = (SAMPLES / "vsq-a.xlsx").read_bytes()
+    plain = openpyxl.load_workbook(io.BytesIO(export_xlsx(original, VSQ, ROWS)))
+    assert plain.sheetnames == openpyxl.load_workbook(io.BytesIO(original)).sheetnames  # no gap: unchanged
+    gap = GapSheet([_gap_row("RC.RP-01", "checked", "gap", "=1+1", None)], {}, "2026-10-06", "recover", "2.0", CONTROLS)
+    wb = openpyxl.load_workbook(io.BytesIO(export_xlsx(original, VSQ, ROWS, gap)))
+    assert wb.sheetnames == [*plain.sheetnames, "Gap report"]
+    assert wb.active.title == plain.active.title  # the visitor's sheet stays the one that opens
+    ws = wb["Gap report"]
+    assert (ws["B1"].value, ws["A3"].value) == ("Scope: recover", "RC.RP-01")
+    assert (ws["E3"].value, ws["E3"].data_type) == ("=1+1", "s")
+    taken = openpyxl.load_workbook(io.BytesIO(original))
+    taken.create_sheet("Gap report")  # a visitor's own sheet of that name
+    buf = io.BytesIO()
+    taken.save(buf)
+    names = openpyxl.load_workbook(io.BytesIO(export_xlsx(buf.getvalue(), VSQ, ROWS, gap))).sheetnames
+    assert names[-2:] == ["Gap report", "Gap report (2)"]
 ```
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `pytest tests/test_api_gap.py tests/test_export.py -k "gap or outcome or scope or starting or workspace_sees" -v`
-Expected: FAIL. The gap paths answer 501, `app.export` has no `gap_report`, and `AnswerDetail.parts` is `[]`.
+Run: `pytest tests/test_api_gap.py tests/test_export.py -k "gap or outcome or scope or starting or workspace_sees or questionnaire" -v`
+Expected: FAIL. The gap paths answer 501, `app.export` has no `GapSheet` or `gap_report`, `export_xlsx` takes no gap, and `AnswerDetail.parts` is `[]`.
 
 - [ ] **Step 3: Write `CONTROLS_URL` and the endpoints**
 
@@ -1146,6 +1284,7 @@ from app.api.runs import run_out, summary
 from app.api.schemas import ERRORS, GapOut, GapRow, GapScope, RunOut
 from app.contracts import ItemLabel, Value
 from app.db.models import Answer, Item, Questionnaire, Run
+from app.export import GapSheet
 from app.runs import create_run
 from app.services.capacity import ensure_capacity
 from app.settings import get_settings
@@ -1198,6 +1337,34 @@ def gap_rows(session: Session, scope: str, q: Questionnaire | None, run: Run | N
             )
         )
     return rows
+
+
+def gap_sheet(session: Session, q: Questionnaire, run: Run) -> GapSheet:
+    """One gap-check run as a sheet (CSF spec 7): its rows, each answer's citations, its date, scope and the CSF
+    data version it ran on (stored in the questionnaire's mapping)."""
+    scope = q.mapping["scope"]
+    cited = {a.id: a.citations for a in session.scalars(select(Answer).where(Answer.run_id == run.id))}
+    return GapSheet(
+        gap_rows(session, scope, q, run),
+        cited,
+        run.started_at.date().isoformat(),
+        scope,
+        q.mapping["csf_version"],
+        csf.CONTROLS_URL,
+    )
+
+
+def latest_gap(session: Session, ws_id: uuid.UUID) -> tuple[Questionnaire, Run] | None:
+    """The workspace's latest done gap-check run, any scope (plan 6B decision 5); None when there is none. A run
+    being checked again is running, so its older sheet is not offered until it is done."""
+    found = session.execute(
+        select(Questionnaire, Run)
+        .join(Run, Run.questionnaire_id == Questionnaire.id)
+        .where(Questionnaire.workspace_id == ws_id, Questionnaire.source == "csf", Run.status == "done")
+        .order_by(Run.started_at.desc(), Run.id)
+        .limit(1)
+    ).first()
+    return (found[0], found[1]) if found else None
 
 
 def _questionnaire(session: Session, ws_id: uuid.UUID, scope: str) -> Questionnaire | None:
@@ -1282,9 +1449,9 @@ def _parts(session: SessionDep, a: Answer, item: Item) -> list[PartOut]:
 
 In `detail`, use `dropped = [_dropped(session, d) for d in a.dropped]`, move `item = session.get_one(Item, a.item_id)` above the `return`, and pass `parts=_parts(session, a, item)` to `AnswerDetail`.
 
-- [ ] **Step 5: Write the gap-report workbook and its endpoint**
+- [ ] **Step 5: Write the gap sheet, both exports and their endpoint**
 
-In `app/export.py`, add `from app import csf` and import `GapRow` next to `Mapping` from `app.api.schemas` (`uuid`, `Any`, `openpyxl` and `get_column_letter` are already imported). Append:
+In `app/export.py`, add `from app import csf`, and import `GapRow` next to `Mapping` from `app.api.schemas`. (`uuid`, `Any`, `dataclass`, `openpyxl` and `get_column_letter` are already imported.) Add this block above `export_xlsx`, whose new parameter names `GapSheet`:
 
 ```python
 GAP_SHEET = "Gap report"
@@ -1297,71 +1464,113 @@ FOOTER = "Not legal advice. CSF 2.0 text © NIST, public domain."
 NOT_RUN = "Not run yet"
 
 
+@dataclass(frozen=True)
+class GapSheet:
+    """One gap-check run as a sheet (CSF spec 7): built by app.api.gap.gap_sheet, written by `_write_gap`."""
+
+    rows: list[GapRow]
+    citations: dict[uuid.UUID, list[dict[str, Any]]]
+    run_date: str
+    scope: str
+    version: str
+    controls_url: str
+
+
 def _gap_word(r: GapRow) -> str:
     if r.tier == "not_checked":
         return csf.NOT_CHECKED[0].upper() + csf.NOT_CHECKED[1:]  # "Not checked in this version"
     return csf.GAP_WORDS[r.label] if r.label else NOT_RUN
 
 
-def gap_report(
-    rows: list[GapRow],
-    citations: dict[uuid.UUID, list[dict[str, Any]]],
-    run_date: str,
-    version: str,
-    controls_url: str,
-) -> bytes:
-    """The gap-report workbook (CSF spec 7): the review line, a header, one row per outcome in scope (unchecked
-    ones too, so coverage is never overstated), then the not-legal-advice footer. NIST's text is verbatim and
-    every cell is inert text (`_put`)."""
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = GAP_SHEET
+def _write_gap(ws: Any, g: GapSheet) -> None:
+    """The review line with the scope and run date, a header, one row per outcome in scope (unchecked ones too,
+    so coverage is never overstated), then the not-legal-advice footer. NIST's text is verbatim and every cell
+    is inert text (`_put`)."""
     _put(ws.cell(1, 1), REVIEW)
+    _put(ws.cell(1, 2), f"Scope: {g.scope}")
+    _put(ws.cell(1, 3), f"Run date: {g.run_date}")
     for i, title in enumerate(GAP_HEAD, 1):
         _put(ws.cell(2, i), title)
-    for n, r in enumerate(rows, 3):
-        cited = citations.get(r.answer_id, []) if r.answer_id else []
+    for n, r in enumerate(g.rows, 3):
+        cited = g.citations.get(r.answer_id, []) if r.answer_id else []
         quotes = "; ".join(f'"{c["quote"]}" ({c["filename"]} line {c["line_start"]})' for c in cited)
         cells = (
             r.csf_id, r.function, r.category, _gap_word(r), r.explanation, quotes or None, r.outcome,
-            f"{r.source_url} {controls_url}", ", ".join(r.related_controls) or None, run_date, version,
+            f"{r.source_url} {g.controls_url}", ", ".join(r.related_controls) or None, g.run_date, g.version,
         )
         for i, value in enumerate(cells, 1):
             _put(ws.cell(n, i), value)
-    _put(ws.cell(len(rows) + 4, 1), FOOTER)
+    _put(ws.cell(len(g.rows) + 4, 1), FOOTER)
     for i, width in enumerate((10, 10, 28, 20, 60, 60, 60, 40, 20, 12, 10), 1):
         ws.column_dimensions[get_column_letter(i)].width = width
+
+
+def _free_title(wb: Any, title: str) -> str:
+    """A sheet name the visitor's workbook does not use yet: never overwrite their own sheet."""
+    names, n, name = set(wb.sheetnames), 2, title
+    while name in names:
+        name, n = f"{title} ({n})", n + 1
+    return name
+
+
+def gap_report(g: GapSheet) -> bytes:
+    """A gap-check run's own export: a workbook holding only the gap sheet."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = GAP_SHEET
+    _write_gap(ws, g)
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()
 ```
 
-In `app/api/export.py`, import `from app import csf`, `from app.api.gap import gap_rows`, `Answer` from the models and `gap_report` from `app.export`. In `export_run`, right after `q = session.get_one(Questionnaire, run.questionnaire_id)`:
+Give `export_xlsx` an optional last parameter `gap: GapSheet | None = None`. Add, just before its `out = io.BytesIO()`:
+
+```python
+    if gap is not None:  # plan 6B decision 5: the workspace's latest gap check rides along, after every sheet
+        _write_gap(wb.create_sheet(_free_title(wb, GAP_SHEET)), gap)
+```
+
+`create_sheet` appends at the end and leaves the active sheet as it was.
+
+In `app/api/export.py`, import `gap_sheet` and `latest_gap` from `app.api.gap`, and `gap_report` from `app.export`. In `export_run`, right after `q = session.get_one(Questionnaire, run.questionnaire_id)`:
 
 ```python
     if q.source == "csf":
         return _gap_report(session, ws.id, run, q)
 ```
 
-and add:
+Then pass the latest gap check into the xlsx branch. The csv branch is unchanged: a csv holds one table.
+
+```python
+    found = None if is_csv else latest_gap(session, ws.id)
+    gap = gap_sheet(session, *found) if found else None
+    body = export_csv(q.original_bytes, mapping, rows) if is_csv else export_xlsx(q.original_bytes, mapping, rows, gap)
+```
+
+This replaces the existing `body = (export_csv if is_csv else export_xlsx)(...)` line; compute `is_csv` before it, as now. Add `"gap": gap.scope if gap else None` to that audit record's `detail`, and add:
 
 ```python
 def _gap_report(session: SessionDep, ws_id: uuid.UUID, run: Run, q: Questionnaire) -> Response:
     """A gap-check run's export (CSF spec 7): the gap-report workbook, named by the scope (a server value)."""
-    scope = q.mapping["scope"]
-    rows = gap_rows(session, scope, q, run)
-    cited = {a.id: a.citations for a in session.scalars(select(Answer).where(Answer.run_id == run.id))}
-    body = gap_report(rows, cited, run.started_at.date().isoformat(), q.mapping["csf_version"], csf.CONTROLS_URL)
-    audit_log.record(session, ws_id, "export", ref=str(run.id), detail={"rows": len(rows), "scope": scope})
+    g = gap_sheet(session, q, run)
+    body = gap_report(g)
+    audit_log.record(session, ws_id, "export", ref=str(run.id), detail={"rows": len(g.rows), "scope": g.scope})
     session.commit()
     return Response(
         body,
         media_type=XLSX,
-        headers={"Content-Disposition": f'attachment; filename="csf-2.0-{scope}-gap-report.xlsx"'},
+        headers={"Content-Disposition": f'attachment; filename="csf-2.0-{g.scope}-gap-report.xlsx"'},
     )
 ```
 
-Add one sentence to `export_run`'s docstring: "A gap-check run answers the gap-report workbook instead (CSF spec 7)." Then regenerate `openapi.json` and the types (the docstring is the operation's description).
+Add two sentences to `export_run`'s docstring: "A gap-check run answers the gap-report workbook instead (CSF spec 7). An xlsx questionnaire's export also carries the workspace's latest done gap check as a `Gap report` sheet (renamed `Gap report (2)` and so on if the file has one), stating its scope and run date; a csv is unchanged." Then regenerate `openapi.json` and the types (the docstring is the operation's description). Add to `docs/CONTRACTS.md`'s change log:
+
+```markdown
+- 2026-10-06: Plan 6B Task 3 (an added sheet, no path, field or status changed): an xlsx questionnaire export
+  carries the workspace's latest done gap check as a `Gap report` sheet (a free name when the file has one),
+  every cell inert; with no done gap check, or for a csv, the export is unchanged (Tarun, 2026-10-06).
+```
 
 - [ ] **Step 6: Run the tests, the chain and the eval replays**
 
@@ -1371,15 +1580,15 @@ Expected: PASS, with no eval diff.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add app/csf.py app/api/gap.py app/api/answers.py app/export.py app/api/export.py tests/test_api_gap.py tests/test_export.py openapi.json web/src/lib/api-types.ts
-git commit -m "feat(csf): gap check endpoints, per-part evidence and the gap-report sheet" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git add app/csf.py app/api/gap.py app/api/answers.py app/export.py app/api/export.py tests/test_api_gap.py tests/test_export.py openapi.json web/src/lib/api-types.ts docs/CONTRACTS.md
+git commit -m "feat(csf): gap check endpoints, per-part evidence and the gap sheet in both exports" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 4: Check again, Ask-me questions, per-part fills and per-part re-decide
+### Task 4: Check again, Ask-me questions, per-part fills in the same CSF function, per-part re-decide
 
-**Lane:** api (after Task 3). **Implementer:** Opus 5.5. **Reviewer:** Opus (lock order, what survives a re-check).
+**Lane:** api (after Task 3). **Implementer:** Opus 5.5. **Reviewer:** Opus (lock order, what survives a re-check, what an answer may fill). **Eval key:** none.
 
 **Files:**
 - Modify: `app/runs.py` (`reopen_changed`, `_same_evidence`), `app/api/gap.py` (`start_gap`), `app/questions.py` (`ensure_questions`, `_suggest`, `accept_suggestion`), `app/api/questions.py` (`_suggestion_out`), `app/redecide.py`
@@ -1395,6 +1604,7 @@ git commit -m "feat(csf): gap check endpoints, per-part evidence and the gap-rep
   - `runs.reopen_changed(session, workspace_id, run_id) -> int` (outcomes re-opened)
   - `runs.REOPEN = ("verified", "partial", "conflict", "unknown")`
   - `questions._opens(session, run_id, item, answer) -> list[OpenItem]`
+  - `questions._same_area(asked: Item, item: Item) -> bool` (a questionnaire: the same topic; a gap-check run: the same CSF function)
   - `questions._fill_part(session, sg, answer) -> None`
   - `redecide._redecide_parts(session, workspace_id, answer, parts) -> int`
   - A filled part carries `"statement_id"` and is never re-decided or re-opened.
@@ -1426,18 +1636,18 @@ def test_check_again_with_nothing_changed_stays_done(s: Session) -> None:
     assert s.scalars(select(Answer).where(Answer.run_id == run.id)).one().label == "verified"
 
 
-def test_check_again_reruns_only_the_parts_whose_evidence_changed(s: Session) -> None:
+def test_check_again_reruns_every_part_of_an_affected_outcome(s: Session) -> None:
     ws, it, run = _done(s)
-    _stale(s, run.id, "3")
+    _stale(s, run.id, "3")  # one part's evidence changed: the whole outcome is affected (CSF spec 5.6)
     assert runs.reopen_changed(s, ws.id, run.id) == 1
     assert runs.reopen_changed(s, ws.id, run.id) == 0  # a second press re-opens nothing more
     s.refresh(run)
     ri = _parts_of(s, run.id)
-    assert (run.status, ri.state, sorted(ri.parts)) == ("running", "pending", ["1", "2", "4"])
+    assert (run.status, ri.state, ri.parts) == ("running", "pending", {})
     assert s.scalar(select(Answer).where(Answer.run_id == run.id)) is None
     llm = ByStepLLM({"stance": YES})
     assert runs.step(s, ws.id, run.id, llm, MODELS) == [it.id]
-    assert [q.item_id for q in llm.requests] == ["PR.DS-11#3"]
+    assert [q.item_id for q in llm.requests] == [f"PR.DS-11#{n}" for n in (1, 2, 3, 4)]
 
 
 def test_check_again_keeps_the_visitors_outcomes_and_accepted_parts(s: Session) -> None:
@@ -1460,7 +1670,7 @@ def test_check_again_keeps_the_visitors_outcomes_and_accepted_parts(s: Session) 
 Append to `tests/test_api_gap.py`:
 
 ```python
-def test_check_again_after_an_upload_reopens_only_what_the_new_document_reaches(db: Engine) -> None:
+def test_check_again_after_an_upload_reopens_the_outcomes_the_new_document_reaches(db: Engine) -> None:
     client, ws_id = visitor(db)
     run = client.post("/api/gap/core/run").json()
     _finish(client, run["id"], ByStepLLM({}))  # no documents: every Checked outcome is Gap
@@ -1474,7 +1684,7 @@ def test_check_again_after_an_upload_reopens_only_what_the_new_document_reaches(
     assert rows["PR.DS-11"]["label"] == "covered"
     assert rows["GV.RM-02"]["label"] == "not_answered"  # Ask me is never re-checked
     calls = len(llm.requests)
-    assert 4 <= calls < 73  # only parts the new line reaches
+    assert 4 <= calls <= 73  # every part with passages, of the outcomes the new line reaches
     assert client.post("/api/gap/core/run").json()["status"] == "done"  # nothing changed since
     assert len(llm.requests) == calls
 ```
@@ -1502,12 +1712,13 @@ def _same_evidence(session: Session, workspace_id: uuid.UUID, o: csf.Outcome, n:
 
 
 def reopen_changed(session: Session, workspace_id: uuid.UUID, run_id: uuid.UUID) -> int:
-    """Check again after an upload (CSF spec 5.6, carry c; plan 6B decision 3), with no model call. Every stored
-    part of a Checked outcome whose evidence or wording changed is dropped; its outcome goes back to pending,
-    with its answer removed and its open fills dismissed, so the step loop re-runs only those parts. An
-    outcome the visitor edited, approved, confirmed or marked not applicable stays, and so does a part filled
-    by an accepted fill. Locks the run first, so two presses re-open once. Returns the outcomes re-opened;
-    with any, the run is running again."""
+    """Check again after an upload (CSF spec 5.6; plan 6B decision 3), with no model call. A Checked outcome is
+    affected when any stored part's evidence or wording changed, or a part is missing. Every machine-judged part
+    of an affected outcome is dropped, and the outcome goes back to pending with its answer removed and its
+    open fills dismissed, so the step loop runs all of its parts again. A part filled by a fill the visitor
+    accepted stays, and so does an outcome the visitor edited, approved, confirmed or marked not applicable.
+    Locks the run first, so two presses re-open once. Returns the outcomes re-opened; with any, the run is
+    running again."""
     run = session.scalar(select(Run).where(Run.id == run_id, Run.workspace_id == workspace_id).with_for_update())
     if run is None or run.status != "done":
         session.commit()
@@ -1530,13 +1741,12 @@ def reopen_changed(session: Session, workspace_id: uuid.UUID, run_id: uuid.UUID)
         o = csf.framework().get(item.csf_id or "")
         if o.tier != "checked":
             continue
-        keep = {
-            k: raw
+        affected = len(stored) < len(o.parts) or any(
+            not raw.get("statement_id") and not _same_evidence(session, workspace_id, o, int(k), raw)
             for k, raw in stored.items()
-            if raw.get("statement_id") or _same_evidence(session, workspace_id, o, int(k), raw)
-        }
-        if len(keep) < len(o.parts):
-            reopened[item.id] = keep
+        )
+        if affected:  # every machine-judged part runs again; the visitor's accepted parts stay
+            reopened[item.id] = {k: raw for k, raw in stored.items() if raw.get("statement_id")}
     for item_id, keep in reopened.items():  # lock order: answer, then run item, then suggestions
         session.execute(delete(Answer).where(Answer.run_id == run_id, Answer.item_id == item_id))
         session.execute(
@@ -1581,12 +1791,12 @@ from collections.abc import Iterator
 from datetime import date
 
 import pytest
-from sqlalchemy import Engine, select, update
+from sqlalchemy import Engine, func, select, update
 from sqlalchemy.orm import Session
 
 from app import csf, runs
 from app import questions as qs
-from app.db.models import Item, RunItem, SuggestedFill
+from app.db.models import Answer, Item, RunItem, SuggestedFill
 from tests import factories as f
 from tests.fakes import ByStepLLM
 
@@ -1620,6 +1830,10 @@ def _item(s: Session, q_id: object, csf_id: str) -> Item:
     return s.scalars(select(Item).where(Item.questionnaire_id == q_id, Item.csf_id == csf_id)).one()
 
 
+def _answer_id(s: Session, run_id: object, item_id: object) -> object:
+    return s.scalar(select(Answer.id).where(Answer.run_id == run_id, Answer.item_id == item_id))
+
+
 def test_a_gap_run_asks_its_ask_me_outcomes_only(s: Session) -> None:
     ws, q, run = _core_done(s)
     asked = sorted(_code(s, x.item_ids) for x in qs.ensure_questions(s, ws.id, run.id))
@@ -1637,20 +1851,20 @@ def test_an_ask_me_answer_is_redacted_stored_and_confirmed(s: Session) -> None:
     assert csf.gap_label(o, answer.label, answer.value, answer.statement_id) == "confirmed_by_you"
 
 
-def test_a_fill_for_one_part_replaces_that_part_and_the_outcome_is_combined_again(s: Session) -> None:
+def test_a_govern_answer_suggests_fills_for_govern_parts_only_until_accepted(s: Session) -> None:
     ws, q, run = _core_done(s)
-    # v1's tiers pair no Ask-me outcome with a Checked one by topic (plan 6B note 8): this test pairs one
-    s.execute(update(Item).where(Item.questionnaire_id == q.id, Item.csf_id == "GV.RM-02").values(topic="Policy"))
-    s.commit()
+    # GV.RM-02 (Risk Management Strategy) and GV.PO-01/02 (Policy) share only the CSF function Govern (decision 8)
     question = next(x for x in qs.ensure_questions(s, ws.id, run.id) if _code(s, x.item_ids) == "GV.RM-02")
     reply = json.dumps({"passages": [{"passage": 1, "stance": "yes", "quote": SAID, "note": "x"}]})
     llm = ByStepLLM({"recheck": reply})
     _, _, found = qs.answer_question(s, ws.id, question.id, SAID, llm, MODELS, TODAY)
     po1, po2 = _item(s, q.id, "GV.PO-01"), _item(s, q.id, "GV.PO-02")
-    # one re-check per open part: GV.PO-01's 3 and GV.PO-02's 4, under MAX_RECHECKS
+    # one re-check per open Govern part: GV.PO-01's 3 and GV.PO-02's 4, under MAX_RECHECKS; nothing else
     assert [r.item_id for r in llm.requests] == [f"{po1.id}#{n}" for n in (1, 2, 3)] + [
         f"{po2.id}#{n}" for n in (1, 2, 3, 4)
     ]
+    assert len(llm.requests) <= qs.MAX_RECHECKS
+    assert s.get_one(Answer, _answer_id(s, run.id, po1.id)).label == "unknown"  # nothing applied until accepted
     assert sorted((sg.item_id == po1.id, sg.part) for sg in found) == [
         (False, 1), (False, 2), (False, 3), (False, 4), (True, 1), (True, 2), (True, 3)
     ]
@@ -1667,6 +1881,19 @@ def test_a_fill_for_one_part_replaces_that_part_and_the_outcome_is_combined_agai
     assert states == {1: "open", 2: "accepted", 3: "open"}  # only that part's other fills are dismissed
     with pytest.raises(qs.Conflict):
         qs.accept_suggestion(s, ws.id, fill.id)
+
+
+def test_an_answer_never_fills_another_functions_parts(s: Session) -> None:
+    ws, q, run = _core_done(s)
+    govern = [_item(s, q.id, c).id for c in ("GV.PO-01", "GV.PO-02")]
+    s.execute(update(Answer).where(Answer.run_id == run.id, Answer.item_id.in_(govern)).values(approved_at=func.now()))
+    s.commit()  # Govern has no open Checked part left; every other function's outcomes are open Gaps
+    question = next(x for x in qs.ensure_questions(s, ws.id, run.id) if _code(s, x.item_ids) == "GV.RM-02")
+    reply = json.dumps({"passages": [{"passage": 1, "stance": "yes", "quote": SAID, "note": "x"}]})
+    llm = ByStepLLM({"recheck": reply})
+    _, answer, found = qs.answer_question(s, ws.id, question.id, SAID, llm, MODELS, TODAY)
+    assert answer is not None and answer.label == "user_confirmed"
+    assert (llm.requests, found) == ([], [])  # no Protect, Detect, Identify, Respond or Recover part is asked
 ```
 
 Append to `tests/test_redecide.py` (add `from app import csf, runs`, `from app.db.models import RunItem` and `from tests.fakes import ByStepLLM`):
@@ -1704,7 +1931,7 @@ def test_a_metadata_override_redecides_each_part_and_recombines(db: Engine) -> N
 - [ ] **Step 6: Run them to verify they fail**
 
 Run: `pytest tests/test_questions_csf.py tests/test_redecide.py -v`
-Expected: FAIL. The Checked Gap outcomes are queued as questions, the recheck runs per outcome, and `redecide` turns the outcome into `unknown`.
+Expected: FAIL. The Checked Gap outcomes are queued as questions; an Ask-me answer re-checks nothing (no Checked outcome shares its topic), or per outcome; and `redecide` turns the outcome into `unknown`.
 
 - [ ] **Step 7: Write the interview changes**
 
@@ -1740,11 +1967,42 @@ def _opens(session: Session, run_id: uuid.UUID, i: Item, a: Answer) -> list[Open
     return out
 ```
 
-In `_suggest`, replace the `opens = [...]` comprehension with:
+Add:
 
 ```python
-    opens = [o for i, a in pairs for o in _opens(session, run_id, i, a)][:MAX_RECHECKS]
+def _same_area(asked: Item, i: Item) -> bool:
+    """Which open items a statement may fill. A questionnaire keeps spec 6.9's rule: the answered item's topic.
+    A gap-check run fills Checked parts in the answered outcome's CSF function (plan 6B decision 8: a Govern
+    answer may fill Govern parts). Either way a fill is only a suggestion until the visitor accepts it."""
+    if asked.csf_id is None or i.csf_id is None:
+        return i.topic == asked.topic
+    fw = csf.framework()
+    return fw.get(i.csf_id).function == fw.get(asked.csf_id).function
 ```
+
+In `_suggest`:
+- Load the answered item first: `asked = session.get_one(Item, answered_item)`.
+- In the `pairs` filter, replace `i.topic == topic` with `_same_area(asked, i)`.
+- Replace the `opens = [...]` comprehension with:
+
+```python
+    opens = [o for i, a in pairs for o in _opens(session, run_id, i, a)][:MAX_RECHECKS]  # the per-answer cap
+```
+
+- `app.interview.recheck` is frozen and re-checks only the items of the one topic it is given. So replace its single call (inside the existing `try:`) with one call per topic group. The groups share the same `spend_in_time` (the 90 s deadline and the budget) and the same cost meter, so the cap of 8 calls per answer still holds:
+
+```python
+        found = [
+            sg
+            for t in dict.fromkeys(o.item.topic for o in opens)  # the topics in queue order
+            for sg in recheck(
+                session, workspace_id, statement_id, t, [o for o in opens if o.item.topic == t],
+                meter, models["recheck"], spend_in_time,
+            )
+        ]
+```
+
+The `topic` parameter of `_suggest` stays as it is; the questionnaire path's groups hold one topic, which is that topic.
 
 and in the `SuggestedFill` insert rows, replace `"item_id": uuid.UUID(sg.key),` with:
 
@@ -1876,11 +2134,11 @@ git commit -m "feat(csf): check again per changed part, Ask-me questions, per-pa
 
 ### Task 5: The Gap check view (tab 6)
 
-**Lane:** ui, worktree `VART-wt-6b-ui` (no database). **Implementer:** Opus 5.5. **Reviewer:** Opus (design.md, keys, accessibility).
+**Lane:** ui, worktree `VART-wt-6b-ui` (no database). **Implementer:** Opus 5.5. **Reviewer:** Opus (design.md, keys, accessibility). **Eval key:** none.
 
 **Files:**
 - Create: `web/src/views/GapCheck.tsx`, `web/src/views/GapCheck.test.tsx`
-- Modify: `web/src/lib/api.ts`, `web/src/lib/route.ts`, `web/src/lib/route.test.ts`, `web/src/lib/labels.ts`, `web/src/components/ui.tsx`, `web/src/components/Shell.tsx`, `web/src/components/Shell.test.tsx`, `web/src/App.tsx`, `web/src/test/mockApi.ts`, `design.md`
+- Modify: `web/src/lib/api.ts`, `web/src/lib/route.ts`, `web/src/lib/route.test.ts`, `web/src/lib/labels.ts`, `web/src/components/ui.tsx`, `web/src/components/Shell.tsx`, `web/src/components/Shell.test.tsx`, `web/src/App.tsx`, `web/src/views/Export.tsx`, `web/src/views/Export.test.tsx`, `web/src/test/mockApi.ts`, `design.md`
 
 **Interfaces:**
 - Consumes:
@@ -1970,6 +2228,16 @@ export function GapChip({ label }: { label: GapLabel }) {
   - add `["g i p d s o a", "gap check scope: govern · identify · protect · detect · respond · recover · all core"]` after the `v p c u y x` row.
 
 `web/src/App.tsx`: import `GapCheck` and render `{route.view === "gap" && <GapCheck {...props} scope={route.scope} outcome={route.item} />}`.
+
+`web/src/views/Export.tsx` (decision 5): after the sentence ending `A csv comes back as csv.`, add ` If you ran a gap check, an xlsx also gets a Gap report sheet with the latest one, its scope and its date.` Append to `web/src/views/Export.test.tsx`'s describe block:
+
+```tsx
+  it("says an xlsx carries the latest gap check", async () => {
+    mockApi({ "GET /api/runs/r1/answers": { run: fixtures.run, rows: fixtures.rows } });
+    render(<ExportView workspace={fixtures.workspace} onGone={() => {}} runId="r1" />);
+    expect(await screen.findByText(/an xlsx also gets a Gap report sheet/)).toBeInTheDocument();
+  });
+```
 
 `web/src/test/mockApi.ts`: import `GapOut` and `GapRow`, and add to `fixtures`:
 
@@ -2367,7 +2635,7 @@ git commit -m "feat(web): the Gap check view, scope keys, filter counts and the 
 
 ### Task 6: The gap inspector
 
-**Lane:** ui (after Task 5). **Implementer:** Opus 5.5. **Reviewer:** Opus.
+**Lane:** ui (after Task 5). **Implementer:** Opus 5.5. **Reviewer:** Opus. **Eval key:** none.
 
 **Files:**
 - Create: `web/src/views/GapDrawer.tsx`, `web/src/views/GapDrawer.test.tsx`
@@ -2714,25 +2982,160 @@ git commit -m "feat(web): the gap inspector: NIST's text and links, per-part sta
 
 ---
 
-### Task 7: Integration and the Playwright gap flow on recorded replies
+### Task 7: The planted improvement plan joins the sample pack (data lane)
 
-**Runs on:** `plan6b`, by the lead (database `vart_test_plan6b`). **Reviewer:** Opus. **Lead-run steps:** the merge, the recording and the cap measurement.
+**Lane:** data, worktree `VART-wt-6b-data`, database `vart_test_6b_data`, run by the lead (it records). It starts after adversary checkpoint 1 and runs in parallel with the api and ui lanes. **Reviewer:** Opus (every key change derived, no gate touched). **Eval key:** about $0.10 for the dev re-record; $0.04 more only if gap-dev drifts. **Stop point:** Step 6.
+
+**Files:**
+- Create: `data/dev/src/sip.md` (the planted plan's source, for `datakit.render`)
+- Create (rendered): `data/dev/docs/security-improvement-plan.md`
+- Delete: `data/dev/gap/docs/security-improvement-plan.md` (and the empty `data/dev/gap/docs/`)
+- Modify:
+  - `data/dev/facts.yaml`: the `sip` document, the five `sip-*` statements, the controls they name that the dev sheet lacks, and traps G1-G4, each appended at the end of its list;
+  - `data/dev/gap/facts.yaml`: the same entries removed; its header comment says the planted plan now lives in the dev pack;
+  - `app/api/documents.py`: `SAMPLE_ORDER` gains `security-improvement-plan.md` at the end; its "rules classify all 22" comment says 23;
+  - `tests/test_api_documents.py` (22 → 23 at lines 91 and 117);
+  - `tests/test_eval_run.py:310` (`("sample", 22)` → `("sample", 23)`);
+  - `tests/datakit/test_gap.py`: where a test looks for the `sip` entries in the gap sheet, it looks in the dev sheet, with the same assertions;
+  - `data/NOTICE.md`, only if it lists the dev documents.
+- Re-derived, never edited by hand:
+  - `data/dev/key/vsq-a.yaml` and `data/dev/key/mvsp-b.yaml` (`python -m datakit.derive_key dev`);
+  - `data/dev/key/csf-core.yaml` (`python -m datakit.gap dev`), expected byte-identical.
+- Re-recorded: `evals/recorded/dev.jsonl` (appended), `evals/results/latest.json` and `evals/results/latest.md`. `evals/recorded/gap-dev.jsonl` and `evals/results/gap-dev.*` change only under Step 7's rule.
+
+**Interfaces:**
+- Consumes: `datakit.render`, `datakit.derive_key`, `datakit.gap`, `datakit.validate` (unchanged), and `datakit.gap.doc_path`, which reads a document from `data/dev/docs` once its id is not in the gap sheet.
+- Produces:
+  - the sample pack with 23 documents;
+  - `/api/documents/sample` loads `security-improvement-plan.md` (rules classify it: kind `plan`, final, effective 2026-07-01; no model call);
+  - re-derived questionnaire keys;
+  - a re-recorded dev eval whose gating gates all pass.
+
+The planted plan states two non-compliances (threat intelligence not yet received, not yet used in analysis) and one disagreement (G1: alerts not yet routed to on-call, against the logging policy). In the sample pack it gives the live demo's Not met (stated) on ID.RA-02 and DE.AE-07. The questionnaires can see it too:
+- G1 becomes a planted conflict for any item whose control is `alerting`;
+- the planned-only traps G2-G4 enter the dev pack.
+
+That is why the dev keys are re-derived and the dev gates re-checked.
+
+- [ ] **Step 1: Update the counts the tests pin**
+
+In `tests/test_api_documents.py`, change `len(first.json()) == 22` to `== 23`, and `n == 22 and len(set(names)) == 22` to `n == 23 and len(set(names)) == 23`. In `tests/test_eval_run.py:310`, change `("sample", 22)` to `("sample", 23)`.
+
+Run: `pytest tests/test_api_documents.py tests/test_eval_run.py -v`
+Expected: FAIL. The pack still has 22 documents, and `SAMPLE_ORDER` does not match a 23-document fact sheet yet.
+
+- [ ] **Step 2: Move the document and its facts**
+
+- `git mv data/dev/gap/docs/security-improvement-plan.md data/dev/src/sip.md`. The source is Markdown; `datakit.render` writes `data/dev/docs/<filename>` from `data/dev/src/<id>.md`.
+- Cut from `data/dev/gap/facts.yaml` and append, unchanged, to the end of the matching lists in `data/dev/facts.yaml`:
+  - the `documents` entry `sip`;
+  - the statements `sip-threat-intel-sources`, `sip-threat-intel-analysis`, `sip-alerting`, `sip-incident-analysis` and `sip-incident-containment`;
+  - every gap-sheet control that a moved statement names and the dev sheet lacks (`threat-intel-sources`, `threat-intel-analysis`, `incident-analysis` and `incident-containment`; `alerting` is already a dev control);
+  - traps G1-G4 (each names a `sip-*` statement).
+- Appending keeps the merged sheet `datakit.gap` builds (dev first, then gap) in the same order as before, so the gap key and gap-dev do not move.
+- In `data/dev/gap/facts.yaml`'s header comment, add the line: `The planted improvement plan (sip) and its traps G1-G4 moved to data/dev/facts.yaml in Plan 6B, so the sample pack shows a stated non-compliance.`
+- In `app/api/documents.py`, append `"security-improvement-plan.md"` to `SAMPLE_ORDER`, and change the comment's 22 to 23.
+
+Then run:
+
+```bash
+python -m datakit.render dev
+cmp data/dev/docs/security-improvement-plan.md <(git show HEAD:data/dev/gap/docs/security-improvement-plan.md)
+```
+
+Expected: no output from `cmp`, so the rendered file is byte-identical to the one gap-dev was recorded on. If `cmp` reports a difference, keep the rendered file; Step 7 then re-records gap-dev.
+
+- [ ] **Step 3: Validate and re-derive the keys**
+
+Run: `python -m datakit.validate all`
+Expected: `datakit.validate all: 0 problems`.
+
+A "conflict without a planted trap" or a statement not found means the move missed an entry. Fix the move, never the key. If a problem can only be fixed by changing a fact, stop and take it to Tarun.
+
+Run: `python -m datakit.derive_key dev && python -m datakit.gap dev && git diff --exit-code data/dev/key/csf-core.yaml && git diff --stat data/dev/key`
+Expected:
+- `csf-core.yaml` is unchanged;
+- any change in `vsq-a.yaml` or `mvsp-b.yaml` is on an item whose control a `sip-*` statement names (for example `alerting`). Read the diff and check that each changed item traces to one.
+
+- [ ] **Step 4: Run the tests**
+
+Run: `pytest tests/test_api_documents.py tests/test_eval_run.py tests/datakit -v`
+Expected: PASS. That includes `test_the_sample_pack_loads_once_in_fact_sheet_order`, and the sample load's rules classify the new file with no model call. If the rules classify it differently from its fact-sheet entry (kind `plan`, final, 2026-07-01), stop: `app/classify.py` is not this plan's to change.
+
+- [ ] **Step 5 (lead): Re-record the dev eval**
+
+```bash
+(set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.run --pack dev --mode record)
+```
+
+Expected: about $0.10. Only items whose prompts changed (passages that now include the new file) are paid, and the rest replay. The command writes `evals/results/latest.{json,md}`.
+
+- [ ] **Step 6 (lead): Re-check every dev gate — the stop point**
+
+Run: `python -m evals.run --pack dev && python -m evals.run --pack dev && git diff --exit-code evals/results`
+Expected: exit 0 both times, with no diff between the two replays.
+
+Read `evals/results/latest.md` and check every gating gate in `evals/score.py`'s dev table against its committed value:
+- `label_accuracy` ≥ 0.90: 82 of 89 today; at least 81 of 89 passes, if the item count stays 89;
+- recall@8 ≥ 0.95;
+- judge faithfulness ≥ 0.95;
+- the planted-conflict gate, which now counts G1 as a sixth planted trap;
+- the date-rule gate, and every other gate at its spec value.
+
+**If any gating gate fails, stop here.** Do not merge the lane, do not tune a prompt, a phrasing or the key, and do not lower a gate. Send Tarun the gate, its value, the items it missed with their causes, and the cost so far. He decides whether the demo keeps the document.
+
+- [ ] **Step 7 (lead): gap-dev must not move**
+
+Run: `python -m evals.run --pack gap-dev && git diff --exit-code evals/results/gap-dev.json evals/results/gap-dev.md`
+Expected: exit 0 with no diff: gap-dev already loaded this document from the same bytes.
+
+If there is a diff (the render changed the file, or the merged order moved):
+- record gap-dev once: `(set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.run --pack gap-dev --mode record)`, about $0.04;
+- re-check its gating gates as in Step 6, with the same stop rule; `label_accuracy` stays reported, not gating (Tarun, 2026-10-06).
+
+- [ ] **Step 8: Run the chains and commit**
+
+Run: the backend chain, then `python -m datakit.validate all`.
+Expected: PASS.
+
+```bash
+git add data/dev app/api/documents.py tests/test_api_documents.py tests/test_eval_run.py tests/datakit/test_gap.py evals/recorded evals/results
+git commit -m "data(dev): the planted improvement plan joins the sample pack; keys re-derived, dev eval re-recorded" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+(Add `data/NOTICE.md` if Step 2 changed it.)
+
+---
+
+### Task 8: Integration and the E2E suite re-recorded with the gap flow
+
+**Runs on:** `plan6b`, by the lead (database `vart_test_plan6b`). **Reviewer:** Opus. **Lead-run steps:** the merges, the recording and the cap measurement. **Eval key:** about $0.15: the sample flow about $0.05 (the sample pack changed), the gap flow about $0.08, the Govern re-checks about $0.01.
 
 **Files:**
 - Create: `web/e2e/gap.spec.ts`
-- Modify: `web/e2e/recorded.jsonl` (appended by the record run, never by hand)
+- Modify: `web/e2e/recorded.jsonl`, deleted and recorded again by the lead's record run (never edited by hand)
 
 **Interfaces:**
 - Consumes:
-  - everything from Tasks 1-6;
+  - everything from Tasks 1-7;
   - `RUN_WAIT` and `xlsxCells` from `web/e2e/helpers.ts`;
-  - the Workspace view's `l` (load the sample documents; rules classify all 22, so no model call).
-- Produces: one E2E flow. It runs a core gap check over the sample documents, opens a Checked outcome's parts, answers an Ask-me outcome, and checks the exported gap report cell by cell.
+  - the Workspace view's `l` (load the sample documents: rules classify all 23, so no model call).
+- Produces: the E2E suite on one fresh recording, with one new flow. The flow:
+  - runs a core gap check over the sample documents;
+  - sees a stated non-compliance;
+  - opens a Checked outcome's parts;
+  - answers an Ask-me outcome (re-checked against Govern parts);
+  - checks the exported gap report cell by cell.
 
 - [ ] **Step 1 (lead): Merge the lanes**
 
-On `plan6b`: `git merge --no-ff plan6b-api` then `git merge --no-ff plan6b-ui` (both with the trailer paragraph). Then run `python scripts/export_openapi.py && (cd web && npm run gen:api) && git diff --exit-code openapi.json web/src/lib/api-types.ts`. Run the backend chain, the frontend chain and the eval replays.
-Expected: PASS. The two lanes touch disjoint files, so neither merge conflicts. Task 3's docstring change regenerated the types on the api lane; the ui lane built on Task 1's types, which differ only in that description.
+On `plan6b`, merge the lanes with `git merge --no-ff`, in this order (each merge commit gets the trailer paragraph):
+1. `plan6b-data`, only after its Step 6 passed;
+2. `plan6b-api`;
+3. `plan6b-ui`.
+
+Then run `python scripts/export_openapi.py && (cd web && npm run gen:api) && git diff --exit-code openapi.json web/src/lib/api-types.ts`, the backend chain, the frontend chain, and the eval replays (`git diff --exit-code evals/results` against the data lane's results).
+Expected: PASS. The three lanes touch disjoint files, so no merge conflicts.
 
 - [ ] **Step 2: Write the flow**
 
@@ -2742,20 +3145,23 @@ Expected: PASS. The two lanes touch disjoint files, so neither merge conflicts. 
 import { expect, test } from "@playwright/test";
 import { RUN_WAIT, xlsxCells } from "./helpers.ts";
 
-// One core gap check (at most 73 stance calls, no draft call) in its own workspace. With the other specs (about
-// 150 calls) it stays under the 400-an-hour per-network model-call cap. The Ask-me answer's topic pairs with no
-// Checked outcome, so it makes no recheck call.
+// One core gap check (at most 73 stance calls, no draft call) in its own workspace, plus at most 7 re-checks of
+// Govern parts after the Ask-me answer. With the other specs (about 150 calls) it stays under the 400-an-hour
+// per-network model-call cap.
 test("the gap check runs over the sample documents, takes an Ask-me answer and exports the report", async ({ page }) => {
   await page.goto("/?view=workspace");
   await expect(page.getByRole("button", { name: "Load sample documents" })).toBeEnabled();
   await page.keyboard.press("l");
-  await expect(page.getByText("access-control-policy.docx")).toBeVisible();
+  await expect(page.getByText("security-improvement-plan.md")).toBeVisible();
   await page.keyboard.press("6");
   await page.waitForURL(/view=gap/);
   await expect(page.getByText("checked 31 · ask me 5 · not checked 70 · of 106")).toBeVisible();
   await page.keyboard.press("r");
   await expect(page.getByText(/36 of 36 checked · done/)).toBeVisible({ timeout: RUN_WAIT });
   await expect(page.getByRole("row", { name: /^[A-Z]{2}\.[A-Z]{2}-\d\d / })).toHaveCount(106);
+  // the planted improvement plan: at least one stated non-compliance shows
+  const filters = page.getByRole("group", { name: "filter by label" });
+  await expect(filters.getByRole("button", { name: /^not met [1-9]\d*$/ })).toBeVisible();
 
   // A Checked outcome: NIST's text and link, and its four parts
   await page.getByRole("row", { name: /^PR\.DS-11 / }).click();
@@ -2765,13 +3171,13 @@ test("the gap check runs over the sample documents, takes an Ask-me answer and e
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();
 
-  // An Ask-me outcome, answered in the inspector
+  // An Ask-me outcome, answered in the inspector (re-checked against Govern parts; fills stay suggestions)
   await page.getByRole("row", { name: /^GV\.RM-02 / }).click();
   await drawer
     .getByLabel("your answer to GV.RM-02")
     .fill("Yes. The board approved a cybersecurity risk appetite statement, and the security team shares it with every new hire.");
   await drawer.getByRole("button", { name: "Send" }).click();
-  await expect(drawer.getByText("confirmed by you").first()).toBeVisible();
+  await expect(drawer.getByText("confirmed by you").first()).toBeVisible({ timeout: RUN_WAIT });
   await page.keyboard.press("Escape");
   await expect(page.getByRole("row", { name: /^GV\.RM-02 / })).toContainText("confirmed by you");
 
@@ -2782,9 +3188,10 @@ test("the gap check runs over the sample documents, takes an Ask-me answer and e
   expect(saved.suggestedFilename()).toBe("csf-2.0-core-gap-report.xlsx");
   const file = test.info().outputPath(saved.suggestedFilename()); // openpyxl needs the extension
   await saved.saveAs(file);
-  const cells = xlsxCells(file, "Gap report", ["A1", "A2", "D2", "A3", "G3", "A110"]);
+  const cells = xlsxCells(file, "Gap report", ["A1", "B1", "A2", "D2", "A3", "G3", "A110"]);
   expect(cells).toMatchObject({
     A1: "Possible gap — review it",
+    B1: "Scope: core",
     A2: "ID",
     D2: "Label",
     A3: "GV.OC-01",
@@ -2794,20 +3201,24 @@ test("the gap check runs over the sample documents, takes an Ask-me answer and e
 });
 ```
 
-- [ ] **Step 3: Run it against the recording to verify it fails**
+- [ ] **Step 3: Run it against the old recording to verify it fails**
 
 Run: `cd web && LLM_MODE=replay npx playwright test e2e/gap.spec.ts`
 Expected: FAIL. The step endpoint answers 500 on a `ReplayMiss`, because no gap-check stance call is recorded yet.
 
-- [ ] **Step 4 (lead): Record the gap flow with the eval key**
+- [ ] **Step 4 (lead): Record the whole suite again with the eval key**
 
-Make sure no server is listening on port 8000: Playwright reuses an existing server outside CI, and a replay server would ignore record mode. Then:
+The sample pack changed in Task 7, so the sample flow's prompts changed too, and the whole suite is recorded fresh. Starting from an empty file leaves no stale rows.
+
+First make sure no server is listening on port 8000: Playwright reuses an existing server outside CI, and a replay server would ignore record mode. Then:
 
 ```bash
-cd web && (set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" LLM_MODE=record npx playwright test e2e/gap.spec.ts)
+cd web && rm -f e2e/recorded.jsonl && (set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" LLM_MODE=record npx playwright test)
 ```
 
-Expected: PASS live in about 13 minutes. `web/e2e/recorded.jsonl` gains at most 73 stance rows, about $0.08 of the eval key; stop and ask Tarun if the key's remaining credit is under $1. Rows already recorded are replayed, not re-paid. The recording appends; the existing rows stay byte for byte (`git diff web/e2e/recorded.jsonl` shows only added lines).
+Expected: every spec passes live in about 25 minutes, for about $0.15 of the eval key. Stop and ask Tarun if the key's remaining credit is under $1.
+
+If the gap flow's `not met` filter shows 0 live, the run is valid evidence of a miss, not a test to loosen. Stop and report to Tarun with the two planted outcomes' labels (ID.RA-02, DE.AE-07).
 
 - [ ] **Step 5 (lead): Replay the whole suite twice, measure the cap, scan the recording**
 
@@ -2820,7 +3231,7 @@ Then read the per-network model calls the last run counted (the e2e server write
 python -c "from sqlalchemy import create_engine, text; import os; e = create_engine(os.environ['DATABASE_URL']); print(e.connect().execute(text(\"SELECT window_start, hits FROM ip_limits WHERE kind = 'llm' ORDER BY window_start DESC LIMIT 2\")).all())"
 ```
 
-Expected: the latest window's hits are at most about 225 and under 400. If one suite run straddles an hour, add the two windows. Record the number in Task 8's PROGRESS entry.
+Expected: the latest window's hits are about 231 and under 400. If one suite run straddles an hour, add the two windows. Over 400 is a failure: report it to Tarun and do not raise the cap. Record the number in Task 9's PROGRESS entry.
 
 Then run `gitleaks dir --redact --no-banner web/e2e/recorded.jsonl` (the `.gitleaks.toml` allowlist covers the 64-hex keys).
 Expected: no leaks.
@@ -2829,28 +3240,35 @@ Expected: no leaks.
 
 ```bash
 git add web/e2e/gap.spec.ts web/e2e/recorded.jsonl
-git commit -m "test(e2e): the gap check flow on recorded replies" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "test(e2e): the gap check flow; the suite re-recorded on the 23-document sample pack" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 8: Adversary checkpoint 2, docs, final review and the release plan
+### Task 9: Adversary checkpoint 2, docs, final review and the release plan
 
-**Runs on:** `plan6b`, by the lead. **Outward steps:** Tarun's (push, PR, migrate, fast-forward `main`).
+**Runs on:** `plan6b`, by the lead. **Eval key:** none. **Outward steps:** Tarun's (push, PR, migrate, fast-forward `main`).
 
 **Files:**
 - Modify: `README.md`, `CLAUDE.md`, `docs/PROGRESS.md`, `docs/superpowers/specs/2026-10-05-vart-csf-gap-check-design.md`, `docs/CONTRACTS.md` (fix-round lines only, if any)
 
 - [ ] **Step 1 (lead): Adversary checkpoint 2**
 
-Dispatch Fable 5.1 on `main..plan6b`: what input, label, lock order, copy or coverage claim did everyone miss? Point it at this plan's Review Focus and at:
+Dispatch Fable 5.1 on `main..plan6b`: what input, label, lock order, copy, fill or coverage claim did everyone miss? Point it at this plan's Review Focus and at:
 - the runner's resume path;
 - `reopen_changed` against an accepted fill and an in-flight step;
+- the function-wide fills (Review Focus 6);
+- the gap sheet in a visitor's workbook (a sheet name clash, inert cells, the active sheet);
+- the moved planted document's facts and keys;
 - the inspector at 375px;
-- the export's inert cells;
 - the network budget.
 
-Each accepted finding gets a fix by the owning lane's implementer, a reviewer pass, and a CONTRACTS.md change-log line when it touches the contract. Re-run Task 7 Step 5 after any fix that changes what the E2E calls.
+Each accepted finding gets:
+- a fix by the owning lane's implementer;
+- a reviewer pass;
+- a CONTRACTS.md change-log line when it touches the contract.
+
+Re-run Task 8 Step 5 after any fix that changes what the E2E calls.
 
 - [ ] **Step 2: Write the README section**
 
@@ -2864,14 +3282,16 @@ outcome, what they show: **Covered**, **Partly covered**, **Not met (stated)** w
 done, **Documents disagree**, or **Gap** when nothing speaks to it. Each checked outcome is cut into NIST's own
 parts; every part is asked as a question through the same engine that fills questionnaires, and code combines
 the parts' labels and writes the explanation. Every finding quotes your line next to NIST's verbatim text and
-links to NIST, with the related SP 800-53 Rev 5 controls. The report exports as a gap-report sheet.
+links to NIST, with the related SP 800-53 Rev 5 controls. The report exports as a gap-report sheet, alone or
+inside your filled questionnaire. The sample company's documents include an improvement plan that states two
+controls are not in place yet, so the demo shows what a stated non-compliance looks like.
 
 **What it is not.** It is not legal advice, an audit, a certification or a compliance score, and no overall score
 is shown. Every finding reads "possible gap, review it". It checks 31 of CSF 2.0's 106 outcomes against documents,
 asks you about 5 governance outcomes that documents rarely state, and lists the other 70 as not checked in this
-version. A checked outcome is judged on documents only: your answers confirm the Ask-me outcomes and can fill a
-checked part only as a suggestion you accept. On the dev pack its outcome labels agree with a blind judge's key
-22 times in 31 (0.71 against a 0.80 target, reported in `evals/results/gap-dev.md`).
+version. A checked outcome is judged on documents only: your answers confirm the Ask-me outcomes, and can fill a
+checked part in the same CSF function only as a suggestion you accept. On the dev pack its outcome labels agree
+with a blind judge's key 22 times in 31 (0.71 against a 0.80 target, reported in `evals/results/gap-dev.md`).
 
 Not legal advice. CSF 2.0 text © NIST, public domain.
 ```
@@ -2881,32 +3301,39 @@ Not legal advice. CSF 2.0 text © NIST, public domain.
 `CLAUDE.md` Map:
 - add `app/api/gap.py` (gap-check endpoints) to the API line;
 - in the UI line, add `GapCheck.tsx` and `GapDrawer.tsx` (the Gap check view and its inspector) after `web/src/views/`;
-- in the Engine line, after `app/csf.py ...`, add "; `app/runs.py` answers a gap-check run part by part (`run_items.parts`)".
+- in the Engine line, after `app/csf.py ...`, add "; `app/runs.py` answers a gap-check run part by part (`run_items.parts`)";
+- in the data line, `data/dev/gap/` becomes "the gap check's outcome map and judged overrides; the planted improvement plan is in the dev pack".
 
-Commands: the E2E line gains "`gap.spec.ts` records alone (`LLM_MODE=record npx playwright test e2e/gap.spec.ts`)".
+Commands: the E2E line keeps "re-record with ... `rm -f e2e/recorded.jsonl` and `LLM_MODE=record npx playwright test`".
 
 The CSF spec:
-- under 5.6's last bullet add `Sync (Plan 6B): a check again re-runs only the parts whose evidence or wording changed since they were judged (retrieval only, no model call); an unchanged part sends the same prompt, so its result cannot change. The visitor starts it with r; an upload starts no model call by itself.`;
-- under section 7 add `Sync (Plan 6B): the path's first segment is "workspace" (the API has no company name); the filter toggles have no single keys; the coverage line sits in the status line; 800-53 controls link to NIST's SP 800-53 Rev 5 page.`;
-- add a change-log line `2026-10-06: Plan 6B sync, no new behaviour beyond 5.6's narrowing (sections 5.6 and 7).`
+- under 5.6, add: `Sync (Plan 6B, Tarun 2026-10-06): in a gap-check run an Ask-me answer is re-checked against the open parts of Checked outcomes in the same CSF function (a questionnaire keeps the same-topic rule), at most 8 re-checks per answer; a fill stays a suggestion until accepted. Check again (r) re-runs every machine-judged part of each affected outcome; a part the visitor filled stays.`
+- under section 7, add: `Sync (Plan 6B): the path's first segment is "workspace" (the API has no company name); the filter toggles have no single keys; the coverage line sits in the status line; 800-53 controls link to NIST's SP 800-53 Rev 5 page; the gap sheet also rides in an xlsx questionnaire export (the latest done gap check, with its scope and date).`
+- under section 8, add: `Sync (Plan 6B, Tarun 2026-10-06): the planted improvement plan moved from the gap extension into the dev pack, which is the sample pack, so the live demo shows Not met (stated). The questionnaire keys were re-derived and the dev eval re-recorded; its gates held.`
+- add a change-log line: `2026-10-06: Plan 6B sync (sections 5.6, 7 and 8): fills within a CSF function, the gap sheet in questionnaire exports, the planted plan in the sample pack.`
 
 - [ ] **Step 4: Update `docs/PROGRESS.md`**
 
-- At a glance: the 6A row reads `done, live`. Add a row `| 6B CSF gap check, the visitor half | done on plan6b; release pending | Gap check view (tab 6), per-part runner and resume, check again per changed part, Ask-me answers, gap-report sheet, one E2E flow (<N> model calls per full suite) |`.
-- Decisions, dated the merge day, from this plan's execution notes:
+- At a glance:
+  - the 6A row reads `done, live`;
+  - add a row `| 6B CSF gap check, the visitor half | done on plan6b; release pending | Gap check view (tab 6), per-part runner and resume, check again per affected outcome, Ask-me answers filling Govern parts, gap sheet in both exports, the planted plan in the sample pack, one E2E flow (<N> model calls per full suite) |`;
+  - the Plan 2 row's dev baseline gets the re-recorded numbers ("re-recorded 2026-10-06 with 23 documents: label accuracy <x>, ...").
+- Decisions, dated the merge day:
   - the per-part migration (two columns, no table);
-  - check again re-runs only changed parts, started by `r`, never by an upload;
-  - a gap-check run's export is the gap report;
+  - check again re-runs every part of each affected outcome, started by `r`, never by an upload;
+  - the gap sheet goes in both exports;
   - controls link to one NIST page;
-  - the sample pack stays without the gap extension;
-  - per-part fills are built but unpaired by v1's tiers;
+  - the planted improvement plan joins the sample pack (Tarun), which reverses the 6A decision that kept it gap-only; the dev keys were re-derived and the dev gates held at their values;
+  - fills widen to the same CSF function (Tarun);
   - the filter toggles have no keys.
-- "6B carry-over": mark (a), (b), (c) and (d) done, each with its task. Keep "Stance improvement" and "`app.csf.evidence` drops statements after the top-8 cut" as carried to a later plan. The latter still holds, and `reopen_changed` inherits it: a new Ask-me statement that reaches a part's top 8 changes that part's passages and re-runs it once.
-- Add `### Plan 6B`, `_Filled in after the release (Step 8)._` under Releases.
+- "6B carry-over":
+  - mark (a), (b), (c) and (d) done, each with its task;
+  - keep "Stance improvement" and "`app.csf.evidence` drops statements after the top-8 cut" as carried to a later plan. The latter still holds, and `reopen_changed` inherits it: a new Ask-me statement that reaches a part's top 8 changes that part's passages and re-opens its outcome once.
+- Under Releases, add `### Plan 6B`, `_Filled in after the release (Step 8)._`
 
 - [ ] **Step 5: Run every chain once more and commit**
 
-Run: the backend chain, the frontend chain, `python -m evals.run --pack dev && python -m evals.run --pack gap-dev && git diff --exit-code evals/results`, and `cd web && LLM_MODE=replay npx playwright test`.
+Run: the backend chain, the frontend chain, `python -m datakit.validate all`, `python -m evals.run --pack dev && python -m evals.run --pack gap-dev && git diff --exit-code evals/results`, and `cd web && LLM_MODE=replay npx playwright test`.
 Expected: PASS.
 
 ```bash
@@ -2916,18 +3343,18 @@ git commit -m "docs(csf): Plan 6B readme section, map, spec sync and progress" -
 
 - [ ] **Step 6 (lead): Final Opus review**
 
-An Opus reviewer reads `main..plan6b` against this plan, the CSF spec sections 5, 7 and 11, and the Review Focus. Fix rounds follow its findings; then re-run Step 5's chains.
+An Opus reviewer reads `main..plan6b` against this plan, the CSF spec sections 5, 7, 8 and 11, and the Review Focus. Fix rounds follow its findings; then re-run Step 5's chains.
 
 - [ ] **Step 7 (lead → Tarun): The release plan**
 
 Send Tarun this plan. Every step is his; the lead runs nothing outward.
 1. Push `plan6b` and open a pull request to `main`.
-2. Wait for green CI: gates, backend, frontend, e2e.
+2. Wait for green CI: gates, backend (with the dev and gap-dev replays), frontend, e2e.
 3. From the branch head, run `ops/setup.sh migrate`: Neon goes `a7c3e9d1b2f4` → `c4e8a2d6f1b3` before `main` moves, because Vercel deploys `main` at once. The migration is additive, and the live code ignores both columns.
 4. Fast-forward `main` to `plan6b` and push. Vercel deploys.
-5. Check that the smoke test passes, `/api/health` reads `"status":"ok"`, and the Gap check tab opens on https://vart-v2.vercel.app.
+5. Check that the smoke test passes and `/api/health` reads `"status":"ok"`. On https://vart-v2.vercel.app, check that the sample pack lists 23 documents and the Gap check tab opens.
 
-No new file ships in the function bundle (`data/csf/csf-2.0.json` shipped with 6A), so no preview bundle check is needed.
+One small Markdown file joins `data/dev/docs`, which already ships in the function bundle; no preview bundle check is needed for 2 KB.
 
 - [ ] **Step 8 (lead): The release record**
 
@@ -2935,7 +3362,8 @@ After Tarun's step 5, fill `### Plan 6B` in `docs/PROGRESS.md`:
 - `main` = `<sha>`, merged by PR `#<n>` after green CI;
 - the migration;
 - the smoke and health results;
-- the E2E's model calls per suite.
+- the E2E's model calls per suite;
+- the re-recorded dev numbers.
 
 Commit it on `plan6b-record` from the new `main`, with the trailer. Pushing it is Tarun's.
 
@@ -2948,26 +3376,34 @@ Commit it on `plan6b-record` from the new `main`, with the trailer. Pushing it i
   - 5.2-5.3 (part by part, labels combined by code): Task 2.
   - 5.4 (Ask-me redacted, stored, Confirmed by you, Not answered): Task 2 `ASK`, Task 4 `ensure_questions` and `test_an_ask_me_answer_is_redacted_stored_and_confirmed`, Task 3 `gap_rows`, Task 6 answer box.
   - 5.5 (not checked: no call, no label): Task 3 view test, Task 5 rows.
-  - 5.6 (per-part re-check, accepted fill replaces one part before combine): Task 4.
+  - 5.6 (re-check per part, every part of each affected outcome; an accepted fill replaces one part before combine; fills within a CSF function): Task 4.
   - 5.7 (claim by parts at most 8, resume after a refusal, spend before every call, no open transaction): Task 2.
   - 6 (no schema change beyond the one migration): Task 1.
-  - 7 (tab 6, path, scope keys, r, e, filter counts, grouped 28px rows, inspector with NIST text, link, controls, explanation, footnoted sources, line listings, dropped evidence, Ask-me box, status line, export columns, copy): Tasks 3, 5 and 6.
-  - 8 (the E2E side): Task 7.
-  - 11 (view, export, README): Tasks 3-8.
+  - 7 (tab 6, path, scope keys, r, e, filter counts, grouped 28px rows, inspector with NIST text, link, controls, explanation, footnoted sources, line listings, dropped evidence, Ask-me box, status line, export columns in both exports, copy): Tasks 3, 5 and 6.
+  - 8 (planted cases visible in the demo; the E2E): Tasks 7 and 8.
+  - 11 (view, export, README): Tasks 3-9.
   - Carries (a)-(d): Tasks 2, 2, 4 and 3+6. Ruling 5 (csf questionnaires not counted, listed or deleted) was already in Plan 3's code; Task 3 pins listing.
-- **Placeholders.** Two kinds of text stand in for content that already exists:
-  - "<keep the existing docstring>" (Task 2 `check_parts`) and "<the Task 1 docstring, unchanged>" (Task 3) name text written earlier, in Task 1 or in 6A, not left to write;
-  - `<N>`, `<sha>` and `<n>` in Task 8 are numbers only the run and the release produce.
+- **Placeholders.**
+  - "<keep the existing docstring>" (Task 2 `check_parts`) and "<the Task 1 docstring, unchanged>" (Task 3) name text that already exists.
+  - `<N>`, `<x>`, `<sha>` and `<n>` in Task 9 are numbers only the runs and the release produce.
 - **Type consistency.**
   - `check_part(session, workspace_id, o, n, llm, models, spend)` is the same in Tasks 2-4.
-  - `part_result(o, n, raw)` and `outcome_values(o, parts)` (parts keyed `"1"`..`"n"`) are the same in Tasks 2, 3 (`_parts`), 4 (`_fill_part`, `_redecide_parts`).
+  - `part_result(o, n, raw)` and `outcome_values(o, parts)` (parts keyed `"1"`..`"n"`) are the same in Tasks 2, 3 (`_parts`) and 4 (`_fill_part`, `_redecide_parts`).
   - `reopen_changed(session, workspace_id, run_id) -> int` is the same in Task 4 and CONTRACTS.md.
-  - `gap_rows(session, scope, q, run)` is used by `gap_view` and `_gap_report`.
-  - `gap_report(rows, citations, run_date, version, controls_url)` is the same in its test and its endpoint.
-  - On the frontend, `GapRow`, `GapOut`, `PartOut`, `GapLabel`, `GapScope` come from the generated types.
-  - `GapChip` takes `GapLabel`, and `PartOut.label` (a `PartLabel`) is assignable to it.
-  - `useStepLoop(runId, data, onData, onGone)` is called with a `RunRowsOut` made from `GapOut.run`.
-- **Counts that tests pin:** 106 outcomes, 31 / 5 / 70 tiers, 36 items in the core run, 73 parts, Recover's one in-scope outcome (RC.RP-01), PR.DS-11's four parts, the first core step taking GV.OC-03, GV.RM-02, GV.RR-02 and GV.PO-01 (1 + 1 + 1 + 3), and the gap report's footer at row 110 for the core. A tier change moves them together (6A self-review).
-- **Review Focus.** Each of the five lines has its test in the owning task. Two failure modes outside the five are noted and accepted:
-  - two steps on one stale claim (Plan 4 carry N1) could store one part twice; the later write wins and nothing is charged twice beyond what the existing N1 allows;
+  - `gap_rows(session, scope, q, run)` feeds `gap_view` and `gap_sheet`.
+  - `gap_sheet(session, q, run) -> GapSheet` feeds `gap_report(g)` and `export_xlsx(..., gap)`.
+  - `GapSheet(rows, citations, run_date, scope, version, controls_url)` has the same field order in its tests and its builder.
+  - `_same_area(asked, item)` is only in `app/questions.py`.
+  - On the frontend, `GapRow`, `GapOut`, `PartOut`, `GapLabel` and `GapScope` come from the generated types; `GapChip` takes `GapLabel`, and `PartOut.label` is assignable to it.
+- **Counts that tests pin:**
+  - 106 outcomes, 31 / 5 / 70 tiers, 36 items in the core run, 73 parts;
+  - Recover's one in-scope outcome (RC.RP-01) and PR.DS-11's four parts;
+  - the first core step taking GV.OC-03, GV.RM-02, GV.RR-02 and GV.PO-01 (1 + 1 + 1 + 3);
+  - 7 Govern re-checks (GV.PO-01's 3 and GV.PO-02's 4);
+  - the gap report's footer at row 110 for the core;
+  - 23 sample documents.
+
+  A tier change moves the CSF counts together (6A self-review), and the sample count moves with `data/dev/facts.yaml`.
+- **Review Focus.** Each of the six lines has its test in the owning task. Two failure modes outside them are noted and accepted:
+  - two steps on one stale claim (Plan 4 carry N1) could store one part twice; the later write wins, and nothing is charged twice beyond what the existing N1 allows;
   - a withdrawn NIST id in an old run ends at `MAX_ATTEMPTS` (the `ponytail:` comment in `_answer_outcome`).
