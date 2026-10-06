@@ -1811,7 +1811,7 @@
       ],
       "source_url": "https://csrc.nist.gov/projects/cybersecurity-framework/filters#/csf/filters",
       "tier": "checked",
-      "question": "Is the recovery portion of the incident response or disaster recovery plan executed when needed, and is it tested or exercised?"
+      "question": "Is the recovery portion of the incident response plan, such as disaster recovery failover and restore, executed once initiated from the incident response process?"
     },
     {
       "id": "RC.RP-02",

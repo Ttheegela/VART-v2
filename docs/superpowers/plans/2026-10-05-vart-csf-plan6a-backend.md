@@ -1185,7 +1185,7 @@ def test_the_key_plants_what_the_spec_asks() -> None:
     assert by_label["not_met"] == {"ID.RA-02", "DE.AE-07"}
     assert by_label["gap"] == {"ID.AM-03", "PR.AA-06", "PR.IR-04"}
     assert by_label["partly_covered"] == {"PR.AA-03", "RS.MA-01", "RS.CO-02"}
-    assert Counter(labels.values())["covered"] == 19
+    assert Counter(labels.values())["covered"] == 17
 
 
 def test_trap_outcomes_are_never_expected_covered() -> None:
@@ -2135,4 +2135,4 @@ The final Opus review of `main..plan6a`. On a clean review the lead sends Tarun 
 
 - **Spec coverage.** Section 4: Task 1 (file, fields, verbatim NIST text, drift test, refresh rule, tiers fixed with Tarun). Section 5: steps 2-5 in Tasks 3-4 (`check_outcome`, gap labels, `ask_queue` + `store_statement`, not-checked makes no call); step 1 (the view starting a run, caps, expiry) and step 6 (re-check after an upload or answer) are HTTP flows, deferred to 6B with Plan 3's runner (`recheck` is reused unchanged). Section 6: Tasks 2 and 4. Section 7: 6B. Section 8: Tasks 5-7, every gate in the table (cost and speed reported), fail-closed, CI replay, eval key. Section 9: Ask-me answers redacted by `store_statement` and measured by the redaction gate; the CSF file is read, never fetched or executed. Section 11: Tarun's approvals of the IDs (Task 1 Step 7) and of the first baseline (Task 7 Step 5); README and view are 6B.
 - **Type consistency.** `gap_label(o, label, value=None, statement_id=None)` is called the same way in Tasks 3, 4, 5 and 6; `questionnaire_for`, `check_outcome`, `ask_queue`, `item_input` keep Task 4's signatures in Task 6; `datakit.gap.doc_path(pack, gap, spec)` and `trap_sources(f, control)` match their uses in `evals/gap.py`; `score.gates(metrics, table)` is the one signature change in `evals/score.py`.
-- **Counts that tests pin and that move together:** 106 outcomes, 29 Checked, 5 Ask-me, 72 not checked, 34 in the core, 7 in Govern, 19 expected Covered. If Tarun changes the tiers at the review gate, update these numbers in `tests/datakit/test_csf.py`, `tests/test_csf.py`, `tests/datakit/test_gap.py` and `tests/test_eval_gap.py` together with the outcome map.
+- **Counts that tests pin and that move together:** 106 outcomes, 29 Checked, 5 Ask-me, 72 not checked, 34 in the core, 7 in Govern, 17 expected Covered. If Tarun changes the tiers at the review gate, update these numbers in `tests/datakit/test_csf.py`, `tests/test_csf.py`, `tests/datakit/test_gap.py` and `tests/test_eval_gap.py` together with the outcome map.

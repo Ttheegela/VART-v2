@@ -121,10 +121,13 @@ def test_a_label_override_changes_the_derived_label() -> None:
     assert all(before[c] == "verified" and after[c] == "partial" for c in changed)
 
 
-def test_a_label_override_without_its_missing_parts_fails_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("missing", [None, "", "   "])
+def test_a_label_override_without_its_missing_parts_fails_validation(
+    monkeypatch: pytest.MonkeyPatch, missing: str | None
+) -> None:
     facts, g = gap.load("dev")
     outcomes = tuple(
-        o.model_copy(update={"missing": None}) if o.csf_id == "PR.DS-11" else o for o in g.outcomes
+        o.model_copy(update={"missing": missing}) if o.csf_id == "PR.DS-11" else o for o in g.outcomes
     )
     monkeypatch.setattr(gap, "load", lambda pack: (facts, g.model_copy(update={"outcomes": outcomes})))
     assert "outcome PR.DS-11: a label override needs missing" in gap.check("dev")

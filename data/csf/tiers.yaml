@@ -39,7 +39,7 @@ checked:
   RS.AN-03: "Is analysis performed after an incident to establish what happened and its root cause?"
   RS.MI-01: "Are incidents contained, and is there a process for doing so?"
   RS.CO-02: "Are customers and other stakeholders notified of security incidents?"
-  RC.RP-01: "Is the recovery portion of the incident response or disaster recovery plan executed when needed, and is it tested or exercised?"
+  RC.RP-01: "Is the recovery portion of the incident response plan, such as disaster recovery failover and restore, executed once initiated from the incident response process?"
 ask:
   GV.OC-03: "Which legal, regulatory and contractual cybersecurity requirements apply to your organization, and how are they managed?"
   GV.RM-02: "Has your organization set risk appetite and risk tolerance statements for cybersecurity, and how are they communicated?"
