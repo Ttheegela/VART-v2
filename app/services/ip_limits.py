@@ -15,8 +15,9 @@ from app.db.models import IpLimit
 # (events allowed, window) per kind; generous for people, tight for scripts.
 LIMITS: dict[str, tuple[int, timedelta]] = {
     "workspace": (20, timedelta(hours=1)),
-    "upload": (60, timedelta(hours=1)),
+    "upload": (60, timedelta(hours=1)),  # documents and questionnaires
     "run": (20, timedelta(hours=1)),
+    "llm": (400, timedelta(hours=1)),  # step calls and interview answers (foundation adversary I1)
 }
 KEEP = timedelta(days=2)
 

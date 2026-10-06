@@ -6,17 +6,19 @@ from sqlalchemy import delete
 
 from app.api.deps import COOKIE_NAME, SessionDep, WorkspaceDep, live_workspace
 from app.db.models import Workspace
+from app.services.workspaces import WORKSPACE_TTL
 
 router = APIRouter()
 
 
 class WorkspaceOut(BaseModel):
     created_at: datetime
+    expires_at: datetime  # the top bar's "expires 23h41m" (design.md)
 
 
 @router.get("/api/workspace")
 def read_workspace(ws: WorkspaceDep) -> WorkspaceOut:
-    return WorkspaceOut(created_at=ws.created_at)
+    return WorkspaceOut(created_at=ws.created_at, expires_at=ws.created_at + WORKSPACE_TTL)
 
 
 @router.post("/api/workspace/reset", status_code=204)

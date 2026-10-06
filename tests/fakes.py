@@ -1,3 +1,5 @@
+import threading
+
 from app.llm.client import LLMRequest, LLMResult
 
 
@@ -16,3 +18,21 @@ class FakeLLM:
         if isinstance(reply, Exception):
             raise reply
         return LLMResult(text=reply, input_tokens=10, output_tokens=5, cost_usd=0.0)
+
+
+class ByStepLLM:
+    """Answers by step, safe across threads (the runner's concurrency tests). Counts requests per step."""
+
+    def __init__(self, replies: dict[str, str | Exception], cost: float = 0.0) -> None:
+        self.replies = replies
+        self.cost = cost
+        self.requests: list[LLMRequest] = []
+        self._lock = threading.Lock()
+
+    def complete(self, req: LLMRequest) -> LLMResult:
+        with self._lock:
+            self.requests.append(req)
+        reply = self.replies[req.step]
+        if isinstance(reply, Exception):
+            raise reply
+        return LLMResult(text=reply, input_tokens=10, output_tokens=5, cost_usd=self.cost)

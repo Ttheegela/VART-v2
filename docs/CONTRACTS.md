@@ -46,6 +46,36 @@ passages' chunk ids in order (`[p.chunk_id for p in result.retrieval.passages]`)
 the retrieval drops, decide's third argument (`jsonable(result.retrieval.dropped)`) (new `answers` columns, for
 example `stances jsonb`); the passages are rebuilt from those chunks with the documents' current metadata.
 
+## HTTP contract (Plan 3)
+
+Frozen after Plan 3's adversary checkpoint 1 (plan3a Task 2). The models live in `app/api/schemas.py`; the
+operations are pinned by `tests/test_openapi.py::test_the_frozen_contract_is_exactly_these_operations`;
+`web/src/lib/api-types.ts` is generated from `openapi.json`. A change needs the lead's OK and a change-log line.
+
+- Workspace: the signed cookie. The frontend calls `GET /api/workspace` before any other workspace call
+  (FastAPI drops a cookie set on a response that raises). `WorkspaceOut.expires_at` is `created_at` + 24 h.
+- Errors: `{"detail": "<sentence>"}`. 404 unknown or foreign id, or a workspace gone mid-request (a foreign-key
+  violation); 409 state conflict; 422 refused input (`IngestError`'s sentence; FastAPI's list form for schema
+  validation); 429 per-network limit or model budget, with `Retry-After`; 503 demo full or model calls off; 501
+  for a stub (Part 0 only). The handlers are `app.api.errors.install`.
+- Free text: every request text is cleaned of NUL and lone surrogates; the three bounded bodies (`AnswerEdit.text`
+  4,000, `NotApplicableIn.reason` 500, `AnswerQuestionIn.text` 4,000 characters) are cleaned and stripped before
+  their bounds, so blank text is a 422.
+- Step runner: create a run (`POST /api/questionnaires/{id}/runs`, all items pending), then call
+  `POST /api/runs/{id}/step` while `status == "running"`. A step claims up to 4 items (`FOR UPDATE SKIP LOCKED`;
+  claims older than 5 minutes are taken again), answers them outside any transaction, writes one answer per item
+  (`UNIQUE (run_id, item_id)`, conflicting inserts do nothing), stops claiming after 240 s, and returns
+  unstarted items to pending. A refused budget is a 429 with the unstarted items returned. An item whose model
+  call fails twice is `unknown` with a sentence saying so; its cost still counts. A repeated or concurrent step
+  never processes an item twice or spends twice.
+- Caps: per network an hour `workspace` 20, `upload` 60, `run` 20, `llm` 400 (steps and interview answers),
+  each enforced through the one helper `app.api.errors.limit(request, session, kind)`; per workspace an hour per
+  step (`llm_budget.CAPS`); globally 1,500 model calls an hour and 4,000 a day.
+- Plan 6B room: `QuestionnaireOut.source` includes `csf`; `ItemOut.csf_id`; runs scoped by questionnaire;
+  `GET /api/questionnaires` lists built-in questionnaires. The seam is per-item dispatch in `app/runs.py` on
+  `Questionnaire.source` / `Item.csf_id`; 6B may change the internals of `_answer`, `_values` and `step` (they are
+  not frozen), but not a path or a model defined here.
+
 ## Change log
 
 - 2026-10-04: frozen (Plan 2A Task 2).
@@ -67,3 +97,4 @@ example `stances jsonb`); the passages are rebuilt from those chunks with the do
   quotation marks, no comment on a document's status. `check` now ignores trailing `,;:` inside quotation marks
   (round 2, Ruling 10: revised before acceptance from `,;:.`; still `draft@p2`).
   Signatures unchanged; re-record.
+- 2026-10-06: HTTP contract frozen (Plan 3A Task 2) after adversary checkpoint 1.
