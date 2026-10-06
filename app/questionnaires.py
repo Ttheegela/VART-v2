@@ -6,6 +6,7 @@ import csv
 import io
 import re
 import unicodedata
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,6 +20,9 @@ from app.ingest.parse import MAX_BYTES, IngestError, decode, sniff
 MAX_ITEMS = 150  # spec 9
 MAX_ROWS = 2000  # rows read per sheet (a 150-item questionnaire with section rows fits many times over)
 MAX_COLS = 52
+MAX_QUESTION = 2000  # characters; the stance and draft prompts carry the question verbatim
+MAX_TOPIC = 200
+MAX_UNZIPPED = 4 * 1024 * 1024  # export loads the whole workbook, so a bigger one once unpacked is refused
 HEADER_SCAN = 30
 HEADER_CELL = 40  # a header cell is short; a question is not
 PREVIEW = 8
@@ -85,12 +89,21 @@ def read_sheets(filename: str, data: bytes) -> tuple[str, list[Sheet]]:
         if fmt == "csv":
             text = decode(data)
             reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter(text))
-            rows = [[c.strip() for c in r[:MAX_COLS]] for _, r in zip(range(MAX_ROWS), reader, strict=False)]
-            return fmt, [Sheet(None, _pad(rows))]
+            raw = [r for _, r in zip(range(MAX_ROWS + 1), reader, strict=False)]
+            if len(raw) > MAX_ROWS or any(len(r) > MAX_COLS for r in raw):  # what export would refuse
+                raise IngestError(
+                    f"A csv questionnaire can have at most {MAX_ROWS} rows and {MAX_COLS} columns."
+                )
+            return fmt, [Sheet(None, _pad([[c.strip() for c in r] for r in raw]))]
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            if sum(i.file_size for i in z.infolist()) > MAX_UNZIPPED:
+                raise IngestError("This workbook is too large to write answers back into.")
         wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
         try:
             sheets = []
             for ws in wb.worksheets:
+                if ws.sheet_state != "visible":
+                    continue  # hidden sheets are not the visitor's questionnaire (hidden rows are kept)
                 ws.reset_dimensions()
                 rows = [
                     [_text(v) for v in r[:MAX_COLS]]
@@ -214,6 +227,10 @@ def read_items(sheets: list[Sheet], mapping: Mapping) -> list[ParsedItem]:
                 section = filled[0]
             continue
         topic = at(row, mapping.topic_col) if mapping.topic_col else section
+        if len(question) > MAX_QUESTION:
+            raise IngestError(f"Row {n}'s question is longer than {MAX_QUESTION:,} characters.")
+        if topic and len(topic) > MAX_TOPIC:
+            raise IngestError(f"Row {n}'s topic is longer than {MAX_TOPIC} characters.")
         items.append(
             ParsedItem(
                 n, at(row, mapping.id_col), " ".join(question.split()), topic, at(row, mapping.answer_col)

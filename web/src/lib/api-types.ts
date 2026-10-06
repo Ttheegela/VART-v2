@@ -63,7 +63,8 @@ export interface paths {
   "/api/documents/{document_id}": {
     /**
      * Delete Document
-     * @description 409 when a run used the document (reset the workspace to start over).
+     * @description 409 while a run is going (a step may be citing the document) and when a run used the document (reset
+     * the workspace to start over).
      */
     delete: operations["delete_document_api_documents__document_id__delete"];
     /**
@@ -96,7 +97,8 @@ export interface paths {
      * confirms with PUT .../mapping. 422 for a refused file, a file over 1 MB (`MAX_QUESTIONNAIRE_BYTES`), or a
      * workspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`, built-in `csf` ones not counted);
      * 429 per network (`upload`); 503 when the demo is full. The sheet names are stored at upload, so listing
-     * never re-parses the file.
+     * never re-parses the file. Also 422 for an xlsx over 4 MB unpacked, a csv over 2,000 rows or 52 columns;
+     * hidden sheets are skipped; the file name is normalised.
      */
     post: operations["upload_questionnaire_api_questionnaires_post"];
   };
@@ -1332,7 +1334,8 @@ export interface operations {
   };
   /**
    * Delete Document
-   * @description 409 when a run used the document (reset the workspace to start over).
+   * @description 409 while a run is going (a step may be citing the document) and when a run used the document (reset
+   * the workspace to start over).
    */
   delete_document_api_documents__document_id__delete: {
     parameters: {
@@ -1570,7 +1573,8 @@ export interface operations {
    * confirms with PUT .../mapping. 422 for a refused file, a file over 1 MB (`MAX_QUESTIONNAIRE_BYTES`), or a
    * workspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`, built-in `csf` ones not counted);
    * 429 per network (`upload`); 503 when the demo is full. The sheet names are stored at upload, so listing
-   * never re-parses the file.
+   * never re-parses the file. Also 422 for an xlsx over 4 MB unpacked, a csv over 2,000 rows or 52 columns;
+   * hidden sheets are skipped; the file name is normalised.
    */
   upload_questionnaire_api_questionnaires_post: {
     requestBody: {

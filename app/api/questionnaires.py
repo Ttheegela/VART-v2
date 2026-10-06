@@ -29,8 +29,10 @@ from app.api.schemas import (
 )
 from app.db.models import Item, Questionnaire, Run, Workspace
 from app.ingest.parse import IngestError
+from app.ingest.store import _cut
 from app.questionnaires import SAMPLE_DIR, SAMPLES, Sheet, detect, preview, read_items, read_sheets
 from app.services import audit_log
+from app.text import normalize
 
 router = APIRouter(tags=["questionnaires"], responses=ERRORS)
 
@@ -166,13 +168,14 @@ def upload_questionnaire(
     confirms with PUT .../mapping. 422 for a refused file, a file over 1 MB (`MAX_QUESTIONNAIRE_BYTES`), or a
     workspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`, built-in `csf` ones not counted);
     429 per network (`upload`); 503 when the demo is full. The sheet names are stored at upload, so listing
-    never re-parses the file."""
+    never re-parses the file. Also 422 for an xlsx over 4 MB unpacked, a csv over 2,000 rows or 52 columns;
+    hidden sheets are skipped; the file name is normalised."""
     ws_id = ws.id
     require_upload_allowance(request, session)
     data = file.file.read(MAX_QUESTIONNAIRE_BYTES + 1)
     if len(data) > MAX_QUESTIONNAIRE_BYTES:
         raise IngestError("Questionnaire files must be 1 MB or smaller.")
-    name = (file.filename or "questionnaire")[:255]
+    name = _cut(normalize((file.filename or "questionnaire").encode("utf-8", "replace").decode()))
     fmt, sheets = read_sheets(name, data)
     if any(s.name and len(s.name) > SHEET_NAME_MAX for s in sheets):
         raise IngestError(

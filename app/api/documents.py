@@ -23,8 +23,17 @@ from app.api.schemas import (
     LinesOut,
 )
 from app.classify import classify
-from app.db.models import Answer, Chunk, Document, DocumentLine, InterviewQuestion, SuggestedFill, Workspace
-from app.ingest.parse import MAX_BYTES, IngestError, parse
+from app.db.models import (
+    Answer,
+    Chunk,
+    Document,
+    DocumentLine,
+    InterviewQuestion,
+    Run,
+    SuggestedFill,
+    Workspace,
+)
+from app.ingest.parse import MAX_BYTES, MAX_LINES, IngestError, parse
 from app.ingest.store import _store, ingest_document
 from app.redecide import redecide
 from app.services import audit_log
@@ -174,8 +183,11 @@ def update_document(
 
 @router.delete("/api/documents/{document_id}", status_code=204)
 def delete_document(document_id: uuid.UUID, ws: WorkspaceDep, session: SessionDep) -> None:
-    """409 when a run used the document (reset the workspace to start over)."""
+    """409 while a run is going (a step may be citing the document) and when a run used the document (reset
+    the workspace to start over)."""
     doc = _own(session, ws, document_id)
+    if session.scalar(select(exists().where(Run.workspace_id == ws.id, Run.status == "running"))):
+        raise Conflict("A run is in progress; wait for it to finish.")
     chunk_ids = [str(c) for c in session.scalars(select(Chunk.id).where(Chunk.document_id == doc.id))]
     used = session.scalar(
         select(
@@ -200,8 +212,8 @@ def document_lines(
     document_id: uuid.UUID,
     ws: WorkspaceDep,
     session: SessionDep,
-    start: Annotated[int, Query(alias="from", ge=1)] = 1,
-    end: Annotated[int | None, Query(alias="to", ge=1)] = None,
+    start: Annotated[int, Query(alias="from", ge=1, le=MAX_LINES)] = 1,
+    end: Annotated[int | None, Query(alias="to", ge=1, le=MAX_LINES)] = None,
 ) -> LinesOut:
     """Stored (redacted) lines `from`..`to`, at most 200."""
     doc = _own(session, ws, document_id)

@@ -111,6 +111,7 @@ def _validation(ws: Any, letter: str) -> set[str] | None:
         if (
             dv.type == "list"
             and dv.formula1
+            and dv.formula1.startswith('"')  # a range (=$F$1:$F$3) is not an inline list
             and any(letter == re.sub(r"\d", "", str(c).split(":")[0]) for c in str(dv.sqref).split())
         ):
             return {v.strip() for v in dv.formula1.strip('"').split(",")}
@@ -121,7 +122,9 @@ def export_xlsx(original: bytes, mapping: Mapping, rows: list[ExportRow]) -> byt
     wb = openpyxl.load_workbook(io.BytesIO(original))
     ws = wb[mapping.sheet] if mapping.sheet else wb.active
     h = mapping.header_row
-    first = ws.max_column + 1
+    a_idx = column_index_from_string(mapping.answer_col)
+    c_idx = column_index_from_string(mapping.comments_col) if mapping.comments_col else 0
+    first = max(ws.max_column, a_idx, c_idx) + 1  # past every mapped column: a file may have no answer column
     if first + 2 > XLSX_MAX_COL:
         raise Conflict("This sheet has no room for three more columns.")
     style = ws.cell(h, column_index_from_string(mapping.question_col))
@@ -170,10 +173,10 @@ def export_csv(original: bytes, mapping: Mapping, rows: list[ExportRow]) -> byte
         len(row) > MAX_COLS for row in table
     ):  # the importer's caps: no padding bomb
         raise IngestError("This file is too large to export into.")
-    width = max(len(r) for r in table)
-    table = [r + [""] * (width - len(r)) for r in table]
     a = column_index_from_string(mapping.answer_col) - 1
     c = column_index_from_string(mapping.comments_col) - 1 if mapping.comments_col else None
+    width = max(max(len(r) for r in table), a + 1, (c + 1) if c is not None else 0)
+    table = [r + [""] * (width - len(r)) for r in table]
     table[mapping.header_row - 1] += list(ADDED)
     by_row = {r.row: r for r in rows}
     for n, line in enumerate(table, start=1):

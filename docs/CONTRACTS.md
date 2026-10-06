@@ -130,3 +130,9 @@ change-log line; changing or removing a path, a field or a status needs the lead
   refuses null for NOT NULL fields; `DELETE /api/questionnaires/{id}`, 5 questionnaires and 1 MB per file,
   idempotent counted sample questionnaire; inert export cells; `llm` counted per model call in the spender;
   scoped budget 429 (`llm_budget.Refused`, `refusal_scope`). Added optional fields are allowed after the freeze.
+- 2026-10-07: inputs lane, adversary-3 fix round (no path, field or status changed; limits only): a document
+  delete answers 409 while a run in the workspace is `running`; a document over 1,000,000 characters of text, a
+  question over 2,000 or a topic over 200 characters, an xlsx over 4 MB unpacked, and a csv over 2,000 rows or
+  52 columns are refused with the existing 422 sentence; `lines?from=&to=` is at most 20,000 (422); questionnaire
+  file names are normalised; hidden sheets are skipped on import; the export's added columns sit past every
+  mapped column.

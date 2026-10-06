@@ -2620,7 +2620,7 @@
     },
     "/api/documents/{document_id}": {
       "delete": {
-        "description": "409 when a run used the document (reset the workspace to start over).",
+        "description": "409 while a run is going (a step may be citing the document) and when a run used the document (reset\nthe workspace to start over).",
         "operationId": "delete_document_api_documents__document_id__delete",
         "parameters": [
           {
@@ -2828,6 +2828,7 @@
             "required": false,
             "schema": {
               "default": 1,
+              "maximum": 20000,
               "minimum": 1,
               "title": "From",
               "type": "integer"
@@ -2840,6 +2841,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maximum": 20000,
                   "minimum": 1,
                   "type": "integer"
                 },
@@ -3040,7 +3042,7 @@
         ]
       },
       "post": {
-        "description": "Multipart xlsx or csv. Answers the detected mapping and a preview; no items exist until the visitor\nconfirms with PUT .../mapping. 422 for a refused file, a file over 1 MB (`MAX_QUESTIONNAIRE_BYTES`), or a\nworkspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`, built-in `csf` ones not counted);\n429 per network (`upload`); 503 when the demo is full. The sheet names are stored at upload, so listing\nnever re-parses the file.",
+        "description": "Multipart xlsx or csv. Answers the detected mapping and a preview; no items exist until the visitor\nconfirms with PUT .../mapping. 422 for a refused file, a file over 1 MB (`MAX_QUESTIONNAIRE_BYTES`), or a\nworkspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`, built-in `csf` ones not counted);\n429 per network (`upload`); 503 when the demo is full. The sheet names are stored at upload, so listing\nnever re-parses the file. Also 422 for an xlsx over 4 MB unpacked, a csv over 2,000 rows or 52 columns;\nhidden sheets are skipped; the file name is normalised.",
         "operationId": "upload_questionnaire_api_questionnaires_post",
         "requestBody": {
           "content": {
