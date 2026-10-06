@@ -309,8 +309,8 @@
       "question": "Is there a documented cybersecurity policy, based on the organization's context and strategy, that is communicated and enforced?",
       "parts": [
         "Is the policy for managing cybersecurity risks established based on organizational context, cybersecurity strategy and priorities?",
-        "Is the policy for managing cybersecurity risks communicated?",
-        "Is the policy for managing cybersecurity risks enforced?"
+        "Is the policy for managing cybersecurity risks communicated, for example through training?",
+        "Is the policy for managing cybersecurity risks enforced, for example disciplinary?"
       ]
     },
     {
@@ -787,7 +787,7 @@
       "parts": [
         "Are vulnerabilities in assets identified?",
         "Are vulnerabilities in assets validated?",
-        "Are vulnerabilities in assets recorded?"
+        "Are vulnerabilities in assets recorded, for example tracked?"
       ]
     },
     {
@@ -900,9 +900,9 @@
       "tier": "checked",
       "question": "Is there a process for receiving, analyzing and responding to vulnerability reports from outside the organization?",
       "parts": [
-        "Are processes for receiving vulnerability disclosures established?",
-        "Are processes for analyzing vulnerability disclosures established?",
-        "Are processes for responding to vulnerability disclosures established?"
+        "Are processes for receiving vulnerability disclosures, such as reports, established?",
+        "Are processes for analyzing vulnerability disclosures, for example prioritized, established?",
+        "Are processes for responding to vulnerability disclosures, for example tracked, established?"
       ]
     },
     {
@@ -1241,7 +1241,7 @@
       "tier": "checked",
       "question": "Is physical access to offices, facilities and other assets managed, monitored and enforced?",
       "parts": [
-        "Is physical access to assets managed?",
+        "Is physical access to assets, such as facilities, managed?",
         "Is physical access to assets monitored?",
         "Is physical access to assets enforced commensurate with risk?"
       ]
@@ -1428,7 +1428,7 @@
       "tier": "checked",
       "question": "Is software maintained, patched and replaced according to risk?",
       "parts": [
-        "Is software maintained?",
+        "Is software maintained, for example patched dependencies?",
         "Is software replaced?",
         "Is software removed commensurate with risk?"
       ]

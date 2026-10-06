@@ -12,6 +12,16 @@
 #   2026-10-06  option A (Tarun; CSF spec 4 and 5.2-5.3 amended; Rulings 15, 17): parts for every checked outcome (73), cut by
 #               spec 4's rule; paraphrase_words. Parts are frozen from the first recording: every later change is a tuning
 #               round with a line here citing NIST's clause.
+#   2026-10-06  per-part tuning round 1 (Ruling 21; generic instances of NIST's words, as example clauses):
+#               ID.RA-08 "receiving, analyzing, and responding to vulnerability disclosures": parts 1-3 gain "such as
+#               reports", "for example prioritized", "for example tracked" (reports: disclosures, prioritized:
+#               analyzing, tracked: responding).
+#               ID.RA-01 "identified, validated, and recorded": part 3 gains "for example tracked" (tracked: recorded).
+#               PR.PS-02 "Software is maintained": part 1 gains "for example patched dependencies" (patched:
+#               maintained, dependencies: software).
+#               PR.AA-06 "Physical access to assets is managed": part 1 gains "such as facilities" (facilities: assets).
+#               GV.PO-01 "is communicated and enforced": parts 2-3 gain "for example through training" and "for
+#               example disciplinary" (training: communicated, disciplinary: enforced).
 checked:
   GV.PO-01: "Is there a documented cybersecurity policy, based on the organization's context and strategy, that is communicated and enforced?"
   GV.PO-02: "Are cybersecurity policies reviewed, updated, communicated and enforced on a regular schedule?"
@@ -61,8 +71,8 @@ ask:
 parts:
   GV.PO-01:
     - "Is the policy for managing cybersecurity risks established based on organizational context, cybersecurity strategy and priorities?"
-    - "Is the policy for managing cybersecurity risks communicated?"
-    - "Is the policy for managing cybersecurity risks enforced?"
+    - "Is the policy for managing cybersecurity risks communicated, for example through training?"
+    - "Is the policy for managing cybersecurity risks enforced, for example disciplinary?"
   GV.PO-02:
     - "Is the policy for managing cybersecurity risks reviewed?"
     - "Is the policy for managing cybersecurity risks updated?"
@@ -90,13 +100,13 @@ parts:
   ID.RA-01:
     - "Are vulnerabilities in assets identified?"
     - "Are vulnerabilities in assets validated?"
-    - "Are vulnerabilities in assets recorded?"
+    - "Are vulnerabilities in assets recorded, for example tracked?"
   ID.RA-02:
     - "Is cyber threat intelligence received from information sharing forums and sources?"
   ID.RA-08:
-    - "Are processes for receiving vulnerability disclosures established?"
-    - "Are processes for analyzing vulnerability disclosures established?"
-    - "Are processes for responding to vulnerability disclosures established?"
+    - "Are processes for receiving vulnerability disclosures, such as reports, established?"
+    - "Are processes for analyzing vulnerability disclosures, for example prioritized, established?"
+    - "Are processes for responding to vulnerability disclosures, for example tracked, established?"
   PR.AA-01:
     - "Are identities and credentials for authorized users managed by the organization?"
     - "Are identities and credentials for services managed by the organization?"
@@ -112,7 +122,7 @@ parts:
     - "Are access permissions, entitlements and authorizations reviewed?"
     - "Do access permissions, entitlements and authorizations incorporate the principles of least privilege and separation of duties?"
   PR.AA-06:
-    - "Is physical access to assets managed?"
+    - "Is physical access to assets, such as facilities, managed?"
     - "Is physical access to assets monitored?"
     - "Is physical access to assets enforced commensurate with risk?"
   PR.DS-01:
@@ -132,7 +142,7 @@ parts:
     - "Are configuration management practices, such as baseline configurations and change control, established?"
     - "Are configuration management practices, such as baseline configurations and change control, applied?"
   PR.PS-02:
-    - "Is software maintained?"
+    - "Is software maintained, for example patched dependencies?"
     - "Is software replaced?"
     - "Is software removed commensurate with risk?"
   PR.PS-04:
@@ -164,10 +174,15 @@ parts:
   RC.RP-01:
     - "Is the recovery portion of the incident response plan, such as disaster recovery failover and restore, executed once initiated from the incident response process?"
 paraphrase_words:
+  GV.PO-01: {training: communicated, disciplinary: enforced}
   ID.AM-08: {acquisition: cycles, retirement: cycles}
+  ID.RA-01: {tracked: recorded}
+  ID.RA-08: {reports: disclosures, prioritized: analyzing, tracked: responding}
+  PR.AA-06: {facilities: assets}
   PR.DS-01: {encryption: protected}
   PR.DS-02: {encryption: protected}
   PR.PS-01: {baseline: configuration, change: management, control: management}
+  PR.PS-02: {patched: maintained, dependencies: software}
   PR.PS-04: {centrally: available}
   PR.PS-06: {testing: practices, code: software, review: practices}
   PR.IR-03: {recovery: resilience, objectives: requirements}
