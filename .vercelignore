@@ -1,7 +1,7 @@
 # Keep the deployed function small: the runtime needs app/ and the sample data (data/dev/docs, data/questionnaires).
 .venv
 .env*
-docs
+/docs
 tests
 evals
 scripts
