@@ -11,7 +11,7 @@ from app import redact
 from app.contracts import Line
 from app.ingest.parse import IngestError, parse
 from app.patterns import PLACEHOLDER
-from app.redact import redact_lines, redact_text
+from app.redact import redact_filename, redact_lines, redact_text
 
 
 @pytest.mark.parametrize(
@@ -254,6 +254,177 @@ def test_a_keyed_secret_of_any_shape_is_redacted(text: str) -> None:
 def test_a_key_body_right_after_an_equals_sign_is_redacted(text: str) -> None:
     # adversary-3 re-review N2: the PEM-row lookbehind excluded '='
     assert redact_text(text).endswith("=<SECRET>")
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("Dana Ortiz.docx", "<PERSON>.docx"),
+        (
+            "notes_from_Marcus_Lee_2026.md",
+            "notes_from_<PERSON>_2026.md",
+        ),  # preflight P2: digits not in the span
+        ("access-control-policy.docx", "access-control-policy.docx"),
+        ("Access Control Policy.docx", "Access Control Policy.docx"),
+        ("SOC 2 Type II summary.pdf", "SOC 2 Type II summary.pdf"),
+        ("dana.ortiz@kestrelyn.example.xlsx", "<EMAIL>.xlsx"),  # preflight P2: extension split first
+    ],
+)
+def test_a_name_in_a_file_name_is_redacted_without_a_sentence_around_it(name: str, expected: str) -> None:
+    # Triage row 31: Presidio tags "Dana Ortiz" only inside a sentence; a bare file name slipped through.
+    assert redact_filename(name) == expected
+
+
+def test_last_comma_first_is_one_name() -> None:
+    # Triage row 30 (preflight P2c): Presidio tags "Ortiz" and "Dana" apart; each alone is one word.
+    assert redact_text("Reviewed by Ortiz, Dana on Monday.") == "Reviewed by <PERSON> on Monday."
+
+
+def test_a_comma_pair_that_is_not_a_name_keeps_the_side_that_is_one() -> None:
+    # Preflight P15: the merged span fails the name filter; the separate spans are tried instead.
+    text = "Dana Ortiz, Ltd"  # "Dana Ortiz" (0-10) is a name; ", Ltd" is not part of it
+    people = [type("R", (), {"start": 0, "end": 10})(), type("R", (), {"start": 12, "end": 15})()]
+    assert redact._spans(text, people) == [(0, 10, "PERSON")]
+
+
+def test_an_all_caps_accented_name_is_a_known_gap() -> None:
+    # Known gap (review C1): the small model tags no ALL CAPS accented name, and every rule that catches
+    # "JOSÉ NÚÑEZ" also takes place names and headings, which spec 9 keeps as evidence. Open question 3.
+    assert redact_text("Signed by JOSÉ NÚÑEZ on 2026-09-01.") == "Signed by JOSÉ NÚÑEZ on 2026-09-01."
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Primary region: SÃO PAULO (sa-east-1).",
+        "Data center: MÉXICO CITY",
+        "SOCIÉTÉ GÉNÉRALE",
+        "MFA IS ENFORCED FOR ALL USERS IN SÃO PAULO",
+        "## PROTECTION DES DONNÉES PERSONNELLES",
+    ],
+)
+def test_all_caps_accented_places_and_headings_are_kept(text: str) -> None:
+    assert redact_text(text) == text
+
+
+def test_a_secret_in_a_file_name_with_a_name_is_redacted_too() -> None:
+    out = redact_filename("Marcus Lee sk_live_abcdef1234567890XYZ.txt")
+    assert out == "<PERSON> <SECRET>.txt"
+
+
+def test_a_pair_inside_a_comma_list_is_not_merged() -> None:
+    text = "SSO providers: Okta, Duo, Ping"
+    assert redact_text(text) == text
+    assert redact_text("Reviewed by Ortiz, Dana on Monday.") == "Reviewed by <PERSON> on Monday."
+
+
+@pytest.mark.parametrize("name", ["Key Rotation.pdf", "Jamf Pro.pdf", "Data Retention.docx"])
+def test_ordinary_title_case_file_names_are_kept(name: str) -> None:
+    assert redact_filename(name) == name
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Priya M. Patel.pdf",
+        "Dana - Ortiz.pdf",
+        "Dana   Ortiz.pdf",
+        "notes---Dana---Ortiz.pdf",
+        "Dana.-.Ortiz.pdf",
+    ],
+)
+def test_runs_of_separators_do_not_split_a_name_in_a_file_name(name: str) -> None:
+    # Re-review I-A: Presidio tags each word apart when two separators sit between them.
+    out = redact_filename(name)
+    assert "<PERSON>" in out and out.endswith(".pdf")
+    assert not any(w in out for w in ("Dana", "Ortiz", "Priya", "Patel"))
+
+
+_SECRETS = {
+    "stripe": "sk_live_abcdef1234567890XYZ",
+    "github_pat": "github_pat_11ABCDEFG0abcdefghijklmn",
+    "ghp": "ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+    "aws": "AKIAABCDEFGHIJKLMNOP",
+    "slack": "xoxb-1234567890-abcdefghij",
+    "google": "AIza" + "B" * 20 + "c" * 15,
+    "gitlab": "glpat-abcdefghij1234567890",
+    "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV",
+    "pem": "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7",
+}
+
+
+@pytest.mark.parametrize(
+    "join",
+    [
+        "{s}",
+        "notes_{s}",
+        "Marcus_Lee_{s}",
+        "notes-{s}",
+        "notes.{s}",
+        "{s}_v2",
+        "notes_{s}_v2",
+        "{s}-notes",
+        "{s}.backup",
+    ],
+)
+@pytest.mark.parametrize("kind", sorted(_SECRETS))
+def test_a_secret_after_a_separator_in_a_file_name_is_redacted(kind: str, join: str) -> None:
+    # Re-review I-B: "\\b" treats "_" as a word character, so "notes_ghp_..." slipped past the patterns.
+    secret = _SECRETS[kind]
+    out = redact_filename(join.format(s=secret) + ".txt")
+    assert not any(secret[i : i + 8] in out for i in range(0, len(secret) - 7)), out
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "access-control-policy",
+        "Access_Review_Q3_2026",
+        "ISO_27001_SoA",
+        "kestrelyn_token_rotation_policy",
+        "password_policy_2026",
+        "api_key_management_standard",
+        "secret-scanning-runbook",
+    ],
+)
+def test_policy_style_file_names_survive_the_secret_patterns(name: str) -> None:
+    assert redact_filename(name + ".pdf") == name + ".pdf"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Owner: Kim, Sarah, CISO",
+        "Approved by Patel, Priya, Head of Security.",
+        "Reviewers: Kim, Sarah and Morgan",
+        "Contact Kim, Sarah, or Patel, Priya.",
+    ],
+)
+def test_last_first_followed_by_a_title_or_more_is_still_a_name(text: str) -> None:
+    # Re-review I-C: only a pair PRECEDED by ", " is a list member.
+    assert "Sarah" not in redact_text(text) and "Priya" not in redact_text(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "SSO providers: Duo, Ping, Okta",
+        "SSO providers: Duo, Ping and Okta",
+        "MDM: Jamf, Kandji",
+        "Tools: Okta, Jamf, Kandji, Duo",
+    ],
+)
+def test_product_lists_stay(text: str) -> None:
+    assert redact_text(text) == text
+
+
+def test_a_secret_followed_by_a_name_in_a_file_name_loses_both() -> None:
+    assert redact_filename("AKIAABCDEFGHIJKLMNOP_Dana_Ortiz.txt") == "<SECRET>_<PERSON>.txt"
+
+
+def test_an_email_glued_to_a_name_in_a_file_name_loses_both() -> None:
+    out = redact_filename("dana.ortiz@kestrelyn.example.Priya M. Patel.txt")
+    assert "Patel" not in out and "kestrelyn" not in out
 
 
 @pytest.mark.parametrize("redact", [redact_text, lambda t: redact_lines([Line(t)])[0].text])

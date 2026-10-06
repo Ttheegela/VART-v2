@@ -129,6 +129,8 @@ jobs:
       DATABASE_URL: postgresql+psycopg://vart:vart@localhost:5434/vart_test
       SESSION_SECRET: ci-session-secret
       CRON_SECRET: ci-cron-secret
+      LLM_MODE: replay
+      LLM_RECORDING: ${{ github.workspace }}/web/e2e/recorded.jsonl
     steps:
       - uses: actions/checkout@v4
         with:
@@ -151,6 +153,7 @@ jobs:
         working-directory: web
       - run: npx playwright install --with-deps chromium
         working-directory: web
+      # retries are 0 in playwright.config.ts on purpose: a retry re-runs the shared sample run and can pass the 400/h per-network cap
       - run: npm run e2e
         working-directory: web
       - uses: actions/upload-artifact@v4

@@ -1,6 +1,385 @@
 {
   "components": {
     "schemas": {
+      "AnswerDetail": {
+        "properties": {
+          "approved": {
+            "title": "Approved",
+            "type": "boolean"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/CitationOut"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "conflict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConflictOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dropped": {
+            "items": {
+              "$ref": "#/components/schemas/DroppedOut"
+            },
+            "title": "Dropped",
+            "type": "array"
+          },
+          "edited": {
+            "title": "Edited",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "item": {
+            "$ref": "#/components/schemas/ItemOut"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "label": {
+            "enum": [
+              "verified",
+              "partial",
+              "conflict",
+              "unknown",
+              "user_confirmed",
+              "na"
+            ],
+            "title": "Label",
+            "type": "string"
+          },
+          "scope_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Note"
+          },
+          "sources": {
+            "title": "Sources",
+            "type": "integer"
+          },
+          "statement_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statement Id"
+          },
+          "statement_lines": {
+            "items": {
+              "$ref": "#/components/schemas/LineOut"
+            },
+            "title": "Statement Lines",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "enum": [
+                  "Yes",
+                  "No",
+                  "Partial"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "id",
+          "item_id",
+          "label",
+          "value",
+          "text",
+          "confidence",
+          "sources",
+          "approved",
+          "edited",
+          "statement_id",
+          "item",
+          "citations",
+          "dropped",
+          "conflict",
+          "scope_note",
+          "statement_lines"
+        ],
+        "title": "AnswerDetail",
+        "type": "object"
+      },
+      "AnswerEdit": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "AnswerEdit",
+        "type": "object"
+      },
+      "AnswerQuestionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "AnswerQuestionIn",
+        "type": "object"
+      },
+      "AnswerQuestionOut": {
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "question": {
+            "$ref": "#/components/schemas/QuestionOut"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionOut"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "question",
+          "answer",
+          "suggestions"
+        ],
+        "title": "AnswerQuestionOut",
+        "type": "object"
+      },
+      "AnswerSummary": {
+        "description": "One grid row's answer (design.md: id, label, conf, src, question, answer, approval).",
+        "properties": {
+          "approved": {
+            "title": "Approved",
+            "type": "boolean"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "edited": {
+            "title": "Edited",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "label": {
+            "enum": [
+              "verified",
+              "partial",
+              "conflict",
+              "unknown",
+              "user_confirmed",
+              "na"
+            ],
+            "title": "Label",
+            "type": "string"
+          },
+          "sources": {
+            "title": "Sources",
+            "type": "integer"
+          },
+          "statement_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statement Id"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "enum": [
+                  "Yes",
+                  "No",
+                  "Partial"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "id",
+          "item_id",
+          "label",
+          "value",
+          "text",
+          "confidence",
+          "sources",
+          "approved",
+          "edited",
+          "statement_id"
+        ],
+        "title": "AnswerSummary",
+        "type": "object"
+      },
+      "ApprovedCount": {
+        "properties": {
+          "approved": {
+            "title": "Approved",
+            "type": "integer"
+          },
+          "skipped_edited": {
+            "default": 0,
+            "title": "Skipped Edited",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "approved"
+        ],
+        "title": "ApprovedCount",
+        "type": "object"
+      },
+      "AuditEventOut": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          }
+        },
+        "required": [
+          "at",
+          "actor",
+          "action",
+          "ref",
+          "detail"
+        ],
+        "title": "AuditEventOut",
+        "type": "object"
+      },
+      "Body_upload_document_api_documents_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_document_api_documents_post",
+        "type": "object"
+      },
+      "Body_upload_questionnaire_api_questionnaires_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_questionnaire_api_questionnaires_post",
+        "type": "object"
+      },
       "CanaryStatus": {
         "properties": {
           "at": {
@@ -30,6 +409,570 @@
           "credits_usd"
         ],
         "title": "CanaryStatus",
+        "type": "object"
+      },
+      "CitationOut": {
+        "description": "A cited line, re-read from the stored document (spec 2) with two lines of context each side.",
+        "properties": {
+          "context": {
+            "items": {
+              "$ref": "#/components/schemas/ContextLine"
+            },
+            "title": "Context",
+            "type": "array"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "found_in_source": {
+            "title": "Found In Source",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "policy",
+              "report",
+              "record",
+              "contract",
+              "plan",
+              "questionnaire",
+              "statement",
+              "other"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "quote": {
+            "title": "Quote",
+            "type": "string"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "enum": [
+                  "internal-systems",
+                  "customer-product",
+                  "production",
+                  "employees",
+                  "vendors-and-contractors"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          },
+          "stance": {
+            "enum": [
+              "yes",
+              "no",
+              "partial"
+            ],
+            "title": "Stance",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "final",
+              "draft"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "filename",
+          "kind",
+          "status",
+          "date",
+          "scope",
+          "line",
+          "quote",
+          "stance",
+          "found_in_source",
+          "context"
+        ],
+        "title": "CitationOut",
+        "type": "object"
+      },
+      "ConflictOut": {
+        "properties": {
+          "rule": {
+            "enum": [
+              "date",
+              "documents-disagree"
+            ],
+            "title": "Rule",
+            "type": "string"
+          },
+          "sides": {
+            "items": {
+              "$ref": "#/components/schemas/ConflictSideOut"
+            },
+            "title": "Sides",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rule",
+          "sides"
+        ],
+        "title": "ConflictOut",
+        "type": "object"
+      },
+      "ConflictSideOut": {
+        "properties": {
+          "citations": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "stance": {
+            "enum": [
+              "yes",
+              "no"
+            ],
+            "title": "Stance",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stance",
+          "date",
+          "citations"
+        ],
+        "title": "ConflictSideOut",
+        "type": "object"
+      },
+      "ContextLine": {
+        "properties": {
+          "cited": {
+            "title": "Cited",
+            "type": "boolean"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "n",
+          "text",
+          "cited"
+        ],
+        "title": "ContextLine",
+        "type": "object"
+      },
+      "DocumentOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "effective_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Date"
+          },
+          "evidence_allowed": {
+            "title": "Evidence Allowed",
+            "type": "boolean"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "policy",
+              "report",
+              "record",
+              "contract",
+              "plan",
+              "questionnaire",
+              "statement",
+              "other"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "line_count": {
+            "title": "Line Count",
+            "type": "integer"
+          },
+          "metadata_source": {
+            "enum": [
+              "rule",
+              "model",
+              "user"
+            ],
+            "title": "Metadata Source",
+            "type": "string"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "enum": [
+                  "internal-systems",
+                  "customer-product",
+                  "production",
+                  "employees",
+                  "vendors-and-contractors"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          },
+          "source": {
+            "enum": [
+              "sample",
+              "upload",
+              "drive",
+              "statement"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "final",
+              "draft"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "source",
+          "kind",
+          "status",
+          "effective_date",
+          "scope",
+          "evidence_allowed",
+          "metadata_source",
+          "line_count",
+          "created_at"
+        ],
+        "title": "DocumentOut",
+        "type": "object"
+      },
+      "DocumentPatch": {
+        "additionalProperties": false,
+        "description": "A visitor override (spec 5 step 3): only the fields sent change; metadata_source becomes 'user'.",
+        "properties": {
+          "effective_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Date"
+          },
+          "evidence_allowed": {
+            "title": "Evidence Allowed",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "policy",
+              "report",
+              "record",
+              "contract",
+              "plan",
+              "questionnaire",
+              "statement",
+              "other"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "enum": [
+                  "internal-systems",
+                  "customer-product",
+                  "production",
+                  "employees",
+                  "vendors-and-contractors"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          },
+          "status": {
+            "enum": [
+              "final",
+              "draft"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "DocumentPatch",
+        "type": "object"
+      },
+      "DocumentUpdated": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "effective_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Date"
+          },
+          "evidence_allowed": {
+            "title": "Evidence Allowed",
+            "type": "boolean"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "policy",
+              "report",
+              "record",
+              "contract",
+              "plan",
+              "questionnaire",
+              "statement",
+              "other"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "line_count": {
+            "title": "Line Count",
+            "type": "integer"
+          },
+          "metadata_source": {
+            "enum": [
+              "rule",
+              "model",
+              "user"
+            ],
+            "title": "Metadata Source",
+            "type": "string"
+          },
+          "redecided": {
+            "title": "Redecided",
+            "type": "integer"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "enum": [
+                  "internal-systems",
+                  "customer-product",
+                  "production",
+                  "employees",
+                  "vendors-and-contractors"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          },
+          "source": {
+            "enum": [
+              "sample",
+              "upload",
+              "drive",
+              "statement"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "final",
+              "draft"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "source",
+          "kind",
+          "status",
+          "effective_date",
+          "scope",
+          "evidence_allowed",
+          "metadata_source",
+          "line_count",
+          "created_at",
+          "redecided"
+        ],
+        "title": "DocumentUpdated",
+        "type": "object"
+      },
+      "DroppedOut": {
+        "properties": {
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "reason": {
+            "enum": [
+              "containment",
+              "quote-length",
+              "record-field",
+              "not-evidence",
+              "placeholder",
+              "injection",
+              "statement"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "sentence": {
+            "title": "Sentence",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "document_id",
+          "filename",
+          "line",
+          "sentence"
+        ],
+        "title": "DroppedOut",
+        "type": "object"
+      },
+      "ErrorOut": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorOut",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
         "type": "object"
       },
       "HealthOut": {
@@ -68,6 +1011,851 @@
         "title": "HealthOut",
         "type": "object"
       },
+      "ItemOut": {
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "csf_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Csf Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "row_ref": {
+            "title": "Row Ref",
+            "type": "string"
+          },
+          "topic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic"
+          }
+        },
+        "required": [
+          "id",
+          "position",
+          "row_ref",
+          "code",
+          "topic",
+          "question",
+          "csf_id"
+        ],
+        "title": "ItemOut",
+        "type": "object"
+      },
+      "LineOut": {
+        "properties": {
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "n",
+          "text"
+        ],
+        "title": "LineOut",
+        "type": "object"
+      },
+      "LinesOut": {
+        "properties": {
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/LineOut"
+            },
+            "title": "Lines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "document_id",
+          "filename",
+          "lines"
+        ],
+        "title": "LinesOut",
+        "type": "object"
+      },
+      "Mapping": {
+        "additionalProperties": false,
+        "description": "Where the questionnaire lives in its file. Columns are letters for xlsx and csv alike (A is the first\ncolumn); header_row is 1-based. topic_col is optional: without it, the last section row is the topic.",
+        "properties": {
+          "answer_col": {
+            "pattern": "^[A-Z]{1,3}$",
+            "title": "Answer Col",
+            "type": "string"
+          },
+          "comments_col": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{1,3}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments Col"
+          },
+          "header_row": {
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Header Row",
+            "type": "integer"
+          },
+          "id_col": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{1,3}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Col"
+          },
+          "question_col": {
+            "pattern": "^[A-Z]{1,3}$",
+            "title": "Question Col",
+            "type": "string"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          },
+          "sheet": {
+            "anyOf": [
+              {
+                "maxLength": 31,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet"
+          },
+          "topic_col": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{1,3}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic Col"
+          }
+        },
+        "required": [
+          "sheet",
+          "header_row",
+          "id_col",
+          "question_col",
+          "answer_col",
+          "comments_col"
+        ],
+        "title": "Mapping",
+        "type": "object"
+      },
+      "NotApplicableIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "NotApplicableIn",
+        "type": "object"
+      },
+      "PreviewRow": {
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "row": {
+            "title": "Row",
+            "type": "integer"
+          },
+          "topic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic"
+          }
+        },
+        "required": [
+          "row",
+          "id",
+          "question",
+          "topic",
+          "answer"
+        ],
+        "title": "PreviewRow",
+        "type": "object"
+      },
+      "QuestionOut": {
+        "properties": {
+          "asked_count": {
+            "title": "Asked Count",
+            "type": "integer"
+          },
+          "codes": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Codes",
+            "type": "array"
+          },
+          "follow_up": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up"
+          },
+          "high_weight": {
+            "title": "High Weight",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "item_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Item Ids",
+            "type": "array"
+          },
+          "reason": {
+            "enum": [
+              "conflict",
+              "unknown",
+              "partial"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "follow_up",
+              "answered",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionOut"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "item_ids",
+          "codes",
+          "reason",
+          "text",
+          "follow_up",
+          "status",
+          "asked_count",
+          "high_weight",
+          "suggestions"
+        ],
+        "title": "QuestionOut",
+        "type": "object"
+      },
+      "QuestionnaireDetail": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "detected": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Mapping"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "xlsx",
+              "csv",
+              "builtin"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "item_count": {
+            "title": "Item Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "latest_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Run Id"
+          },
+          "mapping": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Mapping"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "preview": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewRow"
+            },
+            "title": "Preview",
+            "type": "array"
+          },
+          "sheets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sheets",
+            "type": "array"
+          },
+          "source": {
+            "enum": [
+              "sample",
+              "upload",
+              "drive",
+              "csf"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "source",
+          "format",
+          "sheets",
+          "detected",
+          "mapping",
+          "preview",
+          "item_count",
+          "latest_run_id",
+          "created_at",
+          "items"
+        ],
+        "title": "QuestionnaireDetail",
+        "type": "object"
+      },
+      "QuestionnaireOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "detected": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Mapping"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "xlsx",
+              "csv",
+              "builtin"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "item_count": {
+            "title": "Item Count",
+            "type": "integer"
+          },
+          "latest_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Run Id"
+          },
+          "mapping": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Mapping"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "preview": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewRow"
+            },
+            "title": "Preview",
+            "type": "array"
+          },
+          "sheets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sheets",
+            "type": "array"
+          },
+          "source": {
+            "enum": [
+              "sample",
+              "upload",
+              "drive",
+              "csf"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "source",
+          "format",
+          "sheets",
+          "detected",
+          "mapping",
+          "preview",
+          "item_count",
+          "latest_run_id",
+          "created_at"
+        ],
+        "title": "QuestionnaireOut",
+        "type": "object"
+      },
+      "RunOut": {
+        "properties": {
+          "cost_usd": {
+            "title": "Cost Usd",
+            "type": "number"
+          },
+          "done": {
+            "title": "Done",
+            "type": "integer"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "models": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "object"
+          },
+          "prompt_versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Prompt Versions",
+            "type": "object"
+          },
+          "questionnaire_id": {
+            "format": "uuid",
+            "title": "Questionnaire Id",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "done",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "questionnaire_id",
+          "status",
+          "total",
+          "done",
+          "cost_usd",
+          "models",
+          "prompt_versions",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "RunOut",
+        "type": "object"
+      },
+      "RunRow": {
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "item": {
+            "$ref": "#/components/schemas/ItemOut"
+          }
+        },
+        "required": [
+          "item",
+          "answer"
+        ],
+        "title": "RunRow",
+        "type": "object"
+      },
+      "RunRowsOut": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RunRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunOut"
+          }
+        },
+        "required": [
+          "run",
+          "rows"
+        ],
+        "title": "RunRowsOut",
+        "type": "object"
+      },
+      "StepOut": {
+        "properties": {
+          "answered": {
+            "items": {
+              "$ref": "#/components/schemas/RunRow"
+            },
+            "title": "Answered",
+            "type": "array"
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunOut"
+          }
+        },
+        "required": [
+          "run",
+          "answered"
+        ],
+        "title": "StepOut",
+        "type": "object"
+      },
+      "SuggestionOut": {
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "label": {
+            "enum": [
+              "verified",
+              "partial"
+            ],
+            "title": "Label",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "accepted",
+              "dismissed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "enum": [
+                  "Yes",
+                  "No",
+                  "Partial"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "id",
+          "item_id",
+          "code",
+          "question",
+          "label",
+          "value",
+          "text",
+          "status"
+        ],
+        "title": "SuggestionOut",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
       "VersionOut": {
         "properties": {
           "models": {
@@ -95,10 +1883,16 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
           }
         },
         "required": [
-          "created_at"
+          "created_at",
+          "expires_at"
         ],
         "title": "WorkspaceOut",
         "type": "object"
@@ -111,6 +1905,1045 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/answers/{answer_id}": {
+      "get": {
+        "description": "The Evidence drawer: citations re-read from the stored lines with context, dropped evidence, both\nsides of a conflict, the scope note, the visitor's statement.",
+        "operationId": "get_answer_api_answers__answer_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Answer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Get Answer",
+        "tags": [
+          "answers"
+        ]
+      },
+      "patch": {
+        "description": "Edit the text; the answer becomes unapproved and `edited`.",
+        "operationId": "edit_answer_api_answers__answer_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Answer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Edit Answer",
+        "tags": [
+          "answers"
+        ]
+      }
+    },
+    "/api/answers/{answer_id}/approve": {
+      "post": {
+        "description": "409 for a conflict or an unknown answer (answer the question first).",
+        "operationId": "approve_answer_api_answers__answer_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Answer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Approve Answer",
+        "tags": [
+          "answers"
+        ]
+      }
+    },
+    "/api/answers/{answer_id}/not-applicable": {
+      "post": {
+        "description": "Label `na` with the reason in the audit log (spec 6.9).",
+        "operationId": "mark_not_applicable_api_answers__answer_id__not_applicable_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Answer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotApplicableIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Mark Not Applicable",
+        "tags": [
+          "answers"
+        ]
+      }
+    },
+    "/api/audit": {
+      "get": {
+        "description": "This workspace's events, newest first, at most 500. Details never hold document text.",
+        "operationId": "list_audit_api_audit_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEventOut"
+                  },
+                  "title": "Response List Audit Api Audit Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "List Audit",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/api/documents": {
+      "get": {
+        "description": "Every document in the workspace, sample, uploaded and statements, oldest first.",
+        "operationId": "list_documents_api_documents_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentOut"
+                  },
+                  "title": "Response List Documents Api Documents Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "List Documents",
+        "tags": [
+          "documents"
+        ]
+      },
+      "post": {
+        "description": "Multipart upload of one file. Parsed in memory, redacted, classified, chunked; the bytes are not\nstored. 422 with a sentence for a refused file; 429 per network (`upload`, 60 an hour); 503 when full.\nA body over Vercel's 4.5 MB limit gets the platform's own 413 (not JSON) before the app sees it.",
+        "operationId": "upload_document_api_documents_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_document_api_documents_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Refused input: a sentence, or FastAPI's validation list"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Upload Document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/documents/sample": {
+      "post": {
+        "description": "The sample company's documents (not redacted, not counted against the upload limit). Idempotent.",
+        "operationId": "load_sample_documents_api_documents_sample_post",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentOut"
+                  },
+                  "title": "Response Load Sample Documents Api Documents Sample Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Load Sample Documents",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/documents/{document_id}": {
+      "delete": {
+        "description": "409 while a run is going (a step may be citing the document) and when a run used the document (reset\nthe workspace to start over).",
+        "operationId": "delete_document_api_documents__document_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Delete Document",
+        "tags": [
+          "documents"
+        ]
+      },
+      "patch": {
+        "description": "Override metadata; every answer that used this document is decided again with no model call.",
+        "operationId": "update_document_api_documents__document_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentUpdated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Update Document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/documents/{document_id}/lines": {
+      "get": {
+        "description": "Stored (redacted) lines `from`..`to`, at most 200.",
+        "operationId": "document_lines_api_documents__document_id__lines_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 20000,
+              "minimum": 1,
+              "title": "From",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 20000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Refused input: a sentence, or FastAPI's validation list"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Document Lines",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "operationId": "health_api_health_get",
@@ -137,6 +2970,1531 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/questionnaires": {
+      "get": {
+        "description": "The workspace's uploaded and sample questionnaires, newest first. The built-in `csf` one (Plan 6B) is\nleft out: it is not the visitor's file and does not count toward the 5-per-workspace cap.",
+        "operationId": "list_questionnaires_api_questionnaires_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QuestionnaireOut"
+                  },
+                  "title": "Response List Questionnaires Api Questionnaires Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "List Questionnaires",
+        "tags": [
+          "questionnaires"
+        ]
+      },
+      "post": {
+        "description": "Multipart xlsx or csv. Answers the detected mapping and a preview; no items exist until the visitor\nconfirms with PUT .../mapping. 422 for a refused file, a file over 1 MB (`MAX_QUESTIONNAIRE_BYTES`), or a\nworkspace that already holds 5 questionnaires (`MAX_QUESTIONNAIRES`, built-in `csf` ones not counted);\n429 per network (`upload`); 503 when the demo is full. The sheet names are stored at upload, so listing\nnever re-parses the file. Also 422 for an xlsx over 4 MB unpacked, a csv over 2,000 rows or 52 columns;\nhidden sheets are skipped; the file name is normalised.",
+        "operationId": "upload_questionnaire_api_questionnaires_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_questionnaire_api_questionnaires_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionnaireOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Refused input: a sentence, or FastAPI's validation list"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Upload Questionnaire",
+        "tags": [
+          "questionnaires"
+        ]
+      }
+    },
+    "/api/questionnaires/sample/{name}": {
+      "post": {
+        "description": "`vsq-a` (xlsx) or `mvsp-b` (csv), mapped and itemised at once. 404 for another name. Idempotent:\nwhen the workspace already has that sample, it is answered again and nothing is stored. A new one counts\nunder the per-network `upload` limit (429), the storage breaker (503) and `MAX_QUESTIONNAIRES` (422).\nNo model call.",
+        "operationId": "load_sample_questionnaire_api_questionnaires_sample__name__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionnaireDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Refused input: a sentence, or FastAPI's validation list"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Load Sample Questionnaire",
+        "tags": [
+          "questionnaires"
+        ]
+      }
+    },
+    "/api/questionnaires/{questionnaire_id}": {
+      "delete": {
+        "description": "Remove a questionnaire and its items, so the 5-per-workspace cap does not force a reset. 409 when a\nrun used it (reset the workspace to start over). A built-in `csf` questionnaire is 404 here. The row is\nlocked before the run check, so a run being created at the same moment either wins (409) or fails.",
+        "operationId": "delete_questionnaire_api_questionnaires__questionnaire_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "questionnaire_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Questionnaire Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Delete Questionnaire",
+        "tags": [
+          "questionnaires"
+        ]
+      },
+      "get": {
+        "operationId": "get_questionnaire_api_questionnaires__questionnaire_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "questionnaire_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Questionnaire Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionnaireDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Get Questionnaire",
+        "tags": [
+          "questionnaires"
+        ]
+      }
+    },
+    "/api/questionnaires/{questionnaire_id}/mapping": {
+      "put": {
+        "description": "Replace the items with the ones this mapping reads. 422 when it finds none or more than 150; 409 once a\nrun exists for the questionnaire, or for a built-in `csf` one (it has no file to map); 429 per network\n(`upload`: each mapping re-parses the stored file).",
+        "operationId": "confirm_mapping_api_questionnaires__questionnaire_id__mapping_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "questionnaire_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Questionnaire Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Mapping"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionnaireDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Refused input: a sentence, or FastAPI's validation list"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Confirm Mapping",
+        "tags": [
+          "questionnaires"
+        ]
+      }
+    },
+    "/api/questionnaires/{questionnaire_id}/runs": {
+      "post": {
+        "description": "A new run over every item, all pending. 422 when the questionnaire has no items yet; 429 per network\n(`run`, 20 an hour); 503 when the demo is full.",
+        "operationId": "create_run_api_questionnaires__questionnaire_id__runs_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "questionnaire_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Questionnaire Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Refused input: a sentence, or FastAPI's validation list"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Create Run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/questions/{question_id}/answer": {
+      "post": {
+        "description": "Accept the answer, or ask the one follow-up. An accepted answer is stored as a dated, redacted\nstatement, the item becomes \"Confirmed by you\", and open items in the same topic are re-checked (at most\n8, budgeted) for suggested fills; when the model budget or the network's `llm` calls are used up the\nanswer is kept and no fills come back. 409 when the question is closed or its item was answered since;\n429 when the network's `interview` cap (60 an hour) is used up.",
+        "operationId": "answer_question_api_questions__question_id__answer_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "question_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Question Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerQuestionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerQuestionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Refused input: a sentence, or FastAPI's validation list"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Answer Question",
+        "tags": [
+          "interview"
+        ]
+      }
+    },
+    "/api/questions/{question_id}/skip": {
+      "post": {
+        "operationId": "skip_question_api_questions__question_id__skip_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "question_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Question Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Skip Question",
+        "tags": [
+          "interview"
+        ]
+      }
+    },
+    "/api/runs/{run_id}": {
+      "get": {
+        "operationId": "get_run_api_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Get Run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/answers": {
+      "get": {
+        "description": "Every item with its answer (None while pending), in questionnaire order.",
+        "operationId": "run_answers_api_runs__run_id__answers_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunRowsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Run Answers",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/approve-verified": {
+      "post": {
+        "description": "Approve every verified answer not yet approved (design key A). An edited answer is left for a look\n(adversary-1 M5): approve it by itself; `skipped_edited` counts them.",
+        "operationId": "approve_verified_api_runs__run_id__approve_verified_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovedCount"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Approve Verified",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/export": {
+      "get": {
+        "description": "The original file with the answer column filled and Status, Sources and Notes columns added; csv in,\ncsv out. Unapproved answers read \"Draft, not approved\". Every cell written is inert text: a value starting\nwith =, +, -, @, tab, CR or LF gets a ' prefix in csv, and xlsx cells are written with data_type 's'. The\nresponse is an attachment with an ASCII-safe file name. 429 per network (`export`, 60 an hour).",
+        "operationId": "export_run_api_runs__run_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {},
+              "text/csv": {}
+            },
+            "description": "The filled file"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Export Run",
+        "tags": [
+          "export"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/questions": {
+      "get": {
+        "description": "Open and follow-up questions first, in the planner's order (conflicts, then high-weight topics, then\nthe rest), then answered and skipped ones. Empty until the run is done.",
+        "operationId": "list_questions_api_runs__run_id__questions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QuestionOut"
+                  },
+                  "title": "Response List Questions Api Runs  Run Id  Questions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "List Questions",
+        "tags": [
+          "interview"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/step": {
+      "post": {
+        "description": "Claim up to 4 pending items, answer them, write one answer each. Call again while status is\n`running` (a step may answer nothing while another step holds the rest: wait a moment first). 429 with\nRetry-After when the network (`llm`, 400 model calls an hour, counted per call by the spender) or a model\nbudget (workspace hour, global hour, global day) is used up; the sentence names which. 503 when model\ncalls are off, or the provider is failing (a bad key, no credit, a rate limit, an outage): nothing is\nmarked failed, the items stay pending and Retry-After says when to ask again.",
+        "operationId": "step_run_api_runs__run_id__step_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StepOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Step Run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/suggestions/{suggestion_id}/accept": {
+      "post": {
+        "description": "Apply a suggested fill to its item's answer (unapproved). 409 when it is not open.",
+        "operationId": "accept_suggestion_api_suggestions__suggestion_id__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Suggestion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A state-changing request from another site (POST, PUT, PATCH, DELETE)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unknown id, another workspace's id, or the workspace is gone"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The action conflicts with the item's state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "A per-network limit or the model budget; see Retry-After"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "The demo is full, or model calls are off"
+          }
+        },
+        "summary": "Accept Suggestion",
+        "tags": [
+          "interview"
+        ]
       }
     },
     "/api/version": {

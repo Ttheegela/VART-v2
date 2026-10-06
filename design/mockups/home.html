@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VART — Home, direction C (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Mockup only. The app self-hosts the face: @fontsource/jetbrains-mono -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* Hallmark · direction C "console" · genre: modern-minimal · macrostructure: Index-First, in the Workbench chrome
+ * nav: N8 terminal bar (wordmark only on Home) · footer: status line · enrichment: none · context: user-provided
+ * theme: custom · vibe: "an instrument you drive from the keyboard" · axes: light body, dark chrome / mono / neutral
+ * single family by design: JetBrains Mono 400/500/700 · pre-emit critique: P5 H4 E4 S5 R5 V4
+ * Static mockup. Token values are the Tailwind neutral scale that web/src/index.css aliases (see /design.md).
+ */
+:root {
+  --n-100: #f5f5f5; --n-200: #e5e5e5; --n-300: #d4d4d4; --n-400: #a3a3a3; --n-500: #737373;
+  --n-600: #525252; --n-700: #404040; --n-800: #262626; --n-900: #171717; --n-950: #0a0a0a; --n-50: #fafafa; --white: #ffffff;
+  --color-paper: var(--white); --color-sunken: var(--n-100); --color-mark: var(--n-200);
+  --color-rule: var(--n-200); --color-rule-strong: var(--n-300);
+  --color-ink: var(--n-950); --color-ink-2: var(--n-700); --color-ink-3: var(--n-600);
+  --color-chrome: var(--n-950); --color-chrome-2: var(--n-900); --color-chrome-rule: var(--n-800);
+  --color-on-chrome: var(--n-50); --color-on-chrome-2: var(--n-400);
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --text-xs: 0.6875rem; --text-sm: 0.8125rem; --text-base: 0.875rem;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px; --space-10: 40px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --bar-h: 36px; --status-h: 28px;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { overflow-x: clip; }
+body { margin: 0; min-height: 100dvh; display: flex; flex-direction: column; background: var(--color-paper); color: var(--color-ink); font: 400 var(--text-sm)/1.55 var(--font-mono); font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 1px; }
+[data-chrome] :focus-visible { outline-color: var(--color-on-chrome); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+kbd { display: inline-block; min-width: 1.5em; padding: 0 var(--space-1); font: 500 var(--text-xs)/1.5 var(--font-mono); text-align: center; border: 1px solid currentColor; }
+
+/* N8 terminal bar, inverted; Home shows the wordmark only */
+.bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); height: var(--bar-h); padding: 0 var(--space-4); background: var(--color-chrome); color: var(--color-on-chrome-2); }
+.wordmark { font-weight: 700; letter-spacing: 0.12em; color: var(--color-on-chrome); text-decoration: none; }
+.bar .meta { white-space: nowrap; }
+
+main { flex: 1; width: 100%; max-width: 48rem; margin: 0 auto; padding: var(--space-10) var(--space-4); }
+h1 { margin: 0 0 var(--space-3); font: 500 var(--text-base)/1.45 var(--font-mono); overflow-wrap: anywhere; min-width: 0; }
+.lede { margin: 0 0 var(--space-6); max-width: 72ch; color: var(--color-ink-2); }
+.sub { margin: 0 0 var(--space-2); padding-bottom: var(--space-1); font: 500 var(--text-xs)/1.4 var(--font-mono); color: var(--color-ink-2); border-bottom: 1px solid var(--color-ink); }
+section + section { margin-top: var(--space-10); }
+
+/* Index-First rows: each way in is a row with its key */
+.ways { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--color-ink); }
+.ways li { border-bottom: 1px solid var(--color-rule-strong); }
+.way { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-1) var(--space-3); align-items: baseline; padding: var(--space-3) var(--space-2); color: inherit; text-decoration: none; transition: background-color 100ms var(--ease-out); }
+.way:hover { background: var(--color-sunken); }
+.way:active { background: var(--color-mark); }
+.way kbd { color: var(--color-ink-3); border-color: var(--color-rule-strong); }
+.way strong { font-weight: 500; white-space: nowrap; }
+.way p { grid-column: 2 / 4; margin: 0; color: var(--color-ink-2); }
+.way .go { font-size: var(--text-xs); color: var(--color-ink-3); white-space: nowrap; }
+
+/* Label table: same chips as the Run grid */
+.scroll { overflow-x: auto; }
+.sheet { width: 100%; min-width: 34rem; border-collapse: collapse; }
+.sheet th { height: 24px; padding: 0 var(--space-2); text-align: left; font: 500 var(--text-xs)/1 var(--font-mono); color: var(--color-ink-2); border-bottom: 1px solid var(--color-ink); white-space: nowrap; }
+.sheet td { padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--color-rule); vertical-align: top; }
+.sheet td:first-child { width: 19ch; }
+.sheet td:last-child { width: 8ch; white-space: nowrap; }
+.note { margin: var(--space-2) 0 0; font-size: var(--text-xs); color: var(--color-ink-3); }
+
+.st { display: inline-block; min-width: 9ch; padding: 0 var(--space-1); font: 500 var(--text-xs)/18px var(--font-mono); text-transform: lowercase; white-space: nowrap; border: 1px solid transparent; }
+.st-verified { background: var(--color-chrome); color: var(--color-on-chrome); }
+.st-confirmed { background: var(--n-700); color: var(--color-on-chrome); }
+.st-partial { border-color: var(--color-ink); }
+.st-conflict { border: 2px solid var(--color-ink); line-height: 16px; font-weight: 700; text-transform: uppercase; }
+.st-unknown { border: 1px dashed var(--n-400); color: var(--color-ink-2); }
+.st-na { color: var(--color-ink-3); }
+
+.kv { display: grid; grid-template-columns: 14ch minmax(0, 1fr); gap: 2px var(--space-3); margin: 0; }
+.kv dt { color: var(--color-ink-3); }
+.kv dd { margin: 0; }
+
+/* Status line, inverted */
+.status { display: flex; align-items: center; gap: var(--space-4); height: var(--status-h); padding: 0 var(--space-4); background: var(--color-chrome); color: var(--color-on-chrome-2); font-size: var(--text-xs); white-space: nowrap; overflow: hidden; }
+.status .mode { padding: 0 var(--space-2); background: var(--color-on-chrome); color: var(--color-ink); font-weight: 700; }
+.status .keys { display: flex; gap: var(--space-3); min-width: 0; overflow: hidden; }
+.status kbd { border-color: var(--color-chrome-rule); color: var(--color-on-chrome); }
+.status .end { margin-left: auto; }
+.status a { color: inherit; }
+
+@media (max-width: 899px) { .status .end { display: none; } }
+@media (max-width: 480px) {
+  .way { grid-template-columns: auto minmax(0, 1fr); }
+  .way .go { display: none; }
+  .way p { grid-column: 1 / 3; }
+  .bar .meta { display: none; }
+  .status .keys span:nth-child(n+3) { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition-duration: 120ms !important; transition-property: opacity !important; } }
+</style>
+</head>
+<body>
+<header class="bar" data-chrome>
+  <a class="wordmark" href="#">VART</a>
+  <span class="meta">synthetic demo data</span>
+</header>
+
+<main>
+  <section aria-labelledby="intro">
+    <h1 id="intro">Questionnaires answered from your own documents</h1>
+    <p class="lede">VART reads a company’s policies, reports and records, answers each item of a vendor security
+      questionnaire, and quotes the exact source line behind every answer. Labels are decided by rules in code, not
+      by the model, and a person approves every answer before export.</p>
+
+    <ul class="ways">
+      <li>
+        <a class="way" href="run-grid-c.html" aria-keyshortcuts="s">
+          <kbd aria-hidden="true">s</kbd><strong>Try with a sample company</strong><span class="go">open</span>
+          <p>Kestrelyn, a fictional SaaS company: 22 documents and the bundled Vendor Security Questionnaire. The run
+            is precomputed, so it opens instantly and costs nothing.</p>
+        </a>
+      </li>
+      <li>
+        <a class="way" href="#" aria-keyshortcuts="o">
+          <kbd aria-hidden="true">o</kbd><strong>Use your own files</strong><span class="go">upload</span>
+          <p>An xlsx or csv questionnaire, plus documents in docx, pdf, md or xlsx. Your workspace is private, stops
+            working after 24 hours and is deleted within about 37.</p>
+        </a>
+      </li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="labels">
+    <h2 class="sub" id="labels">how a label is decided</h2>
+    <div class="scroll">
+      <table class="sheet">
+        <thead><tr><th scope="col">label</th><th scope="col">when</th><th scope="col">value</th></tr></thead>
+        <tbody>
+          <tr><td><span class="st st-verified">verified</span></td><td>Every surviving quote says the same thing, from a final document.</td><td>Yes / No</td></tr>
+          <tr><td><span class="st st-partial">partial</span></td><td>Mixed evidence, a negation in the quote, a scope difference, or draft documents only.</td><td>Partial</td></tr>
+          <tr><td><span class="st st-conflict">conflict</span></td><td>Two documents disagree. A newer record is listed first, and you are asked which is current.</td><td>—</td></tr>
+          <tr><td><span class="st st-unknown">unknown</span></td><td>No evidence survived the checks. The item goes to Questions for you.</td><td>—</td></tr>
+          <tr><td><span class="st st-confirmed">confirmed by you</span></td><td>You answered it; your answer is kept as a dated statement and cited.</td><td>Yours</td></tr>
+          <tr><td><span class="st st-na">not applicable</span></td><td>You marked it so, with a reason in the audit log.</td><td>N/A</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">A quote that is not found word for word in its source, or that comes from a template, a contract or
+      a flagged injection, is dropped before any label is set. Every answer stays “Draft, not approved” until a
+      person approves it.</p>
+  </section>
+
+  <section aria-labelledby="status">
+    <h2 class="sub" id="status">system status</h2>
+    <dl class="kv">
+      <dt>overall</dt><dd>OK</dd>
+      <dt>database</dt><dd>OK</dd>
+      <dt>model check</dt><dd>OK (2026-10-05)</dd>
+    </dl>
+  </section>
+</main>
+
+<footer class="status" data-chrome>
+  <span class="mode">HOME</span>
+  <span class="keys"><span><kbd>s</kbd> sample</span><span><kbd>o</kbd> own files</span><span><kbd>?</kbd> all keys</span></span>
+  <span class="end">VART · labels decided by code · synthetic demo data · <a href="#">MIT</a></span>
+</footer>
+</body>
+</html>

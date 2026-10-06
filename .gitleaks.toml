@@ -15,13 +15,13 @@ description = "Fake PEM test input in the Plan 2b draft, not a key; scoped to th
 targetRules = ["private-key"]
 paths = ['''^docs/superpowers/plans/2026-10-04-vart-v2-plan2b-ingest\.md$''']
 
-# Why: every eval recording row is written with sort_keys, so it reads `"key": "<64 hex>"`, and generic-api-key matches
+# Why: every recording row (evals/recorded and web/e2e/recorded.jsonl) is written with sort_keys, so it reads `"key": "<64 hex>"`, and generic-api-key matches
 # that by name; the value is the sha256 record/replay key of a canonical LLM request, not a credential.
 [[allowlists]]
-description = "Record/replay keys (64-hex sha256) in evals/recorded/*.jsonl; scoped to that path, generic-api-key and a 64-hex secret only, so a real key inside recorded prompt text is still caught"
+description = "Record/replay keys (64-hex sha256) in evals/recorded/*.jsonl and web/e2e/recorded.jsonl; scoped to those paths, generic-api-key and a 64-hex secret only, so a real key inside recorded prompt text is still caught"
 condition = "AND"
 targetRules = ["generic-api-key"]
-paths = ['''^evals/recorded/[^/]+\.jsonl$''']
+paths = ['''^(?:evals/recorded/[^/]+|web/e2e/recorded)\.jsonl$''']
 regexes = ['''^[0-9a-f]{64}$''']
 
 # Why: the redaction tests feed fake keyed secrets ("API_KEY_PROD=abcdefgh12345678") and a cautious-side case
@@ -41,6 +41,15 @@ condition = "AND"
 targetRules = ["generic-api-key"]
 paths = ['''^tests/test_ingest_store\.py$''']
 regexes = ['''^iso27001-policy\.md$''']
+
+# Why: the redaction tests build file names around fake provider keys (a Stripe key, an AWS key id, a GitLab token, a
+# JWT) to prove redact_filename removes them; every value is an invented literal, not a credential.
+[[allowlists]]
+description = "Fake provider keys in tests/test_redact.py; scoped to that file, the four matching rules and the exact fake values"
+condition = "AND"
+targetRules = ["stripe-access-token", "aws-access-token", "gitlab-pat", "jwt"]
+paths = ['''^tests/test_redact\.py$''']
+regexes = ['''^(?:sk_live_abcdef1234567890XYZ|AKIAABCDEFGHIJKLMNOP|glpat-abcdefghij1234567890|eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV)$''']
 
 # Why: the gap-dev eval plants a fake API key in an Ask-me answer so the redaction gate has a secret to catch
 # (evals/fixtures/gap-dev-answers.json, and the Plan 6a draft that quotes the fixture); it is not a credential.

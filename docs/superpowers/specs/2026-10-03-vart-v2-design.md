@@ -269,7 +269,7 @@ ids return 404.
 | `documents` | id, filename, source (sample/upload/drive/statement), sha256, kind, status, effective_date, scope, evidence_allowed, metadata_source (rule/model/user), line_count |
 | `document_lines` | document_id, n, text (redacted) — primary key (document_id, n) |
 | `chunks` | id, document_id, line_start, line_end, text, heading, flags text[], as_of, `record` (a one-line record row; Plan 2), `tsv` tsvector (generated); no `embedding` column (Plan 2's recall@8 did not need vectors, section 6.5) |
-| `questionnaires` | id, filename, source, original_bytes (xlsx only), sheet, mapping jsonb |
+| `questionnaires` | id, filename, source, original_bytes (xlsx and csv, Plan 3), sheet, mapping jsonb |
 | `items` | id, questionnaire_id, position, row_ref, code, topic, question, csf_id |
 | `runs` | id, questionnaire_id, status, prompt_versions jsonb, models jsonb, cost_usd, started_at, finished_at |
 | `run_items` | run_id, item_id, state (pending/claimed/done), claimed_at — the step endpoint's work list |
@@ -301,6 +301,8 @@ ids return 404.
   `POST /api/answers/{id}/approve`, `POST /api/runs/{id}/approve-verified`
 - Interview: `GET /api/runs/{id}/questions`, `POST /api/questions/{id}/answer` (→ accept or follow-up, plus suggested
   fills), `POST /api/questions/{id}/skip`, `POST /api/suggestions/{id}/accept`
+- Added (Plan 3): `POST /api/documents/sample` (load the bundled sample pack), `GET /api/questionnaires`,
+  `POST /api/answers/{id}/not-applicable`, and `WorkspaceOut.expires_at` on the workspace response.
 - Export: `GET /api/runs/{id}/export` (xlsx or csv, matching the input)
 - Audit: `GET /api/audit`
 - Internal: `GET /api/internal/cleanup` and `GET /api/internal/canary` (Vercel crons, bearer `CRON_SECRET`)
@@ -425,7 +427,7 @@ the cheapest pool model that keeps the classification eval at 22/22 on the dev p
 
 | Stage | Metric | Gate (dev pack; tightened after the Plan 2 baseline) |
 |---|---|---|
-| Column mapping | correct mapping on the 10 variants | 10/10 (moves to Plan 3 with the mapper) |
+| Column mapping | correct mapping on the 10 variants | 10/10 (a pytest, `tests/test_questionnaires.py`; Plan 3) |
 | Parsing | lines extracted vs source text | reported |
 | Classification | kind, status, dated, scope, `evidence_allowed` vs the `facts.yaml` documents on the dev pack | 22/22 |
 | Retrieval | recall@8 of key evidence lines (no pinning) | ≥ 0.95 (spec 0.90) |
@@ -443,7 +445,7 @@ the cheapest pool model that keeps the classification eval at 22/22 on the dev p
 After the Plan 2 baseline, each gate tightens to max(spec value, baseline - 0.02); the table shows the tightened
 targets (`evals/score.py` `GATES`) with the spec value in brackets. Plan 2 also gates classification (22/22), the
 D-trap date rule (per planted date trap), fills suggested by the interview's re-check (all), and the redacted-upload
-stage (citations 1.00, private-data leaks 0); the column-mapping gate moves to Plan 3 with the mapper.
+stage (citations 1.00, private-data leaks 0); the column-mapping gate is a pytest (`tests/test_questionnaires.py`, 10/10; Plan 3).
 
 The README compares v2 with v1 honestly: different datasets, and v1's retrieval had the key's evidence pinned in.
 
@@ -489,7 +491,7 @@ when the database is unreachable, see below), UptimeRobot, Langfuse. Migrations 
 Neon branch first, additive changes before code that needs them, risky ones back to back with the deploy (PriorPath
 RUNBOOK rules). After any packaging or middleware change, check `/` on the preview as well as `/api/health` (the
 PriorPath `cdn = true` incident). A hello-world deploy happens in Plan 1, not at the end. Presidio and spaCy's
-`en_core_web_sm` ship in the function bundle, as in PriorPath. Before a release the lead checks the function size on a
+`en_core_web_sm` ship in the function bundle, as in PriorPath. The sample data (`data/dev/docs`, `data/questionnaires`) ships in the bundle from Plan 3 (Plan 3). Before a release the lead checks the function size on a
 preview made from the Vercel CLI (`vercel deploy` without `--prod`), because Git previews are off for every branch
 except `main` (`vercel.json`, `git.deploymentEnabled`). The preview sits behind Vercel Authentication; the size check
 reads the build output, so that is fine.

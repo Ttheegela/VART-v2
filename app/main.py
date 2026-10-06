@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
@@ -12,7 +13,18 @@ from starlette.concurrency import run_in_threadpool
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app import __version__
-from app.api import internal, workspace
+from app.api import (
+    answers,
+    audit,
+    documents,
+    errors,
+    export,
+    internal,
+    questionnaires,
+    questions,
+    runs,
+    workspace,
+)
 from app.db.session import get_engine
 from app.observability import flush as flush_traces
 from app.observability import has_pending
@@ -43,6 +55,9 @@ class FlushTraces:
 app.add_middleware(FlushTraces)
 app.include_router(workspace.router)
 app.include_router(internal.router)
+errors.install(app)
+for module in (documents, questionnaires, runs, answers, questions, export, audit):
+    app.include_router(module.router)
 
 
 class CanaryStatus(BaseModel):
@@ -79,6 +94,10 @@ def health() -> JSONResponse:
         body["canary"] = {"ok": bool(ok), "at": at.isoformat(), "credits_usd": credits}
         if not ok or at < datetime.now(UTC) - CANARY_STALE:
             body["status"] = "degraded"
+    if os.environ.get("VERCEL") == "1" and get_settings().llm_mode != "live":
+        body["status"] = (
+            "degraded"  # get_llm refuses every step there: say so at deploy, not on the first run
+        )
     return JSONResponse(body)
 
 

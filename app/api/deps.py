@@ -1,15 +1,18 @@
 import os
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, Response
 from itsdangerous import BadSignature, URLSafeSerializer
 from sqlalchemy.orm import Session
 
+from app.api.errors import GONE
 from app.db.models import Workspace
 from app.db.session import get_session
 from app.llm.client import LLMClient, default_client
+from app.llm.recorder import RecordingClient, ReplayClient
 from app.services.capacity import ensure_capacity
 from app.services.ip_limits import client_ip, hit, ip_hash, retry_after
 from app.services.workspaces import WORKSPACE_TTL
@@ -49,8 +52,8 @@ def live_workspace(request: Request, session: Session) -> Workspace | None:
 def current_workspace(request: Request, response: Response, session: SessionDep) -> Workspace:
     """The visitor's workspace; a first visit creates one and sets the cookie on `response`.
 
-    FastAPI drops headers set on the injected Response when an endpoint raises (404, 422) or returns a
-    Response itself, so such a request never delivers a new cookie. The frontend must therefore call
+    Only GET /api/workspace uses this (NewWorkspaceDep). Every other endpoint uses `require_workspace`, so no
+    POST mints a workspace or overwrites the visitor's cookie (adversary-1 C1). The frontend calls
     GET /api/workspace (ensureWorkspace) before any workspace-dependent endpoint.
     """
     ws = live_workspace(request, session)
@@ -82,11 +85,29 @@ def current_workspace(request: Request, response: Response, session: SessionDep)
     return ws
 
 
-WorkspaceDep = Annotated[Workspace, Depends(current_workspace)]
+def require_workspace(request: Request, session: SessionDep) -> Workspace:
+    """The live workspace the cookie names, or the GONE 404 ("reload the page"); never creates one."""
+    ws = live_workspace(request, session)
+    if ws is None:
+        raise HTTPException(status_code=404, detail=GONE)
+    return ws
+
+
+NewWorkspaceDep = Annotated[Workspace, Depends(current_workspace)]
+WorkspaceDep = Annotated[Workspace, Depends(require_workspace)]
 
 
 def get_llm() -> LLMClient | None:
-    return default_client()
+    settings = get_settings()
+    if settings.llm_mode == "live":
+        return default_client()
+    if os.environ.get("VERCEL") == "1":
+        raise RuntimeError("LLM_MODE must be live on Vercel")
+    path = Path(settings.llm_recording)
+    if settings.llm_mode == "replay":
+        return ReplayClient(path)
+    live = default_client()
+    return RecordingClient(live, path) if live is not None else None
 
 
 LLMDep = Annotated[LLMClient | None, Depends(get_llm)]

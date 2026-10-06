@@ -174,6 +174,8 @@ class RunItem(Base):
     )
     state: Mapped[str] = mapped_column(String(8), default="pending", server_default="pending")
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # Claims so far; an item whose step crashed three times is answered as failed instead of claimed again.
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     __table_args__ = (
         CheckConstraint(_in("state", ("pending", "claimed", "done")), name="ck_run_items_state"),
         Index("ix_run_items_state", "run_id", "state"),
@@ -204,6 +206,12 @@ class Answer(Base):
     )
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     edited: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # What decide needs to run again with no model call after a metadata override (spec 6.7;
+    # docs/CONTRACTS.md "JSON shapes for Plan 3"): the stances, the passages' chunk ids in the order the
+    # stances index them, and the retrieval drops (decide's third argument).
+    stances: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, server_default="[]")
+    chunk_ids: Mapped[list[str]] = mapped_column(JSONB, default=list, server_default="[]")
+    retrieval_dropped: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, server_default="[]")
     created_at: Mapped[datetime] = _created_at()
     __table_args__ = (
         UniqueConstraint("run_id", "item_id", name="uq_answers_run_item"),
@@ -219,6 +227,72 @@ class Answer(Base):
         ),
         CheckConstraint("label <> 'user_confirmed' OR statement_id IS NOT NULL", name="ck_answers_statement"),
         CheckConstraint("confidence >= 0 AND confidence <= 1", name="ck_answers_confidence"),
+        CheckConstraint(
+            "jsonb_typeof(stances) = 'array' AND jsonb_typeof(chunk_ids) = 'array' "
+            "AND jsonb_typeof(retrieval_dropped) = 'array'",
+            name="ck_answers_engine_arrays",
+        ),
+    )
+
+
+class InterviewQuestion(Base):
+    """One entry of "Questions for you" (spec 5 step 6, 6.9). `rank` is the planner's order; asked at most
+    twice: the question and its one follow-up."""
+
+    __tablename__ = "interview_questions"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    workspace_id: Mapped[uuid.UUID] = _workspace_fk()
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"))
+    item_ids: Mapped[list[uuid.UUID]] = mapped_column(ARRAY(UUID(as_uuid=True)))
+    reason: Mapped[str] = mapped_column(String(8))
+    rank: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(12), default="open", server_default="open")
+    asked_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    answer_text: Mapped[str | None] = mapped_column(Text, default=None)  # redacted
+    statement_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id"), default=None)
+    created_at: Mapped[datetime] = _created_at()
+    __table_args__ = (
+        UniqueConstraint("run_id", "item_ids", name="uq_interview_questions_items"),
+        CheckConstraint(
+            _in("reason", ("conflict", "unknown", "partial")), name="ck_interview_questions_reason"
+        ),
+        CheckConstraint(
+            _in("status", ("open", "follow_up", "answered", "skipped")), name="ck_interview_questions_status"
+        ),
+        CheckConstraint("asked_count BETWEEN 0 AND 2", name="ck_interview_questions_asked"),
+        CheckConstraint("cardinality(item_ids) >= 1", name="ck_interview_questions_items"),
+    )
+
+
+class SuggestedFill(Base):
+    """A fill the statement re-check found (spec 6.9): shown, never applied until the visitor accepts it."""
+
+    __tablename__ = "suggestions"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    workspace_id: Mapped[uuid.UUID] = _workspace_fk()
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"))
+    item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("items.id", ondelete="CASCADE"), index=True)
+    # NO ACTION, as answers.statement_id: a statement a suggestion cites cannot be deleted by itself.
+    statement_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id"), index=True)
+    label: Mapped[str] = mapped_column(String(16))
+    value: Mapped[str | None] = mapped_column(String(8), default=None)
+    text: Mapped[str] = mapped_column(Text, default="", server_default="")
+    citations: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    dropped: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, server_default="[]")
+    confidence: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    status: Mapped[str] = mapped_column(String(10), default="open", server_default="open")
+    created_at: Mapped[datetime] = _created_at()
+    __table_args__ = (
+        UniqueConstraint("run_id", "item_id", "statement_id", name="uq_suggestions_fill"),
+        CheckConstraint(_in("label", ("verified", "partial")), name="ck_suggestions_label"),
+        CheckConstraint("value IS NULL OR value IN ('Yes', 'No', 'Partial')", name="ck_suggestions_value"),
+        CheckConstraint(
+            "jsonb_typeof(citations) = 'array' AND jsonb_array_length(citations) > 0",
+            name="ck_suggestions_cited",
+        ),
+        CheckConstraint(_in("status", ("open", "accepted", "dismissed")), name="ck_suggestions_status"),
+        CheckConstraint("confidence >= 0 AND confidence <= 1", name="ck_suggestions_confidence"),
     )
 
 

@@ -3,13 +3,27 @@
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Literal
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from app.contracts import BudgetExhausted
 from app.db.models import IpLimit, LlmUsage
-from app.services.ip_limits import bump
+from app.services.ip_limits import LIMITS, _window_start, bump, hit
+
+Scope = Literal["workspace", "network", "hour", "day"]  # which cap refused a call (adversary-1 I5)
+
+
+class Refused(BudgetExhausted):
+    """BudgetExhausted naming the cap that refused, so the 429 says which and when it resets
+    (app.api.errors). A plain BudgetExhausted reads as the workspace scope."""
+
+    def __init__(self, step: str, scope: Scope) -> None:
+        super().__init__(step)
+        self.scope: Scope = scope
+
 
 # Calls per workspace per hour. A 60-item questionnaire needs about 60 stance + 50 draft calls.
 CAPS: dict[str, int] = {"stance": 150, "draft": 120, "classify": 40, "recheck": 60}
@@ -74,17 +88,57 @@ def try_consume(session: Session, workspace_id: uuid.UUID, kind: str, now: datet
     return bump(session, GLOBAL_KEY, GLOBAL_DAY_KIND, _day(hour)) <= GLOBAL_PER_DAY
 
 
-def spender(session: Session, workspace_id: uuid.UUID) -> Callable[[str], bool]:
+def refusal_scope(
+    session: Session,
+    workspace_id: uuid.UUID,
+    kind: str,
+    network: str | None = None,
+    now: datetime | None = None,
+) -> Scope:
+    """Which cap refused the last `kind` call: a refusal leaves its counter over the cap for the window, and
+    the caps are checked in the order the spender spends them: network, workspace, global hour, global day."""
+    now = now or datetime.now(UTC)
+    hour = _hour(now)
+    if network is not None:
+        limit, window = LIMITS["llm"]
+        used = session.scalar(
+            select(IpLimit.hits).where(
+                IpLimit.ip_hash == network,
+                IpLimit.window_start == _window_start(now, window),
+                IpLimit.kind == "llm",
+            )
+        )
+        if (used or 0) > limit:
+            return "network"
+    used = session.scalar(
+        select(LlmUsage.calls).where(
+            LlmUsage.workspace_id == workspace_id, LlmUsage.hour_start == hour, LlmUsage.kind == kind
+        )
+    )
+    if (used or 0) > CAPS[kind]:
+        return "workspace"
+    if _global_used(session, GLOBAL_KIND, hour) > GLOBAL_PER_HOUR:
+        return "hour"
+    return "day"
+
+
+def spender(session: Session, workspace_id: uuid.UUID, network: str | None = None) -> Callable[[str], bool]:
     """The budget hook engine code calls before every model call (app.contracts.Spend). It spends one call of
     that step and commits at once, so the shared global counter row is never held across a model call and no
     transaction ever holds two try_consume calls (Plan 1A Task 3 review).
+
+    With `network` (the request's `ip_hash`, `app.api.errors.network`), each call also counts one `llm` event
+    for that network first: the per-network `llm` limit is per model call, not per request (adversary-1 I2).
+    A call the network limit refuses spends no workspace or global budget.
 
     Commits everything pending in `session`, not only the budget row. Read what you need from ORM objects into
     plain values before calling it; after it, run no query and touch no ORM attribute until the model call
     returns. One spender per session; `step` is a key of `CAPS`."""
 
     def spend(step: str) -> bool:
-        allowed = try_consume(session, workspace_id, step)
+        allowed = (network is None or hit(session, network, "llm")) and try_consume(
+            session, workspace_id, step
+        )
         session.commit()
         return allowed
 

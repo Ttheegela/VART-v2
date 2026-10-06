@@ -14,12 +14,12 @@ export default class ErrorBoundary extends Component<{ children: ReactNode }, { 
   render() {
     if (!this.state.failed) return this.props.children;
     return (
-      <div role="alert" className="space-y-3 border border-black bg-white p-4">
+      <div role="alert" className="m-4 space-y-3 border border-rule-strong p-4">
         <p className="font-medium">Something went wrong on this screen.</p>
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="rounded bg-black px-3 py-1.5 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+          className="h-7 bg-chrome px-2 text-sm font-medium text-on-chrome hover:bg-neutral-800"
         >
           Reload
         </button>

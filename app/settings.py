@@ -1,5 +1,7 @@
 """All configuration comes from environment variables. Nothing secret has a default."""
 
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Every default comes from the model pool (spec 6.14): cheap Chinese or open-weight models on OpenRouter
@@ -57,6 +59,9 @@ class Settings(BaseSettings):
     classify_model: str = DEFAULT_MODELS["classify"]
     judge_model: str = DEFAULT_MODELS["judge"]
     recheck_model: str = ""  # empty: the stance model
+    # E2E and local dev only: answer model calls from a recording (replay) or record them (record, eval key).
+    llm_mode: Literal["live", "record", "replay"] = "live"
+    llm_recording: str = ""
     canary_min_credits_usd: float = 2.0
 
     def models(self) -> dict[str, str]:

@@ -1,4 +1,4 @@
-"""Check a deployed VART: UI served from the CDN, health ok, workspace cookie, version.
+"""Check a deployed VART: UI served from the CDN, health ok, workspace cookie, version, a same-site write.
 
 python scripts/smoke.py https://vart.vercel.app
 
@@ -53,6 +53,16 @@ def check(c: httpx.Client) -> str:
     version = get_json(c, "version", "/api/version")
     if not isinstance(version.get("version"), str):
         raise fail("version", 'GET /api/version has no string "version"', version)
+    # A browser-style write: the cross-site guard compares Origin with the Host the function sees, so a
+    # platform that rewrote Host would 403 every production write (final review M4). It resets the smoke's
+    # own workspace.
+    origin = f"{c.base_url.scheme}://{c.base_url.netloc.decode()}"
+    try:
+        wrote = c.post("/api/workspace/reset", headers={"Origin": origin})
+    except httpx.HTTPError as e:
+        raise fail("same-site write", f"POST /api/workspace/reset failed: {e!r}") from e
+    if wrote.status_code != 204:
+        raise fail("same-site write", f"POST /api/workspace/reset answered {wrote.status_code}", wrote.text)
     return f"ok: version {version['version']}, canary {health.get('canary')}"
 
 

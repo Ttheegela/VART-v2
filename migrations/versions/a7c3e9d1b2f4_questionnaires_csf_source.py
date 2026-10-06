@@ -1,7 +1,7 @@
 """questionnaires csf source
 
 Revision ID: a7c3e9d1b2f4
-Revises: ffbf91b464dc
+Revises: 3a1f0c9e7b21
 Create Date: 2026-10-05 12:00:00.000000
 
 """
@@ -12,7 +12,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "a7c3e9d1b2f4"
-down_revision: Union[str, Sequence[str], None] = "ffbf91b464dc"
+down_revision: Union[str, Sequence[str], None] = "3a1f0c9e7b21"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

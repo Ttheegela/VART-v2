@@ -1,16 +1,23 @@
-# Keep the deployed function small: the runtime needs only app/. Plan 4 un-ignores data/ for the sample pack; the gap check reads data/csf/csf-2.0.json at runtime (app/csf.py).
+# Keep the deployed function small: the runtime needs app/, the sample data (data/dev/docs, data/questionnaires)
+# and the CSF framework file (data/csf/csf-2.0.json, read by app/csf.py from Plan 6B).
 .venv
 .env*
-docs
+/docs
 tests
 evals
 scripts
 datakit
-data/*
-# CSF gap check (Plan 6A): keep only the framework file
-!data/csf/
-data/csf/*
-!data/csf/csf-2.0.json
+# The sample path (Plan 3) reads the dev documents and the two bundled questionnaires at runtime.
+/data/*
+!/data/dev
+/data/dev/*
+!/data/dev/docs
+!/data/questionnaires
+!/data/csf
+/data/csf/*
+!/data/csf/csf-2.0.json
+!/data/NOTICE.md
+!/data/LICENSE
 .github
 .mypy_cache
 .ruff_cache
