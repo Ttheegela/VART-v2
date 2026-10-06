@@ -235,15 +235,17 @@ change-log line; changing or removing a path, a field or a status needs the lead
   rule changes, so nothing is re-recorded.
 - 2026-10-06: Plan 6B final review fix (Ruling 14; copy and mapping only, the label id `confirmed_by_you` and the OpenAPI schema are unchanged): an Ask-me outcome the visitor answered reads "Answered by you" (view chip, drawer, sheet via `csf.gap_word`) and stays in the review set; "Confirmed by you" is only for a Checked outcome made Covered by accepted fills (Ruling 6). The failed sheet word is "Failed" (stale "Not run yet" fixed). No prompt or label rule changes, so nothing is re-recorded.
 - 2026-10-07: Plan 4 Task 2 (behaviour inside existing statuses; no path, field or status changed): a step answers
-  its claimed items, or a gap check's parts, at the same time, each job on its own session, spender and cost
-  meter; it spends before every model call and holds no transaction across one. Every claimed item is settled in
-  questionnaire order: items that ran beside a refused, outage-hit or missing-recording item are written, not
-  given back (they were paid), and an item whose write fails stays claimed while the others are still written.
-  After the writes it raises ReplayMiss, then a refused budget, then an unexpected error, then the 503 when
-  nothing was answered. When something else was answered, each item that met an outage keeps its attempt; when
-  nothing was, only the first item that met it keeps its attempt and the others are refunded (Ruling 5), so a true
-  outage costs at most one attempt a step and items the provider always fails still end Failed. A 429 is retried
-  once after a short pause (Retry-After, at most 2 s, else 1 s). Whether the deadline cut a retry is decided when the retry is refused, not at settlement. A failed
-  outcome now pays for each of its parts, since they run at once. A step answers by 270 s whatever the provider
-  does; a job still running then goes back with its attempt counted, its cost is not added to the run, and a part
-  it stores later lands on no row (the write is guarded by the step's claim).
+  its claimed items, or a gap check's parts, at the same time, each job on its own session, spender and cost meter;
+  it spends before every model call and holds no transaction across one. Every claimed item is settled in
+  questionnaire order: items that ran beside a refused, outage-hit or missing-recording item are written, not given
+  back (they were paid), and an item whose write fails stays claimed while the others are still written. After the
+  writes it raises ReplayMiss, then a refused budget, then an unexpected error, then the 503 when no model job
+  answered (a row written with no model call, Failed at the attempt limit or an Ask-me outcome, does not count).
+  When a model job answered, each item that met an outage keeps its attempt; when none did, only the first item
+  that met it keeps its attempt and the others are refunded (Ruling 5), so a true outage costs at most one attempt
+  a step and items the provider always fails still end Failed. A 429 is retried once after a short pause
+  (Retry-After plus up to 0.5 s of jitter, at most 2 s; 1 s to 1.5 s without one). Whether the deadline cut a retry
+  is decided when the retry is refused, not at settlement. A failed outcome now pays for each of its parts, since
+  they run at once. A step answers by 270 s whatever the provider does; a job still running then goes back with its
+  attempt counted, its cost is not added to the run (it may still spend, counted in every cap), and a part it
+  stores later lands on no row (the write is guarded by the step's claim).

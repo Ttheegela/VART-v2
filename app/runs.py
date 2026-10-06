@@ -6,6 +6,7 @@ time on a small thread pool, each job on its own session, spender and cost meter
 step claims outcomes by their parts (CSF spec 5.7) and stores each part as it lands."""
 
 import logging
+import random
 import time
 import uuid
 from collections.abc import Callable, Mapping
@@ -43,9 +44,8 @@ STALE = timedelta(
     minutes=5
 )  # a claim this old belongs to a crashed step (DEADLINE_S keeps live ones younger)
 DEADLINE_S = 240.0  # under Vercel's 300 s function limit, as in PriorPath
-HARD_S = (
-    270.0  # a step answers by then whatever its jobs do: under Vercel's 300 s; STALE never meets a live step
-)
+# a step answers by then whatever its jobs do: under Vercel's 300 s, so STALE never meets a live step
+HARD_S = 270.0
 MAX_ATTEMPTS = 3  # claims before an item that keeps crashing its step is answered as failed
 FAILED_TEXT = "No answer: the model call failed twice. Re-run live to try again."
 STEP_PARTS = 8  # CSF spec 5.7: a gap-check step claims outcomes until their parts add up to 8 (8 x 15 s p90)
@@ -184,16 +184,16 @@ class _DeadlineCut(LLMError):
 
 def _retry_pause(exc: LLMError) -> float:
     """Seconds to wait before retrying: a short pause on a rate limit (429), so a step's workers do not
-    re-fire their calls in the same second (adversary-1 I3): Retry-After, at most 2 s, else 1 s. No wait
-    otherwise."""
+    re-fire their calls in the same second (adversary-1 I3): Retry-After (else 1 s) plus up to 0.5 s of
+    jitter, at most 2 s. No wait otherwise."""
     cause = exc.__cause__
     if getattr(cause, "status_code", None) != 429:
         return 0.0
     try:
-        after = float(cause.response.headers.get("retry-after", ""))  # type: ignore[union-attr]
+        after = max(0.0, float(cause.response.headers.get("retry-after", "")))  # type: ignore[union-attr]
     except (AttributeError, ValueError):
-        return 1.0
-    return min(2.0, max(0.0, after))
+        after = 1.0
+    return min(2.0, after + random.uniform(0.0, 0.5))
 
 
 def _once[T](session: Session, call: Callable[[], T], can_retry: Callable[[], bool]) -> T:
@@ -332,7 +332,11 @@ def _run_all(
     without waiting for it. Results come back per item in the order the jobs were listed."""
 
     def guarded(job: Callable[[], _Done]) -> _Done | None:
-        return job() if in_time() else None
+        try:
+            ok = in_time()
+        except Exception as exc:  # a broken clock is this job's error, not the step's (review M1)
+            return _Done(None, 0.0, exc)
+        return job() if ok else None
 
     out: dict[uuid.UUID, list[_Done | None]] = {item_id: [] for item_id in jobs}
     flat = [(item_id, job) for item_id, listed in jobs.items() for job in listed]
@@ -538,12 +542,13 @@ def step(
     only before DEADLINE_S (`clock`); the step answers by HARD_S in real time. Then, on this thread in
     questionnaire order: write every answer that came back (one row per item; a duplicate write does nothing),
     count every paid call, give back the items that met a refusal, a missing recording or the deadline
-    (attempt refunded), and those that met an outage or were late (attempt kept). When nothing was answered,
-    only the first item that met the outage keeps its attempt and the others are refunded (Ruling 5); a late
-    job's stays. An item whose write fails stays claimed with its attempt and cost counted, and the others are
-    still settled. Raises, after the writes: ReplayMiss, then a `llm_budget.Refused` naming the cap, then an
-    unexpected error (its item stays claimed), then ModelsUnavailable when nothing was answered. Returns the
-    item ids answered. `network` is `errors.network(request)`: each spender counts each call for it."""
+    (attempt refunded), and those that met an outage or were late (attempt kept). When no model job answered
+    (a row written with no call does not count), only the first item that met the outage keeps its attempt and
+    the others are refunded (Ruling 5); a late job's stays. An item whose write fails stays claimed with its
+    attempt and cost counted, and the others are still settled. Raises, after the writes: ReplayMiss, then a
+    `llm_budget.Refused` naming the cap, then an unexpected error (its item stays claimed), then
+    ModelsUnavailable when no model job answered. Returns the item ids answered. `network` is
+    `errors.network(request)`: each spender counts each call for it."""
     run = _run(session, workspace_id, run_id)
     if run.status != "running":
         return []
@@ -605,6 +610,9 @@ def step(
     results = _run_all(jobs, in_time, hard_at)
 
     answered: list[uuid.UUID] = []
+    paid: list[
+        uuid.UUID
+    ] = []  # answered from a model job's result: what Ruling 5 and the 503 go by (review I1)
     give_back: list[uuid.UUID] = []
     down: list[uuid.UUID] = []  # met an outage, in questionnaire order
     late: list[uuid.UUID] = []  # still running at HARD_S: the attempt stays
@@ -628,6 +636,7 @@ def step(
                 )
                 _safe_write(session, workspace_id, run_id, item_id, values or FAILED, cost)
                 answered.append(item_id)
+                paid.append(item_id)
                 continue
             _add_cost(session, run_id, cost)
             session.commit()
@@ -653,6 +662,7 @@ def step(
                     log.error("run %s item %s: %s; answered as failed", run_id, item_id, type(err).__name__)
                 _write(session, workspace_id, run_id, item_id, FAILED, 0.0)  # its cost is already added
                 answered.append(item_id)
+                paid.append(item_id)
             else:
                 crashed = crashed or err  # stays claimed, attempt counted: a crash loop ends at MAX_ATTEMPTS
         except Exception as exc:
@@ -663,11 +673,12 @@ def step(
             session.commit()
             crashed = crashed or exc
     _release(session, run_id, give_back)
-    # Something was answered: the outage was selective, so each item that met it keeps its attempt
-    # (adversary-3 N1). Nothing was answered: only the first item that met it keeps its attempt and the rest
-    # are refunded (Ruling 5, preflight I1), so a true outage costs at most one attempt a step and items the
-    # provider always fails still end FAILED, one by one, even when they are all that is left.
-    first = down[:1] if not answered else down
+    # A model job answered: the outage was selective, so each item that met it keeps its attempt (adversary-3
+    # N1). None did (rows written with no call, Failed at MAX_ATTEMPTS or Ask me, do not count): only the
+    # first item that met it keeps its attempt and the rest are refunded (Ruling 5, preflight I1), so a true
+    # outage costs at most one attempt a step and items the provider always fails still end FAILED, one by
+    # one.
+    first = down[:1] if not paid else down
     _release(session, run_id, first, refund=False)
     _release(session, run_id, down[len(first) :])
     _release(session, run_id, late, refund=False)
@@ -683,8 +694,8 @@ def step(
         raise Refused(kind, scope) from None
     if crashed is not None:
         raise crashed
-    if (down or late) and not answered:
-        raise ModelsUnavailable()  # when something was answered, the next step meets the outage itself
+    if (down or late) and not paid:
+        raise ModelsUnavailable()  # when a model job answered, the next step meets the outage itself
     _finish_if_done(session, run)
     return answered
 

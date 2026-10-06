@@ -125,12 +125,9 @@ def _when_done(monkeypatch: pytest.MonkeyPatch, name: str, jobs: int) -> threadi
 def test_four_items_run_at_once(s: Session) -> None:
     ws, run = _questionnaire(s, 4)
     llm = Slow({"stance": STANCE, "draft": DRAFT})
-    start = time.monotonic()
     answered = runs.step(s, ws.id, run.id, llm, MODELS)
-    took = time.monotonic() - start
     assert len(answered) == 4 and len(llm.requests) == 8
-    assert llm.most >= 2  # calls overlapped
-    assert took < 3 * PAUSE  # sequential: 8 calls x PAUSE; concurrent: stance then draft, about 2 x PAUSE
+    assert llm.most >= 2  # calls overlapped (no wall-clock bound: it flakes under load, review I2)
     assert [s.get_one(Item, i).position for i in answered] == [1, 2, 3, 4]  # questionnaire order
     s.refresh(run)
     assert float(run.cost_usd) == pytest.approx(0.08)  # every paid call counted once
@@ -228,6 +225,65 @@ def test_an_outage_on_every_item_is_a_503_that_spends_one_attempt(s: Session) ->
     ]
 
 
+def _attempts(s: Session) -> dict[int, tuple[str, int]]:
+    s.expire_all()
+    rows = s.execute(
+        select(Item.position, RunItem.state, RunItem.attempts).join(Item, Item.id == RunItem.item_id)
+    )
+    return {p: (st, at) for p, st, at in rows}
+
+
+def test_a_sustained_outage_is_a_503_every_step_and_spends_one_attempt_a_step(s: Session) -> None:
+    # Review I1: an item written Failed at MAX_ATTEMPTS needed no model call, so it does not make the outage
+    # selective; every step is a 503 that keeps at most one attempt, however many items have reached the limit
+    ws, run = _questionnaire(s, 5)
+    llm = ByStepLLM({"stance": _outage()})
+    for _ in range(3 * runs.MAX_ATTEMPTS + 1):
+        before = _attempts(s)
+        with pytest.raises(ModelsUnavailable):
+            runs.step(s, ws.id, run.id, llm, MODELS)
+        after = _attempts(s)
+        kept = [p for p, (st, at) in after.items() if st == "pending" and at > before[p][1]]
+        assert len(kept) <= 1, (before, after)
+    states = _attempts(s)
+    assert [states[p][0] for p in (1, 2, 3)] == ["done"] * 3  # one item reaches the limit every 3 steps
+    assert states[4] == ("pending", 1) and states[5] == ("pending", 0)
+
+
+def test_an_ask_me_outcome_beside_a_checked_one_does_not_hide_an_outage(s: Session) -> None:
+    # Review I1: a gap check's core scope starts with Ask-me outcomes (answered with no call); a Checked one
+    # whose every part met the outage still makes the step a 503
+    ws = f.workspace(s)
+    f.chunk(s, f.document(s, ws, filename="backup-policy.docx"), line_start=2, line_end=2, text=LINE)
+    q = f.questionnaire(s, ws, source="csf", filename="csf-2.0")
+    ask, checked = csf.framework().get("GV.OC-03"), csf.framework().get("PR.DS-11")
+    assert (ask.tier, checked.tier) == ("ask", "checked")
+    for pos, o in enumerate((ask, checked), 1):
+        f.item(
+            s, q, position=pos, csf_id=o.id, code=o.id, row_ref=o.id, topic=o.category, question=o.question
+        )
+    s.commit()
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    with pytest.raises(ModelsUnavailable):
+        runs.step(s, ws.id, run.id, ByStepLLM({"stance": _outage()}), MODELS)
+    assert _attempts(s) == {1: ("done", 1), 2: ("pending", 1)}
+    assert s.scalars(select(Answer.text)).all() == [""]  # the Ask-me row is written; no Failed answer
+
+
+def test_a_clock_that_raises_in_a_worker_is_settled_not_lost(s: Session) -> None:
+    # Review M1: an exception from the clock as a job starts comes back as that job's error; the other job's
+    # answer is still written before it is raised
+    ws, run = _questionnaire(s, 2)
+    reads = iter([0.0, 0.0])  # the deadline, one job's start: the other job's start raises StopIteration
+
+    with pytest.raises(StopIteration):
+        runs.step(
+            s, ws.id, run.id, ByStepLLM({"stance": STANCE, "draft": DRAFT}), MODELS, clock=lambda: next(reads)
+        )
+    assert sorted(st for st, _ in _attempts(s).values()) == ["claimed", "done"]  # its attempt stays counted
+    assert len(s.scalars(select(Answer)).all()) == 1
+
+
 def test_items_the_provider_always_fails_end_failed_even_when_they_are_all_that_is_left(s: Session) -> None:
     # Ruling 5: two items that always meet an outage, alone at the end of a run, both end FAILED in a bounded
     # number of steps (a refund for both would 503 forever)
@@ -252,19 +308,21 @@ def test_items_the_provider_always_fails_end_failed_even_when_they_are_all_that_
 
 
 @pytest.mark.parametrize(
-    ("headers", "pause"), [({}, 1.0), ({"retry-after": "1.5"}, 1.5), ({"retry-after": "30"}, 2.0)]
+    ("headers", "low", "high"),
+    [({}, 1.0, 1.5), ({"retry-after": "1.2"}, 1.2, 1.7), ({"retry-after": "30"}, 2.0, 2.0)],
 )
 def test_a_rate_limit_pauses_before_its_single_retry(
-    s: Session, monkeypatch: pytest.MonkeyPatch, headers: dict[str, str], pause: float
+    s: Session, monkeypatch: pytest.MonkeyPatch, headers: dict[str, str], low: float, high: float
 ) -> None:
-    # Adversary-1 I3: eight workers must not re-fire their calls in the same second
+    # Adversary-1 I3: eight workers must not re-fire their calls in the same second; with up to 0.5 s of
+    # jitter (review M2), never past 2 s
     ws, run = _questionnaire(s, 1)
     slept: list[float] = []
     monkeypatch.setattr(runs.time, "sleep", slept.append)
     llm = ByStepLLM({"stance": _status_error(429, headers)})
     with pytest.raises(ModelsUnavailable):
         runs.step(s, ws.id, run.id, llm, MODELS)
-    assert (len(llm.requests), slept) == (2, [pause])
+    assert len(llm.requests) == 2 and len(slept) == 1 and low <= slept[0] <= high
 
 
 def test_a_server_error_is_retried_without_a_pause(s: Session, monkeypatch: pytest.MonkeyPatch) -> None:
