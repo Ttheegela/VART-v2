@@ -33,9 +33,17 @@ def test_the_key_plants_what_the_spec_asks() -> None:
     assert by_label["documents_disagree"] == {"PR.AA-05", "DE.AE-06"}
     assert by_label["not_met"] == {"ID.RA-02", "DE.AE-07"}
     assert by_label["gap"] == {"ID.AM-03", "PR.AA-06", "PR.IR-04"}
-    assert by_label["partly_covered"] == {"PR.AA-03", "RS.MA-01", "RS.CO-02"}
+    assert by_label["partly_covered"] == {
+        "PR.AA-03",
+        "RS.MA-01",
+        "RS.CO-02",
+        "PR.DS-11",
+        "PR.IR-03",
+        "ID.AM-05",
+        "ID.AM-08",
+    }
     assert {"RS.AN-03", "RS.MI-01"} <= by_label["covered"]
-    assert Counter(labels.values())["covered"] == 21
+    assert Counter(labels.values())["covered"] == 17
 
 
 def test_trap_outcomes_are_never_expected_covered() -> None:
@@ -47,7 +55,6 @@ def test_trap_outcomes_are_never_expected_covered() -> None:
         "ID.RA-02": {"planned"},
         "DE.AE-07": {"planned"},
         "RS.MA-01": {"draft"},
-        "RS.CO-02": {"draft", "template"},
         "PR.IR-04": {"template"},
     }
     labels = _labels()
@@ -102,3 +109,22 @@ def test_a_template_gap_does_not_count_as_an_honest_gap(monkeypatch: pytest.Monk
     )
     monkeypatch.setattr(gap, "load", lambda pack: (facts, g.model_copy(update={"outcomes": outcomes})))
     assert "only 1 honest gap outcome(s) planted, need 2" in gap.check("dev")
+
+
+def test_a_label_override_changes_the_derived_label() -> None:
+    facts, g = gap.load("dev")
+    plain = g.model_copy(update={"outcomes": tuple(o.model_copy(update={"label": None}) for o in g.outcomes)})
+    before = {k.code: k.expected_label for k in gap.derive_gap(facts, plain).items}
+    after = {k.code: k.expected_label for k in gap.derive_gap(facts, g).items}
+    changed = {c for c in after if after[c] != before[c]}
+    assert changed == {"PR.DS-11", "PR.IR-03", "ID.AM-05", "ID.AM-08"}
+    assert all(before[c] == "verified" and after[c] == "partial" for c in changed)
+
+
+def test_a_label_override_without_its_missing_parts_fails_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+    facts, g = gap.load("dev")
+    outcomes = tuple(
+        o.model_copy(update={"missing": None}) if o.csf_id == "PR.DS-11" else o for o in g.outcomes
+    )
+    monkeypatch.setattr(gap, "load", lambda pack: (facts, g.model_copy(update={"outcomes": outcomes})))
+    assert "outcome PR.DS-11: a label override needs missing" in gap.check("dev")

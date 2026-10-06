@@ -161,6 +161,10 @@ class Key(_Strict):
 class GapOutcome(_Strict):
     csf_id: str
     control: str
+    # A broad outcome whose control's statements answer only part of NIST's text is Partly covered, whatever
+    # the control's own stance says; `missing` names the NIST parts with no evidence (required with it).
+    label: Literal["partly_covered"] | None = None
+    missing: str | None = None
 
 
 class GapFacts(_Strict):

@@ -65,7 +65,15 @@ def selection(facts: Facts, gap: GapFacts) -> Selection:
 
 
 def derive_gap(facts: Facts, gap: GapFacts) -> Key:
-    return derive(merged(facts, gap), selection(facts, gap))
+    key = derive(merged(facts, gap), selection(facts, gap))
+    partly = {m.csf_id for m in gap.outcomes if m.label == "partly_covered"}
+    items = tuple(
+        k.model_copy(update={"expected_label": "partial", "expected_value": "Partial"})
+        if k.code in partly
+        else k
+        for k in key.items
+    )
+    return key.model_copy(update={"items": items})
 
 
 def doc_path(pack: str, gap: GapFacts, spec: DocSpec) -> Path:
@@ -102,6 +110,11 @@ def check(pack: str) -> list[str]:
     want = {o.id for o in checked()}
     controls = {c.id for c in f.controls}
     p += [f"outcome {i} is mapped twice" for i in sorted({i for i in ids if ids.count(i) > 1})]
+    p += [
+        f"outcome {m.csf_id}: a label override needs missing"
+        for m in gap.outcomes
+        if m.label and not m.missing
+    ]
     p += [f"Checked outcome {i} has no control" for i in sorted(want - set(ids))]
     p += [f"outcome {i} is not a Checked CSF outcome" for i in sorted(set(ids) - want)]
     p += [

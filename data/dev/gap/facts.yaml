@@ -1,7 +1,8 @@
 # Gap-check extension of data/dev/facts.yaml (datakit.gap). Read only by the CSF gap check (eval pack gap-dev), so
 # the questionnaire keys, the dev eval and its recordings do not change. Same rules as the dev fact sheet: a
 # statement appears verbatim in its document; ASCII only.
-#   outcomes  every Checked CSF 2.0 outcome (data/csf/tiers.yaml) and the one control that answers it
+#   outcomes  every Checked CSF 2.0 outcome (data/csf/tiers.yaml) and the one control that answers it. `label: partly_covered`
+#             with `missing:` (the NIST parts that lack evidence) overrides the derived label for a broad outcome.
 pack: dev
 
 documents:
@@ -16,6 +17,7 @@ controls:
   - {id: threat-intel-analysis, topic: Detection, truth: "Threat intelligence is not yet used in event analysis; planned for 2027"}
   - {id: incident-analysis, topic: Incident response, truth: "A post-incident review establishes what happened and its root cause"}
   - {id: incident-containment, topic: Incident response, truth: "Confirmed incidents are contained by isolating systems and revoking credentials"}
+  - {id: activity-monitoring, topic: Detection, truth: "Access and activity on production systems are audited and monitored to detect intrusions and unauthorized disclosure"}
 
 statements:
   - id: sip-threat-intel-sources
@@ -46,6 +48,50 @@ statements:
     control: incident-containment
     stance: yes
     text: "Once an incident is confirmed, the on-call engineer contains it by isolating the affected systems and revoking the affected credentials before recovery begins."
+  # DE.CM-09: the logging and monitoring policy states the outcome itself (a scan finds weaknesses, not events).
+  - id: lmp-activity-monitoring
+    doc: lmp
+    control: activity-monitoring
+    stance: yes
+    text: "Kestrelyn shall audit and monitor the access and activity of systems and applications that process or store production and sensitive data"
+  - id: lmp-intrusion-detection
+    doc: lmp
+    control: activity-monitoring
+    stance: yes
+    text: "Kestrelyn shall audit access and activity to detect, report, and guard against:"
+  - id: lmp-audit-logging
+    doc: lmp
+    control: activity-monitoring
+    stance: yes
+    text: "All critical computing systems and software must enable audit logging."
+  # RS.CO-02: a final line, disaster scope only, so partial; it keeps the outcome from being a draft-only trap.
+  - id: bcp-communications
+    doc: bcp
+    control: breach-notification
+    stance: partial
+    text: "Role: Communications Lead; Responsibility: Keeps employees and customers informed"
+  # GV.PO-01: communicated and enforced (the key's first quote covers only "established").
+  - id: hrp-awareness-training
+    doc: hrp
+    control: infosec-program
+    stance: yes
+    text: "All employees complete security awareness training annually."
+  - id: hrp-discipline
+    doc: hrp
+    control: infosec-program
+    stance: yes
+    text: "A fair disciplinary process is used for employees suspected of violating security rules."
+  # ID.RA-08: analyzing and responding (the key's first quote covers receiving and acknowledging).
+  - id: vmp-findings-tracked
+    doc: vmp
+    control: vuln-disclosure
+    stance: yes
+    text: "All vulnerability findings must be reported and tracked to resolution."
+  - id: vmp-findings-prioritized
+    doc: vmp
+    control: vuln-disclosure
+    stance: yes
+    text: "Findings are prioritized by severity and by how easily they can be exploited."
 
 traps:
   - id: G1
@@ -71,8 +117,8 @@ outcomes:
   - {csf_id: ID.AM-01, control: asset-inventory}
   - {csf_id: ID.AM-02, control: asset-inventory}
   - {csf_id: ID.AM-03, control: data-flow-diagram}
-  - {csf_id: ID.AM-05, control: data-classification}
-  - {csf_id: ID.AM-08, control: media-sanitization}
+  - {csf_id: ID.AM-05, control: data-classification, label: partly_covered, missing: "criticality, resources and mission impact (only classification has evidence)"}
+  - {csf_id: ID.AM-08, control: media-sanitization, label: partly_covered, missing: "end-of-life for systems, software and services (only hardware disposal and data deletion have evidence)"}
   - {csf_id: ID.RA-01, control: pentest}
   - {csf_id: ID.RA-02, control: threat-intel-sources}
   - {csf_id: ID.RA-08, control: vuln-disclosure}
@@ -82,14 +128,14 @@ outcomes:
   - {csf_id: PR.AA-06, control: physical-access}
   - {csf_id: PR.DS-01, control: encryption-at-rest}
   - {csf_id: PR.DS-02, control: encryption-in-transit}
-  - {csf_id: PR.DS-11, control: backups}
+  - {csf_id: PR.DS-11, control: backups, label: partly_covered, missing: "protected and maintained (no line on backup protection, retention or integrity); restore-test frequency differs between the documents"}
   - {csf_id: PR.PS-01, control: build-release}
   - {csf_id: PR.PS-02, control: patch-sla}
   - {csf_id: PR.PS-04, control: central-logging}
   - {csf_id: PR.PS-06, control: sast}
-  - {csf_id: PR.IR-03, control: rto-rpo}
+  - {csf_id: PR.IR-03, control: rto-rpo, label: partly_covered, missing: "normal situations, and requirements achieved (only the RTO and RPO targets have evidence, no test shows them met)"}
   - {csf_id: PR.IR-04, control: uptime-sla}
-  - {csf_id: DE.CM-09, control: vuln-scanning}
+  - {csf_id: DE.CM-09, control: activity-monitoring}
   - {csf_id: DE.AE-06, control: alerting}
   - {csf_id: DE.AE-07, control: threat-intel-analysis}
   - {csf_id: RS.MA-01, control: ir-plan}

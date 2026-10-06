@@ -90,7 +90,7 @@ def test_trap_coverage_is_measured_where_a_planned_only_sentence_is_the_only_men
     DE.AE-07, whose controls no other statement speaks to."""
     pack = gap.load()
     traps = gap.trap_outcomes(pack)
-    assert traps == ["ID.RA-02", "PR.IR-04", "DE.AE-07", "RS.MA-01", "RS.CO-02"]
+    assert traps == ["ID.RA-02", "PR.IR-04", "DE.AE-07", "RS.MA-01"]
     planned = {s for t in pack.facts.traps if t.kind == "planned_only" for s in t.statements}
     for code in ("ID.RA-02", "DE.AE-07"):
         assert {s.id for s in pack.facts.statements_for(pack.control[code])} <= planned

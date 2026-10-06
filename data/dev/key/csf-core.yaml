@@ -9,6 +9,12 @@ items:
   - doc: isp
     quote: Kestrelyn maintains a documented information security program that is approved by the CEO.
     stance: 'yes'
+  - doc: hrp
+    quote: All employees complete security awareness training annually.
+    stance: 'yes'
+  - doc: hrp
+    quote: A fair disciplinary process is used for employees suspected of violating security rules.
+    stance: 'yes'
   conflict_trap: null
   scope_note_expected: false
   honest_negative: false
@@ -66,8 +72,8 @@ items:
   - M11
   fills: []
 - code: ID.AM-05
-  expected_label: verified
-  expected_value: 'Yes'
+  expected_label: partial
+  expected_value: Partial
   must_ask: false
   evidence:
   - doc: dcp
@@ -79,8 +85,8 @@ items:
   traps: []
   fills: []
 - code: ID.AM-08
-  expected_label: verified
-  expected_value: 'Yes'
+  expected_label: partial
+  expected_value: Partial
   must_ask: false
   evidence:
   - doc: amp
@@ -132,6 +138,12 @@ items:
   - doc: faq
     quote: Security researchers can report vulnerabilities to vulnerability-reports@kestrelyn.example, and Kestrelyn acknowledges
       each report within two business days.
+    stance: 'yes'
+  - doc: vmp
+    quote: All vulnerability findings must be reported and tracked to resolution.
+    stance: 'yes'
+  - doc: vmp
+    quote: Findings are prioritized by severity and by how easily they can be exploited.
     stance: 'yes'
   conflict_trap: null
   scope_note_expected: false
@@ -241,8 +253,8 @@ items:
   traps: []
   fills: []
 - code: PR.DS-11
-  expected_label: verified
-  expected_value: 'Yes'
+  expected_label: partial
+  expected_value: Partial
   must_ask: false
   evidence:
   - doc: bcpol
@@ -309,8 +321,8 @@ items:
   traps: []
   fills: []
 - code: PR.IR-03
-  expected_label: verified
-  expected_value: 'Yes'
+  expected_label: partial
+  expected_value: Partial
   must_ask: false
   evidence:
   - doc: bcp
@@ -337,8 +349,15 @@ items:
   expected_value: 'Yes'
   must_ask: false
   evidence:
-  - doc: vmp
-    quote: Authenticated vulnerability scans of all production hosts and container images run weekly.
+  - doc: lmp
+    quote: Kestrelyn shall audit and monitor the access and activity of systems and applications that process or store production
+      and sensitive data
+    stance: 'yes'
+  - doc: lmp
+    quote: 'Kestrelyn shall audit access and activity to detect, report, and guard against:'
+    stance: 'yes'
+  - doc: lmp
+    quote: All critical computing systems and software must enable audit logging.
     stance: 'yes'
   conflict_trap: null
   scope_note_expected: false
@@ -414,6 +433,9 @@ items:
   - doc: irp
     quote: Affected customers are notified within 48 hours of a confirmed breach.
     stance: 'yes'
+  - doc: bcp
+    quote: 'Role: Communications Lead; Responsibility: Keeps employees and customers informed'
+    stance: partial
   conflict_trap: null
   scope_note_expected: false
   honest_negative: false
