@@ -30,7 +30,7 @@ run automatically on every change to the code):
 - On the dev pack (the sample company used while building and tuning), the share of labels that match the answer key
   stays above a gate (a threshold that fails the build when it is missed).
 - No instruction hidden in a document is followed.
-The holdout pack is a second company written after the engine was frozen, so nothing could be tuned on it; its
+The holdout pack is a second company authored in parallel and first run after the engine was frozen, so nothing could be tuned on it; its
 results are reported, not tuned.
 
 ## Out of scope
