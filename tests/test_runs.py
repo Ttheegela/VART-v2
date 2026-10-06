@@ -4,6 +4,8 @@ from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
+import httpx
+import openai
 import pytest
 from sqlalchemy import Engine, func, select, text
 from sqlalchemy.orm import Session
@@ -400,3 +402,47 @@ def test_a_failed_answer_write_keeps_the_cost_already_spent(
     monkeypatch.setattr(runs, "_write", real)
     s.refresh(run)
     assert run.cost_usd == Decimal("0.0200")
+
+
+def _api_error(status: int) -> LLMError:
+    """The client's real shape: an LLMError raised from an openai.APIStatusError."""
+    err = LLMError(f"stance: {status}")
+    err.__cause__ = openai.APIStatusError(
+        "boom", response=httpx.Response(status, request=httpx.Request("POST", "http://x")), body=None
+    )
+    return err
+
+
+@pytest.mark.parametrize(("status", "calls"), [(401, 1), (408, 2), (429, 2), (503, 2)])
+def test_retry_follows_the_real_status_error(s: Session, status: int, calls: int) -> None:
+    ws, q = _questionnaire(s, n=1)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    llm = ByStepLLM({"stance": _api_error(status)})
+    runs.step(s, ws.id, run.id, llm, MODELS)
+    assert len(llm.requests) == calls
+
+
+def test_a_rate_limit_is_not_retried_past_the_deadline(s: Session) -> None:
+    ws, q = _questionnaire(s, n=1)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    llm = ByStepLLM({"stance": _api_error(429)})
+    ticks = iter([0.0, 0.0, runs.DEADLINE_S + 1, runs.DEADLINE_S + 1])
+    runs.step(s, ws.id, run.id, llm, MODELS, clock=lambda: next(ticks))
+    assert len(llm.requests) == 1
+
+
+def test_an_early_error_releases_the_unstarted_items(s: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    ws, q = _questionnaire(s, n=3)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    real = Session.get_one
+
+    def boom(self, entity, ident, *a, **k):  # type: ignore[no-untyped-def]
+        if entity is runs.Item:
+            raise RuntimeError("lost the item")
+        return real(self, entity, ident, *a, **k)
+
+    monkeypatch.setattr(Session, "get_one", boom)
+    with pytest.raises(RuntimeError):
+        runs.step(s, ws.id, run.id, _llm(), MODELS)
+    # the item that failed stays claimed (attempt counted); the other two go back
+    assert sorted(s.scalars(select(RunItem.state))) == ["claimed", "pending", "pending"]

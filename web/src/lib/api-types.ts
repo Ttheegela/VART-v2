@@ -161,7 +161,8 @@ export interface paths {
   "/api/runs/{run_id}/approve-verified": {
     /**
      * Approve Verified
-     * @description Approve every verified answer not yet approved (design key A).
+     * @description Approve every verified answer not yet approved (design key A). An edited answer is left for a look
+     * (adversary-1 M5): approve it by itself.
      */
     post: operations["approve_verified_api_runs__run_id__approve_verified_post"];
   };
@@ -186,9 +187,10 @@ export interface paths {
     /**
      * Step Run
      * @description Claim up to 4 pending items, answer them, write one answer each. Call again while status is
-     * `running`. 429 with Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the
-     * spender) or a model budget (workspace hour, global hour, global day) is used up; the sentence names which.
-     * 503 when model calls are off.
+     * `running` (a step may answer nothing while another step holds the rest: wait a moment first). 429 with
+     * Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the spender) or a model
+     * budget (workspace hour, global hour, global day) is used up; the sentence names which. 503 when model
+     * calls are off.
      */
     post: operations["step_run_api_runs__run_id__step_post"];
   };
@@ -2120,7 +2122,8 @@ export interface operations {
   };
   /**
    * Approve Verified
-   * @description Approve every verified answer not yet approved (design key A).
+   * @description Approve every verified answer not yet approved (design key A). An edited answer is left for a look
+   * (adversary-1 M5): approve it by itself.
    */
   approve_verified_api_runs__run_id__approve_verified_post: {
     parameters: {
@@ -2290,9 +2293,10 @@ export interface operations {
   /**
    * Step Run
    * @description Claim up to 4 pending items, answer them, write one answer each. Call again while status is
-   * `running`. 429 with Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the
-   * spender) or a model budget (workspace hour, global hour, global day) is used up; the sentence names which.
-   * 503 when model calls are off.
+   * `running` (a step may answer nothing while another step holds the rest: wait a moment first). 429 with
+   * Retry-After when the network (`llm`, 400 model calls an hour, counted per call by the spender) or a model
+   * budget (workspace hour, global hour, global day) is used up; the sentence names which. 503 when model
+   * calls are off.
    */
   step_run_api_runs__run_id__step_post: {
     parameters: {

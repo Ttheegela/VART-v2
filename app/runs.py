@@ -132,9 +132,10 @@ def _release(session: Session, run_id: uuid.UUID, item_ids: list[uuid.UUID]) -> 
 
 def _retryable(exc: LLMError) -> bool:
     """Transport errors, 5xx and a reply that fails the schema repeat rarely; a 4xx (bad key, no credit, bad
-    request) repeats every time and would spend a second unit of budget for nothing."""
+    request) repeats every time and would spend a second unit of budget for nothing. A timeout (408) or a
+    rate limit (429) passes."""
     status = getattr(exc.__cause__, "status_code", None)
-    return not (isinstance(status, int) and 400 <= status < 500)
+    return not (isinstance(status, int) and 400 <= status < 500 and status not in (408, 429))
 
 
 def _answer(
@@ -144,15 +145,17 @@ def _answer(
     llm: LLMClient,
     models: Mapping[str, str],
     spend: Spend,
+    can_retry: Callable[[], bool] = lambda: True,
 ) -> ItemResult:
     """One item, retried once on a failed model call (a malformed reply rarely repeats). Never retries a
-    missing recording or a refused budget. Plan 6B branches here on the questionnaire's source."""
+    missing recording or a refused budget, nor once `can_retry` says the step's deadline has passed.
+    Plan 6B branches here on the questionnaire's source."""
     try:
         return answer_item(session, workspace_id, item, llm, models, spend)
     except (ReplayMiss, BudgetExhausted):
         raise
     except LLMError as exc:
-        if not _retryable(exc):
+        if not _retryable(exc) or not can_retry():
             raise
         session.rollback()
         return answer_item(session, workspace_id, item, llm, models, spend)
@@ -263,10 +266,12 @@ def step(
             _write(session, workspace_id, run_id, item_id, FAILED, 0.0)
             answered.append(item_id)
             continue
-        row = session.get_one(Item, item_id)
-        item = ItemInput(str(row.id), row.question, row.topic)
         try:
-            values = _values(_answer(session, workspace_id, item, meter, models, spend))
+            row = session.get_one(Item, item_id)
+            item = ItemInput(str(row.id), row.question, row.topic)
+            values = _values(
+                _answer(session, workspace_id, item, meter, models, spend, lambda: clock() <= deadline)
+            )
         except (BudgetExhausted, ReplayMiss) as exc:
             session.rollback()
             refused: BudgetExhausted | None = None
