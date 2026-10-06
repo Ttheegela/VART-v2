@@ -30,7 +30,7 @@
 - Backend chain, green before every commit: `ruff check . && ruff format --check . && mypy app scripts datakit evals && pytest -q && alembic check && python -m datakit.validate all` (with `export TEST_DATABASE_URL=postgresql+psycopg://vart:vart@localhost:5434/vart_test_csf && export DATABASE_URL=$TEST_DATABASE_URL`). Never run `docker compose` from a worktree.
 - Tests never touch the network or a real key (pytest-socket); model calls go through `tests/fakes.py`'s `FakeLLM`. The NIST download (Task 1) and the recording run (Task 7) are lead-run commands, never tests.
 - "The app never fetches it." (CSF spec 4) `data/csf/csf-2.0.json` is read from disk; nothing in it is executed (CSF spec 9).
-- "What the visitor sees as 'the framework' is always NIST's verbatim `outcome` text. Only `question` and `tier` are VART's." (CSF spec 4)
+- "What the visitor sees as 'the framework' is always NIST's verbatim `outcome` text. Only `tier`, `question` and `parts` are VART's." (Task 8 amended spec 4: `parts` is the outcome cut by a fixed rule.) (CSF spec 4)
 - "Refreshing the file is a deliberate change with a new `retrieved` date, a re-run of the eval and a change-log line." (CSF spec 4) The change log is the comment block at the top of `data/csf/tiers.yaml`.
 - Decide does not change (CSF spec 5.3): gap labels are computed from `Decision.label` and `Decision.value` only. `app/decide.py`, `app/text.py`, `app/patterns.py`, `app/contracts.py` and the signatures in `docs/CONTRACTS.md` are not edited by any task; no frozen signature needs to change. Adding a new row for `app/csf.py` to `docs/CONTRACTS.md` (Task 7) needs the lead's OK and a change-log line (CLAUDE.md rule 10).
 - Engine code spends the budget before every model call and holds no database transaction across one (CLAUDE.md rule 11): `check_outcome` reaches a model only through `answer_retrieved`, once per part (`check_parts`), with each part's draft refused before anything is spent (Task 8); Ask-me and not-checked outcomes make no model call (CSF spec 5.4-5.5).
@@ -1177,15 +1177,18 @@ def test_the_gap_stage_passes_on_the_dev_pack() -> None:
 
 def test_the_key_plants_what_the_spec_asks() -> None:
     labels = _labels()
-    assert len(labels) == 29 and set(labels) == {o.id for o in gap.checked()}
+    assert len(labels) == 31 and set(labels) == {o.id for o in gap.checked()}
     by_label: dict[str | None, set[str]] = {}
     for code, label in labels.items():
         by_label.setdefault(label, set()).add(code)
     assert by_label["documents_disagree"] == {"PR.AA-05", "DE.AE-06"}
     assert by_label["not_met"] == {"ID.RA-02", "DE.AE-07"}
     assert by_label["gap"] == {"ID.AM-03", "PR.AA-06", "PR.IR-04"}
-    assert by_label["partly_covered"] == {"PR.AA-03", "RS.MA-01", "RS.CO-02"}
-    assert Counter(labels.values())["covered"] == 17
+    assert by_label["partly_covered"] == {
+        "PR.AA-03", "RS.MA-01", "RS.CO-02", "PR.DS-02", "PR.DS-11", "PR.IR-03",
+        "ID.AM-05", "ID.AM-08", "GV.PO-02", "PR.AA-01", "PR.PS-02", "PR.PS-06",
+    }  # final key (Task 7, judges 1 and 2); the tests/datakit/test_gap.py copy is the live one
+    assert Counter(labels.values())["covered"] == 12
 
 
 def test_trap_outcomes_are_never_expected_covered() -> None:

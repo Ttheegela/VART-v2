@@ -19,6 +19,7 @@ the change log at the end, and a re-recording of the evals when a prompt or a la
 | draft | `app/draft.py` (2A) | `PROMPT_VERSION = "draft@p2"`; `plain_name(filename: str) -> str`; `user_prompt(item: ItemInput, decision: Decision) -> str`; `check(text, decision, documents) -> list[str]`; `template_answer(decision) -> str`; `write_draft(llm, item, decision, model, spend, documents) -> Draft` | yes |
 | pipeline | `app/pipeline.py` (2A) | `answer_item(session, workspace_id, item, llm, models, spend) -> ItemResult`; `answer_retrieved(session, workspace_id, item, retrieval, llm, models, spend) -> ItemResult` (answer_item after its retrieval); raises `BudgetExhausted` when `spend("stance")` is refused | via stance, draft |
 | interview | `app/interview.py` (2A) | `high_weight(topic) -> bool`; `plan_queue(items) -> list[QueueEntry]`; `follow_up(question, answer) -> str or None`; `recheck(session, workspace_id, statement_id, topic, items, llm, model, spend) -> list[Suggestion]` | recheck only |
+| csf | `app/csf.py` (6A) | `framework() -> Framework`; `in_scope(scope) -> tuple[Outcome, ...]`; `item_input(o) -> ItemInput`; `gap_label(o, label, value=None, statement_id=None) -> GapLabel or None`; `questionnaire_for(session, workspace_id, scope) -> Questionnaire`; `part_inputs(o) -> tuple[ItemInput, ...]`; `evidence(session, workspace_id, item) -> Retrieval`; `check_parts(session, workspace_id, o, llm, models, spend) -> list[ItemResult]`; `part_label(r) -> PartLabel`; `combine(labels) -> PartLabel`; `explain(o, parts) -> str`; `aggregate(o, parts) -> ItemResult`; `check_outcome(session, workspace_id, o, llm, models, spend) -> ItemResult or None`; `ask_queue(outcomes, asked) -> list[QueueEntry]` | via answer_retrieved (stance only; a part's draft is never written) |
 | budget | `app/services/llm_budget.py` | `spender(session, workspace_id) -> Spend` | no |
 
 ## Rules every unit keeps
@@ -71,3 +72,6 @@ example `stances jsonb`); the passages are rebuilt from those chunks with the do
   `DropReason` gains `"statement"`; `app.pipeline.answer_retrieved` is added (`answer_item` is now retrieve plus
   `answer_retrieved`, behaviour and signature unchanged); `app.csf.check_outcome` drops statement passages before
   stance. No prompt changes; no questionnaire label can change, so no re-recording.
+- 2026-10-06: csf unit added (Plan 6A, lead's OK under rule 10): framework, built-in questionnaire, per-part checks
+  (`check_parts`, `part_label`, `combine`, `explain`, `aggregate`) and `ask_queue`. No existing signature changed
+  beyond the Ruling 9 entry above.

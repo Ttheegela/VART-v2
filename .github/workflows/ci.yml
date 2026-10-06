@@ -46,6 +46,7 @@ jobs:
       - run: pytest -q
       - run: pytest -q tests/test_decide.py tests/test_decide_properties.py --cov=app.decide --cov-branch --cov-fail-under=100
       - run: python -m evals.run --pack dev
+      - run: python -m evals.run --pack gap-dev
       - run: git diff --exit-code evals/results
       - run: alembic check
       - run: python scripts/export_openapi.py && git diff --exit-code openapi.json

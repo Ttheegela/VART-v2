@@ -63,6 +63,10 @@ One entry per CSF 2.0 outcome (subcategory):
 | `parts` | `["Are backups of data created?", "Are backups of data protected?", ...]`: the outcome cut by the rule below, as yes/no questions in NIST's order (Checked tier only, at least one) | VART |
 | `csf_version`, `retrieved` | `2.0`, the download date | VART |
 
+Sync (Plan 6A, Task 7): the version, the date and the source are stored once at the top of the file, not on every
+entry. The controls are SP 800-53 Rev 5.2.0. `source_url` is the Reference Tool page (NIST has no page per outcome).
+The tier change log is the comment block at the top of `data/csf/tiers.yaml`.
+
 Rules:
 - What the visitor sees as "the framework" is always NIST's verbatim `outcome` text. Only `tier`, `question` and
   `parts` are VART's.
@@ -93,7 +97,9 @@ Rules:
   differs, or if a control ID is not a valid SP 800-53 rev5 identifier.
 - Refreshing the file is a deliberate change with a new `retrieved` date, a re-run of the eval and a change-log line.
 
-**v1 tiers (the exact IDs are fixed in the plan's first task, from the downloaded file, for Tarun's review):**
+**v1 tiers (the exact IDs are fixed in the plan's first task, from the downloaded file, for Tarun's review).**
+Sync: the approved list is 31 Checked, 5 Ask me and 70 not checked (Tarun added RS.AN-03 and RS.MI-01 at the tier
+gate on 2026-10-05); the "about" counts below are the first draft.
 - **Checked (about 30):** outcomes a vendor's policies and records state directly — Protect: identity, authentication
   and access control; data security; platform security; technology infrastructure resilience. Detect: continuous
   monitoring and adverse event analysis. Respond: incident management, analysis, reporting and mitigation. Recover:
@@ -197,6 +203,9 @@ Replace step 3 with:
      p90, inside the step's 240 s deadline (spec 6.3). An outcome with more than 8 parts would be claimed alone; no
      v1 outcome has more than 5.
 
+Sync (Plan 6A, Task 7), 5.3: `na` shows no label. A Checked outcome the visitor confirms shows **Confirmed by you**.
+Sync, 5.4: *Questions for you* holds Ask-me outcomes only.
+
 ## 6. Data model
 
 The schema already fits: runs belong to a questionnaire, and `items.csf_id` exists.
@@ -268,6 +277,14 @@ mentions the control.
 | Retrieval | `retrieval_recall_at_8` keeps its name and now measures the key quotes found in the union of the parts' passages: reported |
 | Part agreement | over the outcomes whose key names `missing_parts`, the share where the engine left every missing part Gap or Partly covered and did not leave all the other parts Gap: reported, not a gate. It is degenerate for a one-part override, where any Gap or Partly covered on that part counts as agreement. |
 
+Sync (Plan 6A, Task 7): the gap extension is `data/dev/gap/` (facts and documents; `python -m datakit.gap dev`),
+with the planted cases above, and the gate names are those of `GATES` in `evals/gap.py`. Cost and seconds per core
+run are reported.
+
+**Label accuracy is reported, below target (Tarun, 2026-10-06).** The per-part baseline is 0.7097 (22 of 31), under
+the 0.80 above. It is accepted and reported, not gating, until a later plan improves stance: `gap-dev.md` keeps the
+0.80 target in the table and marks it "reported: below target, accepted 2026-10-06". Every other gate gates.
+
 Every gate fails closed when it has nothing to measure. CI replays recorded model outputs; recording uses the capped
 eval key.
 
@@ -309,3 +326,6 @@ first baseline.
   unchanged. gap-dev is re-recorded. The key adopts blind judge 2's changes and its per-part re-judge: PR.DS-11 and
   PR.DS-02 are Partly covered, and the key holds 12 Covered, 12 Partly covered, 2 Not met, 2 Documents disagree and 3
   Gap.
+- 2026-10-06: Plan 6A Task 7 sync, no new behaviour. Section 4 (file header, Rev 5.2.0, `source_url`, change log), the
+  tiers (31 / 5 / 70), 5.3 (`na`, Confirmed by you), 5.4 and section 8 (gap extension, gate names, cost and seconds).
+  Section 8: label accuracy is reported below target (0.7097 against 0.80, accepted by Tarun), not gating.

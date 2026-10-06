@@ -1,6 +1,6 @@
 # VART v2 — Progress Log
 
-_Last updated: 2026-10-05 · Branch: `main` (origin: https://github.com/Ttheegela/VART-v2, public) · Live: https://vart-v2.vercel.app_
+_Last updated: 2026-10-06 · Branch: `main` (origin: https://github.com/Ttheegela/VART-v2, public) · Live: https://vart-v2.vercel.app_
 
 ## At a glance
 | Plan | Status | Notes |
@@ -8,6 +8,7 @@ _Last updated: 2026-10-05 · Branch: `main` (origin: https://github.com/Ttheegel
 | 1A Foundation | done, live 2026-10-04 | schema, workspaces, LLM client, health + canary, React shell, CI, gates |
 | 1B Dev data | done | fact sheet, questionnaires, documents, keys |
 | 2 Engine and evals | done, live 2026-10-05 | engine, ingest, evals; baseline label accuracy 0.9213, recall@8 0.9738, cost $0.0361 per 60 items |
+| 6A CSF gap check, backend and evals | done on branch `spec-csf-gap`, not merged | gap-dev baseline: label accuracy 0.7097 (22 of 31; reported, below the 0.80 target, accepted 2026-10-06), 8 other gates pass; 6B (view, export, README, E2E) after Plan 3 |
 | 3 API and UI | not started | |
 | 4 Hardening and launch | not started | |
 | 5 Google Drive | not started | |
@@ -81,6 +82,50 @@ plan's "Execution notes").
 | 2026-10-05 | `ops/setup.sh migrate` brings production to alembic head before `main` moves, because Vercel's Git integration deploys `main` at once (spec 10) |
 | 2026-10-05 | Tarun: a Jev (TypeSafe) spike runs after the Plan 2 baseline: a throwaway sentence-selection stance measured against the current one, with no contract change and no merge; its output is a recommendation |
 | 2026-10-05 | Tarun approved the CSF 2.0 gap check design and Plan 6A (backend and evals), on branch `spec-csf-gap` |
+| 2026-10-06 | Tarun chose option A for the CSF gap check: every Checked outcome is cut into NIST parts by a fixed rule, each part is a question run through the unchanged pipeline, and code combines the parts' labels (CSF spec 5.2-5.3, amended) |
+| 2026-10-06 | The gap-dev key is judged blind: a judge sees NIST's text, the dev documents and the fact sheet, never engine output, and the key is derived in code from that, never hand-edited or run through the engine's combination (CSF spec 8) |
+| 2026-10-06 | Tarun accepted and reported the per-part baseline: label accuracy 0.7097 (22 of 31) against the spec's 0.80, after two judged key rounds and one per-part tuning round |
+| 2026-10-06 | `label_accuracy` in gap-dev is reported, not gating, with its 0.80 target kept in the table and marked "reported: below target, accepted 2026-10-06", until a later plan improves stance; every other gate gates |
+
+## 6A baseline (gap-dev, 2026-10-06)
+Per-part design, replayed from the recording with no key. Gates: 8/8 gating pass; `label_accuracy` 0.7097 is reported
+below its 0.80 target.
+
+| Reported | Value |
+|---|---|
+| cost per core run | $0.0378 |
+| seconds per core run | 790 |
+| retrieval_recall_at_8 | 0.75 |
+| part_agreement | 0.78 |
+
+The 9 label misses of 31 Checked outcomes, each with its cause (from `gap-parts-1-diagnosis`):
+- DE.CM-09, expected Covered, got Partly: stance; the data part reads lmp:13's "critical" as a stated limit.
+- GV.PO-01, Covered, got Partly: retrieval; the "established" and "enforced" parts miss the key lines (NIST's own words
+  rarely appear in company documents).
+- ID.RA-08, Covered, got Partly: retrieval; the key's prioritized and tracked line is not reached by the "receiving"
+  part.
+- PR.DS-01, Covered, got Partly: retrieval; the integrity part never reaches "improper alteration or loss".
+- PR.IR-03, Partly, got Covered: stance; the pair "normal and adverse situations" stays in one part, and RTO/RPO lines
+  read as yes.
+- PR.PS-01, Covered, got Gap: retrieval; the CI/CD line (sdp:17) is in neither part's top 8 after the NIST-literal cut.
+- RC.RP-01, Covered, got Gap: stance; "once initiated from the incident response process" is a qualifier no single
+  passage states.
+- RS.CO-02, Partly, got Documents disagree: stance; a draft line is judged "no" against a final "yes".
+- RS.MA-01, Partly, got Gap: stance; the plan line lacks the "third parties" qualifier, and one part carries both
+  qualifiers.
+
+Six misses are retrieval and five are stance (one is both in effect); combine and the key caused none.
+
+## 6B carry-over
+From Ruling 18 (per-part design):
+- (a) Persist per-part results, so an outcome refused by the budget resumes without paying twice.
+- (b) The runner claims csf items until their parts sum to at most 8 per step.
+- (c) A per-part re-check: an accepted suggestion replaces that part before `combine`.
+- (d) The inspector shows each part's status (and a draft-only quote's document status).
+- Stance improvement: raise `label_accuracy` to its 0.80 target (qualifier and stated-limit reads; part retrieval
+  vocabulary), then make it gating again.
+- Also: `app.csf.evidence` drops statements after the top-8 cut, so filter before the cut when 6B touches retrieval;
+  Plan 3's questionnaire cap must exclude source `csf` (adversary-3 I4).
 
 ## How to run
 See `CLAUDE.md` (commands) and `README.md`.

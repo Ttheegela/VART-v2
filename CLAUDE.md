@@ -41,8 +41,11 @@ Progress and the decisions table: `docs/PROGRESS.md`. The detailed per-task ledg
 - Engine (Plan 2): `app/contracts.py` (frozen unit types; signatures in `docs/CONTRACTS.md`), `app/patterns.py`,
   `app/ingest/` (parse, pdf, store), `app/redact.py`, `app/classify.py`, `app/chunk.py`, `app/retrieve.py`,
   `app/stance.py`, `app/decide.py`, `app/draft.py`, `app/grounding.py`, `app/pipeline.py` (`answer_item`),
-  `app/interview.py`.
-- `evals/`: `run.py` (harness), `score.py` (metrics, gates), `bench.py` (model bench), `recorded/` (replayed model
+  `app/interview.py`, `app/csf.py` (CSF 2.0 gap check: framework, built-in questionnaire, per-part checks,
+  gap labels).
+- `data/csf/` NIST CSF 2.0 extract, `tiers.yaml`, built `csf-2.0.json` (`python -m datakit.csf build`);
+  `data/dev/gap/` the gap check's fact-sheet extension (`python -m datakit.gap dev`).
+- `evals/`: `run.py` (harness), `gap.py` (the `gap-dev` pack), `score.py` (metrics, gates), `bench.py` (model bench), `recorded/` (replayed model
   outputs), `results/` (committed results; CI fails on drift).
 
 ## Commands
@@ -53,7 +56,8 @@ Progress and the decisions table: `docs/PROGRESS.md`. The detailed per-task ledg
 - Frontend: `cd web && npm run lint && npm test && npm run build`
 - Gates: `python scripts/check_monochrome.py` (the sponsor check is CI-only: it needs the secret)
 - Dev data: `python -m datakit.validate all` (stages: facts, docs, questionnaires, keys, mapper)
-- Evals, no network: `python -m evals.run --pack dev`. Recording (`--mode record|live`) and `python -m evals.bench`
+- Evals, no network: `python -m evals.run --pack dev` and `python -m evals.run --pack gap-dev` (label_accuracy is
+  reported there, not gating). Recording (`--mode record|live`) and `python -m evals.bench`
   use the eval key, never the production key. The lead, or an agent it names, runs them without asking Tarun, never
   prints the key, and asks before spending past its $5 cap:
   `(set -a; . ~/.config/vart/eval.env; set +a; OPENROUTER_API_KEY="$VART_EVAL_OPENROUTER_API_KEY" python -m evals.run --pack dev --mode record)`
