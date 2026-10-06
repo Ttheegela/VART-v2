@@ -538,13 +538,12 @@ def step(
     only before DEADLINE_S (`clock`); the step answers by HARD_S in real time. Then, on this thread in
     questionnaire order: write every answer that came back (one row per item; a duplicate write does nothing),
     count every paid call, give back the items that met a refusal, a missing recording or the deadline
-    (attempt refunded), and those that met an outage or were late (attempt kept). When nothing was answered
-    and more than one job met the outage, it is the provider's, not the items': their attempts are refunded
-    too (adversary-1 I3); a late job's stays. An item whose write fails stays claimed with its attempt and
-    cost counted, and the others are still settled. Raises, after the writes: ReplayMiss, then a
-    `llm_budget.Refused` naming the cap, then an unexpected error (its item stays claimed), then
-    ModelsUnavailable when nothing was answered. Returns the item ids answered. `network` is
-    `errors.network(request)`: each spender counts each call for it."""
+    (attempt refunded), and those that met an outage or were late (attempt kept). When nothing was answered,
+    only the first item that met the outage keeps its attempt and the others are refunded (Ruling 5); a late
+    job's stays. An item whose write fails stays claimed with its attempt and cost counted, and the others are
+    still settled. Raises, after the writes: ReplayMiss, then a `llm_budget.Refused` naming the cap, then an
+    unexpected error (its item stays claimed), then ModelsUnavailable when nothing was answered. Returns the
+    item ids answered. `network` is `errors.network(request)`: each spender counts each call for it."""
     run = _run(session, workspace_id, run_id)
     if run.status != "running":
         return []
@@ -607,8 +606,7 @@ def step(
 
     answered: list[uuid.UUID] = []
     give_back: list[uuid.UUID] = []
-    down: list[uuid.UUID] = []  # met an outage: the attempt stays unless the outage was the whole step's
-    hits = 0  # jobs that met an outage
+    down: list[uuid.UUID] = []  # met an outage, in questionnaire order
     late: list[uuid.UUID] = []  # still running at HARD_S: the attempt stays
     replay: ReplayMiss | None = None
     refused: BudgetExhausted | None = None
@@ -648,7 +646,6 @@ def step(
                 late.append(item_id)
             elif isinstance(err, LLMError) and _provider_down(err):
                 down.append(item_id)
-                hits += sum(isinstance(e, LLMError) and _provider_down(e) for e in errors)
             elif isinstance(err, _DeadlineCut):
                 give_back.append(item_id)  # the deadline cut the retry: not tried twice, so not failed
             elif isinstance(err, (LLMError, SQLAlchemyError)):
@@ -666,11 +663,13 @@ def step(
             session.commit()
             crashed = crashed or exc
     _release(session, run_id, give_back)
-    # Every started job met the provider, and more than one did: an outage, not these items, so a few minutes
-    # of it never walk a step's items to MAX_ATTEMPTS (adversary-1 I3). Otherwise the attempt stays: an item
-    # the others survive, or one met alone step after step, still ends FAILED (adversary-3 N1). ponytail: two
-    # or more items the provider always fails, met only by each other, loop until the run is re-run.
-    _release(session, run_id, down, refund=not answered and hits > 1)
+    # Something was answered: the outage was selective, so each item that met it keeps its attempt
+    # (adversary-3 N1). Nothing was answered: only the first item that met it keeps its attempt and the rest
+    # are refunded (Ruling 5, preflight I1), so a true outage costs at most one attempt a step and items the
+    # provider always fails still end FAILED, one by one, even when they are all that is left.
+    first = down[:1] if not answered else down
+    _release(session, run_id, first, refund=False)
+    _release(session, run_id, down[len(first) :])
     _release(session, run_id, late, refund=False)
     if replay is not None:
         raise replay

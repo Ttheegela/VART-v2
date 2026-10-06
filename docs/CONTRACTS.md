@@ -240,10 +240,10 @@ change-log line; changing or removing a path, a field or a status needs the lead
   questionnaire order: items that ran beside a refused, outage-hit or missing-recording item are written, not
   given back (they were paid), and an item whose write fails stays claimed while the others are still written.
   After the writes it raises ReplayMiss, then a refused budget, then an unexpected error, then the 503 when
-  nothing was answered. An item that met an outage keeps its attempt only when the outage was selective (something
-  else was answered, or it was the only job to meet it); when every started job met it and more than one did, the
-  attempts are refunded (adversary-1 I3). A 429 is retried once after a short pause (Retry-After, at most 2 s,
-  else 1 s). Whether the deadline cut a retry is decided when the retry is refused, not at settlement. A failed
+  nothing was answered. When something else was answered, each item that met an outage keeps its attempt; when
+  nothing was, only the first item that met it keeps its attempt and the others are refunded (Ruling 5), so a true
+  outage costs at most one attempt a step and items the provider always fails still end Failed. A 429 is retried
+  once after a short pause (Retry-After, at most 2 s, else 1 s). Whether the deadline cut a retry is decided when the retry is refused, not at settlement. A failed
   outcome now pays for each of its parts, since they run at once. A step answers by 270 s whatever the provider
   does; a job still running then goes back with its attempt counted, its cost is not added to the run, and a part
   it stores later lands on no row (the write is guarded by the step's claim).

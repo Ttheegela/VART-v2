@@ -419,8 +419,8 @@ def _api_error(status: int) -> LLMError:
 @pytest.mark.parametrize(("status", "calls"), [(401, 1), (402, 1), (408, 2), (429, 2), (503, 2)])
 def test_a_provider_outage_writes_no_failed_answers(s: Session, status: int, calls: int) -> None:
     # Adversary-3 I3: the items go back untried, the cost is kept, the route answers 503.
-    # Plan 4 Task 2: the three items run at once and each meets the outage; every started job met it, so it is
-    # the provider's, not the items': every attempt is refunded (adversary-1 I3)
+    # Plan 4 Task 2: the three items run at once and each meets the outage; nothing was answered, so only the
+    # first keeps its attempt (Ruling 5)
     ws, q = _questionnaire(s, n=3)
     run = runs.create_run(s, ws.id, q.id, MODELS)
     llm = ByStepLLM({"stance": _api_error(status)})
@@ -428,7 +428,11 @@ def test_a_provider_outage_writes_no_failed_answers(s: Session, status: int, cal
         runs.step(s, ws.id, run.id, llm, MODELS)
     assert len(llm.requests) == 3 * calls
     assert s.scalars(select(Answer)).all() == []
-    assert sorted(s.execute(select(RunItem.state, RunItem.attempts)).all()) == [("pending", 0)] * 3
+    assert sorted(s.execute(select(RunItem.state, RunItem.attempts)).all()) == [
+        ("pending", 0),
+        ("pending", 0),
+        ("pending", 1),
+    ]  # the first item that met it keeps its attempt
 
 
 @pytest.mark.parametrize("status", [400, 403])

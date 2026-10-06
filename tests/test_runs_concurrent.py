@@ -1,3 +1,4 @@
+import contextlib
 import json
 import threading
 import time
@@ -206,15 +207,48 @@ def test_an_outage_mid_step_writes_the_others_and_keeps_the_attempt_of_the_item_
     assert s.scalar(select(func.count()).where(Answer.text == runs.FAILED_TEXT)) == 0
 
 
-def test_an_outage_on_every_item_is_a_503_with_no_failed_answer_and_no_attempt_spent(s: Session) -> None:
-    # Adversary-1 I3: every started job met the provider, so it is the provider, not these items: a 3-minute
-    # outage must not walk a step's items to MAX_ATTEMPTS
+def test_an_outage_on_every_item_is_a_503_that_spends_one_attempt(s: Session) -> None:
+    # Adversary-1 I3, Ruling 5: a 3-minute outage must not walk a step's items to MAX_ATTEMPTS; only the first
+    # item that met it keeps its attempt
     ws, run = _questionnaire(s, 3)
     llm = Slow({"stance": _outage()})
     with pytest.raises(ModelsUnavailable):
         runs.step(s, ws.id, run.id, llm, MODELS)
     assert s.scalars(select(Answer)).all() == []
-    assert sorted(s.execute(select(RunItem.state, RunItem.attempts)).all()) == [("pending", 0)] * 3
+    first = s.execute(
+        select(RunItem.state, RunItem.attempts)
+        .join(Item, Item.id == RunItem.item_id)
+        .where(Item.position == 1)
+    ).one()
+    assert tuple(first) == ("pending", 1)
+    assert sorted(s.execute(select(RunItem.state, RunItem.attempts)).all()) == [
+        ("pending", 0),
+        ("pending", 0),
+        ("pending", 1),
+    ]
+
+
+def test_items_the_provider_always_fails_end_failed_even_when_they_are_all_that_is_left(s: Session) -> None:
+    # Ruling 5: two items that always meet an outage, alone at the end of a run, both end FAILED in a bounded
+    # number of steps (a refund for both would 503 forever)
+    ws, run = _questionnaire(s, 3)
+
+    class TwoAlwaysFail(ByStepLLM):
+        def complete(self, req: LLMRequest) -> LLMResult:
+            if "(item 2)" in req.user or "(item 3)" in req.user:
+                with self._lock:
+                    self.requests.append(req)
+                raise _status_error(408)
+            return super().complete(req)
+
+    llm = TwoAlwaysFail({"stance": STANCE, "draft": DRAFT})
+    for _ in range(2 * runs.MAX_ATTEMPTS + 1):  # 1 + 2 x MAX_ATTEMPTS steps is enough: 6 here, one spare
+        with contextlib.suppress(ModelsUnavailable):
+            runs.step(s, ws.id, run.id, llm, MODELS)
+    s.refresh(run)
+    assert run.status == "done"
+    texts = dict(s.execute(select(Item.position, Answer.text).join(Answer, Answer.item_id == Item.id)).all())
+    assert texts[1] != runs.FAILED_TEXT and texts[2] == texts[3] == runs.FAILED_TEXT
 
 
 @pytest.mark.parametrize(
