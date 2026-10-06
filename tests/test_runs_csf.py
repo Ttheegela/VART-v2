@@ -1,5 +1,6 @@
 import json
 from collections.abc import Iterator
+from datetime import UTC, date, datetime
 
 import pytest
 from sqlalchemy import Engine, delete, select, update
@@ -7,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from app import csf, runs
 from app.contracts import BudgetExhausted
-from app.db.models import Answer, Item, Run, RunItem
+from app.db.models import Answer, Item, Run, RunItem, SuggestedFill
+from app.ingest.store import store_statement
 from app.llm.client import LLMError, LLMRequest, LLMResult
 from app.services import llm_budget
 from tests import factories as f
@@ -175,3 +177,116 @@ def test_no_transaction_is_open_while_a_part_runs(s: Session) -> None:
     llm = Watching({"stance": YES})
     assert runs.step(s, ws.id, run.id, llm, MODELS) == [it.id]
     assert len(llm.requests) == 4
+
+
+def _done(s: Session):  # type: ignore[no-untyped-def]
+    ws, it, run = _backups(s)
+    runs.step(s, ws.id, run.id, ByStepLLM({"stance": YES}), MODELS)
+    return ws, it, run
+
+
+def _stale(s: Session, run_id: object, part: str) -> None:
+    """Make one stored part look judged on other passages (as before a new upload changed its retrieval)."""
+    ri = _parts_of(s, run_id)
+    ri.parts = {**ri.parts, part: {**ri.parts[part], "chunk_ids": []}}
+    s.commit()
+
+
+def test_check_again_with_nothing_changed_stays_done(s: Session) -> None:
+    ws, it, run = _done(s)
+    assert runs.reopen_changed(s, ws.id, run.id) == 0
+    s.refresh(run)
+    assert run.status == "done"
+    assert s.scalars(select(Answer).where(Answer.run_id == run.id)).one().label == "verified"
+
+
+def test_check_again_reruns_every_part_of_an_affected_outcome(s: Session) -> None:
+    ws, it, run = _done(s)
+    _stale(s, run.id, "3")  # one part's evidence changed: the whole outcome is affected (CSF spec 5.6)
+    assert runs.reopen_changed(s, ws.id, run.id) == 1
+    assert runs.reopen_changed(s, ws.id, run.id) == 0  # a second press re-opens nothing more
+    s.refresh(run)
+    ri = _parts_of(s, run.id)
+    assert (run.status, ri.state, ri.parts) == ("running", "pending", {})
+    assert s.scalar(select(Answer).where(Answer.run_id == run.id)) is None
+    llm = ByStepLLM({"stance": YES})
+    assert runs.step(s, ws.id, run.id, llm, MODELS) == [it.id]
+    assert [q.item_id for q in llm.requests] == [f"PR.DS-11#{n}" for n in (1, 2, 3, 4)]
+
+
+def test_check_again_reopens_a_failed_outcome_and_a_part_judged_by_another_model(s: Session) -> None:
+    ws, it, run = _done(s)
+    a = s.scalars(select(Answer).where(Answer.run_id == run.id)).one()
+    a.text = runs.FAILED_TEXT  # every part stored, the evidence unchanged, but the write failed (adv-1 M4)
+    s.commit()
+    assert runs.reopen_changed(s, ws.id, run.id) == 1
+    runs.step(s, ws.id, run.id, ByStepLLM({"stance": YES}), MODELS)
+    ri = _parts_of(s, run.id)
+    ri.parts = {**ri.parts, "2": {**ri.parts["2"], "model": "old/stance-model"}}  # adversary-1 M5
+    s.commit()
+    assert runs.reopen_changed(s, ws.id, run.id) == 1
+
+
+def test_check_again_keeps_the_visitors_outcomes_and_accepted_parts(s: Session) -> None:
+    ws, it, run = _done(s)
+    _stale(s, run.id, "3")
+    a = s.scalars(select(Answer).where(Answer.run_id == run.id)).one()
+    a.approved_at = datetime.now(UTC)
+    s.commit()
+    assert runs.reopen_changed(s, ws.id, run.id) == 0  # approved: the visitor's
+    a.approved_at = None
+    s.commit()
+    ri = _parts_of(s, run.id)
+    said = store_statement(s, ws.id, LINE, filename="answer-002.txt", today=date(2026, 10, 6))
+    ri.parts = {**ri.parts, "3": {**ri.parts["3"], "statement_id": str(said.id)}}  # filled from an answer
+    s.commit()
+    assert runs.reopen_changed(s, ws.id, run.id) == 0
+    filled = _parts_of(s, run.id).parts["3"]
+    _stale(s, run.id, "1")  # preflight I2: an outcome holding an accepted part is re-opened
+    assert runs.reopen_changed(s, ws.id, run.id) == 1
+    assert _parts_of(s, run.id).parts == {"3": filled}  # only the accepted part is kept
+    llm = ByStepLLM({"stance": YES})
+    assert runs.step(s, ws.id, run.id, llm, MODELS) == [it.id]
+    assert [q.item_id for q in llm.requests] == [f"PR.DS-11#{n}" for n in (1, 2, 4)]
+    a = s.scalars(select(Answer).where(Answer.run_id == run.id)).one()
+    assert (a.label, a.statement_id) == (
+        "user_confirmed",
+        said.id,
+    )  # Covered with a part of theirs (Ruling 6)
+
+
+def test_a_reopen_keeps_open_per_part_fills_and_dismisses_whole_item_ones(s: Session) -> None:
+    ws, it, run = _done(s)
+    said = store_statement(s, ws.id, LINE, filename="answer-002.txt", today=date(2026, 10, 6))
+    cited = [{"quote": LINE}]
+    fill = {"workspace_id": ws.id, "run_id": run.id, "item_id": it.id, "statement_id": said.id}
+    s.add_all(
+        [
+            SuggestedFill(**fill, label="verified", value="Yes", citations=cited, part=2),
+            SuggestedFill(**fill, label="verified", value="Yes", citations=cited, part=0),
+        ]
+    )
+    s.commit()
+    _stale(s, run.id, "1")
+    assert runs.reopen_changed(s, ws.id, run.id) == 1
+    states = dict(s.execute(select(SuggestedFill.part, SuggestedFill.status)).tuples().all())
+    assert states == {2: "open", 0: "dismissed"}  # adversary-1 I4 (c)
+
+
+def test_a_stored_answer_alone_reopens_nothing(s: Session) -> None:
+    """adversary-1 I4: a statement never takes one of a part's K passage slots, so storing the visitor's
+    answer changes no part's evidence."""
+    ws = f.workspace(s)
+    for n in range(4):  # 8 passages, every one of them taken: a statement would push one out
+        doc = f.document(s, ws, filename=f"backup-{n}.docx")
+        f.chunk(s, doc, line_start=1, line_end=1, text=f"Backups of data, copy {n}.")
+        f.chunk(s, doc, line_start=2, line_end=2, text=f"Data backups, site {n}.")
+    q = f.questionnaire(s, ws, source="csf", filename="csf-2.0")
+    o = csf.framework().get("PR.DS-11")
+    f.item(s, q, csf_id=o.id, code=o.id, row_ref=o.id, topic=o.category, question=o.question)
+    s.commit()
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    runs.step(s, ws.id, run.id, ByStepLLM({"stance": YES}), MODELS)
+    assert all(len(p["chunk_ids"]) == 8 for p in _parts_of(s, run.id).parts.values())
+    store_statement(s, ws.id, " ".join(o.parts), filename="answer-001.txt", today=date(2026, 10, 6))
+    assert runs.reopen_changed(s, ws.id, run.id) == 0

@@ -396,7 +396,8 @@ class GapRow(BaseModel):
     item_id: uuid.UUID | None  # None for a not-checked outcome, and before the scope's first run
     answer_id: uuid.UUID | None  # None until the outcome is answered
     # code's (app.csf.gap_label); None: not checked, not answered yet, not applicable, or the model failed.
-    # Confirmed by you also when every part that is not a gap was filled from the visitor's answer (adv-1 I3).
+    # Confirmed by you also for a Checked outcome that would read Covered with a part filled from the
+    # visitor's answer; with a Gap or Partly part left it stays Partly covered (adversary-1 I3, Ruling 6).
     label: GapLabel | None
     explanation: str | None  # code's one paragraph; for Confirmed by you, the visitor's stored answer
     sources: int  # cited documents

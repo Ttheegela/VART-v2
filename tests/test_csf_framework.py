@@ -15,6 +15,7 @@ from app.contracts import Draft, ItemInput
 from app.db.models import DocumentLine, Item, Questionnaire
 from app.draft import check
 from app.ingest.store import store_statement
+from app.retrieve import retrieve
 from app.services.llm_budget import spender
 from tests import factories as f
 from tests.fakes import FakeLLM
@@ -282,9 +283,9 @@ def test_ask_me_outcomes_are_queued_once_and_an_answer_confirms_them(s: Session)
 
 
 def test_a_checked_outcome_is_judged_on_documents_never_on_a_stored_answer(s: Session) -> None:
-    """Ruling 9: a visitor's Ask-me answer about the same topic is no evidence for a Checked outcome; its
-    passage is dropped before stance, reason 'statement'. (It reaches Checked outcomes only as a 6B
-    suggestion.)"""
+    """Ruling 9: a visitor's Ask-me answer about the same topic is no evidence for a Checked outcome; it is
+    never a candidate, so it takes no passage slot (6B adversary-1 I4; it was a 'statement' drop before).
+    (It reaches Checked outcomes only as a 6B suggestion.)"""
     ws = f.workspace(s)
     s.commit()
     statement = store_statement(
@@ -300,5 +301,7 @@ def test_a_checked_outcome_is_judged_on_documents_never_on_a_stored_answer(s: Se
     o = csf.framework().get("PR.DS-01")
     r = csf.check_outcome(s, ws.id, o, llm, MODELS, spender(s, ws.id))
     assert r is not None and r.decision.citations == () and r.retrieval.passages == ()
-    assert [(d.document_id, d.reason) for d in r.decision.dropped] == [(str(statement.id), "statement")]
+    assert r.decision.dropped == () and r.retrieval.dropped == ()
+    plain = retrieve(s, ws.id, csf.part_inputs(o)[0].question, o.category)  # what it would have taken
+    assert [p.doc.id for p in plain.passages] == [str(statement.id)]
     assert csf.gap_label(o, r.decision.label, r.decision.value) == "gap" and llm.requests == []

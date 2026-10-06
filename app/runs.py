@@ -14,7 +14,7 @@ from functools import partial
 from typing import Any
 
 import openai
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import DataError, SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -23,7 +23,7 @@ from app import csf
 from app.api.errors import ModelsUnavailable, NotFound
 from app.classify import PROMPT_VERSION as CLASSIFY_PROMPT
 from app.contracts import BudgetExhausted, ItemInput, ItemResult, Spend, jsonable
-from app.db.models import Answer, Item, Questionnaire, Run, RunItem
+from app.db.models import Answer, Item, Questionnaire, Run, RunItem, SuggestedFill
 from app.draft import PROMPT_VERSION as DRAFT_PROMPT
 from app.ingest.parse import IngestError
 from app.llm.client import LLMClient, LLMError, LLMRequest, LLMResult
@@ -260,10 +260,21 @@ def _answer_outcome(
 def outcome_values(o: csf.Outcome, parts: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     """A Checked outcome's answer row from its stored parts, all present (CSF spec 5.3): the label by
     `combine`, code's explanation, the parts' citations and drops. Its chunk ids are the parts' union, so a
-    metadata override finds it (app.redecide decides it again part by part); no stances of its own."""
+    metadata override finds it (app.redecide decides it again part by part); no stances of its own. Parts
+    filled from the visitor's answer are named "Confirmed by you" in the explanation, and an outcome that
+    would read Covered with any of them is Confirmed by you, citing the first one's statement (Ruling 6:
+    with a Gap or Partly part left it stays Partly covered)."""
     raws = [parts[str(n)] for n in range(1, len(o.parts) + 1)]
-    values = _values(csf.aggregate(o, [csf.part_result(o, n, r) for n, r in enumerate(raws, 1)]))
+    results = [csf.part_result(o, n, r) for n, r in enumerate(raws, 1)]
+    values = _values(csf.aggregate(o, results))
     values["chunk_ids"] = list(dict.fromkeys(c for r in raws for c in r["chunk_ids"]))
+    filled = [n for n, r in enumerate(raws, 1) if r.get("statement_id")]
+    values["statement_id"] = None
+    if filled:
+        values["text"] = _no_nul(csf.explain(o, results, filled))
+        if (values["label"], values["value"]) == ("verified", "Yes"):
+            values |= {"label": "user_confirmed", "value": None}
+            values["statement_id"] = uuid.UUID(raws[filled[0] - 1]["statement_id"])
     return values
 
 
@@ -485,3 +496,102 @@ def step(
         answered.append(item_id)
     _finish_if_done(session, run)
     return answered
+
+
+REOPEN = ("verified", "partial", "conflict", "unknown")  # machine labels; the visitor's own labels stay
+
+
+def _same_evidence(
+    session: Session,
+    workspace_id: uuid.UUID,
+    o: csf.Outcome,
+    n: int,
+    raw: Mapping[str, Any],
+    models: Mapping[str, str],
+) -> bool:
+    """A stored part still describes the documents: the deployed wording and judge (`_is_current`), and the
+    same passages retrieved now, as a set: decide reads them by content, not rank (adversary-1 I4).
+    Retrieval only, no model call."""
+    if not _is_current(o, n, raw, models):
+        return False
+    found = csf.evidence(session, workspace_id, csf.part_inputs(o)[n - 1])
+    return {p.chunk_id for p in found.passages} == set(raw["chunk_ids"])
+
+
+def reopen_changed(session: Session, workspace_id: uuid.UUID, run_id: uuid.UUID) -> int:
+    """Check again after an upload (CSF spec 5.6; plan 6B decision 3), with no model call. A Checked outcome
+    is affected when a stored part is missing, its wording, judge or evidence changed, or its answer failed.
+    Every machine-judged part of an affected outcome is dropped, and the outcome goes back to pending with its
+    answer removed and its whole-item fills dismissed, so the step loop runs all of its parts again. A part
+    filled by a fill the visitor accepted stays, and so do the open per-part fills (a fill is the visitor's
+    answer judged against the part's wording, not the documents), and an outcome the visitor edited,
+    approved, confirmed or marked not applicable. Lock order: the run (two presses re-open once), the
+    answers by id, then their run items, read under those locks so an accept in flight is waited out and its
+    part kept (preflight I1), then the fills. Returns the outcomes re-opened; with any, the run is running."""
+    run = session.scalar(
+        select(Run).where(Run.id == run_id, Run.workspace_id == workspace_id).with_for_update()
+    )
+    if run is None or run.status != "done":
+        session.commit()
+        return 0
+    answers = session.scalars(
+        select(Answer)
+        .join(Item, Item.id == Answer.item_id)
+        .where(
+            Answer.run_id == run_id,
+            Item.csf_id.is_not(None),
+            Answer.label.in_(REOPEN),
+            Answer.edited.is_(False),
+            Answer.approved_at.is_(None),
+        )
+        .order_by(Answer.id)
+        .with_for_update(of=Answer)
+    ).all()
+    failed = {a.item_id for a in answers if a.text == FAILED_TEXT}
+    rows = session.execute(
+        select(RunItem.item_id, RunItem.parts, Item.csf_id)
+        .join(Item, Item.id == RunItem.item_id)
+        .where(RunItem.run_id == run_id, RunItem.item_id.in_([a.item_id for a in answers]))
+        .order_by(Item.position)
+        .with_for_update(of=RunItem)
+    ).all()  # fetched first: _same_evidence runs queries of its own
+    reopened: dict[uuid.UUID, dict[str, Any]] = {}
+    for item_id, stored, csf_id in rows:
+        o = csf.outcome_or_none(csf_id or "")
+        if o is None or o.tier != "checked":
+            continue
+        affected = (
+            item_id in failed
+            or any(str(n) not in stored for n in range(1, len(o.parts) + 1))
+            or any(
+                not raw.get("statement_id")
+                and not _same_evidence(session, workspace_id, o, int(k), raw, run.models)
+                for k, raw in stored.items()
+            )
+        )
+        if affected:  # every machine-judged part runs again; the visitor's accepted parts stay
+            reopened[item_id] = {k: raw for k, raw in stored.items() if raw.get("statement_id")}
+    for item_id, keep in reopened.items():
+        session.execute(delete(Answer).where(Answer.run_id == run_id, Answer.item_id == item_id))
+        session.execute(
+            update(RunItem)
+            .where(RunItem.run_id == run_id, RunItem.item_id == item_id)
+            .values(parts=keep, state="pending", claimed_at=None, attempts=0)
+        )
+        session.execute(
+            update(SuggestedFill)
+            .where(
+                SuggestedFill.run_id == run_id,
+                SuggestedFill.item_id == item_id,
+                SuggestedFill.part == 0,
+                SuggestedFill.status == "open",
+            )
+            .values(status="dismissed")
+        )
+    if reopened:
+        run.status, run.finished_at = "running", None
+        audit_log.record(
+            session, workspace_id, "run.recheck", ref=str(run_id), detail={"outcomes": len(reopened)}
+        )
+    session.commit()
+    return len(reopened)

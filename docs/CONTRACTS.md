@@ -19,7 +19,7 @@ the change log at the end, and a re-recording of the evals when a prompt or a la
 | draft | `app/draft.py` (2A) | `PROMPT_VERSION = "draft@p2"`; `plain_name(filename: str) -> str`; `user_prompt(item: ItemInput, decision: Decision) -> str`; `check(text, decision, documents) -> list[str]`; `template_answer(decision) -> str`; `write_draft(llm, item, decision, model, spend, documents) -> Draft` | yes |
 | pipeline | `app/pipeline.py` (2A) | `answer_item(session, workspace_id, item, llm, models, spend) -> ItemResult`; `answer_retrieved(session, workspace_id, item, retrieval, llm, models, spend) -> ItemResult` (answer_item after its retrieval); raises `BudgetExhausted` when `spend("stance")` is refused | via stance, draft |
 | interview | `app/interview.py` (2A) | `high_weight(topic) -> bool`; `plan_queue(items) -> list[QueueEntry]`; `follow_up(question, answer) -> str or None`; `recheck(session, workspace_id, statement_id, topic, items, llm, model, spend) -> list[Suggestion]` | recheck only |
-| csf | `app/csf.py` (6A) | `framework() -> Framework`; `in_scope(scope) -> tuple[Outcome, ...]`; `item_input(o) -> ItemInput`; `gap_label(o, label, value=None, statement_id=None) -> GapLabel or None`; `questionnaire_for(session, workspace_id, scope) -> Questionnaire`; `part_inputs(o) -> tuple[ItemInput, ...]`; `evidence(session, workspace_id, item) -> Retrieval`; `check_parts(session, workspace_id, o, llm, models, spend) -> list[ItemResult]`; `part_label(r) -> PartLabel`; `combine(labels) -> PartLabel`; `explain(o, parts) -> str`; `aggregate(o, parts) -> ItemResult`; `check_outcome(session, workspace_id, o, llm, models, spend) -> ItemResult or None`; `ask_queue(outcomes, asked) -> list[QueueEntry]`; `current_mapping(scope) -> dict[str, str]`; `check_part(session, workspace_id, o, n, llm, models, spend) -> ItemResult`; `part_result(o, n, raw) -> ItemResult`; `CONTROLS_URL` | via answer_retrieved (stance only; a part's draft is never written) |
+| csf | `app/csf.py` (6A) | `framework() -> Framework`; `in_scope(scope) -> tuple[Outcome, ...]`; `item_input(o) -> ItemInput`; `gap_label(o, label, value=None, statement_id=None) -> GapLabel or None`; `questionnaire_for(session, workspace_id, scope) -> Questionnaire`; `part_inputs(o) -> tuple[ItemInput, ...]`; `evidence(session, workspace_id, item) -> Retrieval`; `check_parts(session, workspace_id, o, llm, models, spend) -> list[ItemResult]`; `part_label(r) -> PartLabel`; `combine(labels) -> PartLabel`; `explain(o, parts, filled=()) -> str`; `aggregate(o, parts) -> ItemResult`; `check_outcome(session, workspace_id, o, llm, models, spend) -> ItemResult or None`; `ask_queue(outcomes, asked) -> list[QueueEntry]`; `current_mapping(scope) -> dict[str, str]`; `check_part(session, workspace_id, o, n, llm, models, spend) -> ItemResult`; `part_result(o, n, raw) -> ItemResult`; `CONTROLS_URL` | via answer_retrieved (stance only; a part's draft is never written) |
 | runs | `app/runs.py` (6B; only these names) | `STEP_PARTS = 8`; `outcome_values(o, parts) -> dict[str, Any]`; `reopen_changed(session, workspace_id, run_id) -> int` | no |
 | budget | `app/services/llm_budget.py` | `spender(session, workspace_id) -> Spend` | no |
 
@@ -120,8 +120,9 @@ change-log line; changing or removing a path, a field or a status needs the lead
   `AnswerDetail.parts` lists a Checked outcome's parts; `SuggestionOut.part` names the part a fill is for (0:
   the whole item); on a gap-check run an answer is re-checked against the open parts in its CSF function, and
   a re-open keeps the open per-part fills. An accepted per-part fill reads "Confirmed by you: part n" in the
-  explanation and "(your answer)" in the sheet's quotes, and the outcome is Confirmed by you once every part
-  that is not a gap was filled.
+  explanation and "(your answer)" in the sheet's quotes, and the outcome is Confirmed by you only when it would
+  otherwise read Covered (one filled part with Gaps left stays Partly covered); accepting one fill never
+  closes the others.
   On a gap-check run, `GET /api/runs/{id}/export` answers the gap-report workbook (it was a 409), and Questions
   for you holds the Ask-me outcomes only. An xlsx questionnaire export carries the latest done gap check as a
   `Gap report` sheet. `Mapping.scope` stays unused.
@@ -208,3 +209,9 @@ change-log line; changing or removing a path, a field or a status needs the lead
   compared case-insensitively), every cell inert; with no done gap check, or for a csv, the export is unchanged
   (Tarun, 2026-10-06).
   Bulk approve (`approve-verified`) skips a gap check's Not met outcomes (adversary-1 N3, Ruling 4; the lead).
+- 2026-10-06: Plan 6B Task 4 (an added optional argument and wording; lead's OK, Rulings 4 and 6, under rule 10
+  for `csf` and `retrieve`): `csf.explain` gains an optional `filled=()` (the part numbers filled from the
+  visitor's answer, named first as "Confirmed by you: part n"); `retrieve(..., exclude_kinds=())` is in place and
+  `csf.evidence` passes `("statement",)`, so a statement is no longer a `statement` drop but never a candidate
+  (the questionnaire path is unchanged). The gap bullet's Confirmed-by-you sentence follows Ruling 6 (Task 1
+  re-review R1). No prompt or label rule changes, so nothing is re-recorded.

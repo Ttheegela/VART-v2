@@ -177,7 +177,11 @@ def _write_gap(ws: Any, g: GapSheet) -> None:
         _put(ws.cell(2, i), title)
     for n, r in enumerate(g.rows, 3):
         cited = g.citations.get(r.answer_id, []) if r.answer_id else []
-        quotes = "; ".join(f'"{c["quote"]}" ({c["filename"]} line {c["line_start"]})' for c in cited)
+        quotes = "; ".join(
+            f'"{c["quote"]}" ({c["filename"]} line {c["line_start"]})'
+            + (" (your answer)" if c.get("yours") else "")
+            for c in cited
+        )
         cells = (
             r.csf_id,
             r.function,

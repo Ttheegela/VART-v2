@@ -13,9 +13,9 @@ from app.api.errors import limit
 from app.api.runs import run_out, summary
 from app.api.schemas import ERRORS, GapOut, GapRow, GapScope, RunOut
 from app.contracts import ItemLabel, Value
-from app.db.models import Answer, Item, Questionnaire, Run
+from app.db.models import Answer, Document, Item, Questionnaire, Run
 from app.export import FAILED_SENTENCE, GapSheet
-from app.runs import FAILED_TEXT, create_run
+from app.runs import FAILED_TEXT, create_run, reopen_changed
 from app.services.capacity import ensure_capacity
 from app.settings import get_settings
 
@@ -84,7 +84,14 @@ def gap_sheet(session: Session, q: Questionnaire, run: Run) -> GapSheet:
     """One gap-check run as a sheet (CSF spec 7): its rows, each answer's citations, its date, scope and the
     CSF data version it ran on (stored in the questionnaire's mapping)."""
     scope = q.mapping["scope"]
-    cited = {a.id: a.citations for a in session.scalars(select(Answer).where(Answer.run_id == run.id))}
+    answers = list(session.scalars(select(Answer).where(Answer.run_id == run.id)))
+    said = {  # the visitor's own answers, marked "(your answer)" in the sheet (adversary-1 I3)
+        str(d)
+        for d in session.scalars(
+            select(Document.id).where(Document.workspace_id == q.workspace_id, Document.kind == "statement")
+        )
+    }
+    cited = {a.id: [c | {"yours": c["document_id"] in said} for c in a.citations] for a in answers}
     return GapSheet(
         gap_rows(session, scope, q, run),
         cited,
@@ -158,4 +165,7 @@ def start_gap(scope: GapScope, ws: WorkspaceDep, session: SessionDep, request: R
     run = latest_run(session, q.id)
     if run is None:
         run = create_run(session, ws_id, q.id, get_settings().models())
+    elif run.status == "done":
+        reopen_changed(session, ws_id, run.id)  # commits; nothing changed: it stays done
+        session.refresh(run)
     return run_out(session, run)

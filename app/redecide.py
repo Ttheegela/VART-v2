@@ -5,14 +5,16 @@ evidence changes the label exactly as decide's rules say."""
 import uuid
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import array
 from sqlalchemy.orm import Session
 
+from app import csf
 from app.contracts import DocInfo, Dropped, Passage, Stance, jsonable
-from app.db.models import Answer, Chunk, Document
+from app.db.models import Answer, Chunk, Document, Item, RunItem
 from app.decide import decide
 from app.draft import template_answer
+from app.runs import outcome_values
 
 REDECIDED = ("verified", "partial", "conflict", "unknown")  # never the visitor's own labels
 
@@ -73,6 +75,12 @@ def redecide(session: Session, workspace_id: uuid.UUID, document_id: uuid.UUID) 
     ).all()
     changed = 0
     for a in answers:
+        parts = session.scalar(
+            select(RunItem.parts).where(RunItem.run_id == a.run_id, RunItem.item_id == a.item_id)
+        )
+        if parts:  # a Checked CSF outcome: its row has no stances of its own (CSF spec 5.3)
+            changed += _redecide_parts(session, workspace_id, a, parts)
+            continue
         passages = passages_for(session, workspace_id, a.chunk_ids)
         if passages is None:
             continue
@@ -91,3 +99,44 @@ def redecide(session: Session, workspace_id: uuid.UUID, document_id: uuid.UUID) 
         changed += 1
     session.commit()
     return changed
+
+
+def _redecide_parts(session: Session, workspace_id: uuid.UUID, a: Answer, parts: dict[str, Any]) -> int:
+    """A CSF outcome after a metadata override: each part decided again from its own stances and passages,
+    then combined again (`outcome_values`). A part filled from the visitor's answer keeps its result. 1 when
+    the outcome's label, value or citations changed (it then loses its approval), else 0. Writes the run item
+    after the answer is locked (app/questions.py's lock order)."""
+    o = csf.outcome_or_none(session.get_one(Item, a.item_id).csf_id or "")
+    if o is None:
+        return 0
+    new = dict(parts)
+    for k, raw in parts.items():
+        if raw.get("statement_id"):
+            continue
+        passages = passages_for(session, workspace_id, raw["chunk_ids"])
+        if passages is None:
+            continue
+        d = decide(passages, tuple(Stance(**s) for s in raw["stances"]), _dropped(raw["retrieval_dropped"]))
+        new[k] = {
+            **raw,
+            "label": d.label,
+            "value": d.value,
+            "citations": jsonable(d.citations),
+            "dropped": jsonable(d.dropped),
+            "conflict": jsonable(d.conflict),
+            "scope_note": d.scope_note,
+            "confidence": d.confidence,
+            "text": template_answer(d),
+        }
+    if new == parts or len(new) != len(o.parts):
+        return 0
+    session.execute(
+        update(RunItem).where(RunItem.run_id == a.run_id, RunItem.item_id == a.item_id).values(parts=new)
+    )
+    values = outcome_values(o, new)
+    if (values["label"], values["value"], values["citations"]) == (a.label, a.value, a.citations):
+        return 0
+    for key, value in values.items():
+        setattr(a, key, value)
+    a.approved_at = None
+    return 1

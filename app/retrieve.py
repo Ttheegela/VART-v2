@@ -47,7 +47,7 @@ _CANDIDATES = text(
         round(ts_rank_cd(c.tsv, q.query, 1)::numeric, 6) AS cd
     FROM chunks c JOIN documents d ON d.id = c.document_id
     CROSS JOIN websearch_to_tsquery('english', :q) AS q(query)
-    WHERE c.workspace_id = :ws AND c.tsv @@ q.query
+    WHERE c.workspace_id = :ws AND c.tsv @@ q.query AND NOT d.kind = ANY(CAST(:exclude AS text[]))
     ORDER BY cd DESC, d.filename, c.line_start
     LIMIT :limit"""
 )
@@ -172,10 +172,18 @@ def _hop(session: Session, workspace_id: uuid.UUID, chosen: Sequence[Any]) -> li
     return found
 
 
-def retrieve(session: Session, workspace_id: uuid.UUID, question: str, topic: str | None) -> Retrieval:
-    """At most K passages for one questionnaire item, best first."""
+def retrieve(
+    session: Session,
+    workspace_id: uuid.UUID,
+    question: str,
+    topic: str | None,
+    exclude_kinds: Sequence[str] = (),
+) -> Retrieval:
+    """At most K passages for one questionnaire item, best first. Documents of `exclude_kinds` are never
+    candidates, so they take no slot (Plan 6B: a Checked CSF part is judged without statements)."""
     query = build_query(question, topic)
-    rows = session.execute(_CANDIDATES, {"q": query, "ws": workspace_id, "limit": CANDIDATES}).all()
+    params = {"q": query, "ws": workspace_id, "limit": CANDIDATES, "exclude": list(exclude_kinds)}
+    rows = session.execute(_CANDIDATES, params).all()
     if not rows:
         return Retrieval((), ())
     ranked = _fused(session, workspace_id, query, rows)

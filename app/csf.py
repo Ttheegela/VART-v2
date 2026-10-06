@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 import uuid
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from functools import cache
@@ -263,14 +263,10 @@ def part_inputs(o: Outcome) -> tuple[ItemInput, ...]:
 
 def evidence(session: Session, workspace_id: uuid.UUID, item: ItemInput) -> Retrieval:
     """What one part of a Checked outcome is judged on (Ruling 9, spec 5.3 "checked against documents"): its
-    retrieval without the visitor's stored answers, each dropped with reason 'statement' before any model sees
-    it. An answer reaches a Checked outcome only as a suggestion the visitor accepts (Plan 6B)."""
-    r = retrieve(session, workspace_id, item.question, item.topic)
-    said = [p for p in r.passages if p.doc.kind == "statement"]
-    return Retrieval(
-        tuple(p for p in r.passages if p.doc.kind != "statement"),
-        r.dropped + tuple(Dropped(p.chunk_id, p.doc.id, p.doc.filename, "statement") for p in said),
-    )
+    retrieval with the visitor's stored answers left out of the candidates, so none takes a passage slot
+    (adversary-1 I4). An answer reaches a Checked outcome only as a suggestion the visitor accepts
+    (Plan 6B)."""
+    return retrieve(session, workspace_id, item.question, item.topic, exclude_kinds=("statement",))
 
 
 def part_label(r: ItemResult) -> PartLabel:
@@ -307,16 +303,19 @@ def _numbers(ns: list[int]) -> str:
     return f"part {ns[0]}" if len(ns) == 1 else "parts " + ", ".join(map(str, ns))
 
 
-def explain(o: Outcome, parts: Sequence[ItemResult]) -> str:
+def explain(o: Outcome, parts: Sequence[ItemResult], filled: Collection[int] = ()) -> str:
     """The outcome's explanation (CSF spec 5.3, amended), by code with no model call: the part numbers by
-    label, then each part that decided the combined label as its question and its own template answer, so a
-    quote always stands beside the stance it was judged with and a stated No is never shown over yes lines."""
+    label, the parts `filled` from the visitor's answer first under their own group (adversary-1 I3), then
+    each part that decided the combined label as its question and its own template answer, so a quote always
+    stands beside the stance it was judged with and a stated No is never shown over yes lines."""
     labels = [part_label(r) for r in parts]
     deciding = _DECIDING[combine(labels)]
-    groups = [
-        f"{word}: {_numbers([n for n, x in enumerate(labels, 1) if x == label])}."
+    mine = [n for n in range(1, len(parts) + 1) if n in filled]
+    groups = [f"Confirmed by you: {_numbers(mine)}."] if mine else []
+    groups += [
+        f"{word}: {_numbers(ns)}."
         for label, word in PART_WORDS.items()
-        if label in labels
+        if (ns := [n for n, x in enumerate(labels, 1) if x == label and n not in filled])
     ]
     answers = [
         f"{q} {template_answer(r.decision)}"

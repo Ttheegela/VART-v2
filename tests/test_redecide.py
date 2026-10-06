@@ -6,9 +6,11 @@ import time
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Answer
+from app import csf, runs
+from app.db.models import Answer, RunItem
 from app.redecide import redecide
 from tests import factories as f
+from tests.fakes import ByStepLLM
 
 QUOTE = "Customer data at rest is encrypted with AES-256."
 
@@ -109,3 +111,35 @@ def test_an_edit_in_flight_is_waited_out_and_kept(db: Engine) -> None:
     assert result == [0]
     with Session(db) as s:
         assert s.get_one(Answer, a_id).text == "Yes, our own words."
+
+
+def test_a_metadata_override_redecides_each_part_and_recombines(db: Engine) -> None:
+    line = "Backups of data are created, protected, maintained and tested every day."
+    yes = json.dumps({"passages": [{"passage": 1, "stance": "yes", "quote": line, "note": "states it"}]})
+    models = {"stance": "m/s", "draft": "m/d"}
+    with Session(db) as s:
+        ws = f.workspace(s)
+        doc = f.document(s, ws, filename="backup-policy.docx")
+        f.chunk(s, doc, line_start=2, line_end=2, text=line)
+        q = f.questionnaire(s, ws, source="csf", filename="csf-2.0")
+        o = csf.framework().get("PR.DS-11")
+        f.item(s, q, csf_id=o.id, code=o.id, row_ref=o.id, topic=o.category, question=o.question)
+        s.commit()
+        run = runs.create_run(s, ws.id, q.id, models)
+        runs.step(s, ws.id, run.id, ByStepLLM({"stance": yes}), models)
+        ri = s.scalars(select(RunItem).where(RunItem.run_id == run.id)).one()
+        ri.parts = {
+            **ri.parts,
+            "4": {**ri.parts["4"], "statement_id": "00000000-0000-0000-0000-000000000001"},
+        }
+        doc.status = "draft"
+        s.commit()
+        assert redecide(s, ws.id, doc.id) == 1
+        a = s.scalars(select(Answer).where(Answer.run_id == run.id)).one()
+        # decide over the outcome row's empty stances would say Gap; per part, a draft-only source is Partly
+        assert (a.label, a.value) == ("partial", "Partial")
+        assert a.text.startswith("Confirmed by you: part 4. Partly evidenced: parts 1, 2, 3.")
+        s.expire_all()
+        parts = s.scalars(select(RunItem).where(RunItem.run_id == run.id)).one().parts
+        assert [parts[k]["label"] for k in "1234"] == ["partial", "partial", "partial", "verified"]
+        assert all(parts[k]["stances"] for k in "123")  # each part keeps the stances it was judged with

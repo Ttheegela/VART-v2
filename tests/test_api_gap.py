@@ -292,3 +292,52 @@ def test_the_questionnaire_export_carries_the_latest_finished_gap_check(db: Engi
         s.commit()
     ws = sheet()
     assert (ws["B1"].value, ws["C1"].value) == ("Scope: recover", "Run date: 2030-01-02")
+
+
+def test_check_again_after_an_upload_reopens_the_outcomes_the_new_document_reaches(db: Engine) -> None:
+    client, ws_id = visitor(db)
+    run = client.post("/api/gap/core/run").json()
+    _finish(client, run["id"], ByStepLLM({}))  # no documents: every Checked outcome is Gap
+    with Session(db) as s:
+        _policy(s, ws_id)  # an upload
+        # adversary-1 I4 (d): exactly the parts the new line reaches are judged, nothing else
+        reached = [
+            p.key
+            for o in csf.in_scope("core")
+            for p in csf.part_inputs(o)
+            if csf.evidence(s, ws_id, p).passages
+        ]
+    llm = ByStepLLM({"stance": YES})
+    again = client.post("/api/gap/core/run").json()
+    assert (again["id"], again["status"]) == (run["id"], "running")
+    _finish(client, run["id"], llm)
+    rows = {r["csf_id"]: r for r in client.get("/api/gap/core").json()["rows"]}
+    assert rows["PR.DS-11"]["label"] == "covered"
+    assert rows["GV.RM-02"]["label"] == "not_answered"  # Ask me is never re-checked
+    assert "PR.DS-11#1" in reached and len(reached) < 73
+    assert sorted(r.item_id for r in llm.requests) == sorted(reached)
+    calls = len(llm.requests)
+    assert client.post("/api/gap/core/run").json()["status"] == "done"  # nothing changed since
+    assert len(llm.requests) == calls
+
+
+def test_an_ask_me_answer_alone_reopens_nothing(db: Engine) -> None:
+    client, ws_id = visitor(db)
+    with Session(db) as s:
+        _policy(s, ws_id)
+    run = client.post("/api/gap/core/run").json()
+    _finish(client, run["id"], ByStepLLM({"stance": YES}))
+    question = next(
+        q for q in client.get(f"/api/runs/{run['id']}/questions").json() if q["codes"] == ["GV.RM-02"]
+    )
+    llm = ByStepLLM({"recheck": json.dumps({"passages": []})})  # the fills found nothing
+    app.dependency_overrides[get_llm] = lambda: llm
+    try:
+        text = "Backups of data are created, protected, maintained and tested; our risk appetite is low."
+        assert client.post(f"/api/questions/{question['id']}/answer", json={"text": text}).status_code == 200
+    finally:
+        app.dependency_overrides.pop(get_llm, None)
+    llm.requests.clear()
+    assert client.post("/api/gap/core/run").json()["status"] == "done"
+    _finish(client, run["id"], llm)
+    assert llm.requests == []
