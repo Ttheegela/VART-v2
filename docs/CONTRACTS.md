@@ -266,6 +266,13 @@ change-log line; changing or removing a path, a field or a status needs the lead
   model budget (429) sets `stepped_at` to the end of its Retry-After, so a run waiting on it is not closed
   (preflight I5); a step never writes into a run closed since it read it; `reopen_changed` (Check again) sets
   `stepped_at`. The UI says why a closed run stopped. No prompt or label rule changes.
+- 2026-10-07: Plan 4 Task 5 (behaviour inside existing statuses; the PATCH declares the sentence 422): `PATCH
+  /api/answers/{id}` on a Confirmed-by-you answer stores the edit as a new dated, redacted statement and points the
+  answer at it (Plan 3 M6), counted under the per-network `interview` cap (429); the earlier statement stays as a
+  citation target but stops being evidence (`evidence_allowed` false) and its open fills are dismissed. Answering a
+  question, skipping one, accepting a fill and editing a confirmed answer take the workspace row FOR NO KEY UPDATE
+  first (two statement writers take turns; FOR KEY SHARE would deadlock them), so none can deadlock against a
+  workspace reset (a reset that wins is the GONE 404).
 - 2026-10-07: Plan 4 Task 6 (ingest behaviour; no signature, path, field or status changed): text a reader cannot
   see is never a line: docx runs marked hidden (w:vanish) or under 1 pt, PDF lines whose first character is under
   1 pt, hidden sheets and hidden rows of an uploaded workbook. Hidden rows of a questionnaire are blanked, so they
