@@ -10,6 +10,18 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-03-vart-v2-design.md` sections 5, 6.12, 6.13, 8 (Tests), 9, 10, 11. Design system: `design.md` (merged from branch `design` in Task 1; binding for every view). Companion plan (contract, API, must-fixes, lanes 3A-inputs and 3A-runs): `docs/superpowers/plans/2026-10-06-vart-v2-plan3a-api.md`. Plan 6B (CSF gap check view, `VART-wt-csf/docs/superpowers/specs/2026-10-05-vart-csf-gap-check-design.md` section 7) is written after this contract freezes and is not built here.
 
+## Execution notes (rulings during execution, recorded 2026-10-06)
+
+- `window.confirm` is accepted for destructive actions in the app (the no-dialog rule applies to artifacts, not here).
+- The E2E suite shares one sample run across the sample, export and interview flows (a serial group), and the upload
+  flow has its own: five separate sample runs would pass the 400-calls-an-hour per-network cap. No header spoofing and
+  no limit override for tests; CI runs the suite with `retries: 0` for the same reason. Record mode waits up to 20
+  minutes for a run; replay keeps 150 s.
+- A conflict pair in the drawer shows each side under its own "yes/no · date" heading.
+- The release preview caught `data/dev/docs` missing from the bundle (an unanchored `docs` in `.vercelignore`); it is
+  anchored as `/docs`.
+- Not built here: the precomputed sample run, editing an answer's text in the UI, the CSF gap check view (Plan 6B).
+
 ## Global Constraints
 
 Plan 3A's Global Constraints apply to this file unchanged. The lines that matter most here, plus the design rules:

@@ -1,6 +1,6 @@
 # VART v2 — Progress Log
 
-_Last updated: 2026-10-05 · Branch: `main` (origin: https://github.com/Ttheegela/VART-v2, public) · Live: https://vart-v2.vercel.app_
+_Last updated: 2026-10-06 · Branch: `main` (origin: https://github.com/Ttheegela/VART-v2, public) · Live: https://vart-v2.vercel.app_
 
 ## At a glance
 | Plan | Status | Notes |
@@ -8,7 +8,7 @@ _Last updated: 2026-10-05 · Branch: `main` (origin: https://github.com/Ttheegel
 | 1A Foundation | done, live 2026-10-04 | schema, workspaces, LLM client, health + canary, React shell, CI, gates |
 | 1B Dev data | done | fact sheet, questionnaires, documents, keys |
 | 2 Engine and evals | done, live 2026-10-05 | engine, ingest, evals; baseline label accuracy 0.9213, recall@8 0.9738, cost $0.0361 per 60 items |
-| 3 API and UI | done 2026-10-06 on `plan3`; release pending | 26 operations, step runner, column mapper, export, console UI, Playwright flows on recorded model replies |
+| 3 API and UI | done, live 2026-10-06 | 27 operations, step runner, column mapper, export, console UI, Playwright flows on recorded model replies |
 | 4 Hardening and launch | not started | |
 | 5 Google Drive | not started | |
 
@@ -50,8 +50,29 @@ _Last updated: 2026-10-05 · Branch: `main` (origin: https://github.com/Ttheegel
 | Daily crons (cleanup 05:00 UTC, canary 17:00 UTC) | ok: `/api/health` at 19:58 UTC on 2026-10-05 showed `"status":"ok"` and the canary ok at 17:59 UTC that day (the canary cron ran; Hobby crons fire within their hour). The cleanup cron leaves no mark in `/api/health` |
 | Vercel builds only `main` | ok: the push of this record's PR branch made no deployment (2026-10-04) |
 
-### Plan 3
-_Filled in after the release (Task 8 Step 4)._
+### Plan 3 — 2026-10-06
+- `main` = `3ad741e`, merged by PR #5 (fast-forward of `plan3`) after green CI: gates (gitleaks over the full history,
+  sponsor check, monochrome), backend (1562 tests, the dev-pack eval replayed with no drift, decide at 100% branch
+  coverage), frontend (102 Vitest tests, lint, build, API types in sync), e2e (the four Playwright flows and the smoke
+  test on `web/e2e/recorded.jsonl`).
+- Preview bundle check before the release: the first preview showed `data/dev/docs` missing (0 of 22 files), because
+  the unanchored `docs` line in `.vercelignore` also matched it; fixed by anchoring it (`/docs`, `3ad741e`). The second
+  preview carried all 22 documents and both questionnaires; the Python function is 71.58 MB.
+- `ops/setup.sh migrate` (Tarun): Neon migrated `ffbf91b464dc` -> `3a1f0c9e7b21` (additive: two tables, four columns)
+  before `main` moved; Plan 2 code kept serving on the new schema (`/api/health` ok).
+- Production deploy READY (Git integration on the push of `main`); `scripts/smoke.py` ok (version `2.0.0.dev0`, now
+  ending with a same-site workspace reset); `/api/health` `"status":"ok"`, `"db":"ok"`; `/` serves the console Home;
+  `/api/docs` lists the API.
+- Tarun on production: one "Try with a sample company" run (vsq-a.xlsx, 64 of 64 answered, $0.0458) and one upload of
+  `web/e2e/fixtures/backup-policy.md`, then a workspace reset.
+
+| Release check | Result |
+|---|---|
+| Production sample run | 64/64 answered: 37 verified, 9 partial, 6 conflict, 12 unknown; $0.0458 |
+| Upload | `backup-policy.md` accepted and classified |
+| Function size | 71.58 MB |
+| E2E on recorded replies | 6/6 in CI |
+| Canary on the Plan 2 models | pending: the 17:00 UTC run on 2026-10-06 |
 
 ## Decisions
 This table is the decisions log kept in the repo. The detailed per-task review rulings are in the lead's local ledgers,
