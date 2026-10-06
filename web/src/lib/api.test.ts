@@ -30,6 +30,14 @@ describe("api", () => {
     await expect(request("/api/runs/r/step", { method: "POST" })).rejects.toMatchObject({ status: 429, retryAfter: 120 });
   });
 
+  it("turns the platform's non-JSON 413 into the file-size sentence", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("Request Entity Too Large", { status: 413 })));
+    await expect(request("/api/documents", { method: "POST" })).rejects.toMatchObject({
+      status: 413,
+      message: "Files must be 4 MB or smaller.",
+    });
+  });
+
   it("reads no body from a 204", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })));
     const reset = request("/api/workspace/reset", { method: "POST" });

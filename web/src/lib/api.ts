@@ -34,6 +34,8 @@ export class ApiError extends Error {
 }
 
 export async function errorMessage(res: Response): Promise<string> {
+  // CONTRACTS.md: a body over Vercel's 4.5 MB limit gets the platform's own 413, which is not JSON.
+  if (res.status === 413) return "Files must be 4 MB or smaller.";
   try {
     const body = await res.json();
     const detail = body?.detail;
@@ -114,6 +116,7 @@ export const api = {
   uploadQuestionnaire: (file: File) => upload<QuestionnaireOut>("/api/questionnaires", file),
   loadSampleQuestionnaire: (name: "vsq-a" | "mvsp-b") => send<QuestionnaireDetail>(`/api/questionnaires/sample/${name}`, "POST"),
   confirmMapping: (id: string, mapping: Mapping) => send<QuestionnaireDetail>(`/api/questionnaires/${enc(id)}/mapping`, "PUT", mapping),
+  deleteQuestionnaire: (id: string) => send<void>(`/api/questionnaires/${enc(id)}`, "DELETE"),
   questionnaire: (id: string) => request<QuestionnaireDetail>(`/api/questionnaires/${enc(id)}`),
   createRun: (questionnaireId: string) => send<RunOut>(`/api/questionnaires/${enc(questionnaireId)}/runs`, "POST"),
   step: (runId: string) => send<StepOut>(`/api/runs/${enc(runId)}/step`, "POST"),

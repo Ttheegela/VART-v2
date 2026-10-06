@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, api, messageOf, type Workspace } from "../lib/api";
 import { useKeys } from "../lib/keys";
 import { go, href, useRoute, type View } from "../lib/route";
@@ -17,11 +17,11 @@ export const KEY_TABLE: [string, string][] = [
   ["1–5", "workspace · run · questions for you · export · audit log"],
   ["v p c u y x", "toggle a label filter (Run)"],
   ["/", "focus search"],
-  ["j / k", "move down / up a row"],
+  ["j / k", "move down / up a row (and ↓ / ↑)"],
   ["enter", "open the evidence drawer"],
   ["esc", "close the drawer or this sheet; clear search"],
   ["r", "re-run live"],
-  ["e", "export"],
+  ["e", "export xlsx"],
   ["A", "approve all verified"],
   ["i", "answer this question"],
   ["a", "approve"],
@@ -41,9 +41,39 @@ function remaining(expiresAt: string | null): string | null {
   return `expires ${h}h${String(m).padStart(2, "0")}m`;
 }
 
+/** A modal layer: while open it owns the keyboard (Esc closes it, Tab stays inside, every other unmodified key is
+ * inert), takes focus on open and gives it back on close. A window capture listener runs before every `useKeys`. */
 export function KeySheet({ onClose }: { onClose: () => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  useLayoutEffect(() => {
+    close.current = onClose;
+  });
+  useEffect(() => {
+    const opener = document.activeElement;
+    box.current?.querySelector<HTMLElement>("button")?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Tab") {
+        const els = [...(box.current?.querySelectorAll<HTMLElement>("button, a[href], input, [tabindex]") ?? [])];
+        const i = els.indexOf(document.activeElement as HTMLElement);
+        e.preventDefault();
+        els[(i + (e.shiftKey ? -1 : 1) + els.length) % els.length]?.focus();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        close.current();
+      } else if (e.ctrlKey || e.metaKey || e.altKey) {
+        return; // browser shortcuts stay the browser's
+      }
+      e.stopImmediatePropagation();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      if (opener instanceof HTMLElement) opener.focus();
+    };
+  }, []);
   return (
-    <div role="dialog" aria-modal="true" aria-label="keys" className="fixed inset-0 z-20 overflow-auto bg-paper p-4">
+    <div ref={box} role="dialog" aria-modal="true" aria-label="keys" className="fixed inset-0 z-20 overflow-auto bg-paper p-4">
       <div className="mx-auto max-w-3xl">
         <div className="flex items-center justify-between border-b border-ink pb-1">
           <h2 className="text-xs font-medium">all keys</h2>
@@ -103,8 +133,7 @@ export function Shell({ mode, cursor, hints, runId, expiresAt, children }: Shell
   const [sheet, setSheet] = useState(false);
   const target = (v: View) => (v === "workspace" || v === "audit" ? { view: v } : runId ? { view: v, run: runId } : null);
   useKeys({
-    "?": () => setSheet(true),
-    Escape: () => setSheet(false),
+    "?": () => setSheet(true), // the open sheet handles its own Esc, so a drawer's Esc is never taken here
     ...Object.fromEntries(
       VIEWS.map(([v], i) => [String(i + 1), () => { const t = target(v); if (t) go(t); }]),
     ),
@@ -114,7 +143,7 @@ export function Shell({ mode, cursor, hints, runId, expiresAt, children }: Shell
     <div className="grid h-dvh grid-rows-[36px_minmax(0,1fr)_28px] bg-paper text-ink">
       <header data-chrome className="flex h-9 items-center gap-4 overflow-hidden bg-chrome px-4 text-on-chrome-2">
         <a href="/" className="font-bold tracking-[0.12em] text-on-chrome">VART</a>
-        <nav aria-label="views" className="flex min-w-0 flex-1 gap-1 overflow-x-auto text-xs">
+        <nav aria-label="views" className="flex min-w-0 flex-1 gap-1 overflow-x-auto p-1 text-xs">
           {VIEWS.map(([v, name], i) => {
             const t = target(v);
             const current = route.view === v;

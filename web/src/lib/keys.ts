@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 /** True for inputs, textareas, selects and contenteditable: single keys there are typing, not commands. */
 export function inTextField(target: EventTarget | null): boolean {
@@ -10,7 +10,9 @@ export function inTextField(target: EventTarget | null): boolean {
  * Keys pressed with Ctrl, Meta or Alt are left to the browser. */
 export function useKeys(map: Record<string, (e: KeyboardEvent) => void>, enabled = true): void {
   const ref = useRef(map);
-  ref.current = map;
+  useLayoutEffect(() => {
+    ref.current = map;
+  });
   useEffect(() => {
     if (!enabled) return;
     const onKey = (e: KeyboardEvent) => {
