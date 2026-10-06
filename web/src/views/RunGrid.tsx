@@ -170,7 +170,9 @@ export default function RunGrid({ workspace, onGone, runId, itemId }: ViewProps 
   const cur = Math.max(0, Math.min(cursor, visible.length - 1));
   const open = itemId ? visible.find((r) => r.item.id === itemId) : undefined;
 
-  useEffect(() => { body.current?.querySelector<HTMLElement>(`tr[data-i="${cur}"]`)?.focus(); }, [cur]);
+  // not while the drawer is open: a full-screen drawer has taken focus, and the row gets it back when it closes
+  const drawerOpen = open !== undefined;
+  useEffect(() => { if (!drawerOpen) body.current?.querySelector<HTMLElement>(`tr[data-i="${cur}"]`)?.focus(); }, [cur, drawerOpen]);
 
   const toggle = (l: Label) => setFilters((f) => { const n = new Set(f); if (n.has(l)) n.delete(l); else n.add(l); return n; });
   const openRow = (i: number) => { const r = visible[i]; if (r?.answer) go({ view: "run", run: runId, item: r.item.id }); };
