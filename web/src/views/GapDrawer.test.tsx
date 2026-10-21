@@ -118,7 +118,7 @@ describe("GapDrawer", () => {
     const { unmount } = render(<GapDrawer {...base} row={{ ...checked, label: null, not_applicable: true, explanation: "Out of scope." }} />);
     expect(screen.getByText("not applicable")).toBeInTheDocument(); // adversary-1 I1
     unmount();
-    const failed = "Not checked: the model call failed twice. Press r to check again.";
+    const failed = "Not checked: the model call failed. Press r to check again.";
     render(<GapDrawer {...base} row={{ ...checked, label: null, explanation: failed }} />);
     expect(screen.getByText(failed)).toBeInTheDocument(); // adversary-1 M4
     expect(screen.getByText("label").nextElementSibling).toHaveTextContent("—");

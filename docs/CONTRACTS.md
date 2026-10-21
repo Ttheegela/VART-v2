@@ -106,7 +106,7 @@ change-log line; changing or removing a path, a field or a status needs the lead
   outcome of the scope's functions in NIST's order with its tier, and the label (`app.csf.gap_label`) and
   explanation from the latest run of the scope's current built-in questionnaire; it writes nothing. An outcome
   the visitor marked not applicable has `GapRow.not_applicable`, no label and its reason as the explanation, on
-  either tier, and the gap sheet writes "Not applicable". An outcome whose model call failed twice has no label
+  either tier, and the gap sheet writes "Not applicable". An outcome whose model call failed has no label
   and the failure sentence as its explanation (never Gap); the sheet writes "Failed".
   `POST /api/gap/{scope}/run` creates or reuses that questionnaire (Plan 3 Ruling 5: built-in ones are never
   counted, listed or deleted), locks it, and answers the run to step: a new one, the running one, or the done
@@ -278,3 +278,5 @@ change-log line; changing or removing a path, a field or a status needs the lead
   see is never a line: docx runs marked hidden (w:vanish) or under 1 pt, PDF lines whose first character is under
   1 pt, hidden sheets and hidden rows of an uploaded workbook. Hidden rows of a questionnaire are blanked, so they
   are never items. The bundled sample data has none, so no stored line, prompt or label moves.
+- 2026-10-21: wording only (no signature, path, field or status changed): a failed answer's sentence no longer says
+  "twice" (a 4xx is tried once), so the gap-check docs say an outcome "whose model call failed".
