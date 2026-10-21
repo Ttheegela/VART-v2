@@ -44,7 +44,7 @@ additive migration (the old code ignores the column); roll a risky one back toge
   start and a reset at the same instant can deadlock. Postgres aborts one of them, the visitor sees an error and
   repeats the action. Accepted for a demo (adversary-1 M12, adversary-2 M1).
 - A database error (`SQLAlchemyError`, such as a dropped Neon connection) inside a step's worker marks that answer
-  FAILED ("the model call failed twice") with no model call made and no attempt left. A step opens up to nine
+  FAILED ("the model call failed") with no model call made and no attempt left. A step opens up to nine
   NullPool connections, so it is likelier than before concurrent steps (adversary-2 M10). Not fixed: the fix is to
   treat it like a provider outage (give the item back, attempt kept).
 

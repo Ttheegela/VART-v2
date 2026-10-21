@@ -24,13 +24,13 @@ from sqlalchemy.exc import DataError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app import csf
-from app.api.errors import Conflict, ModelsUnavailable, NotFound, retry_after_budget
+from app.api.errors import LIMIT_HIT, Conflict, ModelsUnavailable, NotFound, retry_after_budget
 from app.classify import PROMPT_VERSION as CLASSIFY_PROMPT
 from app.contracts import BudgetExhausted, ItemInput, ItemResult, Spend, jsonable
 from app.db.models import Answer, Item, Questionnaire, Run, RunItem, SuggestedFill, Workspace
 from app.draft import PROMPT_VERSION as DRAFT_PROMPT
 from app.ingest.parse import IngestError
-from app.llm.client import LLMClient, LLMError, LLMRequest, LLMResult
+from app.llm.client import LLMClient, LLMError, LLMRequest, LLMResult, limit_hit
 from app.llm.recorder import ReplayMiss
 from app.pipeline import answer_item
 from app.services import audit_log
@@ -49,7 +49,8 @@ HARD_S = 270.0
 MAX_ATTEMPTS = 3  # claims before an item that keeps crashing its step is answered as failed
 ABANDONED = timedelta(minutes=10)  # a running run no step touched this long was left (a closed tab): Ruling 8
 RUN_IN_PROGRESS = "A run of this questionnaire is still going; wait for it to finish first."
-FAILED_TEXT = "No answer: the model call failed twice. Re-run live to try again."
+# says no count on purpose: a 4xx is tried once, a retryable error twice (`_once`)
+FAILED_TEXT = "No answer: the model call failed. Re-run live to try again."
 STEP_PARTS = 8  # CSF spec 5.7: a gap-check step claims outcomes until their parts add up to 8 (8 x 15 s p90)
 # An Ask-me outcome waits for the visitor (CSF spec 5.4): no retrieval, no call; gap_label shows Not answered.
 ASK: dict[str, Any] = {"label": "unknown", "value": None, "text": "", "confidence": 0.0}
@@ -478,13 +479,20 @@ def _no_nul(v: Any) -> Any:
 
 
 def _provider_down(exc: LLMError) -> bool:
-    """The provider, not the model's answer, failed: bad key (401), no credit (402), timeout (408), rate limit
-    (429), 5xx, a dropped connection. A reply that fails the schema, or another 4xx, is a bad answer."""
+    """The provider, not the model's answer, failed: bad key (401), no credit (402), a spend limit (a 403 that
+    names one, `limit_hit`), timeout (408), rate limit (429), 5xx, a dropped connection. A reply that fails
+    the schema, or another 4xx (another 403 is a moderation flag or a model the guardrail does not allow), is
+    a bad answer."""
     cause = exc.__cause__
     if not isinstance(cause, openai.APIError):
         return False
     status = getattr(cause, "status_code", None)
-    return not isinstance(status, int) or status in (401, 402, 408, 429) or status >= 500
+    return (
+        not isinstance(status, int)
+        or status in (401, 402, 408, 429)
+        or status >= 500
+        or limit_hit(cause) is not None
+    )
 
 
 def _values(r: ItemResult) -> dict[str, Any]:
@@ -662,6 +670,7 @@ def step(
     answered: list[uuid.UUID] = []
     give_back: list[uuid.UUID] = []
     down: list[uuid.UUID] = []  # met an outage, in questionnaire order
+    limited = False  # an outage was a spend limit: the 503 says so
     late: list[uuid.UUID] = []  # still running at HARD_S: the attempt stays
     replay: ReplayMiss | None = None
     refused: BudgetExhausted | None = None
@@ -701,6 +710,7 @@ def step(
                 late.append(item_id)
             elif isinstance(err, LLMError) and _provider_down(err):
                 down.append(item_id)
+                limited = limited or limit_hit(err.__cause__) is not None
             elif isinstance(err, _DeadlineCut):
                 give_back.append(item_id)  # the deadline cut the retry: not tried twice, so not failed
             elif isinstance(err, (LLMError, SQLAlchemyError)):
@@ -747,7 +757,8 @@ def step(
     if crashed is not None:
         raise crashed
     if (down or late) and not spoke:
-        raise ModelsUnavailable()  # when a call returned, the next step meets the outage itself
+        # when a call returned, the next step meets the outage itself
+        raise ModelsUnavailable(LIMIT_HIT) if limited else ModelsUnavailable()
     _finish_if_done(session, run)
     return answered
 

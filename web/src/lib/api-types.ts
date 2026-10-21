@@ -92,7 +92,7 @@ export interface paths {
      * @description Every outcome of the scope's functions in NIST's order (the core: all 106), each with its tier and,
      * once the latest run of the scope's current questionnaire has answered it, its gap label and explanation.
      * Labels are decided by code; a not-checked outcome never carries one, nor does one the visitor marked not
-     * applicable (`not_applicable`) or one whose model call failed twice. Writes nothing; no model call.
+     * applicable (`not_applicable`) or one whose model call failed. Writes nothing; no model call.
      */
     get: operations["gap_view_api_gap__scope__get"];
   };
@@ -638,7 +638,7 @@ export interface components {
      * GapRow
      * @description One CSF 2.0 outcome in the Gap check view (CSF spec 7). An outcome the visitor marked not applicable
      * has `not_applicable` set, `label` None and the visitor's reason as `explanation`, on either tier
-     * (adversary-1 I1). An outcome whose model call failed twice has `label` None and the failure sentence as
+     * (adversary-1 I1). An outcome whose model call failed has `label` None and the failure sentence as
      * `explanation`, never a gap label (adversary-1 M4).
      */
     GapRow: {
@@ -1660,7 +1660,7 @@ export interface operations {
    * @description Every outcome of the scope's functions in NIST's order (the core: all 106), each with its tier and,
    * once the latest run of the scope's current questionnaire has answered it, its gap label and explanation.
    * Labels are decided by code; a not-checked outcome never carries one, nor does one the visitor marked not
-   * applicable (`not_applicable`) or one whose model call failed twice. Writes nothing; no model call.
+   * applicable (`not_applicable`) or one whose model call failed. Writes nothing; no model call.
    */
   gap_view_api_gap__scope__get: {
     parameters: {

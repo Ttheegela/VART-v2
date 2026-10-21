@@ -7,7 +7,7 @@ import httpx
 import pytest
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
-from app.llm.client import LLMError, OpenRouterClient, _plain, build_request, complete_model
+from app.llm.client import LLMError, OpenRouterClient, _plain, build_request, complete_model, limit_hit
 from app.settings import REASONING
 from tests.fakes import FakeLLM
 
@@ -120,6 +120,68 @@ def test_http_errors_are_llm_errors_and_never_retried(status: int) -> None:
     with pytest.raises(LLMError):
         _client(handler).complete(_req())
     assert len(calls) == 1
+
+
+# OpenRouter's documented 403 bodies: a guardrail budget or the key's own limit names its limit_source; a
+# moderation flag and a model the guardrail does not allow do not
+BUDGET_403 = {
+    "error": {
+        "code": 403,
+        "message": "Budget limit exceeded for this key.",
+        "metadata": {
+            "limit_source": "openrouter_guardrail_budget",
+            "scope": "key",
+            "limit_usd": 1.0,
+            "spend_usd": 1.02,
+            "resets_at": "2026-10-22T00:00:00Z",
+            "remedy_hint": "Wait for the reset or raise the guardrail budget.",
+        },
+    }
+}
+KEY_403 = {
+    "error": {
+        "code": 403,
+        "message": "Key limit exceeded",
+        "metadata": {"limit_source": "openrouter_key_limit"},
+    }
+}
+FLAGGED_403 = {
+    "error": {"code": 403, "message": "Flagged", "metadata": {"reasons": ["x"], "flagged_input": "y"}}
+}
+NOT_ALLOWED_403 = {"error": {"code": 403, "message": "Model not allowed by guardrail", "metadata": {}}}
+
+
+@pytest.mark.parametrize(
+    ("status", "body", "limit"),
+    [
+        (403, BUDGET_403, "openrouter_guardrail_budget"),
+        (403, KEY_403, "openrouter_key_limit"),
+        (403, FLAGGED_403, None),
+        (403, NOT_ALLOWED_403, None),
+        (403, "<html>Forbidden</html>", None),  # a garbled body is not a budget trip
+        (403, {"error": {"metadata": {"limit_source": ["openrouter_key_limit"]}}}, None),
+        (403, {"error": {"metadata": {"limit_source": "something_new"}}}, None),
+        (402, {"error": {"code": 402, "metadata": {"limit_source": "openrouter_key_limit"}}}, None),
+    ],
+)
+def test_a_403_that_names_a_spend_limit_is_told_from_other_errors(status: int, body: Any, limit: Any) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return (
+            httpx.Response(status, json=body) if isinstance(body, dict) else httpx.Response(status, text=body)
+        )
+
+    with pytest.raises(LLMError) as caught:
+        _client(handler).complete(_req())
+    assert limit_hit(caught.value.__cause__) == limit
+    # the canary records this message: a budget trip reads differently from a model the guardrail refuses
+    tag = f" ({limit})" if limit else ""
+    assert str(caught.value) == f"stance: {type(caught.value.__cause__).__name__}{tag}"
+
+
+def test_limit_hit_reads_a_still_wrapped_body_and_nothing_else() -> None:
+    assert limit_hit(SimpleNamespace(status_code=403, body=BUDGET_403)) == "openrouter_guardrail_budget"
+    assert limit_hit(SimpleNamespace(status_code=403, body=None)) is None
+    assert limit_hit(None) is None
 
 
 def test_timeouts_are_llm_errors() -> None:

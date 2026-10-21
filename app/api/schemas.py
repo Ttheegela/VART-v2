@@ -385,7 +385,7 @@ GapScope = CsfScope  # "core" or one CSF function, lowercase
 class GapRow(BaseModel):
     """One CSF 2.0 outcome in the Gap check view (CSF spec 7). An outcome the visitor marked not applicable
     has `not_applicable` set, `label` None and the visitor's reason as `explanation`, on either tier
-    (adversary-1 I1). An outcome whose model call failed twice has `label` None and the failure sentence as
+    (adversary-1 I1). An outcome whose model call failed has `label` None and the failure sentence as
     `explanation`, never a gap label (adversary-1 M4)."""
 
     csf_id: str

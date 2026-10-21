@@ -161,6 +161,19 @@ def test_a_credit_error_stops_the_run_with_a_partial_table(rig) -> None:  # type
     assert "PARTIAL" in markdown("stance", "dev", rows, guard.reason)
 
 
+def test_a_spend_limit_403_stops_the_run_like_a_402(rig, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    # a guardrail budget (or the key's own limit) answers 403 with error.metadata.limit_source, not 402
+    monkeypatch.setattr(_Http, "status_code", 403)
+    body = {"message": "Budget limit exceeded", "metadata": {"limit_source": "openrouter_guardrail_budget"}}
+    monkeypatch.setattr(_Http, "body", body, raising=False)
+    rig.credit_at = 2
+    pack, items, found = _inputs("a")
+    guard = bench.Guard()
+    rows = bench.bench_stance(pack, items, found, ["m/one", "m/two", "m/three"], "k", 1, guard)
+    assert [r["model"] for r in rows] == ["m/one"] and rig.calls == 2
+    assert guard.reason == "spend limit reached (openrouter_guardrail_budget)"
+
+
 def test_the_spend_cap_stops_the_run(rig) -> None:  # type: ignore[no-untyped-def]
     pack, items, found = _inputs("a", "b", "c", "d")
     guard = bench.Guard(2.5)

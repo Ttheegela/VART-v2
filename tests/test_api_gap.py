@@ -195,9 +195,7 @@ def test_not_applicable_and_failed_outcomes_carry_no_gap_label(db: Engine) -> No
         assert (rows[cid]["label"], rows[cid]["not_applicable"]) == (None, True)
         assert rows[cid]["explanation"] == "Not applicable: not ours"
     assert (rows["PR.AA-01"]["label"], rows["PR.AA-01"]["not_applicable"]) == (None, False)
-    assert (
-        rows["PR.AA-01"]["explanation"] == "Not checked: the model call failed twice. Press r to check again."
-    )
+    assert rows["PR.AA-01"]["explanation"] == "Not checked: the model call failed. Press r to check again."
     assert client.get(f"/api/answers/{na_checked}").json()["parts"] == []  # no stale parts for N/A (M2)
     sheet = openpyxl.load_workbook(io.BytesIO(client.get(f"/api/runs/{run['id']}/export").content))[
         "Gap report"
@@ -209,7 +207,7 @@ def test_not_applicable_and_failed_outcomes_carry_no_gap_label(db: Engine) -> No
         "Failed",
     )
     failed_row = next(n for n in range(3, 109) if sheet.cell(n, 1).value == "PR.AA-01")
-    assert sheet.cell(failed_row, 5).value == "Not checked: the model call failed twice."  # no UI hint
+    assert sheet.cell(failed_row, 5).value == "Not checked: the model call failed."  # no UI hint
 
 
 def test_a_failed_outcome_shows_no_parts_and_an_incomplete_one_neither(db: Engine) -> None:

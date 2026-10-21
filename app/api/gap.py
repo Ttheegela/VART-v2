@@ -37,7 +37,7 @@ def gap_rows(session: Session, scope: str, q: Questionnaire | None, run: Run | N
     """Every outcome of the scope's functions in NIST's order, with the run's answer where it has one. The
     label is code's (`csf.gap_label`): none for a not-checked outcome, none before an outcome is answered,
     none for one marked not applicable (`not_applicable`, the visitor's reason as the explanation) or whose
-    model call failed twice (the failure sentence)."""
+    model call failed (the failure sentence)."""
     items = (
         {}
         if q is None
@@ -143,7 +143,7 @@ def gap_view(scope: GapScope, ws: WorkspaceDep, session: SessionDep) -> GapOut:
     """Every outcome of the scope's functions in NIST's order (the core: all 106), each with its tier and,
     once the latest run of the scope's current questionnaire has answered it, its gap label and explanation.
     Labels are decided by code; a not-checked outcome never carries one, nor does one the visitor marked not
-    applicable (`not_applicable`) or one whose model call failed twice. Writes nothing; no model call."""
+    applicable (`not_applicable`) or one whose model call failed. Writes nothing; no model call."""
     q = _questionnaire(session, ws.id, scope)
     run = latest_run(session, q.id) if q is not None else None
     fw = csf.framework()

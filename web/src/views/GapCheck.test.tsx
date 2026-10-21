@@ -8,7 +8,7 @@ import GapCheck, { coverage } from "./GapCheck";
 
 const props = { workspace: fixtures.workspace, onGone: () => {} };
 const OUTCOME = /^[A-Z]{2}\.[A-Z]{2}-\d\d /;
-const FAILED = "Not checked: the model call failed twice. Press r to check again.";
+const FAILED = "Not checked: the model call failed. Press r to check again.";
 
 describe("GapCheck", () => {
   beforeEach(() => window.history.replaceState(null, "", "?view=gap"));

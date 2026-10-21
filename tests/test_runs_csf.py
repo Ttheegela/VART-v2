@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app import csf, runs
 from app import questions as qs
+from app.api.errors import LIMIT_HIT, ModelsUnavailable
 from app.contracts import BudgetExhausted
 from app.db.models import Answer, Chunk, Document, Item, Run, RunItem, SuggestedFill
 from app.ingest.store import store_statement
@@ -16,6 +17,7 @@ from app.redecide import redecide
 from app.services import llm_budget
 from tests import factories as f
 from tests.fakes import ByStepLLM
+from tests.test_runs import limit_403
 
 MODELS = {"stance": "m/stance", "draft": "m/draft", "classify": "m/c", "recheck": "m/stance", "judge": "m/j"}
 LINE = "Backups of data are created, protected, maintained and tested every day."
@@ -170,6 +172,17 @@ def test_a_failed_outcome_keeps_its_paid_parts_and_says_it_failed(s: Session) ->
     a = s.scalars(select(Answer).where(Answer.run_id == run.id)).one()
     assert (a.label, a.text) == ("unknown", runs.FAILED_TEXT)  # what a re-open and the gap view look for
     assert sorted(_parts_of(s, run.id).parts) == ["1"]
+
+
+def test_a_spend_limit_on_the_parts_waits_and_writes_no_failed_outcome(s: Session) -> None:
+    ws, it, run = _backups(s)
+    llm = ByStepLLM({"stance": limit_403()})
+    with pytest.raises(ModelsUnavailable, match=LIMIT_HIT):
+        runs.step(s, ws.id, run.id, llm, MODELS)
+    assert len(llm.requests) == 4  # each part once: a 403 is never retried
+    assert s.scalar(select(Answer).where(Answer.run_id == run.id)) is None
+    ri = _parts_of(s, run.id)
+    assert (ri.state, ri.attempts, ri.parts) == ("pending", 1, {})
 
 
 def test_an_outcome_id_the_data_no_longer_has_is_answered_as_a_question(s: Session) -> None:
