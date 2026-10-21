@@ -8,10 +8,10 @@ _Last updated: 2026-10-07 · Branch: `main` (origin: https://github.com/Ttheegel
 | 1A Foundation | done, live 2026-10-04 | schema, workspaces, LLM client, health + canary, React shell, CI, gates |
 | 1B Dev data | done | fact sheet, questionnaires, documents, keys |
 | 2 Engine and evals | done, live 2026-10-05 | engine, ingest, evals; baseline label accuracy 0.9213, recall@8 0.9738, cost $0.0361 per 60 items |
-| 3 API and UI | done 2026-10-06 on `plan3`; release pending | 26 operations, step runner, column mapper, export, console UI, Playwright flows on recorded model replies |
-| 6A CSF gap check, backend and evals | done; merged with Plan 3 on branch `plan6a`, release pending | gap-dev baseline: label accuracy 0.7097 (22 of 31; reported, below the 0.80 target, accepted 2026-10-06), 9 other gates pass; 6B (view, export, README, E2E) after Plan 3 |
-| 6B CSF gap check, the visitor half | done on plan6b; release pending | Gap check view (tab 6), per-part runner and resume, check again per affected outcome, Ask-me answers filling Govern parts, gap sheet in both exports, the planted plan in the sample pack. Dev 15/15 with label_accuracy 0.9326; gap-dev 9/9 gating with label_accuracy 0.7097 reported; E2E 7/7, 210 model calls per pass; 1771 pytest and 131 vitest before this commit |
-| 4 Hardening and launch | done on `plan4`; release pending | dev 15/15 (label accuracy 0.9326); gap-dev 9/9 gating (label accuracy 0.7097 reported); holdout 7/7 gating (label accuracy 0.8539, conflict recall 0.7143, citations valid 1.0, injections followed 0.0, reported, not tuned); a live 64-item run 231 s in 16 steps ($0.0622), measured locally (TestClient, live models), not on Vercel, against an estimated 660 s before (64 x 10.35 s p50, sequential); E2E 19 model calls per pass (about 210 before) |
+| 3 API and UI | done, live 2026-10-06 | 27 operations, step runner, column mapper, export, console UI, Playwright flows on recorded model replies |
+| 6A CSF gap check, backend and evals | done, merged 2026-10-06 (backend only; view in 6B) | gap-dev baseline: label accuracy 0.7097 (22 of 31; reported, below the 0.80 target, accepted 2026-10-06), 9 other gates pass; 6B (view, export, README, E2E) after Plan 3 |
+| 6B CSF gap check, the visitor half | done, live 2026-10-06 | Gap check view (tab 6), per-part runner and resume, check again per affected outcome, Ask-me answers filling Govern parts, gap sheet in both exports, the planted plan in the sample pack. Dev 15/15 with label_accuracy 0.9326; gap-dev 9/9 gating with label_accuracy 0.7097 reported; E2E 7/7, 210 model calls per pass; 1771 pytest and 131 vitest before this commit |
+| 4 Hardening and launch | done, live 2026-10-06 | dev 15/15 (label accuracy 0.9326); gap-dev 9/9 gating (label accuracy 0.7097 reported); holdout 7/7 gating (label accuracy 0.8539, conflict recall 0.7143, citations valid 1.0, injections followed 0.0, reported, not tuned); a live 64-item run 231 s in 16 steps ($0.0622), measured locally (TestClient, live models), not on Vercel, against an estimated 660 s before (64 x 10.35 s p50, sequential); E2E 19 model calls per pass (about 210 before) |
 | 5 Google Drive | not started | |
 
 ## Releases
@@ -52,8 +52,53 @@ _Last updated: 2026-10-07 · Branch: `main` (origin: https://github.com/Ttheegel
 | Daily crons (cleanup 05:00 UTC, canary 17:00 UTC) | ok: `/api/health` at 19:58 UTC on 2026-10-05 showed `"status":"ok"` and the canary ok at 17:59 UTC that day (the canary cron ran; Hobby crons fire within their hour). The cleanup cron leaves no mark in `/api/health` |
 | Vercel builds only `main` | ok: the push of this record's PR branch made no deployment (2026-10-04) |
 
-### Plan 3
-_Filled in after the release (Task 8 Step 4)._
+### Plan 6B (CSF gap check, visitor half) — 2026-10-06
+- `main` = `2ff1013`, merged by PR #8 (fast-forward of `plan6b`) after green CI: gates (gitleaks over the full
+  history), backend (1773 tests; dev eval 15/15 with label accuracy 0.9326 on the 23-document sample pack; gap-dev
+  9/9 gating with label_accuracy reported), frontend (133 Vitest tests), e2e (7/7 on recorded replies, 210 model calls
+  per pass from one address).
+- Preview bundle check before the release: function 71.66 MB; all 23 sample documents and `data/csf/csf-2.0.json`
+  present.
+- `ops/setup.sh migrate` (Tarun): Neon migrated `a7c3e9d1b2f4` -> `c4e8a2d6f1b3` (additive: `run_items.parts`,
+  `suggestions.part`) before `main` moved; Plan 6A code kept serving (`/api/health` ok).
+- Production deploy READY (Git integration); `scripts/smoke.py` ok; `/api/health` `"status":"ok"`, `"db":"ok"`;
+  `/api/gap/core` without a workspace answers the expected 404.
+- Tarun on production: a core gap check started from the Gap check tab; it ran part by part as designed
+  (15 of 31 outcomes checked, $0.0359 at the time of this record). Rollback rule: roll back code only, never
+  `alembic downgrade`.
+
+### Plan 6A (CSF gap check, backend) — 2026-10-06
+- `main` = `d071aa2`, merged by PR #7 (fast-forward of `plan6a`, which merged released Plan 3 into Plan 6A) after
+  green CI: gates (gitleaks over the full history), backend (both eval packs replayed with no drift: dev 15/15,
+  gap-dev 9/9 gating with label_accuracy reported), frontend, e2e (6/6 on recorded replies).
+- `ops/setup.sh migrate` (Tarun): Neon migrated `3a1f0c9e7b21` -> `a7c3e9d1b2f4` (widens `ck_questionnaires_source`
+  to allow `csf`) before `main` moved; Plan 3 code kept serving (`/api/health` ok).
+- Production deploy READY (Git integration); `scripts/smoke.py` ok; `/api/health` `"status":"ok"`, `"db":"ok"`; `/`
+  and `/api/docs` unchanged. Nothing in the gap check is reachable by visitors until Plan 6B.
+
+### Plan 3 — 2026-10-06
+- `main` = `3ad741e`, merged by PR #5 (fast-forward of `plan3`) after green CI: gates (gitleaks over the full history,
+  sponsor check, monochrome), backend (1562 tests, the dev-pack eval replayed with no drift, decide at 100% branch
+  coverage), frontend (102 Vitest tests, lint, build, API types in sync), e2e (the four Playwright flows and the smoke
+  test on `web/e2e/recorded.jsonl`).
+- Preview bundle check before the release: the first preview showed `data/dev/docs` missing (0 of 22 files), because
+  the unanchored `docs` line in `.vercelignore` also matched it; fixed by anchoring it (`/docs`, `3ad741e`). The second
+  preview carried all 22 documents and both questionnaires; the Python function is 71.58 MB.
+- `ops/setup.sh migrate` (Tarun): Neon migrated `ffbf91b464dc` -> `3a1f0c9e7b21` (additive: two tables, four columns)
+  before `main` moved; Plan 2 code kept serving on the new schema (`/api/health` ok).
+- Production deploy READY (Git integration on the push of `main`); `scripts/smoke.py` ok (version `2.0.0.dev0`, now
+  ending with a same-site workspace reset); `/api/health` `"status":"ok"`, `"db":"ok"`; `/` serves the console Home;
+  `/api/docs` lists the API.
+- Tarun on production: one "Try with a sample company" run (vsq-a.xlsx, 64 of 64 answered, $0.0458) and one upload of
+  `web/e2e/fixtures/backup-policy.md`, then a workspace reset.
+
+| Release check | Result |
+|---|---|
+| Production sample run | 64/64 answered: 37 verified, 9 partial, 6 conflict, 12 unknown; $0.0458 |
+| Upload | `backup-policy.md` accepted and classified |
+| Function size | 71.58 MB |
+| E2E on recorded replies | 6/6 in CI |
+| Canary on the Plan 2 models | pending: the 17:00 UTC run on 2026-10-06 |
 
 ## Decisions
 This table is the decisions log kept in the repo. The detailed per-task review rulings are in the lead's local ledgers,
@@ -182,7 +227,19 @@ Carried to a later plan:
   part's passages and re-opens its outcome once.
 
 ## Plan 4
-_Filled in after the release (Task 11 Step 7)._
+### Release — 2026-10-06
+- PR #9 (`plan4` into `main`): CI green on `89319db` (backend, e2e, frontend, gates).
+- `ops/setup.sh migrate` (Tarun, from `plan4`): Neon `c4e8a2d6f1b3` -> `e7d1f3a5b9c2` (additive `runs.stepped_at`) before `main` moved.
+- `main` fast-forwarded `2ff1013..89319db`; Vercel's Git integration deployed it (production READY).
+- Size check on a CLI preview: the Python function is 71.81 MB (iad1; limit 250 MB). The preview's `/api/health` reads
+  degraded because the environment variables are production-only (Decision 14).
+- `python scripts/smoke.py https://vart-v2.vercel.app`: ok; `/api/health`: ok, db ok, canary ok; `/api/version`
+  reports `sample_precomputed: true`.
+- `ops/setup.sh status`: env var names, crons (canary 17:00 UTC, cleanup 05:00 UTC) and health as expected.
+- Tarun: GitHub private vulnerability reporting enabled (API: `enabled: true`); the Safari check on the Mac and an
+  iPhone passed (sample flow with the tour, Enter on the Workspace dropdowns, drawer full screen under 900 px).
+- Tag `engine-freeze-plan4` pushed (points at `67a8f01`).
+- Open: `docs/demo.gif` (Tarun records it; the README links it); the next day's 17:00 UTC canary.
 
 ## How to run
 See `CLAUDE.md` (commands) and `README.md`.

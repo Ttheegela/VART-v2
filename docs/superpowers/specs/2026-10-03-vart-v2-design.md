@@ -479,7 +479,7 @@ cell; the interview fills an item), and the live smoke script against production
   caps of 1,500 model calls an hour and 4,000 a day, counted in rows no workspace owns so a workspace reset cannot
   refund them; OpenRouter credit cap, per-IP limits on workspace creation, uploads and runs (Postgres counters keyed
   by a salted IP hash), storage breaker (PriorPath `capacity`), and a precomputed sample run so the default path
-  spends nothing.
+  spends nothing (Plan 4; until then the sample run is live and cost $0.0458 on production, 2026-10-06).
 - **Upload limits:** PDF/DOCX/XLSX/CSV/MD/TXT only, checked by content as well as extension; ≤ 4 MB per file
   (Vercel's request limit is 4.5 MB); ≤ 20 uploaded documents and ≤ 20,000 lines (about 200 pages) per workspace (the
   bundled 22-document sample pack is loaded by the app, not uploaded, so this limit does not apply to it); ≤ 150
