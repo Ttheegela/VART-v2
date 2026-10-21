@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.answers import WHY
 from app.api.deps import get_llm
+from app.api.errors import LIMIT_HIT
 from app.api.schemas import DroppedOut
 from app.contracts import DropReason
 from app.db.models import Answer, AuditEvent, DocumentLine, Workspace
@@ -18,6 +19,7 @@ from app.services import ip_limits
 from tests import factories as f
 from tests.apiclient import visitor
 from tests.fakes import ByStepLLM
+from tests.test_runs import limit_403
 
 QUOTE = "Customer data at rest is encrypted with AES-256."
 STANCE = json.dumps({"passages": [{"passage": 1, "stance": "yes", "quote": QUOTE, "note": "states it"}]})
@@ -216,6 +218,17 @@ def test_without_a_model_key_a_step_is_a_503(ready) -> None:  # type: ignore[no-
     app.dependency_overrides[get_llm] = lambda: None
     run = client.post(f"/api/questionnaires/{qid}/runs").json()
     assert client.post(f"/api/runs/{run['id']}/step").status_code == 503
+
+
+def test_a_spend_limit_403_answers_the_step_with_the_outage_503(ready) -> None:  # type: ignore[no-untyped-def]
+    # the guardrail's budget used up: the run waits as for a 402, writes no failed row and says why
+    client, qid = ready
+    app.dependency_overrides[get_llm] = lambda: ByStepLLM({"stance": limit_403()})
+    run = client.post(f"/api/questionnaires/{qid}/runs").json()
+    r = client.post(f"/api/runs/{run['id']}/step")
+    assert (r.status_code, r.headers["retry-after"], r.json()["detail"]) == (503, "60", LIMIT_HIT)
+    assert client.get(f"/api/runs/{run['id']}/answers").json()["rows"][0]["answer"] is None
+    assert client.get(f"/api/runs/{run['id']}").json()["status"] == "running"
 
 
 def test_a_questionnaire_without_items_cannot_run(db: Engine) -> None:

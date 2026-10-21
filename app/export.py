@@ -137,7 +137,7 @@ REVIEW = "Possible gap — review it"
 FOOTER = "Not legal advice. CSF 2.0 text © NIST, public domain."
 NOT_RUN = "Not run yet"
 FAILED_WORD = "Failed"
-FAILED_SENTENCE = "Not checked: the model call failed twice."  # the view adds its UI hint
+FAILED_SENTENCE = "Not checked: the model call failed."  # the view adds its UI hint
 
 
 @dataclass(frozen=True)

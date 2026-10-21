@@ -272,9 +272,7 @@ def test_the_gap_report_lists_every_outcome_in_scope_with_inert_cells() -> None:
         _gap_row("PR.DS-01", "checked", None, None),  # not answered yet
         _gap_row("PR.DS-02", "checked", None, "Not applicable: we have no data", na=True),
         _gap_row("GV.RM-02", "ask", None, "Not applicable: not ours", na=True),  # either tier: adversary-1 I1
-        _gap_row(
-            "PR.DS-03", "checked", None, "Not checked: the model call failed twice. Press r to check again."
-        ),
+        _gap_row("PR.DS-03", "checked", None, "Not checked: the model call failed. Press r to check again."),
     ]
     body = gap_report(GapSheet(rows, {aid: [cite]}, "2026-10-06", "core", "2.0", CONTROLS))
     ws = openpyxl.load_workbook(io.BytesIO(body))["Gap report"]
@@ -287,7 +285,7 @@ def test_the_gap_report_lists_every_outcome_in_scope_with_inert_cells() -> None:
         "Not run yet",
     ]
     assert [ws.cell(n, 4).value for n in (6, 7, 8)] == ["Not applicable", "Not applicable", "Failed"]
-    assert ws["E8"].value == "Not checked: the model call failed twice."  # the view's UI hint stays out
+    assert ws["E8"].value == "Not checked: the model call failed."  # the view's UI hint stays out
     assert (ws["E3"].value, ws["E3"].data_type) == ("=SUM(A1)", "s")
     assert (ws["F3"].value, ws["F3"].data_type) == ("\"=cmd|' /C calc'!A0\" (backup-policy.docx line 2)", "s")
     assert (ws["G3"].value, ws["I3"].value, ws["J3"].value, ws["K3"].value) == (

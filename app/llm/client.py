@@ -161,6 +161,23 @@ def _plain(value: object) -> str:
     return re.sub(r"[^a-z_]", "", str(value).lower())[:20] or "unknown"
 
 
+LIMITS = ("openrouter_guardrail_budget", "openrouter_key_limit")  # error.metadata.limit_source of a spend cap
+
+
+def limit_hit(exc: BaseException | None) -> str | None:
+    """The spend limit an OpenRouter 403 names (a guardrail's budget or the key's own limit), or None: another
+    403 (a moderation flag, a model the guardrail does not allow), another status, or a body that is missing
+    or not that shape. Like a 402, it means wait, not a bad answer."""
+    if getattr(exc, "status_code", None) != 403:
+        return None
+    body = getattr(exc, "body", None)  # the SDK unwraps {"error": ...}; a raw body may still be wrapped
+    if isinstance(body, dict):
+        body = body.get("error", body)
+    meta = body.get("metadata") if isinstance(body, dict) else None
+    source = meta.get("limit_source") if isinstance(meta, dict) else None
+    return source if source in LIMITS else None
+
+
 class OpenRouterClient:
     def __init__(
         self, api_key: str, *, timeout: float = 60.0, http_client: httpx.Client | None = None
@@ -208,7 +225,10 @@ class OpenRouterClient:
             except APIError as exc:  # connection errors, timeouts and HTTP status errors
                 # End the span here, before LLMError hides the cause, so a trace tells a 402 from a timeout.
                 span.end({"ok": False, "error_type": type(exc).__name__})
-                raise LLMError(f"{req.step}: {type(exc).__name__}") from exc
+                limit = limit_hit(exc)  # named, so the canary tells a budget trip from a model not allowed
+                raise LLMError(
+                    f"{req.step}: {type(exc).__name__}" + (f" ({limit})" if limit else "")
+                ) from exc
             except (
                 ValueError,
                 TypeError,

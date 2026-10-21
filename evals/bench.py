@@ -31,7 +31,15 @@ from app.db.models import Workspace
 from app.db.session import database_url, get_engine
 from app.decide import decide
 from app.draft import write_draft
-from app.llm.client import OPENROUTER_BASE_URL, LLMClient, LLMError, LLMRequest, LLMResult, OpenRouterClient
+from app.llm.client import (
+    OPENROUTER_BASE_URL,
+    LLMClient,
+    LLMError,
+    LLMRequest,
+    LLMResult,
+    OpenRouterClient,
+    limit_hit,
+)
 from app.llm.recorder import RecordingClient, ReplayClient, ReplayMiss
 from app.retrieve import retrieve
 from app.settings import get_settings
@@ -44,7 +52,9 @@ CANDIDATES = RECORDED / "candidates"
 JUDGE_FALLBACK = "moonshotai/kimi-k2.5"  # judges a candidate drafter from the default judge's family
 REFERENCE = "anthropic/claude-sonnet-5.5"  # the quality reference (spec 8), never a default
 MAX_BENCH_USD = 4.0  # live spend at which a run stops; the eval key's own cap is $5
-OUT_OF_CREDIT = 402  # the HTTP status OpenRouter answers when a key's credit limit is used up
+OUT_OF_CREDIT = (
+    402  # the account is out of credit; a key's own limit or a guardrail budget is a 403 (limit_hit)
+)
 
 
 class BenchStop(Exception):
@@ -72,7 +82,8 @@ class Guard:
 
 
 class Guarded:
-    """Sits on the live client only: counts what is really spent and stops the run at the cap or at a 402."""
+    """Sits on the live client only: counts what is really spent and stops the run at the cap, at a 402 or at
+    a 403 that names a spend limit."""
 
     def __init__(self, inner: LLMClient, guard: Guard) -> None:
         self.inner = inner
@@ -84,8 +95,11 @@ class Guarded:
         try:
             result = self.inner.complete(req)
         except LLMError as exc:
-            if getattr(exc.__cause__, "status_code", None) == OUT_OF_CREDIT:
-                self.guard.stop("out of credit (the key's limit)")
+            limit = limit_hit(exc.__cause__)
+            if limit or getattr(exc.__cause__, "status_code", None) == OUT_OF_CREDIT:
+                self.guard.stop(
+                    f"spend limit reached ({limit})" if limit else "out of credit (the key's limit)"
+                )
                 raise BenchStop(self.guard.reason) from exc
             raise
         self.guard.add(result.cost_usd or 0.0)

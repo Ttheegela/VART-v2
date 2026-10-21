@@ -28,6 +28,7 @@ BUDGET: dict[BudgetScope, str] = {
 CROSS_SITE = "Cross-site requests are not accepted."
 WRITES = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 MODELS_DOWN = "Model calls are failing right now; the run resumes when they return."
+LIMIT_HIT = "The demo's model usage limit is reached, so the AI step is paused; try again later."
 GONE = "Your workspace has expired or was reset; reload the page to start a new one."
 
 
@@ -40,8 +41,9 @@ class Conflict(Exception):
 
 
 class ModelsUnavailable(Exception):
-    """The model provider is refusing or not answering (bad key, no credit, rate limit, outage, timeout): the
-    run waits instead of writing failed answers. A 503 with Retry-After."""
+    """The model provider is refusing or not answering (bad key, no credit, a spend limit, rate limit, outage,
+    timeout): the run waits instead of writing failed answers. A 503 with Retry-After; a message, when given,
+    replaces MODELS_DOWN (LIMIT_HIT for a spend limit)."""
 
 
 def network(request: Request) -> str:
@@ -126,7 +128,9 @@ def install(app: FastAPI) -> None:
 
     @app.exception_handler(ModelsUnavailable)
     def _models(_: Request, exc: ModelsUnavailable) -> JSONResponse:
-        return JSONResponse({"detail": MODELS_DOWN}, status_code=503, headers={"Retry-After": "60"})
+        return JSONResponse(
+            {"detail": str(exc) or MODELS_DOWN}, status_code=503, headers={"Retry-After": "60"}
+        )
 
     @app.exception_handler(NoResultFound)
     @app.exception_handler(ObjectDeletedError)

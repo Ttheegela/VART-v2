@@ -12,7 +12,7 @@ from sqlalchemy import Engine, func, select, text
 from sqlalchemy.orm import Session
 
 from app import runs
-from app.api.errors import ModelsUnavailable, NotFound
+from app.api.errors import LIMIT_HIT, ModelsUnavailable, NotFound
 from app.contracts import BudgetExhausted
 from app.db.models import Answer, Item, LlmUsage, Run, RunItem
 from app.llm.client import LLMError, LLMRequest, LLMResult
@@ -407,13 +407,21 @@ def test_a_failed_answer_write_keeps_the_cost_already_spent(
     assert run.cost_usd == Decimal("0.0200")
 
 
-def _api_error(status: int) -> LLMError:
-    """The client's real shape: an LLMError raised from an openai.APIStatusError."""
+def _api_error(status: int, body: object = None) -> LLMError:
+    """The client's real shape: an LLMError raised from an openai.APIStatusError (`body` as the SDK keeps it,
+    the response's `error` object)."""
     err = LLMError(f"stance: {status}")
     err.__cause__ = openai.APIStatusError(
-        "boom", response=httpx.Response(status, request=httpx.Request("POST", "http://x")), body=None
+        "boom", response=httpx.Response(status, request=httpx.Request("POST", "http://x")), body=body
     )
     return err
+
+
+def limit_403(source: str = "openrouter_guardrail_budget") -> LLMError:
+    """OpenRouter's 403 for a spend limit: a guardrail's budget, or the key's own limit."""
+    return _api_error(
+        403, {"message": "Budget limit exceeded for this key.", "metadata": {"limit_source": source}}
+    )
 
 
 @pytest.mark.parametrize(("status", "calls"), [(401, 1), (402, 1), (408, 2), (429, 2), (503, 2)])
@@ -424,8 +432,9 @@ def test_a_provider_outage_writes_no_failed_answers(s: Session, status: int, cal
     ws, q = _questionnaire(s, n=3)
     run = runs.create_run(s, ws.id, q.id, MODELS)
     llm = ByStepLLM({"stance": _api_error(status)})
-    with pytest.raises(ModelsUnavailable):
+    with pytest.raises(ModelsUnavailable) as caught:
         runs.step(s, ws.id, run.id, llm, MODELS)
+    assert caught.value.args == ()  # the generic sentence (MODELS_DOWN)
     assert len(llm.requests) == 3 * calls
     assert s.scalars(select(Answer)).all() == []
     assert sorted(s.execute(select(RunItem.state, RunItem.attempts)).all()) == [
@@ -435,13 +444,37 @@ def test_a_provider_outage_writes_no_failed_answers(s: Session, status: int, cal
     ]  # the first item that met it keeps its attempt
 
 
-@pytest.mark.parametrize("status", [400, 403])
-def test_another_client_error_is_a_failed_answer_after_one_call(s: Session, status: int) -> None:
+@pytest.mark.parametrize("source", ["openrouter_guardrail_budget", "openrouter_key_limit"])
+def test_a_spend_limit_403_is_an_outage_tried_once_that_says_so(s: Session, source: str) -> None:
+    # OpenRouter answers a guardrail's budget, or the key's own limit, with a 403 that names it, not a 402:
+    # like a 402 the items go back (only the first keeps its attempt), nothing is retried and the 503 says why
+    ws, q = _questionnaire(s, n=3)
+    run = runs.create_run(s, ws.id, q.id, MODELS)
+    llm = ByStepLLM({"stance": limit_403(source)})
+    with pytest.raises(ModelsUnavailable) as caught:
+        runs.step(s, ws.id, run.id, llm, MODELS)
+    assert str(caught.value) == LIMIT_HIT and len(llm.requests) == 3
+    assert s.scalars(select(Answer)).all() == []
+    assert sorted(s.execute(select(RunItem.state, RunItem.attempts)).all()) == [
+        ("pending", 0),
+        ("pending", 0),
+        ("pending", 1),
+    ]
+
+
+MODERATION = {"message": "Input flagged", "metadata": {"reasons": ["violence"], "flagged_input": "..."}}
+
+
+@pytest.mark.parametrize(("status", "body"), [(400, None), (403, None), (403, MODERATION), (403, "<html>")])
+def test_another_client_error_is_a_failed_answer_after_one_call(
+    s: Session, status: int, body: object
+) -> None:
     ws, q = _questionnaire(s, n=1)
     run = runs.create_run(s, ws.id, q.id, MODELS)
-    llm = ByStepLLM({"stance": _api_error(status)})
+    llm = ByStepLLM({"stance": _api_error(status, body)})
     runs.step(s, ws.id, run.id, llm, MODELS)
-    assert len(llm.requests) == 1 and s.scalars(select(Answer.text)).one() == runs.FAILED_TEXT
+    text = s.scalars(select(Answer.text)).one()
+    assert len(llm.requests) == 1 and text == runs.FAILED_TEXT and "twice" not in text  # it was tried once
 
 
 def test_an_item_the_provider_always_fails_ends_failed_and_the_others_are_answered(s: Session) -> None:
@@ -490,6 +523,8 @@ def test_the_step_route_maps_an_outage_to_a_503_with_retry_after() -> None:
 
     r = _app(ModelsUnavailable()).get("/boom")
     assert (r.status_code, r.headers["retry-after"]) == (503, "60") and "failing" in r.json()["detail"]
+    r = _app(ModelsUnavailable(LIMIT_HIT)).get("/boom")
+    assert (r.status_code, r.headers["retry-after"], r.json()["detail"]) == (503, "60", LIMIT_HIT)
 
 
 def test_a_nul_in_a_model_reply_is_scrubbed_not_a_500(s: Session) -> None:
